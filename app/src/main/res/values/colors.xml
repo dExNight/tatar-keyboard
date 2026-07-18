@@ -60,6 +60,7 @@
     <color name="ios_key_normal_pressed">#C8CDD4</color>
     <color name="ios_key_functional">#B3B7C0</color>
     <color name="ios_key_functional_pressed">#FFFFFF</color>
+    <color name="ios_key_checked">#A2A6B0</color>
     <color name="ios_key_spacebar">#FFFFFF</color>
     <color name="ios_key_spacebar_pressed">#C8CDD4</color>
     <color name="ios_key_shadow">#40000000</color>

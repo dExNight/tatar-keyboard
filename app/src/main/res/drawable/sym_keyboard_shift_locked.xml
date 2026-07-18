@@ -2,15 +2,14 @@
     android:width="24dp"
     android:height="24dp"
     android:viewportWidth="24"
-    android:viewportHeight="24"
-    android:tint="?attr/functionalTextColor">
+    android:viewportHeight="24">
     <path
-        android:fillColor="@android:color/white"
-        android:strokeColor="@android:color/white"
+        android:fillColor="?attr/functionalTextColor"
+        android:strokeColor="?attr/functionalTextColor"
         android:strokeWidth="1.6"
         android:strokeLineJoin="round"
         android:pathData="M 12,3.5 4.5,11.5 h 4 v 5 h 7 v -5 h 4 z"/>
     <path
-        android:fillColor="@android:color/white"
+        android:fillColor="?attr/functionalTextColor"
         android:pathData="M 8.5,18.5 h 7 v 2.5 h -7 z"/>
 </vector>
