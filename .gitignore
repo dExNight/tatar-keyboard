@@ -45,5 +45,6 @@ captures/
 
 # Keystore files
 *.jks
+keystore.properties
 
 .idea
