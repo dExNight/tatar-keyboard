@@ -5,15 +5,15 @@ milestone_name: milestone
 current_phase: 1
 current_phase_name: Форк и hello-world
 status: executing
-stopped_at: Completed 01-01-PLAN.md (Task 5 device-verify deferred)
-last_updated: "2026-07-18T06:37:09.700Z"
+stopped_at: Completed 01-02-PLAN.md (GitHub repo/push/CI runs + device checkpoint deferred)
+last_updated: "2026-07-18T06:55:00.000Z"
 last_activity: 2026-07-18
-last_activity_desc: Plan 01-01 paused at device-verify checkpoint
+last_activity_desc: Plan 01-02 executed — keystore, signed release, ci.yml authored; GitHub-side steps deferred
 progress:
   total_phases: 1
   completed_phases: 0
   total_plans: 2
-  completed_plans: 1
+  completed_plans: 2
 ---
 
 # State: Tatar Keyboard
@@ -22,11 +22,11 @@ progress:
 
 **Milestone:** v1.0 — MVP + релиз (GitHub Releases + IzzyOnDroid)
 **Phase:** 1 (Форк и hello-world) — EXECUTING
-**Plan:** 01-01 — CLOSED (tasks 1–4 complete: 6594bcd, 43860bb, 852b163, 5bbda51). Task 5 on-device smoke DEFERRED by user (human_needed — install APK, enable IME, type, logcat «Kotlin interop OK»). Next: plan 01-02.
-**Status:** Executing Phase 1
-**Last activity:** 2026-07-18 — Plan 01-01 closed; device verification deferred
+**Plan:** 01-01 — CLOSED (Task 5 on-device smoke DEFERRED, human_needed). 01-02 — CLOSED locally (Task 1 keystore/signing done: ba4bf38, 1721fa7; Task 2 ci.yml authored: 7c63621). DEFERRED (среда без gh/origin): создание GitHub-репо + push, зелёный прогон CI на main, негативный прогон ветки ci-negative-test (Task 3, GitHub-часть; локальный негативный тест скрипта продемонстрирован), Task 4 device-verify + бэкап ключа (human_needed). Next: phase verification после закрытия deferred-пунктов.
+**Status:** Executing Phase 1 (both plans executed; GitHub + device verification pending)
+**Last activity:** 2026-07-18 — Plan 01-02 executed; GitHub-side steps deferred
 
-Progress: [█████░░░░░] 50%
+Progress: [████████░░] 80%
 
 ## Accumulated Context
 
@@ -43,6 +43,9 @@ Progress: [█████░░░░░] 50%
 - [01-01] compileSdk/targetSdk остаются 37 (как в базе b40c70d9), вопреки «36» в CLAUDE.md — даунгрейд = лишний риск; CLAUDE.md обновить отдельным коммитом вне фазы.
 - [01-01] `gradle/wrapper/gradle-wrapper.jar` не трекается (upstream игнорирует `gradle/`); локально скачан официальный jar Gradle v9.6.0 — на новой машине его нужно восстановить (`gradle wrapper` или тот же URL).
 - [01-01] Kotlin — через built-in Kotlin AGP 9 (удалена строка `android.builtInKotlin=false`), плагин `org.jetbrains.kotlin.android` не подключён.
+- [01-02] Подпись release: условный signingConfig через `keystore.properties` (Pattern 3); `release.jks` (RSA 4096, validity 10950, alias `tatarkeyboard`) и `keystore.properties` — только локально, оба gitignored (проверено `git check-ignore` + grep истории). Без файла assembleRelease даёт unsigned APK — CI живёт без секретов.
+- [01-02] CI (`.github/workflows/ci.yml`): официальные actions на мажорных тегах, `permissions: contents: read`; вызывает `scripts/check-no-internet.sh` дважды (fast-fail до сборки + по собранному APK); gradle-wrapper.jar восстанавливается шагом workflow из тега v9.6.0 gradle/gradle с pin по sha256 (jar не в git).
+- [01-02] GitHub-репозиторий НЕ создан (на машине нет `gh`, remote только `upstream`) — создание репо/push/прогоны CI отложены; точные шаги в 01-02-SUMMARY.md § Deferred.
 
 ### Cross-cutting disciplines (каждая фаза)
 
@@ -66,12 +69,12 @@ Progress: [█████░░░░░] 50%
 
 ## Session Continuity
 
-**Stopped at:** Completed 01-01-PLAN.md (Task 5 device-verify deferred)
+**Stopped at:** Completed 01-02-PLAN.md (GitHub repo/push/CI runs deferred — нет gh/origin; device checkpoints 01-01 Task 5 и 01-02 Task 4 deferred — устройство не подключено)
 **Resume file:** None
 
-**Next step:** `/gsd-execute-phase 1` — исполнение фазы «Форк и hello-world» (wave 1: 01-01, wave 2: 01-02; оба плана с human-verify чекпойнтами на устройстве).
+**Next step:** закрыть deferred-пункты (создать GitHub-репо + push → зелёный CI на main → негативный прогон ci-negative-test; on-device проверки debug и release + бэкап ключа), затем phase 1 verification. Точные шаги — 01-02-SUMMARY.md § Deferred.
 
-Last session: 2026-07-18T06:36:57.302Z
+Last session: 2026-07-18T06:55:00.000Z
 
 ---
 *Last updated: 2026-07-18 — roadmap created*
@@ -81,3 +84,4 @@ Last session: 2026-07-18T06:36:57.302Z
 | Plan | Duration | Tasks | Files |
 |------|----------|-------|-------|
 | Phase 1 P01 | 35 min | 4 tasks | 7 files |
+| Phase 1 P02 | 20 min | 2 of 4 tasks (2 deferred) | 3 files (+2 local secrets) |

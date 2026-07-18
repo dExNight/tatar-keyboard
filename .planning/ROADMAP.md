@@ -22,6 +22,7 @@
 **Mode:** mvp
 **Requirements:** PERF-04
 **Depends on:** —
+**Progress:** 01-01 ✓ (Task 5 device-verify deferred) · 01-02 ✓ локальная часть (keystore + подписанный assembleRelease + ci.yml; GitHub-репо/push/прогоны CI и device-verify — deferred, см. 01-02-SUMMARY.md)
 
 Форк rkkr/simple-keyboard, новый applicationId (рабочее имя фиксируется здесь), Kotlin подключён через interop, keystore создан (задел под REL-01, финальная верификация — фаза 11), CI-проверка отсутствия разрешения INTERNET.
 
