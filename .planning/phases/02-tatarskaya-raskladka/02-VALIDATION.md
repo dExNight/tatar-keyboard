@@ -44,7 +44,7 @@ created: 2026-07-18
 | 02-01.T2 | 02-01 | 1 | LAYOUT-01 (пятый ряд сверху), LAYOUT-04 (Element-декларации), LAYOUT-05 | 02-01/T2 | Высоты 5/6 рядов решены в XML; ресурсы в APK; ноль Java-правок | build + aapt2 | `./gradlew assembleDebug && aapt2 dump resources app-debug.apk \| grep tatar` | ✅ | ⬜ pending |
 | 02-01.T3 | 02-01 | 1 | LAYOUT-05 (оговорка: реестр) | 02-01/T2 | tt/tatar в реестре; `case` с `break` (sakha-баг не унаследован); diff = 1 файл | build + grep | `./gradlew assembleDebug && grep -A2 'case LOCALE_TATAR' SubtypeLocaleUtils.java \| grep 'break;'` | ✅ | ⬜ pending |
 | 02-01.T4 | 02-01 | 1 | Phase SC (активация MVP) | — | tt-subtype первым в getDefaultSubtypes; матчинг/fallback не тронуты | build + grep | `./gradlew assembleDebug && grep 'subtypes.add(0' SubtypeLocaleUtils.java` | ✅ | ⬜ pending |
-| 02-01.T5 | 02-01 | 1 | LAYOUT-01, LAYOUT-04 (on-device) | — | Печать 37 букв, shift, ?123/#+=, 5/6 рядов без обрезки | manual | — (checkpoint:human-verify) | — | ⬜ pending |
+| 02-01.T5 | 02-01 | 1 | LAYOUT-01, LAYOUT-04, Phase SC4 (on-device) | — | Печать 37 букв, shift, ?123/#+=, 5/6 рядов без обрезки, smoke-матрица (Telegram/Chrome-WebView/password) | manual | — (checkpoint:human-verify) | — | ⬜ pending |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
@@ -67,8 +67,9 @@ created: 2026-07-18
 | 5 рядов (и 6 при showNumberRow) без обрезки нижнего ряда | LAYOUT-01 / Pitfall 1 (A1) | Clamp-логика KeyboardRow проявляется только при рендере | Визуально + `adb logcat \| grep -i "too tall"` пуст; включить Number row → цифры НАД пятым рядом, всё помещается (Task 5, пп. 5, 7) |
 | Shift даёт Ә Ө Ү Җ Ң Һ | LAYOUT-01 (A3) | `toUpperCase(Locale)` — runtime-поведение | Тап shift → пятый ряд в верхнем регистре, ввод коммитит заглавные (Task 5, п. 4) |
 | ?123 → #+= → возврат к буквам | LAYOUT-04 | Переключение состояний KeyboardState — runtime | Тапы по `?123`, `#+=`, `АБВ` из татарской раскладки (Task 5, п. 6) |
+| Smoke-матрица SC4: татарский ввод в Telegram, Chrome/WebView (keyCode 229), password-поле | Phase SC4 (cross-cutting дисциплина STATE.md) | Зоопарк InputConnection проявляется только в реальных редакторах — WebView шлёт keyCode 229, password-поля меняют поведение | Повторить ввод «әни өй үрдәк җир таң һава» (все 6 букв пятого ряда): (a) Telegram — поле сообщения; (b) Chrome — адресная строка + поле формы/WebView; (c) password-поле — точки маскировки на каждый тап. Во всех трёх без потерь/дублей (02-01 Task 5, п. 8) |
 
-*Если устройство недоступно (как в фазе 1) — чекпойнт Task 5 откладывается в STATE.md Blockers с этим чек-листом; BUILD-критерии фазы закрыты автоматикой, но LAYOUT-01/04 не считаются полностью верифицированными до прогона.*
+*Если устройство недоступно (как в фазе 1) — чекпойнт Task 5 (включая smoke-матрицу SC4) откладывается в STATE.md Blockers с этим чек-листом; BUILD-критерии фазы закрыты автоматикой, но LAYOUT-01/04 и SC4 не считаются полностью верифицированными до прогона.*
 
 ---
 
