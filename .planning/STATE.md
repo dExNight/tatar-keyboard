@@ -3,9 +3,9 @@
 ## Current Position
 
 **Milestone:** v1.0 — MVP + релиз (GitHub Releases + IzzyOnDroid)
-**Phase:** 1 of 11 — Форк и hello-world (not started)
-**Status:** Roadmap создан — готов к планированию фазы 1
-**Last activity:** 2026-07-18 — создан ROADMAP.md, traceability обновлена (34/34)
+**Phase:** 1 of 11 — Форк и hello-world (planned)
+**Status:** Фаза 1 спланирована — 2 плана (2 волны) + SKELETON.md, готова к исполнению
+**Last activity:** 2026-07-17 — планы 01-01 (форк/appId/Kotlin) и 01-02 (подпись/CI PERF-04), walking skeleton зафиксирован
 
 Progress: [░░░░░░░░░░░] 0/11 phases
 
@@ -43,7 +43,7 @@ Progress: [░░░░░░░░░░░] 0/11 phases
 
 ## Session Continuity
 
-**Next step:** `/gsd-plan-phase 1` — планирование фазы «Форк и hello-world».
+**Next step:** `/gsd-execute-phase 1` — исполнение фазы «Форк и hello-world» (wave 1: 01-01, wave 2: 01-02; оба плана с human-verify чекпойнтами на устройстве).
 
 Last session: 2026-07-18 — инициализация проекта, требования (34 v1), роадмап (11 фаз).
 
