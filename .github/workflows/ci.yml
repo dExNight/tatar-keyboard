@@ -1,0 +1,44 @@
+name: CI
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Fast-fail: level 1 (source manifest) runs before any toolchain setup;
+      # without an APK the script skips level 2 and still exits non-zero on INTERNET.
+      - name: Check no INTERNET permission (source manifest)
+        run: bash scripts/check-no-internet.sh
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+
+      # gradle-wrapper.jar is intentionally not tracked (upstream gitignores gradle/);
+      # restore it from the official distribution, pinned by sha256.
+      - name: Restore gradle-wrapper.jar
+        run: |
+          curl -fsSL -o gradle/wrapper/gradle-wrapper.jar \
+            https://raw.githubusercontent.com/gradle/gradle/v9.6.0/gradle/wrapper/gradle-wrapper.jar
+          echo "497c8c2a7e5031f6aa847f88104aa80a93532ec32ee17bdb8d1d2f67a194a9c7  gradle/wrapper/gradle-wrapper.jar" | sha256sum -c -
+
+      - name: Build debug APK
+        run: ./gradlew assembleDebug
+
+      # PERF-04, both levels: source manifest + aapt2 dump permissions on the built APK
+      - name: Check no INTERNET permission (built APK)
+        run: bash scripts/check-no-internet.sh app/build/outputs/apk/debug/app-debug.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: app-debug
+          path: app/build/outputs/apk/debug/app-debug.apk
