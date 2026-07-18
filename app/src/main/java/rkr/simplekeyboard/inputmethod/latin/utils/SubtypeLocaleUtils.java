@@ -113,6 +113,7 @@ public final class SubtypeLocaleUtils {
     private static final String LOCALE_SERBIAN_LATIN = "sr_ZZ";
     private static final String LOCALE_SWEDISH = "sv";
     private static final String LOCALE_SWAHILI = "sw";
+    private static final String LOCALE_TATAR = "tt";
     private static final String LOCALE_TAMIL_INDIA = "ta_IN";
     private static final String LOCALE_TAMIL_SINGAPORE = "ta_SG";
     private static final String LOCALE_TELUGU_INDIA = "te_IN";
@@ -194,6 +195,7 @@ public final class SubtypeLocaleUtils {
             LOCALE_SERBIAN_LATIN,
             LOCALE_SWEDISH,
             LOCALE_SWAHILI,
+            LOCALE_TATAR,
             LOCALE_TAMIL_INDIA,
             LOCALE_TAMIL_SINGAPORE,
             LOCALE_TELUGU_INDIA,
@@ -252,6 +254,7 @@ public final class SubtypeLocaleUtils {
     public static final String LAYOUT_SPANISH = "spanish";
     public static final String LAYOUT_SWISS = "swiss";
     public static final String LAYOUT_TAMIL = "tamil";
+    public static final String LAYOUT_TATAR = "tatar";
     public static final String LAYOUT_TELUGU = "telugu";
     public static final String LAYOUT_THAI = "thai";
     public static final String LAYOUT_TURKISH_Q = "turkish_q";
@@ -545,6 +548,9 @@ public final class SubtypeLocaleUtils {
                 case LOCALE_SERBIAN_LATIN:
                     addLayout(LAYOUT_SERBIAN_QWERTZ);
                     addGenericLayouts();
+                    break;
+                case LOCALE_TATAR:
+                    addLayout(LAYOUT_TATAR);
                     break;
                 case LOCALE_TAMIL_INDIA:
                 case LOCALE_TAMIL_SINGAPORE:
