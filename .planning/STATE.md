@@ -2,18 +2,18 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-current_phase: 03
-current_phase_name: Языки и переключение
-status: executing
-stopped_at: Completed 03-01-PLAN.md (Task 5 device UAT deferred — устройство не подключено; SUMMARY written)
-last_updated: "2026-07-18T09:38:13Z"
+current_phase: 4
+current_phase_name: Механика ввода — регистр и служебные клавиши
+status: planning
+stopped_at: "Plan 03-01 complete-local (Tasks 1–4 committed: e321fc6, a0c6e05, a37a124, b19ce97; Task 5 device UAT deferred в Blockers)"
+last_updated: "2026-07-18T10:13:51.248Z"
 last_activity: 2026-07-18
-last_activity_desc: Phase 03 plan 03-01 executed (Tasks 1–4; device UAT deferred)
 progress:
   total_phases: 3
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 4
   completed_plans: 4
+last_activity_desc: Phase 03 plan 03-01 executed (Tasks 1–4; device UAT deferred)
 ---
 
 # State: Tatar Keyboard
@@ -21,10 +21,10 @@ progress:
 ## Current Position
 
 **Milestone:** v1.0 — MVP + релиз (GitHub Releases + IzzyOnDroid)
-**Phase:** 03 (Языки и переключение) — plan 03-01 complete-local (device UAT deferred)
-**Plan:** 1 of 1
-**Status:** Plan 03-01 executed; Task 5 checkpoint deferred to Blockers
-**Last activity:** 2026-07-18 — Phase 03 plan 03-01 executed (Tasks 1–4 committed, UAT deferred)
+**Phase:** 4 — Механика ввода — регистр и служебные клавиши
+**Plan:** Not started
+**Status:** Ready to plan
+**Last activity:** 2026-07-18
 
 Progress: [██████████] 100%
 
@@ -79,10 +79,10 @@ Progress: [██████████] 100%
 
 ## Session Continuity
 
-**Stopped at:** Plan 03-01 complete-local (Tasks 1–4 committed: e321fc6, a0c6e05, a37a124, b19ce97; Task 5 device UAT deferred в Blockers)
+**Stopped at:** Phase 3 complete (verification passed; on-device UAT отложен, принят), ready to plan Phase 4
 **Resume file:** None
 
-**Next step:** Phase 3 verification / phase close-out, затем Phase 4 — Механика ввода (INPUT-01..04). Device UAT фаз 1–3 — одним заходом при появлении устройства.
+**Next step:** Phase 4 — Механика ввода: регистр и служебные клавиши.
 
 Last session: 2026-07-18T08:29:50.584Z
 

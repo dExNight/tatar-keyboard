@@ -10,15 +10,15 @@ Requirements for initial release (майлстоун v1.0 MVP: release-ready APK
 ### Раскладки
 
 - [x] **LAYOUT-01**: Пользователь печатает на татарской раскладке: стандартная ЙЦУКЕН + отдельный видимый пятый ряд `ә ө ү җ ң һ`
-- [ ] **LAYOUT-02**: Long-press на родственных русских буквах (а→ә, о→ө, у→ү, ж→җ, н→ң, х→һ, э→ә, г→һ) вставляет татарскую букву — работает и на татарской, и на русской раскладке
-- [ ] **LAYOUT-03**: Пользователь печатает на русской (ЙЦУКЕН) и английской (QWERTY) раскладках
+- [x] **LAYOUT-02**: Long-press на родственных русских буквах (а→ә, о→ө, у→ү, ж→җ, н→ң, х→һ, э→ә, г→һ) вставляет татарскую букву — работает и на татарской, и на русской раскладке
+- [x] **LAYOUT-03**: Пользователь печатает на русской (ЙЦУКЕН) и английской (QWERTY) раскладках
 - [x] **LAYOUT-04**: Доступны слои цифр/символов `?123` и `#+=` с возвратом к буквам
 - [x] **LAYOUT-05**: Раскладки описаны данными (XML), не кодом; формат допускает добавление новой раскладки (латиница Zamanälif позже) без изменения движка
 
 ### Переключение языков
 
-- [ ] **SWITCH-01**: Система видит три subtype: tt_RU, ru, en_US; клавиатура запоминает активный
-- [ ] **SWITCH-02**: Тап по глобусу циклически переключает раскладки; long-press по глобусу открывает системный пикер IME
+- [x] **SWITCH-01**: Система видит три subtype: tt_RU, ru, en_US; клавиатура запоминает активный
+- [x] **SWITCH-02**: Тап по глобусу циклически переключает раскладки; long-press по глобусу открывает системный пикер IME
 
 ### Механика ввода
 
@@ -113,12 +113,12 @@ Which phases cover which requirements. Updated during roadmap creation.
 | Requirement | Phase | Status |
 |-------------|-------|--------|
 | LAYOUT-01 | Phase 2 | Complete |
-| LAYOUT-02 | Phase 3 | Pending |
-| LAYOUT-03 | Phase 3 | Pending |
+| LAYOUT-02 | Phase 3 | Complete |
+| LAYOUT-03 | Phase 3 | Complete |
 | LAYOUT-04 | Phase 2 | Complete |
 | LAYOUT-05 | Phase 2 | Complete |
-| SWITCH-01 | Phase 3 | Pending |
-| SWITCH-02 | Phase 3 | Pending |
+| SWITCH-01 | Phase 3 | Complete |
+| SWITCH-02 | Phase 3 | Complete |
 | INPUT-01 | Phase 4 | Pending |
 | INPUT-02 | Phase 4 | Pending |
 | INPUT-03 | Phase 4 | Pending |
