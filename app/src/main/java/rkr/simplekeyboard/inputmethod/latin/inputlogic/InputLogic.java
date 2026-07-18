@@ -42,12 +42,22 @@ import rkr.simplekeyboard.inputmethod.latin.utils.SubtypeLocaleUtils;
  * This class manages the input logic.
  */
 public final class InputLogic {
+    // Must be long enough for a deliberate double tap on space, but shorter than a pause
+    // between sentences. Matches AOSP config_double_space_period_timeout; the system
+    // double tap timeout (~300 ms) is too short for this gesture.
+    private static final long DOUBLE_SPACE_PERIOD_TIMEOUT = 1100;
+
     // TODO : Remove this member when we can.
     final LatinIME mLatinIME;
 
     // This has package visibility so it can be accessed from InputLogicHandler.
     public final RichInputConnection mConnection;
     private final RecapitalizeStatus mRecapitalizeStatus = new RecapitalizeStatus();
+
+    // Time of the last committed space, for double-space-to-period detection.
+    private long mLastSpaceDownTime;
+    // Whether the last input was a double-space-to-period, for revert on backspace.
+    private boolean mJustDoubleSpaced;
 
     /**
      * Create a new instance of the input logic.
@@ -66,6 +76,9 @@ public final class InputLogic {
      */
     public void startInput() {
         mRecapitalizeStatus.disable(); // Do not perform recapitalize until the cursor is moved once
+        // Double-space state must not leak between editors.
+        mJustDoubleSpaced = false;
+        mLastSpaceDownTime = 0;
     }
 
     public void clearCaches() {
@@ -289,6 +302,7 @@ public final class InputLogic {
      * @param event The event to handle.
      */
     private void handleNonSeparatorEvent(final Event event) {
+        mJustDoubleSpaced = false;
         sendKeyCodePoint(event.mCodePoint);
     }
 
@@ -298,9 +312,44 @@ public final class InputLogic {
      * @param inputTransaction The transaction in progress.
      */
     private void handleSeparatorEvent(final Event event, final InputTransaction inputTransaction) {
+        if (event.mCodePoint == Constants.CODE_SPACE) {
+            if (tryDoubleSpacePeriod(inputTransaction.mSettingsValues)) {
+                inputTransaction.requireShiftUpdate(InputTransaction.SHIFT_UPDATE_NOW);
+                return;
+            }
+        } else {
+            mJustDoubleSpaced = false;
+        }
         sendKeyCodePoint(event.mCodePoint);
 
         inputTransaction.requireShiftUpdate(InputTransaction.SHIFT_UPDATE_NOW);
+    }
+
+    /**
+     * Replace a quick second space with a period followed by a space, like AOSP does.
+     *
+     * Only triggers when the previous space was committed less than
+     * {@link #DOUBLE_SPACE_PERIOD_TIMEOUT} ago, the field is not a password field, and the
+     * cursor is preceded by exactly one space that follows a letter or digit.
+     *
+     * @param settingsValues the current settings values.
+     * @return whether the period was committed (the space event is then fully handled).
+     */
+    private boolean tryDoubleSpacePeriod(final SettingsValues settingsValues) {
+        final long now = SystemClock.uptimeMillis();
+        if (now - mLastSpaceDownTime < DOUBLE_SPACE_PERIOD_TIMEOUT
+                && !settingsValues.mInputAttributes.mIsPasswordField
+                && mConnection.getCodePointBeforeCursor() == Constants.CODE_SPACE
+                && Character.isLetterOrDigit(mConnection.getCodePointBeforeCursor(1))) {
+            mConnection.deleteTextBeforeCursor(1);
+            mConnection.commitText(". ", 1);
+            mJustDoubleSpaced = true;
+            mLastSpaceDownTime = 0;
+            return true;
+        }
+        mLastSpaceDownTime = now;
+        mJustDoubleSpaced = false;
+        return false;
     }
 
     /**
@@ -322,8 +371,19 @@ public final class InputLogic {
         inputTransaction.requireShiftUpdate(shiftUpdateKind);
 
         if (mConnection.hasSelection()) {
+            mJustDoubleSpaced = false;
             mConnection.deleteSelectedText();
         } else {
+            if (mJustDoubleSpaced
+                    && mConnection.getCodePointBeforeCursor() == Constants.CODE_SPACE
+                    && mConnection.getCodePointBeforeCursor(1) == Constants.CODE_PERIOD) {
+                // Revert the double-space-to-period: restore the two spaces.
+                mConnection.deleteTextBeforeCursor(2);
+                mConnection.commitText("  ", 1);
+                mJustDoubleSpaced = false;
+                return;
+            }
+            mJustDoubleSpaced = false;
             final int codePointBeforeCursor = mConnection.getCodePointBeforeCursor();
             if (codePointBeforeCursor == Constants.NOT_A_CODE) {
                 sendDownUpKeyEvent(KeyEvent.KEYCODE_DEL);

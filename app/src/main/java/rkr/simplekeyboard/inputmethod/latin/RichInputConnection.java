@@ -298,6 +298,23 @@ public final class RichInputConnection {
         return Character.codePointBefore(mTextBeforeCursor, length);
     }
 
+    /**
+     * Gets the code point at the given offset before the cursor, reading only the local cache.
+     *
+     * @param offsetCodePoints how many code points to skip back from the cursor; 0 is equivalent
+     * to {@link #getCodePointBeforeCursor()}.
+     */
+    public int getCodePointBeforeCursor(final int offsetCodePoints) {
+        int index = mTextBeforeCursor.length();
+        for (int i = 0; i < offsetCodePoints; i++) {
+            if (index < 1) return Constants.NOT_A_CODE;
+            index -= Character.isSupplementaryCodePoint(
+                    Character.codePointBefore(mTextBeforeCursor, index)) ? 2 : 1;
+        }
+        if (index < 1) return Constants.NOT_A_CODE;
+        return Character.codePointBefore(mTextBeforeCursor, index);
+    }
+
     public void replaceText(final int startPosition, final int endPosition, CharSequence text) {
         if (mExpectedSelStart != mExpectedSelEnd) {
             Log.e(TAG, "replaceText called with text range selected");
