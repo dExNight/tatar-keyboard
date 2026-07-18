@@ -4,16 +4,16 @@ milestone: v1.0
 milestone_name: milestone
 current_phase: 10
 current_phase_name: Онбординг и настройки
-status: planning
+status: executing
 stopped_at: Completed 09-01-PLAN.md — Phase 9 complete-local (Task 4 TalkBack UAT deferred, см. Blockers)
-last_updated: "2026-07-18T21:11:15.815Z"
+last_updated: "2026-07-18T21:44:57.184Z"
 last_activity: 2026-07-19
+last_activity_desc: Phase 10 execution started
 progress:
-  total_phases: 9
+  total_phases: 10
   completed_phases: 9
-  total_plans: 10
+  total_plans: 11
   completed_plans: 10
-last_activity_desc: Phase 09 execution started
 ---
 
 # State: Tatar Keyboard
@@ -21,10 +21,10 @@ last_activity_desc: Phase 09 execution started
 ## Current Position
 
 **Milestone:** v1.0 — MVP + релиз (GitHub Releases + IzzyOnDroid)
-**Phase:** 10 — Онбординг и настройки
-**Plan:** Not started
-**Status:** Ready to plan
-**Last activity:** 2026-07-19
+**Phase:** 10 (Онбординг и настройки) — EXECUTING
+**Plan:** 1 of 1
+**Status:** Executing Phase 10
+**Last activity:** 2026-07-19 — Phase 10 execution started
 
 Progress: [█████████░] 90%
 
@@ -63,6 +63,8 @@ Progress: [█████████░] 90%
 
 - [09-01] Фаза 9 — TalkBack достроен до полной A11Y-01/02: 4 гэпа ресерча закрыты — G2 описания только через KeyDescriptionMapper (когда по key.getCode(), 6 татарских кодпоинтов hex-литералами + шаблон «Заглавная %s», shift ×4 по mElementId, enter ×7 по imeAction с приоритетом custom label; строки en base values/strings-a11y.xml + values-ru/strings-a11y.xml, AOSP-имена spoken_*), G1 клик = синтез MotionEvent DOWN/UP в видимый центр → public MainKeyboardView.processMotionEvent (штатный touch-путь, AOSP-паттерн), G3 isClickable/isTextEntryKey (androidx.core транзитив — новых зависимостей нет), G4 TYPE_VIEW_CLICKED + return true. Fork-Java-дифф = 0 строк (boundary 0a280ce: ровно 2 .kt + 2 .xml). Password: собственных announceForAccessibility ноль (запиновано), описания клавиш не обскьюрены осознанно (ACCESSIBILITY_SPEAK_PASSWORD deprecated c API 26 — озвучка = зона TalkBack).
 
+- [10-01] Фаза 10 — онбординг SetupActivity + zero-code верификация SETUP-02: новый SetupActivity.kt (Kotlin, classic View/XML, наследует android.app.Activity — ноль новых зависимостей/gradle-правок) детектит 2 статуса живьём из системы (шаг 1 imm.enabledInputMethodList.any{packageName}, шаг 2 Settings.Secure.DEFAULT_INPUT_METHOD.startsWith("$packageName/") — префикс устойчив к debug-суффиксу), кнопки стартуют только системные экраны (ACTION_INPUT_METHOD_SETTINGS + showInputMethodPicker), рефреш идемпотентен в onWindowFocusChanged(true)+onResume, done-блок → SettingsActivity; собственный флаг завершения НЕ хранится (источник истины — система). Манифест: MAIN/LAUNCHER переехал на SetupActivity (блок ПЕРЕД SettingsActivity), у SettingsActivity LAUNCHER снят но exported=true сохранён (IME→настройки цел — launchSettings класс-интент LatinIME.java:881). Legacy not-enabled AlertDialog старого бренда + private isInputMethodOfThisImeEnabled удалены из SettingsActivity.onStart (проверка зависимостей грепом: оба символа были только в SettingsActivity.java), осиротевшие импорты вычищены, ресурс setup_message оставлен нетронутым (ребрендинг = фаза 11). SETUP-02 = уже реализовано, доказано грепами (тумблеры/громкость + hasVibrator→removePreference + живой отклик Settings→loadSettings→AudioAndHapticFeedbackManager), кода 0 строк. Строки — strings-setup.xml (en base + values-ru), бренд через @string/english_ime_name, «ә»-подсказка. Boundary 13ce533 = ровно 6 файлов app/ (1 .kt + 2 strings-setup.xml + 1 layout + манифест + SettingsActivity.java), без gradle/ic_launcher/старых strings.xml. Обе сборки зелёные, check-no-internet OK, release-APK ≤ 3 МБ. Device-UAT (SC2-live/SC3/SC4) — deferred по standing-паттерну фаз 1–9.
+
 ### Cross-cutting disciplines (каждая фаза)
 
 - Smoke-тест матрицы InputConnection (Telegram, Chrome/WebView keyCode 229, password-поля, MIUI/One UI) — в критериях каждой фазы ввода/UI; полный проход — фаза 8.
@@ -78,6 +80,8 @@ Progress: [█████████░] 90%
 - Прогрессивный разгон backspace (удаление словами после N повторов, как в Gboard) — post-MVP, после юзер-теста; `repeatCount` уже пробрасывается в `onKeyRepeat` (TimerHandler.java:53).
 - [09-01] moreKeys-панель вне a11y-дерева: ё/ъ (long-press е/ь) недостижимы с TalkBack — не блокер MVP (все 6 татарских букв на собственных клавишах пятого ряда, long-press для татарского ввода не нужен); отдельный делегат на MoreKeysKeyboardView — backlog.
 - [09-01] values-tt (татарские названия букв в описаниях) + announce смены shift-режима (AOSP spoken_description_shiftmode_*) — post-MVP backlog.
+- [10-01] ic_launcher (adaptive-иконка ic_launcher.xml + foreground/monochrome, ic_launcher_background=#ECEFF1) — наследие базы форка Simple Keyboard; замена = ребрендинг → фаза 11/backlog (open-Q2 ресерча 10-RESEARCH.md). НЕ трогать в фазе 10.
+- [10-01] Полный ребрендинг ~30 локализованных setup_message (старый бренд «Simple Keyboard») — строка перестала использоваться из кода после удаления legacy-диалога, но оставлена в ресурсах; чистка/ребрендинг → фаза 11 (Pitfall 5).
 
 ### Blockers/Concerns
 
