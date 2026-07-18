@@ -87,7 +87,7 @@
 | Этап 0 (прототип HeliBoard) пропущен | Решение о форке окончательное, контрольная точка не нужна (ответ при инициализации) | — Pending |
 | Майлстоун v1.0 = release-ready APK + GitHub Releases + IzzyOnDroid | RuStore/Play/F-Droid — отдельный майлстоун (ответ при инициализации) | — Pending |
 | Vertical MVP: фазы = сквозные способности, каждая даёт собирающийся APK | Соло-новичок, ранняя рабочая клавиатура для самотестирования | — Pending |
-| Рабочее название «Tatar Keyboard», финальное имя и applicationId — позже | Имени в брифе нет; applicationId зафиксировать в фазе форка | ✓ Done — Phase 1: org.tatarkeyboard.ime (провизорный) |
+| Рабочее название | Tatar Keyboard / org.tatarkeyboard.ime | Имени в брифе нет; applicationId зафиксировать в фазе форка | ✓ Done — Phase 11 pre-release: «Tatar Keyboard», appId org.tatarkeyboard.ime финально |
 
 ## Open Questions
 
