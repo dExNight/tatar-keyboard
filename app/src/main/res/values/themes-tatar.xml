@@ -57,7 +57,7 @@
         name="MainKeyboardView.Tatar"
         parent="KeyboardView.Tatar"
     >
-        <item name="keyPreviewBackground">@drawable/keyboard_key_feedback_background</item>
+        <item name="keyPreviewBackground">@drawable/ios_key_preview_background</item>
         <item name="keyPreviewHeight">@dimen/config_key_preview_height_lxx</item>
         <item name="keyPreviewWidth">@dimen/config_key_preview_width_lxx</item>
         <item name="keyPreviewOffset">@dimen/config_key_preview_offset_lxx</item>
@@ -76,7 +76,7 @@
         name="MoreKeysKeyboardView.Tatar"
         parent="KeyboardView.Tatar"
         >
-        <item name="android:background">@drawable/keyboard_popup_panel_background</item>
+        <item name="android:background">@drawable/ios_popup_panel_background</item>
         <item name="keyBackground">@drawable/btn_keyboard_key_popup</item>
         <item name="keyTypeface">normal</item>
         <item name="verticalCorrection">@dimen/config_more_keys_keyboard_vertical_correction</item>
