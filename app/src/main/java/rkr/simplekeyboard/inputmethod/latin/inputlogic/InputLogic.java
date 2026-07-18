@@ -355,8 +355,10 @@ public final class InputLogic {
                 && !settingsValues.mInputAttributes.mIsPasswordField
                 && mConnection.getCodePointBeforeCursor() == Constants.CODE_SPACE
                 && Character.isLetterOrDigit(mConnection.getCodePointBeforeCursor(1))) {
+            mConnection.beginBatchEdit();
             mConnection.deleteTextBeforeCursor(1);
             mConnection.commitText(". ", 1);
+            mConnection.endBatchEdit();
             mJustDoubleSpaced = true;
             mLastSpaceDownTime = 0;
             return true;
@@ -392,8 +394,10 @@ public final class InputLogic {
                     && mConnection.getCodePointBeforeCursor() == Constants.CODE_SPACE
                     && mConnection.getCodePointBeforeCursor(1) == Constants.CODE_PERIOD) {
                 // Revert the double-space-to-period: restore the two spaces.
+                mConnection.beginBatchEdit();
                 mConnection.deleteTextBeforeCursor(2);
                 mConnection.commitText("  ", 1);
+                mConnection.endBatchEdit();
                 mJustDoubleSpaced = false;
                 return;
             }
