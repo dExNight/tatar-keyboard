@@ -17,15 +17,18 @@
 package rkr.simplekeyboard.inputmethod.latin.setup
 
 import android.app.Activity
+import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
+import android.util.Log
 import android.view.View
 import android.view.WindowInsets
 import android.view.inputmethod.InputMethodManager
 import android.widget.Button
 import android.widget.TextView
+import android.widget.Toast
 import rkr.simplekeyboard.inputmethod.R
 import rkr.simplekeyboard.inputmethod.latin.settings.SettingsActivity
 
@@ -48,6 +51,10 @@ import rkr.simplekeyboard.inputmethod.latin.settings.SettingsActivity
  */
 class SetupActivity : Activity() {
 
+    companion object {
+        private val TAG = SetupActivity::class.java.simpleName
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.setup_activity)
@@ -62,8 +69,14 @@ class SetupActivity : Activity() {
         }
 
         findViewById<Button>(R.id.setup_step1_button).setOnClickListener {
-            startActivity(Intent(Settings.ACTION_INPUT_METHOD_SETTINGS)
-                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            // Some stripped OEM/enterprise builds ship without the
+            // input-method settings screen — never crash the first tap.
+            try {
+                startActivity(Intent(Settings.ACTION_INPUT_METHOD_SETTINGS))
+            } catch (e: ActivityNotFoundException) {
+                Toast.makeText(this, R.string.setup_error_no_settings,
+                        Toast.LENGTH_LONG).show()
+            }
         }
         findViewById<Button>(R.id.setup_step2_button).setOnClickListener {
             (getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager)
@@ -85,10 +98,20 @@ class SetupActivity : Activity() {
         if (hasFocus) updateStepStates()
     }
 
-    /** Step 1 — is this IME enabled in the system? */
+    /**
+     * Step 1 — is this IME enabled in the system? The IMM read is guarded
+     * like upstream's SettingsActivity did it: the binder call has thrown
+     * on some OEM builds, and an exception here must not crash the
+     * first-run screen — treat it as "not enabled".
+     */
     private fun isImeEnabled(): Boolean {
         val imm = getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager
-        return imm.enabledInputMethodList.any { it.packageName == packageName }
+        return try {
+            imm.enabledInputMethodList.any { it.packageName == packageName }
+        } catch (e: Exception) {
+            Log.e(TAG, "Exception in check if input method is enabled", e)
+            false
+        }
     }
 
     /**
@@ -110,14 +133,26 @@ class SetupActivity : Activity() {
         val enabled = isImeEnabled()
         val current = enabled && isImeCurrent()
 
-        findViewById<TextView>(R.id.setup_step1_status).text =
+        // The visual marks ("1"/"2"/"✓") mean nothing to TalkBack — each
+        // status mark carries a spoken done/pending description instead.
+        val step1Status = findViewById<TextView>(R.id.setup_step1_status)
+        step1Status.text =
                 getString(if (enabled) R.string.setup_step_done_mark
                           else R.string.setup_step1_number)
+        step1Status.contentDescription =
+                getString(if (enabled) R.string.setup_step_status_done
+                          else R.string.setup_step_status_pending)
         findViewById<Button>(R.id.setup_step1_button).isEnabled = !enabled
 
-        findViewById<TextView>(R.id.setup_step2_status).text =
+        val step2Status = findViewById<TextView>(R.id.setup_step2_status)
+        step2Status.text =
                 getString(if (current) R.string.setup_step_done_mark
                           else R.string.setup_step2_number)
+        step2Status.contentDescription =
+                getString(if (current) R.string.setup_step_status_done
+                          else R.string.setup_step_status_pending)
+        // The dimming below is decorative; the locked state of step 2 is
+        // conveyed non-visually by the button's disabled semantics.
         findViewById<Button>(R.id.setup_step2_button).isEnabled = enabled && !current
         findViewById<View>(R.id.setup_step2_card).alpha = if (enabled) 1f else 0.4f
 

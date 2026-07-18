@@ -24,6 +24,13 @@
     <string name="setup_step2_number" translatable="false">2</string>
     <string name="setup_step_done_mark" translatable="false">✓</string>
 
+    <!-- Spoken (TalkBack) descriptions for the step status marks. -->
+    <string name="setup_step_status_done">Step done</string>
+    <string name="setup_step_status_pending">Step not done yet</string>
+
+    <!-- Shown only if the device has no input-method settings screen. -->
+    <string name="setup_error_no_settings">Open Settings and turn on this keyboard in the keyboard list manually</string>
+
     <string name="setup_step1_title">Enable the keyboard</string>
     <string name="setup_step1_instruction">Turn this keyboard on in the system keyboard list</string>
     <string name="setup_step1_button">Enable keyboard</string>
