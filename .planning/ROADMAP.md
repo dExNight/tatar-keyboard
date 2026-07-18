@@ -40,6 +40,7 @@
 **Mode:** mvp
 **Requirements:** LAYOUT-01, LAYOUT-04, LAYOUT-05
 **Depends on:** Phase 1
+**Progress:** 02-01 ✓ complete — локальная часть (Tasks 1–4: раскладка данными + реестр + tt-дефолт; сборка/aapt2/no-internet зелёные); Task 5 device-verify — deferred, human verification pending, см. 02-01-SUMMARY.md § Deferred Verification
 
 Ядро ценности (пятый ряд — дифференциатор, которого нет у Gboard/SwiftKey/Яндекса) до любой косметики. Формат раскладок-как-данных (XML) закладывается сразу и должен допускать латиницу Zamanälif позже без правки движка.
 
