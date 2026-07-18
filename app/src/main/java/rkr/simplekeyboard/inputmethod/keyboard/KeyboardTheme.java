@@ -38,10 +38,12 @@ public final class KeyboardTheme {
     public static final int THEME_ID_DARK = 4;
     public static final int THEME_ID_SYSTEM = 5;
     public static final int THEME_ID_SYSTEM_BORDER = 6;
-    public static final int DEFAULT_THEME_ID = THEME_ID_SYSTEM;
+    public static final int THEME_ID_TATAR = 7;
+    public static final int DEFAULT_THEME_ID = THEME_ID_TATAR;
 
     /* package private for testing */
     static final KeyboardTheme[] KEYBOARD_THEMES = {
+        new KeyboardTheme(THEME_ID_TATAR, "Tatar", R.style.KeyboardTheme_Tatar, false),
         new KeyboardTheme(THEME_ID_SYSTEM, "LXXSystem", R.style.KeyboardTheme_LXX_System, false),
         new KeyboardTheme(THEME_ID_SYSTEM_BORDER, "LXXSystemBorder", R.style.KeyboardTheme_LXX_System_Border, false),
         new KeyboardTheme(THEME_ID_LIGHT, "LXXLight", R.style.KeyboardTheme_LXX_Light, true),

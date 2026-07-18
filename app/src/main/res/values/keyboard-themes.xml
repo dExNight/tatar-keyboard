@@ -21,6 +21,7 @@
 <resources>
     <!-- For keyboard color scheme option dialog. -->
     <string-array name="keyboard_theme_names" translatable="false">
+        <item>@string/keyboard_theme_tatar</item>
         <item>@string/keyboard_theme_system</item>
         <item>@string/keyboard_theme_system_border</item>
         <item>@string/keyboard_theme_light</item>
@@ -30,6 +31,7 @@
     </string-array>
 
     <integer-array name="keyboard_theme_ids" translatable="false">
+        <item>7</item>
         <item>5</item>
         <item>6</item>
         <item>3</item>
@@ -39,6 +41,7 @@
     </integer-array>
 
     <string-array name="keyboard_theme_ids_string" translatable="false">
+        <item>7</item>
         <item>5</item>
         <item>6</item>
         <item>3</item>
@@ -48,6 +51,7 @@
     </string-array>
 
     <array name="keyboard_theme_colors" translatable="false">
+        <item>@color/ios_keyboard_background</item>
         <item>@color/background_lxx_system</item>
         <item>@color/background_lxx_system</item>
         <item>@color/background_lxx_light</item>

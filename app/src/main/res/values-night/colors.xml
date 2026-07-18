@@ -29,4 +29,19 @@
     <color name="key_hint_letter_color_lxx_system">#b2ffffff</color>
     <color name="key_background_normal_lxx_system">#ff5a595b</color>
     <color name="key_background_pressed_lxx_system">#20ffffff</color>
+
+    <!-- Color resources for iOS-style Tatar theme (dark). -->
+    <color name="ios_keyboard_background">#2C2C2C</color>
+    <color name="ios_keyboard_background_secondary">#3A3A3A</color>
+    <color name="ios_key_normal">#6B6B6B</color>
+    <color name="ios_key_normal_pressed">#7D7D7D</color>
+    <color name="ios_key_functional">#474747</color>
+    <color name="ios_key_functional_pressed">#8E8E8E</color>
+    <color name="ios_key_spacebar">#6B6B6B</color>
+    <color name="ios_key_spacebar_pressed">#7D7D7D</color>
+    <color name="ios_key_shadow">#B3000000</color>
+    <color name="ios_key_text_color">#FFFFFF</color>
+    <color name="ios_key_functional_text_color">#FFFFFF</color>
+    <color name="ios_key_text_inactive_color">#80FFFFFF</color>
+    <color name="ios_key_hint_color">#B2FFFFFF</color>
 </resources>

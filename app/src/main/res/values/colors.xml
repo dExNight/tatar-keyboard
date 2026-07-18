@@ -52,4 +52,19 @@
     <color name="key_background_pressed_lxx_dark">#4AAAAAAA</color>
     <!-- Dimensions for all themes. -->
     <dimen name="button_corner_radius_lxx">6dp</dimen>
+
+    <!-- Color resources for iOS-style Tatar theme (light). -->
+    <color name="ios_keyboard_background">#D4D6DD</color>
+    <color name="ios_keyboard_background_secondary">#C7CAD2</color>
+    <color name="ios_key_normal">#FFFFFF</color>
+    <color name="ios_key_normal_pressed">#C8CDD4</color>
+    <color name="ios_key_functional">#B3B7C0</color>
+    <color name="ios_key_functional_pressed">#FFFFFF</color>
+    <color name="ios_key_spacebar">#FFFFFF</color>
+    <color name="ios_key_spacebar_pressed">#C8CDD4</color>
+    <color name="ios_key_shadow">#40000000</color>
+    <color name="ios_key_text_color">#000000</color>
+    <color name="ios_key_functional_text_color">#3C3C43</color>
+    <color name="ios_key_text_inactive_color">#70000000</color>
+    <color name="ios_key_hint_color">#90000000</color>
  </resources>

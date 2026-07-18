@@ -93,6 +93,7 @@
     <string name="keyboard_theme_light" translatable="false">Material Light</string>
     <string name="keyboard_theme_system" translatable="false">System Default</string>
     <string name="keyboard_theme_system_border" translatable="false">System Default Border</string>
+    <string name="keyboard_theme_tatar" translatable="false">Tatar</string>
 
     <!-- Title of the button to add a language in the settings dialog [CHAR LIMIT=15] -->
     <string name="add">Add</string>
