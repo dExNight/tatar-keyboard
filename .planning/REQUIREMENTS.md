@@ -51,10 +51,10 @@ Requirements for initial release (майлстоун v1.0 MVP: release-ready APK
 
 ### Доступность
 
-- [ ] **A11Y-01**: TalkBack озвучивает клавиши: ExploreByTouchHelper, каждая клавиша — виртуальный узел
+- [x] **A11Y-01**: TalkBack озвучивает клавиши: ExploreByTouchHelper, каждая клавиша — виртуальный узел
   — *Аннотация (2026-07-18): Каркас фазы 6 достроен: клик по виртуальному узлу = синтез MotionEvent DOWN/UP в видимый центр клавиши → MainKeyboardView.processMotionEvent (AOSP-паттерн; штатный touch-путь, PointerTracker/KeyboardState не изменены — fork-Java-дифф 0 строк) + isClickable/isTextEntryKey + TYPE_VIEW_CLICKED. Ограничение: moreKeys-панель (ё/ъ long-press) вне a11y-дерева — backlog. Озвучка/набор с TalkBack — deferred UAT (SC3). См. 09-RESEARCH.md § 1, § 4.*
 
-- [ ] **A11Y-02**: Татарские буквы имеют контент-описания (напр. «татарская э» для ә)
+- [x] **A11Y-02**: Татарские буквы имеют контент-описания (напр. «татарская э» для ә)
   — *Аннотация (2026-07-18): Описания — KeyDescriptionMapper (прямой when по key.getCode(), без reflection): 6 татарских букв «татарская э/о/у/ж/н/х» ресурсами values/strings-a11y.xml (en base) + values-ru/strings-a11y.xml (AOSP-совместимые имена spoken_*); заглавные — шаблон «Заглавная %s»; 19 служебных (shift ×4 состояний по elementId, enter ×7 по imeAction, приоритет custom label); обычные буквы — label (ru-TTS). values-tt — backlog. См. 09-RESEARCH.md § 2–3.*
 
 ### Совместимость

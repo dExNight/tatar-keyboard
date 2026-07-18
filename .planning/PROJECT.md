@@ -12,6 +12,8 @@
 
 ### Validated
 
+- ✓ TalkBack: полные виртуальные узлы (описания «татарская э» и т.п., 27 строк en+ru, ACTION_CLICK реально печатает через штатный touch-путь) — Phase 9 (on-device TalkBack UAT отложен, принят)
+
 - ✓ Совместимость: edge-to-edge insets (upstream, подтверждено), directBoot device-protected prefs, no-composing (WebView-229 safe), password-подавление, ландшафт без fullscreen-extract (флип) — Phase 8; UAT-матрица 12×8 написана, прогон отложен
 
 - ✓ «Живость»: баллон-превью в слое (не PopupWindow), long-press панель со скольжением, хаптика+подсветка+звук на ACTION_DOWN (звук по умолчанию OFF), iOS-стилизация превью/панели — Phase 7 (on-device UAT отложен, принят)
@@ -110,4 +112,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-07-18 after Phase 8*
+*Last updated: 2026-07-19 after Phase 9*
