@@ -12,6 +12,8 @@
 
 ### Validated
 
+- ✓ «Живость»: баллон-превью в слое (не PopupWindow), long-press панель со скольжением, хаптика+подсветка+звук на ACTION_DOWN (звук по умолчанию OFF), iOS-стилизация превью/панели — Phase 7 (on-device UAT отложен, принят)
+
 - ✓ iOS-скин: Canvas-рендер по зафиксированной палитре/геометрии, light/dark, тема id=7 по умолчанию, собственные иконки, PERF-фиксы горячего пути, каркас ExploreByTouchHelper (+54 КБ APK) — Phase 6 (on-device UAT отложен, принят)
 
 - ✓ Жесты: двойной пробел → точка (AOSP-паттерн, 9 путей сброса состояния), свайп-курсор включён по умолчанию, multi-touch commit-on-second-touch — Phase 5 (on-device UAT отложен, принят)
@@ -106,4 +108,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-07-18 after Phase 6*
+*Last updated: 2026-07-18 after Phase 7*

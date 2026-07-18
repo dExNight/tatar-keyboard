@@ -2,7 +2,7 @@
 phase: 7
 slug: ios-skin-preview-panel
 # status lifecycle: draft (seeded by plan-phase) → validated (set by validate-phase §6)
-status: draft
+status: verified (mechanical) — on-device items deferred
 nyquist_compliant: false
 wave_0_complete: false
 created: 2026-07-18

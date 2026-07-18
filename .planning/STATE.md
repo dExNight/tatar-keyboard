@@ -2,18 +2,18 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-current_phase: 07
-current_phase_name: iOS-скин — превью, панель, отклик
-status: executed
-stopped_at: Phase 7 complete-local (structural verification passed; Task 3 UAT отложен по standing-схеме), ready to plan Phase 8
-last_updated: "2026-07-18T18:20:00.000Z"
+current_phase: 8
+current_phase_name: Совместимость
+status: planning
+stopped_at: Phase 7 complete-local (structural verification passed; Task 3 UAT отложен, принят), ready to plan Phase 8
+last_updated: "2026-07-18T18:27:03.394Z"
 last_activity: 2026-07-18
-last_activity_desc: Phase 07 plan 07-01 complete-local (UAT deferred)
 progress:
   total_phases: 7
   completed_phases: 7
   total_plans: 8
   completed_plans: 8
+last_activity_desc: Phase 07 plan 07-01 complete-local (UAT deferred)
 ---
 
 # State: Tatar Keyboard
@@ -21,10 +21,10 @@ progress:
 ## Current Position
 
 **Milestone:** v1.0 — MVP + релиз (GitHub Releases + IzzyOnDroid)
-**Phase:** 07 (iOS-скин — превью, панель, отклик) — COMPLETE-LOCAL (UAT deferred)
-**Plan:** 1 of 1 complete
-**Status:** Phase 07 complete-local, ready to plan Phase 8
-**Last activity:** 2026-07-18 — Phase 07 plan 07-01 complete-local (UAT deferred)
+**Phase:** 8 — Совместимость
+**Plan:** Not started
+**Status:** Ready to plan
+**Last activity:** 2026-07-18
 
 Progress: [██████████] 100%
 
@@ -97,10 +97,10 @@ Progress: [██████████] 100%
 
 ## Session Continuity
 
-**Stopped at:** Phase 7 complete-local (structural verification passed; Task 3 UAT отложен, принят), ready to plan Phase 8
+**Stopped at:** Phase 7 complete (verification passed; UAT отложен, принят), ready to plan Phase 8
 **Resume file:** None
 
-**Next step:** Phase 8 — Совместимость (полный проход матрицы InputConnection).
+**Next step:** Phase 8 — Совместимость (InputConnection-матрица, MIUI/HyperOS, WebView, edge-to-edge, ландшафт).
 
 Last session: 2026-07-18T18:20:00Z
 
