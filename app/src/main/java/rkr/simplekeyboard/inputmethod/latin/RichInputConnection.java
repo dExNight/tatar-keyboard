@@ -352,7 +352,9 @@ public final class RichInputConnection {
             mExpectedSelStart -= numChars;
         }
 
-        mIC.deleteSurroundingText(numChars, 0);
+        if (isConnected()) {
+            mIC.deleteSurroundingText(numChars, 0);
+        }
     }
 
     public void deleteSelectedText() {
