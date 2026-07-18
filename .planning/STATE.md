@@ -2,18 +2,18 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-current_phase: 05
-current_phase_name: Механика ввода — жесты и multi-touch
-status: complete
-stopped_at: "Phase 5 complete-local (05-01: double-space→period восстановлен, свайп-дефолт true, INPUT-07 запинован; on-device UAT отложен по standing-паттерну)"
-last_updated: "2026-07-18T13:48:44Z"
+current_phase: 6
+current_phase_name: iOS-скин — Canvas-отрисовка и темы
+status: planning
+stopped_at: Completed 05-01-PLAN.md (complete-local; Task 4 UAT deferred → Blockers)
+last_updated: "2026-07-18T14:12:10.953Z"
 last_activity: 2026-07-18
-last_activity_desc: Phase 05 plan 05-01 complete-local (UAT deferred)
 progress:
   total_phases: 5
   completed_phases: 5
   total_plans: 6
   completed_plans: 6
+last_activity_desc: Phase 05 plan 05-01 complete-local (UAT deferred)
 ---
 
 # State: Tatar Keyboard
@@ -21,10 +21,10 @@ progress:
 ## Current Position
 
 **Milestone:** v1.0 — MVP + релиз (GitHub Releases + IzzyOnDroid)
-**Phase:** 05 (Механика ввода — жесты и multi-touch) — COMPLETE-LOCAL
-**Plan:** 1 of 1 (05-01 done; Task 4 UAT deferred)
-**Status:** Phase 05 complete-local, on-device UAT deferred
-**Last activity:** 2026-07-18 — 05-01 complete-local (UAT deferred)
+**Phase:** 6 — iOS-скин — Canvas-отрисовка и темы
+**Plan:** Not started
+**Status:** Ready to plan
+**Last activity:** 2026-07-18
 
 Progress: [██████████] 100%
 
@@ -89,10 +89,10 @@ Progress: [██████████] 100%
 
 ## Session Continuity
 
-**Stopped at:** Completed 05-01-PLAN.md (complete-local; Task 4 UAT deferred → Blockers)
+**Stopped at:** Phase 5 complete (verification passed; UAT отложен, принят), ready to plan Phase 6
 **Resume file:** None
 
-**Next step:** Phase 6 — iOS-скин: Canvas-отрисовка и темы (решение План Б GPL до старта фазы 6 — см. Decisions).
+**Next step:** Phase 6 — iOS-скин: Canvas-отрисовка и темы. Перед стартом — решение Плана Б (см. Decisions).
 
 Last session: 2026-07-18T13:48:44Z
 

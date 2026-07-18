@@ -12,6 +12,8 @@
 
 ### Validated
 
+- ✓ Жесты: двойной пробел → точка (AOSP-паттерн, 9 путей сброса состояния), свайп-курсор включён по умолчанию, multi-touch commit-on-second-touch — Phase 5 (on-device UAT отложен, принят)
+
 - ✓ Механика символьного ввода (shift 3 состояния, автокапитализация, backspace по кодпоинтам с автоповтором, Enter по imeOptions) подтверждена в базе форка структурно, zero-code фаза — Phase 4 (on-device UAT отложен, принят)
 
 - ✓ Три языка (tt_RU «Татарча» / ru / en_US), long-press дубли 10 пар на обеих кириллических раскладках, глобус цикл+пикер, персистентность subtype — Phase 3 (on-device подтверждение отложено, принято)
@@ -102,4 +104,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-07-18 after Phase 4*
+*Last updated: 2026-07-18 after Phase 5*
