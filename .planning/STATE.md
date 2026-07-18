@@ -4,9 +4,9 @@ milestone: v1.0
 milestone_name: milestone
 current_phase: 09
 current_phase_name: Доступность
-status: executing
-stopped_at: Completed 08-01-PLAN.md — Phase 8 complete-local (Task 4 UAT deferred, см. Blockers)
-last_updated: "2026-07-18T20:06:55.623Z"
+status: verifying
+stopped_at: Completed 09-01-PLAN.md — Phase 9 complete-local (Task 4 TalkBack UAT deferred, см. Blockers)
+last_updated: "2026-07-18T20:21:47.634Z"
 last_activity: 2026-07-18
 last_activity_desc: Phase 09 execution started
 progress:
@@ -21,12 +21,12 @@ progress:
 ## Current Position
 
 **Milestone:** v1.0 — MVP + релиз (GitHub Releases + IzzyOnDroid)
-**Phase:** 09 (Доступность) — EXECUTING
+**Phase:** 09 (Доступность) — COMPLETE-LOCAL (Task 4 TalkBack UAT deferred)
 **Plan:** 1 of 1
-**Status:** Executing Phase 09
-**Last activity:** 2026-07-18 — Phase 09 execution started
+**Status:** Phase complete — ready for verification
+**Last activity:** 2026-07-18 — Phase 09 plan 09-01 complete-local (UAT deferred)
 
-Progress: [██████████] 100%
+Progress: [█████████░] 90%
 
 ## Accumulated Context
 
@@ -95,6 +95,8 @@ Progress: [██████████] 100%
 
 - ⚠️ [Phase 8, plan 08-01] Task 4 on-device UAT deferred — устройство не подключено (adb devices пуст), по standing-паттерну фаз 1–7. BUILD-критерии закрыты автоматикой (assembleDebug + assembleRelease зелёные, check-no-internet OK, все 5 COMPAT-вердиктов запинованы fail-capable-грепами, extract mode мёртв во всех 5 config-вариантах, zero-Java boundary: diff d2ae619..HEAD по app/ = ровно values-land/config.xml, ни одного .java/.kt). Исполняемый чеклист — **08-UAT-MATRIX.md** (self-contained: 12 окружений × 8 сценариев, структурные механизмы CLOSED-STRUCTURAL со ссылками, все runtime-ячейки DEFERRED; подготовка/порядок прогона/спец-блоки E8 эмулятор API 35–36, E9 ландшафт без extract mode, E10 Direct Boot PIN, E11 MIUI, E12 One UI — внутри документа). Прогнать вместе с UAT-бандлом фаз 1–7; блок E8 исполним на эмуляторе отдельно, раньше телефона (A4). Финальная простановка чек-боксов COMPAT-01..05 в REQUIREMENTS.md — только после реального прогона.
 
+- ⚠️ [Phase 9, plan 09-01] Task 4 on-device TalkBack UAT deferred — устройство не подключено (adb devices пуст), по standing-паттерну фаз 1–8. BUILD-критерии закрыты автоматикой (assembleDebug + assembleRelease зелёные, check-no-internet OK, release-APK 718 695 байт ≤ 3 МБ, все линии A11Y запинованы fail-capable-грепами, zero-fork-Java boundary: diff 0a280ce..HEAD по app/ = ровно 4 файла — 2 .kt + 2 .xml, ни одного .java). Чек-лист при появлении устройства (установить свежий app-debug.apk, включить TalkBack: Настройки → Спец. возможности): (1) SC1/SC2 explore-by-touch: медленно вести палец по всем рядам татарской раскладки — TalkBack называет КАЖДУЮ клавишу; пятый ряд: ә → «татарская э», ө → «татарская о», ү → «татарская у», җ → «татарская ж», ң → «татарская н», һ → «татарская х»; shift → Ә → «Заглавная татарская э»; служебные: shift/«Клавиша верхнего регистра» (после тапа — «Верхний регистр включён», после двойного — «Caps Lock включён»), delete/«Удалить», пробел/«Пробел», enter в Telegram/«Отправить», ?123/«Символы» → АБВ/«Буквы», глобус/«Сменить язык»; ни одного «shift_key»/сырого имени. (2) SC3 — главный критерий: в Telegram двойным тапом (и, если работает, lift-to-type — A2) набрать «әни» и отправить: каждая буква печатается, слышен earcon клика, слово ушло в чат; проверить и русскую раскладку (глобус двойным тапом → «привет»). (3) Динамика: тап shift → описания букв меняются на заглавные; смена раскладки → узлы новой раскладки озвучиваются. (4) Password: поле пароля — клавиши озвучиваются по именам (описания не обскьюрены — осознанное решение), набранное IME сам не произносит. (5) SC4 — не-TalkBack смоук: ВЫКЛЮЧИТЬ TalkBack → обычная печать в Telegram и Chrome/WebView (буквы, backspace-удержание, double-space→точка, свайп-курсор, long-press панель, баллон) — без деградации. Финальная простановка чек-боксов A11Y-01/02 в REQUIREMENTS.md — только после прогона.
+
 ### Research pointers
 
 - `.planning/research/SUMMARY.md` — конденсат; детали в `research/00`–`08` в корне.
@@ -105,12 +107,12 @@ Progress: [██████████] 100%
 
 ## Session Continuity
 
-**Stopped at:** Phase 8 complete (verification passed; матрица отложена, принята), ready to plan Phase 9
+**Stopped at:** Completed 09-01-PLAN.md — Phase 9 complete-local (Task 4 TalkBack UAT deferred, см. Blockers)
 **Resume file:** None
 
 **Next step:** Phase 9 — Доступность (TalkBack/ExploreByTouch верификация).
 
-Last session: 2026-07-18T19:12:00Z
+Last session: 2026-07-18T20:21:47.628Z
 
 ---
 *Last updated: 2026-07-18 — Phase 1 complete*
@@ -128,3 +130,4 @@ Last session: 2026-07-18T19:12:00Z
 | Phase 06 P01 | 15 min | 6 of 7 tasks (Task 7 UAT deferred) | 18 files (17 app + gradle.properties) |
 | Phase 07 P01 | 25 min | 2 of 3 tasks (Task 3 UAT deferred) | 3 app files (zero Java) + planning |
 | Phase 08 P01 | 12 min | 3 of 4 tasks (Task 4 UAT deferred) | 1 app file (1 line, zero Java) + planning |
+| Phase 09 P01 | 12 min | 4 tasks | 6 files |

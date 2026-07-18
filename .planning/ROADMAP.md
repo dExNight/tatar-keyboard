@@ -161,6 +161,7 @@ Smoke-тесты шли в каждой фазе; здесь — система�
 **Mode:** mvp
 **Requirements:** A11Y-01, A11Y-02
 **Depends on:** Phase 8
+**Progress:** 09-01 ✓ complete-local (Tasks 1–3: KeyDescriptionMapper + strings-a11y.xml en/ru — «татарская э» для ә, 26 spoken_*-строк; делегат достроен — ACTION_CLICK → синтез MotionEvent DOWN/UP → processMotionEvent + TYPE_VIEW_CLICKED, isClickable/isTextEntryKey; все линии запинованы fail-capable-грепами; сборки/no-internet/APK-гейт зелёные; zero-fork-Java boundary 0a280ce..HEAD = ровно 4 файла, ни одного .java); Task 4 device TalkBack UAT — deferred, human verification pending, см. STATE.md § Blockers
 
 Каркас ExploreByTouchHelper заложен в фазе 6 — здесь полная реализация и верификация с включённым TalkBack.
 
