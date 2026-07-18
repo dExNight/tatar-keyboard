@@ -83,6 +83,11 @@ class KeyboardAccessibilityDelegate(
         node.setBoundsInParent(tempBounds)
         node.addAction(AccessibilityNodeInfoCompat.ACTION_CLICK)
         node.isClickable = true
+        // Set on every key, not just letters: the framework contract for this flag is "a
+        // text entry key that is part of a keyboard or keypad", i.e. any key of an IME.
+        // TalkBack uses it to enable lift-to-type across the whole keyboard (including
+        // delete/shift); restricting it to letters would break lift-to-type on delete.
+        // Matches Gboard/LatinIME. Do not "fix" to letters-only.
         node.isTextEntryKey = true
     }
 

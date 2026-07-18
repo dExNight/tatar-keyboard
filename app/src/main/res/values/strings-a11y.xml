@@ -40,6 +40,7 @@
     <string name="spoken_description_symbols_shift_shifted">Symbols</string>
 
     <!-- Other functional keys. -->
+    <string name="spoken_description_tab">Tab</string>
     <string name="spoken_description_delete">Delete</string>
     <string name="spoken_description_space">Space</string>
     <string name="spoken_description_return">Enter</string>

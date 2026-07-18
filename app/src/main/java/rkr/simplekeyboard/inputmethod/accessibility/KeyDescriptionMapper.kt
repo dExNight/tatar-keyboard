@@ -72,6 +72,7 @@ object KeyDescriptionMapper {
                 else -> R.string.spoken_description_shift
             }
             Constants.CODE_DELETE -> R.string.spoken_description_delete
+            Constants.CODE_TAB -> R.string.spoken_description_tab
             Constants.CODE_SPACE -> R.string.spoken_description_space
             Constants.CODE_ENTER -> {
                 // A custom action label (e.g. a web form's own label) wins.

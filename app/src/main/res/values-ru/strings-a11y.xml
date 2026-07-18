@@ -39,6 +39,7 @@
     <string name="spoken_description_symbols_shift_shifted">Символы</string>
 
     <!-- Остальные служебные клавиши. -->
+    <string name="spoken_description_tab">Табуляция</string>
     <string name="spoken_description_delete">Удалить</string>
     <string name="spoken_description_space">Пробел</string>
     <string name="spoken_description_return">Ввод</string>
