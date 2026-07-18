@@ -2,18 +2,18 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-current_phase: 5
+current_phase: 05
 current_phase_name: Механика ввода — жесты и multi-touch
-status: planning
+status: executing
 stopped_at: "Phase 4 complete-local (04-01: структурная верификация PASS, zero-code boundary доказан; on-device UAT отложен по standing-паттерну), ready to plan Phase 5"
-last_updated: "2026-07-18T13:27:13.566Z"
+last_updated: "2026-07-18T13:43:09.083Z"
 last_activity: 2026-07-18
+last_activity_desc: Phase 05 execution started
 progress:
-  total_phases: 4
+  total_phases: 5
   completed_phases: 4
-  total_plans: 5
+  total_plans: 6
   completed_plans: 5
-last_activity_desc: Phase 04 plan 04-01 executed (zero-code verification; device UAT deferred)
 ---
 
 # State: Tatar Keyboard
@@ -21,10 +21,10 @@ last_activity_desc: Phase 04 plan 04-01 executed (zero-code verification; device
 ## Current Position
 
 **Milestone:** v1.0 — MVP + релиз (GitHub Releases + IzzyOnDroid)
-**Phase:** 5 — Механика ввода — жесты и multi-touch
-**Plan:** Not started
-**Status:** Ready to plan
-**Last activity:** 2026-07-18
+**Phase:** 05 (Механика ввода — жесты и multi-touch) — EXECUTING
+**Plan:** 1 of 1
+**Status:** Executing Phase 05
+**Last activity:** 2026-07-18 — Phase 05 execution started
 
 Progress: [██████████] 100%
 
@@ -51,6 +51,8 @@ Progress: [██████████] 100%
 
 - [03-01] Long-press дубли — литеральные `latin:moreKeys` одиночными кодпоинтами (10 клавиш вкл. е→ё/ь→ъ из F1), без KeyboardTextsTable; заглавные не прописываются (MoreKeySpec auto-upcase). Русская раскладка — собственный layout set `russian` (6 XML, копия tatar-рядов без пятого ряда) — shared east_slavic (be_BY/kk/ky/uk) не тронут. Реестр: LOCALE_TATAR мигрирован на "tt_RU" (prefs-миграцию не писали — dev-строка tt:tatar самовосстанавливается), getDefaultSubtypes = детерминированная тройка tt_RU→ru→en_US (MVP-хак и мёртвый fallback F2 удалены). «Татарча» через locale_exception_keys. SWITCH-01/02 (глобус/цикл/пикер/персистентность) — ноль нового кода, штатные механизмы форка; pref_enable_ime_switch остаётся false (цикл строго внутри IME). Трактовка A3: «система видит три subtype» = виртуальный subtype-реестр форка — при простановке SWITCH-01 в REQUIREMENTS.md добавить аннотацию.
 
+- [05-01] Double-space→period восстановлен в InputLogic по AOSP-паттерну: always-on без pref, константа 1100 мс, гейты password + буква/цифра-перед-пробелом (новый cache-only аксессор getCodePointBeforeCursor(offset) в RichInputConnection), revert по backspace; гигиена состояния — сбросы mJustDoubleSpaced/mLastSpaceDownTime в startInput() и на любом событии кроме успешного double-space (несепаратор, не-пробельный сепаратор, backspace без revert). Свайп-дефолт pref_space_swipe → true в 3 согласованных местах (Settings.java, prefs_screen_preferences.xml, app_restrictions.xml); pref_delete_swipe не тронут. INPUT-07 — zero-work, доказательства запинованы fail-capable-грепами. Boundary фазы = 5 объявленных файлов (diff-чек от 8e4693e).
+
 - [04-01] Фаза 4 — zero-code верификация: вердикт ресерча 04-RESEARCH.md ALL WORKS (INPUT-01..04 работают в базе форка), все доказательства запинованы fail-capable-грепами. Принята трактовка INPUT-03 (2026-07-18): эквивалент deleteSurroundingText с подсчётом по кодпоинту + AOSP-автоповтор 400 мс → 50 мс. Бонус INPUT-01: caps lock long-press'ом shift (1200 мс). Диф кода фазы пуст (boundary-check b19ce97..HEAD по app/ = пусто).
 
 ### Cross-cutting disciplines (каждая фаза)
@@ -64,6 +66,7 @@ Progress: [██████████] 100%
 - Порядок клавиш пятого ряда (алфавитный vs частотный) — юзер-тест после MVP.
 - minSdk 24 vs 26 — решить перед фазой 11.
 - Финальное название приложения и applicationId — до публикации.
+- app_restrictions.xml: android:title перепутаны между pref_enable_ime_switch и pref_space_swipe (pre-existing upstream, ~строки 40/45) — поправить отдельным коммитом вне фазы 5.
 - Прогрессивный разгон backspace (удаление словами после N повторов, как в Gboard) — post-MVP, после юзер-теста; `repeatCount` уже пробрасывается в `onKeyRepeat` (TimerHandler.java:53).
 
 ### Blockers/Concerns

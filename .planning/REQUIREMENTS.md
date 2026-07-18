@@ -31,7 +31,9 @@ Requirements for initial release (майлстоун v1.0 MVP: release-ready APK
 
 - [x] **INPUT-04**: Клавиша Enter показывает и выполняет действие поля по imeOptions (поиск/перенос/готово/отправить)
 - [ ] **INPUT-05**: Двойной тап по пробелу вставляет точку с пробелом
+  — *Аннотация (2026-07-18): восстановлено по AOSP-паттерну (rkkr вырезал), always-on без pref, таймаут 1100 мс, гейты password + буква/цифра, revert по backspace. См. 05-RESEARCH.md § INPUT-05.*
 - [ ] **INPUT-06**: Свайп по пробелу перемещает курсор
+  — *Аннотация (2026-07-18): механика штатная в форке; работа фазы — флип default pref_space_swipe → true (3 места). См. 05-RESEARCH.md § INPUT-06.*
 - [ ] **INPUT-07**: Multi-touch: при втором касании первая клавиша коммитится (быстрая печать двумя пальцами не теряет буквы)
 
 ### iOS-скин
@@ -127,9 +129,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | INPUT-02 | Phase 4 | Verifying (04-01: structural PASS; on-device UAT deferred) |
 | INPUT-03 | Phase 4 | Verifying (04-01: structural PASS; on-device UAT deferred) |
 | INPUT-04 | Phase 4 | Verifying (04-01: structural PASS; on-device UAT deferred) |
-| INPUT-05 | Phase 5 | Pending |
-| INPUT-06 | Phase 5 | Pending |
-| INPUT-07 | Phase 5 | Pending |
+| INPUT-05 | Phase 5 | Verifying (05-01: structural PASS; on-device UAT deferred) |
+| INPUT-06 | Phase 5 | Verifying (05-01: structural PASS; on-device UAT deferred) |
+| INPUT-07 | Phase 5 | Verifying (05-01: structural PASS; on-device UAT deferred) |
 | UI-01 | Phase 6 | Pending |
 | UI-02 | Phase 7 | Pending |
 | UI-03 | Phase 7 | Pending |
