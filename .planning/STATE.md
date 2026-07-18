@@ -5,14 +5,15 @@ milestone_name: milestone
 current_phase: 1
 current_phase_name: Форк и hello-world
 status: executing
-last_updated: "2026-07-18T02:00:00.000Z"
+stopped_at: Completed 01-01-PLAN.md (Task 5 device-verify deferred)
+last_updated: "2026-07-18T06:37:09.700Z"
 last_activity: 2026-07-18
-last_activity_desc: Plan 01-01 tasks 1-4 done, paused at Task 5 human-verify checkpoint
+last_activity_desc: Plan 01-01 paused at device-verify checkpoint
 progress:
   total_phases: 1
   completed_phases: 0
   total_plans: 2
-  completed_plans: 0
+  completed_plans: 1
 ---
 
 # State: Tatar Keyboard
@@ -21,11 +22,11 @@ progress:
 
 **Milestone:** v1.0 — MVP + релиз (GitHub Releases + IzzyOnDroid)
 **Phase:** 1 (Форк и hello-world) — EXECUTING
-**Plan:** 01-01 — tasks 1–4 complete (commits 6594bcd, 43860bb, 852b163, 5bbda51); PAUSED at Task 5 checkpoint:human-verify (on-device smoke test: install, enable IME, type, logcat interop)
+**Plan:** 01-01 — CLOSED (tasks 1–4 complete: 6594bcd, 43860bb, 852b163, 5bbda51). Task 5 on-device smoke DEFERRED by user (human_needed — install APK, enable IME, type, logcat «Kotlin interop OK»). Next: plan 01-02.
 **Status:** Executing Phase 1
-**Last activity:** 2026-07-18 — Plan 01-01 paused at device-verify checkpoint
+**Last activity:** 2026-07-18 — Plan 01-01 closed; device verification deferred
 
-Progress: [░░░░░░░░░░░] 0/11 phases
+Progress: [█████░░░░░] 50%
 
 ## Accumulated Context
 
@@ -65,9 +66,18 @@ Progress: [░░░░░░░░░░░] 0/11 phases
 
 ## Session Continuity
 
+**Stopped at:** Completed 01-01-PLAN.md (Task 5 device-verify deferred)
+**Resume file:** None
+
 **Next step:** `/gsd-execute-phase 1` — исполнение фазы «Форк и hello-world» (wave 1: 01-01, wave 2: 01-02; оба плана с human-verify чекпойнтами на устройстве).
 
-Last session: 2026-07-18 — инициализация проекта, требования (34 v1), роадмап (11 фаз).
+Last session: 2026-07-18T06:36:57.302Z
 
 ---
 *Last updated: 2026-07-18 — roadmap created*
+
+## Performance Metrics
+
+| Plan | Duration | Tasks | Files |
+|------|----------|-------|-------|
+| Phase 1 P01 | 35 min | 4 tasks | 7 files |

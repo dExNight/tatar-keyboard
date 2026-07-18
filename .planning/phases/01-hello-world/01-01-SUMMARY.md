@@ -182,6 +182,12 @@ None для этого плана — внешние сервисы не нас�
 - **Блокер к «полностью verified»:** on-device смоук Task 5 (human_needed) отложен. Phase 1 verification должна поднять его как незакрытый human-verify.
 - Готово к плану 01-02 (keystore/signingConfig + CI на GitHub Actions, где `scripts/check-no-internet.sh` встаёт в workflow).
 
+## Self-Check: PASSED
+
+- Files verified on disk: `scripts/check-no-internet.sh`, `KotlinInteropCheck.kt`, `01-01-SUMMARY.md`, `gradle/wrapper/gradle-wrapper.jar` — all FOUND.
+- Task commits verified in git log: `6594bcd`, `43860bb`, `852b163`, `5bbda51` — all FOUND.
+- Task 5 (on-device smoke) intentionally NOT verified — deferred by user, routed as human_needed.
+
 ---
 *Phase: 01-hello-world*
 *Completed: 2026-07-18 (Task 5 deferred — human verification pending)*
