@@ -34,6 +34,17 @@ jobs:
       - name: Build debug APK
         run: ./gradlew assembleDebug
 
+      # keystore.properties is gitignored, so signingConfig is skipped by design
+      # (app/build.gradle) and assembleRelease produces an unsigned APK. That is
+      # correct for CI: the gates below check size and resources, not the signature
+      # (the signature is verified locally with apksigner).
+      - name: Build release APK (unsigned)
+        run: ./gradlew assembleRelease
+
+      # PERF-01: hard budget 3 MB = 3145728 bytes (1024*1024*3), byte-exact via stat.
+      - name: Check release APK size (PERF-01 ≤ 3 MB)
+        run: test $(stat -c%s app/build/outputs/apk/release/app-release-unsigned.apk) -le 3145728
+
       # PERF-04, both levels: source manifest + aapt2 dump permissions on the built APK
       - name: Check no INTERNET permission (built APK)
         run: bash scripts/check-no-internet.sh app/build/outputs/apk/debug/app-debug.apk
