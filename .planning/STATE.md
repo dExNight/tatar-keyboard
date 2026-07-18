@@ -4,16 +4,16 @@ milestone: v1.0
 milestone_name: milestone
 current_phase: 10
 current_phase_name: Онбординг и настройки
-status: executing
-stopped_at: Completed 09-01-PLAN.md — Phase 9 complete-local (Task 4 TalkBack UAT deferred, см. Blockers)
-last_updated: "2026-07-18T21:44:57.184Z"
+status: verifying
+stopped_at: Completed 10-01-PLAN.md — Phase 10 complete-local (Task 5 device UAT deferred)
+last_updated: "2026-07-18T21:59:44.725Z"
 last_activity: 2026-07-19
 last_activity_desc: Phase 10 execution started
 progress:
   total_phases: 10
-  completed_phases: 9
+  completed_phases: 10
   total_plans: 11
-  completed_plans: 10
+  completed_plans: 11
 ---
 
 # State: Tatar Keyboard
@@ -23,10 +23,10 @@ progress:
 **Milestone:** v1.0 — MVP + релиз (GitHub Releases + IzzyOnDroid)
 **Phase:** 10 (Онбординг и настройки) — EXECUTING
 **Plan:** 1 of 1
-**Status:** Executing Phase 10
+**Status:** Phase complete — ready for verification
 **Last activity:** 2026-07-19 — Phase 10 execution started
 
-Progress: [█████████░] 90%
+Progress: [██████████] 100%
 
 ## Accumulated Context
 
@@ -99,6 +99,8 @@ Progress: [█████████░] 90%
 
 - ⚠️ [Phase 8, plan 08-01] Task 4 on-device UAT deferred — устройство не подключено (adb devices пуст), по standing-паттерну фаз 1–7. BUILD-критерии закрыты автоматикой (assembleDebug + assembleRelease зелёные, check-no-internet OK, все 5 COMPAT-вердиктов запинованы fail-capable-грепами, extract mode мёртв во всех 5 config-вариантах, zero-Java boundary: diff d2ae619..HEAD по app/ = ровно values-land/config.xml, ни одного .java/.kt). Исполняемый чеклист — **08-UAT-MATRIX.md** (self-contained: 12 окружений × 8 сценариев, структурные механизмы CLOSED-STRUCTURAL со ссылками, все runtime-ячейки DEFERRED; подготовка/порядок прогона/спец-блоки E8 эмулятор API 35–36, E9 ландшафт без extract mode, E10 Direct Boot PIN, E11 MIUI, E12 One UI — внутри документа). Прогнать вместе с UAT-бандлом фаз 1–7; блок E8 исполним на эмуляторе отдельно, раньше телефона (A4). Финальная простановка чек-боксов COMPAT-01..05 в REQUIREMENTS.md — только после реального прогона.
 
+- ⚠️ [Phase 10, plan 10-01] Task 5 on-device UAT deferred — устройство не подключено (adb devices пуст), по standing-паттерну фаз 1–9. BUILD-критерии закрыты автоматикой (assembleDebug + assembleRelease зелёные, check-no-internet OK, release-APK 728 719 байт ≤ 3 145 728, все структурные грепы SETUP-01/02 PASS, boundary 13ce533..HEAD по app/ = ровно 6 объявленных файлов, без gradle/ic_launcher/старых strings.xml). Чек-лист при появлении устройства (полные шаги — 10-01-SUMMARY.md § Deferred Verification): (1) SC3 главный — чистая установка: adb uninstall org.tatarkeyboard.ime.debug → adb install app-debug.apk → тап по иконке «Tatar Keyboard (dev)» на лаунчере → открывается ОНБОРДИНГ (не настройки), 2 карточки шагов не завершены; (2) шаг 1: «Включить клавиатуру» → системный экран → включить → назад → карточка шага 1 ✓ БЕЗ ручного обновления, шаг 2 активен; (3) шаг 2: «Выбрать клавиатуру» → системный picker → выбрать → после закрытия экран сам показывает «Готово» с подсказкой «ә» (рефреш по возврату фокуса — Pitfall 2); (4) финал SC3: Telegram → напечатать «ә» (пятый ряд) и отправить — от иконки до «ә» без подсказок; (5) «Готово»-кнопка: вернуться в онбординг (иконка) → сразу «Готово»-состояние (статусы живые) → «Открыть настройки» → SettingsActivity; старый диалог «Simple Keyboard is not enabled…» НЕ появляется нигде; (6) SC2-live (SETUP-02): Настройки → «Нажатие клавиши» → включить/выключить звук клика → отклик меняется сразу; выключить/включить вибрацию → отклик меняется без перезапуска IME; (7) SC4 smoke-матрица: печать в Telegram и Chrome/WebView (буквы/пятый ряд, глобус tt-ru-en, shift/caps, backspace-удержание, double-space→точка, свайп-курсор, long-press панель, баллон) + password-поле — без деградации; IME→настройки через ⚙-путь клавиатуры работает. Финальная простановка чек-боксов SETUP-01/02 в REQUIREMENTS.md — только после прогона. Прогнать вместе с UAT-бандлом фаз 1–9.
+
 - ⚠️ [Phase 9, plan 09-01] Task 4 on-device TalkBack UAT deferred — устройство не подключено (adb devices пуст), по standing-паттерну фаз 1–8. BUILD-критерии закрыты автоматикой (assembleDebug + assembleRelease зелёные, check-no-internet OK, release-APK 718 695 байт ≤ 3 МБ, все линии A11Y запинованы fail-capable-грепами, zero-fork-Java boundary: diff 0a280ce..HEAD по app/ = ровно 4 файла — 2 .kt + 2 .xml, ни одного .java). Чек-лист при появлении устройства (установить свежий app-debug.apk, включить TalkBack: Настройки → Спец. возможности): (1) SC1/SC2 explore-by-touch: медленно вести палец по всем рядам татарской раскладки — TalkBack называет КАЖДУЮ клавишу; пятый ряд: ә → «татарская э», ө → «татарская о», ү → «татарская у», җ → «татарская ж», ң → «татарская н», һ → «татарская х»; shift → Ә → «Заглавная татарская э»; служебные: shift/«Клавиша верхнего регистра» (после тапа — «Верхний регистр включён», после двойного — «Caps Lock включён»), delete/«Удалить», пробел/«Пробел», enter в Telegram/«Отправить», ?123/«Символы» → АБВ/«Буквы», глобус/«Сменить язык»; ни одного «shift_key»/сырого имени. (2) SC3 — главный критерий: в Telegram двойным тапом (и, если работает, lift-to-type — A2) набрать «әни» и отправить: каждая буква печатается, слышен earcon клика, слово ушло в чат; проверить и русскую раскладку (глобус двойным тапом → «привет»). (3) Динамика: тап shift → описания букв меняются на заглавные; смена раскладки → узлы новой раскладки озвучиваются. (4) Password: поле пароля — клавиши озвучиваются по именам (описания не обскьюрены — осознанное решение), набранное IME сам не произносит. (5) SC4 — не-TalkBack смоук: ВЫКЛЮЧИТЬ TalkBack → обычная печать в Telegram и Chrome/WebView (буквы, backspace-удержание, double-space→точка, свайп-курсор, long-press панель, баллон) — без деградации. Финальная простановка чек-боксов A11Y-01/02 в REQUIREMENTS.md — только после прогона.
 
 ### Research pointers
@@ -111,12 +113,12 @@ Progress: [█████████░] 90%
 
 ## Session Continuity
 
-**Stopped at:** Phase 9 complete (verification passed; TalkBack UAT отложен, принят), ready to plan Phase 10
+**Stopped at:** Completed 10-01-PLAN.md — Phase 10 complete-local (Task 5 device UAT deferred)
 **Resume file:** None
 
 **Next step:** Phase 10 — Онбординг и настройки.
 
-Last session: 2026-07-18T20:21:47.628Z
+Last session: 2026-07-18T21:59:44.720Z
 
 ---
 *Last updated: 2026-07-18 — Phase 1 complete*
@@ -135,3 +137,4 @@ Last session: 2026-07-18T20:21:47.628Z
 | Phase 07 P01 | 25 min | 2 of 3 tasks (Task 3 UAT deferred) | 3 app files (zero Java) + planning |
 | Phase 08 P01 | 12 min | 3 of 4 tasks (Task 4 UAT deferred) | 1 app file (1 line, zero Java) + planning |
 | Phase 09 P01 | 12 min | 4 tasks | 6 files |
+| Phase 10 P01 | 10 min | 4 of 5 tasks (Task 5 UAT deferred) tasks | 6 app files (4 new + 2 edits) + planning files |
