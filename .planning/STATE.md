@@ -2,18 +2,18 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-current_phase: 6
+current_phase: 06
 current_phase_name: iOS-скин — Canvas-отрисовка и темы
-status: planning
+status: executing
 stopped_at: Completed 05-01-PLAN.md (complete-local; Task 4 UAT deferred → Blockers)
-last_updated: "2026-07-18T14:12:10.953Z"
+last_updated: "2026-07-18T14:39:39.422Z"
 last_activity: 2026-07-18
+last_activity_desc: Phase 06 execution started
 progress:
-  total_phases: 5
+  total_phases: 6
   completed_phases: 5
-  total_plans: 6
+  total_plans: 7
   completed_plans: 6
-last_activity_desc: Phase 05 plan 05-01 complete-local (UAT deferred)
 ---
 
 # State: Tatar Keyboard
@@ -21,10 +21,10 @@ last_activity_desc: Phase 05 plan 05-01 complete-local (UAT deferred)
 ## Current Position
 
 **Milestone:** v1.0 — MVP + релиз (GitHub Releases + IzzyOnDroid)
-**Phase:** 6 — iOS-скин — Canvas-отрисовка и темы
-**Plan:** Not started
-**Status:** Ready to plan
-**Last activity:** 2026-07-18
+**Phase:** 06 (iOS-скин — Canvas-отрисовка и темы) — EXECUTING
+**Plan:** 1 of 1
+**Status:** Executing Phase 06
+**Last activity:** 2026-07-18 — Phase 06 execution started
 
 Progress: [██████████] 100%
 
@@ -53,6 +53,8 @@ Progress: [██████████] 100%
 
 - [05-01] Double-space→period восстановлен в InputLogic по AOSP-паттерну: always-on без pref, константа 1100 мс, гейты password + буква/цифра-перед-пробелом (новый cache-only аксессор getCodePointBeforeCursor(offset) в RichInputConnection), revert по backspace; гигиена состояния — сбросы mJustDoubleSpaced/mLastSpaceDownTime в startInput() и на любом событии кроме успешного double-space (несепаратор, не-пробельный сепаратор, backspace без revert). Свайп-дефолт pref_space_swipe → true в 3 согласованных местах (Settings.java, prefs_screen_preferences.xml, app_restrictions.xml); pref_delete_swipe не тронут. INPUT-07 — zero-work, доказательства запинованы fail-capable-грепами. Boundary фазы = 5 объявленных файлов (diff-чек от 8e4693e).
 
+- [06-01] iOS-скин маршрутом (b) 06-RESEARCH.md: тема id=7 «Tatar» поверх штатной системы тем (KeyboardTheme.KEYBOARD_THEMES, DEFAULT_THEME_ID=7), палитра ТОЛЬКО ресурсами ios_* в values/ (#D4D6DD/#FFFFFF/#B3B7C0/#40000000) + values-night/ (#2C2C2C/#6B6B6B/#474747/#B3000000) — dark mode штатным механизмом; тень — layer-list из двух roundRect 5dp со смещением 1dp (setShadowLayer отклонён); иконки shift/shift_locked/globe — собственные path'ы, тонировка ?attr/functionalTextColor сохранена. 3 PERF-фикса: индексный цикл onDrawKeyboard, HashMap-кэш клонов KeyDrawParams (инвалидация в setKeyboard), кэш строки+textScaleX языка пробела (инвалидация в setKeyboard/startDisplayLanguageOnSpacebar). A11y-каркас ExploreByTouchHelper (Kotlin) + androidx.customview:customview:1.1.0 — первая внешняя зависимость; APK-гейт пройден: release 645 830 → 700 679 байт (+54 849, ≤ 3 145 728); транзитивы только annotation/core/collection. Попутно gradle.properties: android.useAndroidX=false→true (обязательно для androidx-зависимостей).
+
 - [04-01] Фаза 4 — zero-code верификация: вердикт ресерча 04-RESEARCH.md ALL WORKS (INPUT-01..04 работают в базе форка), все доказательства запинованы fail-capable-грепами. Принята трактовка INPUT-03 (2026-07-18): эквивалент deleteSurroundingText с подсчётом по кодпоинту + AOSP-автоповтор 400 мс → 50 мс. Бонус INPUT-01: caps lock long-press'ом shift (1200 мс). Диф кода фазы пуст (boundary-check b19ce97..HEAD по app/ = пусто).
 
 ### Cross-cutting disciplines (каждая фаза)
@@ -78,6 +80,8 @@ Progress: [██████████] 100%
 - ⚠️ [Phase 4, plan 04-01] Task 3 on-device UAT deferred — устройство не подключено (adb devices пуст), по standing-паттерну фаз 1–3. BUILD-критерии закрыты автоматикой (assembleDebug зелёный, check-no-internet OK, все структурные грепы INPUT-01..04 PASS, ZERO-CODE boundary: diff b19ce97..HEAD по app/ пуст). Чек-лист при появлении устройства (полные шаги — 04-01-SUMMARY.md § Deferred Verification; всё на татарской раскладке, shift/backspace выборочно повторить на русской): (1) установка текущего app-debug.apk (uninstall не обязателен — дефолты не менялись); (2) INPUT-01: тап shift → пятый ряд Ә Ө Ү Җ Ң Һ + ЙЦУКЕН заглавные, ввод буквы → возврат в строчные; двойной тап → caps lock (sticky-иконка), серия заглавных, тап → выход; long-press shift ~1.2 с → caps lock (бонус); (3) INPUT-02: новое сообщение в Telegram → shifted; после «. » → снова shifted; адресная строка Chrome и email-поле → НЕ shifted; выключить Auto-capitalization → эффект пропадает, включить обратно; (4) INPUT-03: «әни өй үрдәк», удержание backspace → после ~0.4 с серия ~20 удалений/сек; ә/җ/ң удаляются целиком за одно нажатие; (5) INPUT-04: Enter в поиске Chrome (лупа/поиск), Telegram (send), заметках multiline (перенос), форме actionDone (галка); (6) smoke SC5: backspace+Enter в WebView/поле формы Chrome (keyCode 229) и password-поле; (7) MIUI — при наличии Xiaomi (иначе пометить как не покрыто). 04-01-SUMMARY.md § Deferred Verification обновляется после резолва.
 
 - ⚠️ [Phase 5, plan 05-01] Task 4 on-device UAT deferred — устройство не подключено (adb devices пуст), по standing-паттерну фаз 1–4. BUILD-критерии закрыты автоматикой (assembleDebug зелёный, check-no-internet OK, все структурные грепы INPUT-05..07 PASS, boundary: diff 8e4693e..HEAD по app/ = только 5 объявленных файлов). Чек-лист при появлении устройства (полные шаги — 05-01-SUMMARY.md § Deferred Verification): (1) установка свежего app-debug.apk; uninstall ЖЕЛАТЕЛЕН — dev-prefs могли зафиксировать space_swipe=false до флипа default; (2) INPUT-05: в Telegram и заметках «әни» + двойной пробел (< 1.1 с) → «әни. » и shift поднят; backspace сразу → откат к двум пробелам; двойной пробел после точки/в начале поля → просто два пробела; медленный второй пробел (> 1.1 с) → без точки; (3) INPUT-05/password: в password-поле двойной пробел НЕ даёт точку; (4) INPUT-06: свайп по пробелу двигает курсор из коробки без настроек; поверх татарского текста с ә/җ курсор шагает по буквам; выключить pref → жест пропадает, включить обратно; (5) INPUT-07: быстрая печать двумя пальцами «әни өй үрдәк җир» — без потери букв и порядка; (6) smoke SC4: пп. 2/4/5 в Chrome WebView/поле формы (keyCode 229) + password без аномалий; (7) MIUI — при наличии Xiaomi (иначе пометить как не покрыто). Финальная простановка чек-боксов INPUT-05..07 — после UAT.
+
+- ⚠️ [Phase 6, plan 06-01] Task 7 on-device UAT deferred — устройство не подключено (adb devices пуст), по standing-паттерну фаз 1–5. BUILD-критерии закрыты автоматикой (assembleDebug + assembleRelease зелёные, check-no-internet OK, палитра/тема/PERF/boundary запинованы грепами, APK-гейт числовой PASS). Чек-лист при появлении устройства (полные шаги — 06-01-SUMMARY.md § Deferred Verification): (1) установка свежего APK; uninstall ЖЕЛАТЕЛЕН — dev-prefs могли зафиксировать старую тему (pref_keyboard_theme_20140509, риск R6); (2) SC1 палитра: светлая — фон #D4D6DD, клавиши белые, служебные #B3B7C0, радиус ~5dp, резкая 1dp-тень; тёмная — #2C2C2C/#6B6B6B/#474747; pressed: обычная темнеет, служебная белеет; (3) SC1 смена темы light↔dark при показанной клавиатуре без перезапуска IME (Android 12+ особо — live-reload, риск R3; если не подхватилась — снять условие < S в KeyboardSwitcher.java:91-93, 1 строка); (4) SC4 ввод фаз 2–5 поверх нового рендера: пятый ряд ә ө ү җ ң һ видим/нажимаем (гапы не съели ряд, риск R4), глобус tt/ru/en, shift/caps (иконка меняется на залитую), long-press дубли, double-space→период, свайп-курсор, двупальцевая печать; (5) SC3 профайлер: минута печати — ноль GC-событий, janky ~0; (6) smoke: Telegram, Chrome WebView (229), password; MIUI при наличии; (7) TalkBack НЕ верифицируется (фаза 9) — только отсутствие touch-регрессий без TalkBack.
 
 ### Research pointers
 

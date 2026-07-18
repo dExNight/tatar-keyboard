@@ -41,6 +41,7 @@ Requirements for initial release (майлстоун v1.0 MVP: release-ready APK
 ### iOS-скин
 
 - [ ] **UI-01**: Клавиатура отрисована на Canvas по зафиксированной геометрии и палитре (светлая: фон #D4D6DD, клавиши #FFF, служебные #B3B7C0; тёмная: #2C2C2C/#6B6B6B/#474747; радиус ~5dp, резкая 1dp-тень), тема следует системной светлой/тёмной
+  - *Аннотация (2026-07-18): реализовано маршрутом (b) 06-RESEARCH.md — тема id=7 «Tatar» поверх штатной системы тем форка, layer-list-тень (setShadowLayer отклонён — на HW-acceleration работает только для текста), 3 PERF-фикса горячего пути, a11y-каркас ExploreByTouchHelper (APK-гейт пройден: 646→701 КБ ≤ 3 МБ)*
 - [ ] **UI-02**: При нажатии буквенной клавиши над ней мгновенно появляется баллон-превью (в слое клавиатуры, не PopupWindow)
 - [ ] **UI-03**: Long-press панель альтернатив с выбором скольжением пальца
 - [ ] **UI-04**: Визуальная реакция, хаптика (KEYBOARD_TAP) и системный звук клика срабатывают на ACTION_DOWN; звук и вибрация отключаемы в настройках
@@ -134,7 +135,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | INPUT-05 | Phase 5 | Verifying (05-01: structural PASS; on-device UAT deferred) |
 | INPUT-06 | Phase 5 | Verifying (05-01: structural PASS; on-device UAT deferred) |
 | INPUT-07 | Phase 5 | Verifying (05-01: structural PASS; on-device UAT deferred) |
-| UI-01 | Phase 6 | Pending |
+| UI-01 | Phase 6 | Verifying (06-01: structural PASS; on-device UAT deferred) |
 | UI-02 | Phase 7 | Pending |
 | UI-03 | Phase 7 | Pending |
 | UI-04 | Phase 7 | Pending |
