@@ -2,18 +2,18 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-current_phase: 8
+current_phase: 08
 current_phase_name: Совместимость
-status: planning
+status: executing
 stopped_at: Phase 7 complete-local (structural verification passed; Task 3 UAT отложен, принят), ready to plan Phase 8
-last_updated: "2026-07-18T18:27:03.394Z"
+last_updated: "2026-07-18T18:59:41.597Z"
 last_activity: 2026-07-18
+last_activity_desc: Phase 08 execution started
 progress:
-  total_phases: 7
+  total_phases: 8
   completed_phases: 7
-  total_plans: 8
+  total_plans: 9
   completed_plans: 8
-last_activity_desc: Phase 07 plan 07-01 complete-local (UAT deferred)
 ---
 
 # State: Tatar Keyboard
@@ -21,10 +21,10 @@ last_activity_desc: Phase 07 plan 07-01 complete-local (UAT deferred)
 ## Current Position
 
 **Milestone:** v1.0 — MVP + релиз (GitHub Releases + IzzyOnDroid)
-**Phase:** 8 — Совместимость
-**Plan:** Not started
-**Status:** Ready to plan
-**Last activity:** 2026-07-18
+**Phase:** 08 (Совместимость) — EXECUTING
+**Plan:** 1 of 1
+**Status:** Executing Phase 08
+**Last activity:** 2026-07-18 — Phase 08 execution started
 
 Progress: [██████████] 100%
 
@@ -58,6 +58,8 @@ Progress: [██████████] 100%
 - [04-01] Фаза 4 — zero-code верификация: вердикт ресерча 04-RESEARCH.md ALL WORKS (INPUT-01..04 работают в базе форка), все доказательства запинованы fail-capable-грепами. Принята трактовка INPUT-03 (2026-07-18): эквивалент deleteSurroundingText с подсчётом по кодпоинту + AOSP-автоповтор 400 мс → 50 мс. Бонус INPUT-01: caps lock long-press'ом shift (1200 мс). Диф кода фазы пуст (boundary-check b19ce97..HEAD по app/ = пусто).
 
 - [07-01] Фаза 7 — zero-Java стилизация: in-layer превью/панель подтверждены (DrawingPreviewPlacerView в android.R.id.content окна IME, PopupWindow в исходниках отсутствует — перенос не понадобился); баллон/панель — 2 новых drawable (ios_key_preview_background: layer-list roundRect ios_key_normal + 1dp-тень, радиус 5dp, size/padding зеркалят старый feedback-drawable; ios_popup_panel_background: радиус 5dp, padding 5dp сохранён) + 2 item в themes-tatar.xml; sound default оставлен false по решению пользователя (тумблер — фаза 10); Java/Kotlin-дифф фазы = 0 строк (boundary-чек fbfd66a..HEAD).
+
+- [08-01] Фаза 8 — data-only совместимость: единственная правка под app/ = 1 строка values-land/config.xml (config_use_fullscreen_mode true→false) — extract mode мёртв во всех 5 config-вариантах (true=0, false=5), onEvaluateFullscreenMode() всегда false штатным ресурсным путём (Java-override отклонён ресерчем). Все 5 COMPAT-вердиктов запинованы fail-capable-грепами: insets-линия upstream 827da4f/2885ae5 (fitsSystemWindows v28-сплит, requestApplyInsets, onComputeInsets, contrast off), directBoot (манифест + device-protected prefs, ноль обходных call-sites), no-composing (0 вхождений) + commitText/deleteSurroundingText, password (mIsPasswordField-гейт + ноль словаря). Матрица SC5 написана — 08-UAT-MATRIX.md (CLOSED-STRUCTURAL + DEFERRED, ни одного PASS до device-прогона). Java/Kotlin-дифф фазы = 0 строк (boundary-чек d2ae619..HEAD).
 
 ### Cross-cutting disciplines (каждая фаза)
 

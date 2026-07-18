@@ -57,10 +57,19 @@ Requirements for initial release (майлстоун v1.0 MVP: release-ready APK
 ### Совместимость
 
 - [ ] **COMPAT-01**: В password-полях клавиатура корректно вводит текст, без подсказок и обучения
+  — *Аннотация (2026-07-18): Structurally free: движка подсказок/словаря/обучения в форке нет вообще (ноль Dictionary/UserHistory-кода); mIsPasswordField гейтит double-space (InputLogic.java:355); ввод — общий commitText-путь. См. 08-RESEARCH.md § COMPAT-01.*
+
 - [ ] **COMPAT-02**: Ввод работает в WebView/Chrome (сценарий keyCode 229)
+  — *Аннотация (2026-07-18): Structurally free: composing-текста в коде ноль (setComposingText/Region — 0 вхождений, решение проекта); буквы commitText (InputLogic.java:606), backspace deleteSurroundingText по кодпоинтам (RichInputConnection.java:356) — keyCode 229 не возникает. См. 08-RESEARCH.md § COMPAT-02.*
+
 - [ ] **COMPAT-03**: Edge-to-edge и WindowInsets корректны на API 35+ (клавиатура не перекрыта системными панелями)
+  — *Аннотация (2026-07-18): Гэп-кандидат закрыт upstream'ом до нашей базы (827da4f, 2885ae5): fitsSystemWindows в layout-v28 + requestApplyInsets (LatinIME.java:333) + onComputeInsets (:535) + contrast off (:935); кода фазы 0 строк. Визуальный чек API 35/36 — deferred UAT. См. 08-RESEARCH.md § COMPAT-03.*
+
 - [ ] **COMPAT-04**: Клавиатура работает в ландшафтной ориентации
+  — *Аннотация (2026-07-18): Раскладки в ландшафте — данными (5row-фракции values-land); единственный кодовый пробел фазы — values-land config_use_fullscreen_mode=true → флип в false (реализация решения onEvaluateFullscreenMode()=false штатным ресурсом, Java-дифф 0). См. 08-RESEARCH.md § COMPAT-04.*
+
 - [ ] **COMPAT-05**: directBootAware: клавиатура доступна до первой разблокировки устройства
+  — *Аннотация (2026-07-18): directBootAware=true на сервисе + ВСЕ prefs через PreferenceManagerCompat → device-protected storage (credential-protected не трогается вообще); прочие компоненты сознательно не помечены. PIN-ввод после ребута — deferred UAT. См. 08-RESEARCH.md § COMPAT-05.*
 
 ### Онбординг и настройки
 
@@ -144,11 +153,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 | UI-04 | Phase 7 | Verifying (07-01: structural PASS; on-device UAT deferred) |
 | A11Y-01 | Phase 9 | Pending |
 | A11Y-02 | Phase 9 | Pending |
-| COMPAT-01 | Phase 8 | Pending |
-| COMPAT-02 | Phase 8 | Pending |
-| COMPAT-03 | Phase 8 | Pending |
-| COMPAT-04 | Phase 8 | Pending |
-| COMPAT-05 | Phase 8 | Pending |
+| COMPAT-01 | Phase 8 | Verifying (08-01: structural PASS; on-device UAT deferred) |
+| COMPAT-02 | Phase 8 | Verifying (08-01: structural PASS; on-device UAT deferred) |
+| COMPAT-03 | Phase 8 | Verifying (08-01: structural PASS; on-device UAT deferred) |
+| COMPAT-04 | Phase 8 | Verifying (08-01: structural PASS; on-device UAT deferred) |
+| COMPAT-05 | Phase 8 | Verifying (08-01: structural PASS; on-device UAT deferred) |
 | SETUP-01 | Phase 10 | Pending |
 | SETUP-02 | Phase 10 | Pending |
 | PERF-01 | Phase 11 | Pending |
