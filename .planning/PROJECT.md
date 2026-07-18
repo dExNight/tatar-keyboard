@@ -51,7 +51,7 @@
 - **Tech stack**: форк Simple Keyboard; новый код — Kotlin через interop (Java-базу массово не конвертировать); UI — один кастомный View + Canvas; Compose допустим только в Activity настроек — решения окончательные, альтернативы не предлагать
 - **Performance** (жёсткие бюджеты): APK ≤ 3 МБ; PSS показанной клавиатуры ≤ 30 МБ; холодный старт до показа < 400 мс (главная метрика); ноль аллокаций в цикле отрисовки; janky-кадры ~0%
 - **Privacy**: без разрешения INTERNET вообще + CI-проверка манифеста; никаких аналитик/Firebase — проверяемая гарантия «данные не собираются»
-- **SDK**: minSdk 24–26 (уточнить перед релизом), targetSdk/compileSdk 36
+- **SDK**: minSdk 24–26 (уточнить перед релизом), targetSdk/compileSdk 37 (база Simple Keyboard уже на API 37; даунгрейд до 36 отклонён как лишний риск — см. SKELETON.md фазы 01)
 - **IME-архитектура**: InputMethodService, directBootAware, onEvaluateFullscreenMode()=false; в MVP без composing-текста — коммит сразу, удаление deleteSurroundingText по кодпоинтам
 - **Legal (стиль iOS)**: геометрия/палитра/поведение — можно; шрифт SF Pro, иконки SF Symbols, звуки Apple, слова iPhone/iOS в маркетинге — запрещено (Roboto, свои VectorDrawable)
 - **Данные**: раскладки хранить данными (XML), не кодом; формат должен допускать латиницу позже
