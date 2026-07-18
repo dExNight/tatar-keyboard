@@ -2,18 +2,18 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-current_phase: 06
-current_phase_name: iOS-скин — Canvas-отрисовка и темы
-status: phase_complete
-stopped_at: Completed 06-01-PLAN.md (complete-local; Task 7 UAT deferred → Blockers)
-last_updated: "2026-07-18T14:56:00.000Z"
+current_phase: 7
+current_phase_name: iOS-скин — превью, панель, отклик
+status: planning
+stopped_at: Phase 6 complete-local (structural verification passed; Task 7 UAT отложен по standing-схеме), ready to plan Phase 7
+last_updated: "2026-07-18T17:40:36.832Z"
 last_activity: 2026-07-18
-last_activity_desc: Phase 06 plan 06-01 complete-local (UAT deferred)
 progress:
   total_phases: 6
   completed_phases: 6
   total_plans: 7
   completed_plans: 7
+last_activity_desc: Phase 06 plan 06-01 complete-local (UAT deferred)
 ---
 
 # State: Tatar Keyboard
@@ -21,10 +21,10 @@ progress:
 ## Current Position
 
 **Milestone:** v1.0 — MVP + релиз (GitHub Releases + IzzyOnDroid)
-**Phase:** 06 (iOS-скин — Canvas-отрисовка и темы) — COMPLETE-LOCAL (UAT deferred)
-**Plan:** 1 of 1 complete
-**Status:** Phase 06 complete-local; ready to plan Phase 7
-**Last activity:** 2026-07-18 — Phase 06 plan 06-01 complete-local (UAT deferred)
+**Phase:** 7 — iOS-скин — превью, панель, отклик
+**Plan:** Not started
+**Status:** Ready to plan
+**Last activity:** 2026-07-18
 
 Progress: [██████████] 100%
 
@@ -93,10 +93,10 @@ Progress: [██████████] 100%
 
 ## Session Continuity
 
-**Stopped at:** Phase 6 complete-local (structural verification passed; Task 7 UAT отложен по standing-схеме), ready to plan Phase 7
+**Stopped at:** Phase 6 complete (verification passed; UAT отложен, принят), ready to plan Phase 7
 **Resume file:** None
 
-**Next step:** Phase 7 — iOS-скин: превью, панель, отклик (баллон/long-press панель/хаптика той же темой).
+**Next step:** Phase 7 — iOS-скин: превью, панель, отклик.
 
 Last session: 2026-07-18T14:56:00Z
 

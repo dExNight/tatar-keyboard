@@ -12,6 +12,8 @@
 
 ### Validated
 
+- ✓ iOS-скин: Canvas-рендер по зафиксированной палитре/геометрии, light/dark, тема id=7 по умолчанию, собственные иконки, PERF-фиксы горячего пути, каркас ExploreByTouchHelper (+54 КБ APK) — Phase 6 (on-device UAT отложен, принят)
+
 - ✓ Жесты: двойной пробел → точка (AOSP-паттерн, 9 путей сброса состояния), свайп-курсор включён по умолчанию, multi-touch commit-on-second-touch — Phase 5 (on-device UAT отложен, принят)
 
 - ✓ Механика символьного ввода (shift 3 состояния, автокапитализация, backspace по кодпоинтам с автоповтором, Enter по imeOptions) подтверждена в базе форка структурно, zero-code фаза — Phase 4 (on-device UAT отложен, принят)
@@ -71,7 +73,7 @@
 |----------|-----------|---------|
 | Форк Simple Keyboard, не с нуля и не HeliBoard | Лёгкость (0.65 МБ), Apache-2.0, посильно новичку; HeliBoard = GPL + 20 МБ (research/06) | ✓ Good — Phase 1: merge b40c70d9, сборка/подпись работают |
 | Пятый видимый ряд для ә ө ү җ ң һ, не long-press-only | ә — 5-я по частоте буква (6.65%), 6 букв = 10.6% буквоупотреблений | ✓ Good — Phases 2–5: механика+жесты подтверждены без форсмажоров |
-| Kotlin + Canvas-View, без Compose в IME | Compose: +20–40 МБ RAM, медленный холодный старт (research/01, 02) | In progress — Phase 6 начинает Canvas-отрисовку |
+| Kotlin + Canvas-View, без Compose в IME | Compose: +20–40 МБ RAM, медленный холодный старт (research/01, 02) | ✓ Good — Phase 6: Canvas-скин + первый Kotlin-файл (a11y-делегат) |
 | Без разрешения INTERNET | Проверяемая ОС-гарантия приватности, Data Safety = «No data collected» | ✓ Good — Phase 1: манифест чист, script+CI написаны |
 | Без composing-текста в MVP | Минимизация багов зоопарка InputConnection | ✓ Good — Phases 1–5: deleteSurroundingText, zero composing, работает |
 | Этап 0 (прототип HeliBoard) пропущен | Решение о форке окончательное, контрольная точка не нужна (ответ при инициализации) | — Pending |
@@ -104,4 +106,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-07-18 after Phase 5 + Plan B decision*
+*Last updated: 2026-07-18 after Phase 6*
