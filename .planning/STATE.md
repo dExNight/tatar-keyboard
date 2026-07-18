@@ -5,9 +5,9 @@ milestone_name: milestone
 current_phase: 1
 current_phase_name: Форк и hello-world
 status: executing
-last_updated: "2026-07-18T01:35:15.904Z"
+last_updated: "2026-07-18T02:00:00.000Z"
 last_activity: 2026-07-18
-last_activity_desc: Phase 1 execution started
+last_activity_desc: Plan 01-01 tasks 1-4 done, paused at Task 5 human-verify checkpoint
 progress:
   total_phases: 1
   completed_phases: 0
@@ -21,8 +21,9 @@ progress:
 
 **Milestone:** v1.0 — MVP + релиз (GitHub Releases + IzzyOnDroid)
 **Phase:** 1 (Форк и hello-world) — EXECUTING
+**Plan:** 01-01 — tasks 1–4 complete (commits 6594bcd, 43860bb, 852b163, 5bbda51); PAUSED at Task 5 checkpoint:human-verify (on-device smoke test: install, enable IME, type, logcat interop)
 **Status:** Executing Phase 1
-**Last activity:** 2026-07-18 — Phase 1 execution started
+**Last activity:** 2026-07-18 — Plan 01-01 paused at device-verify checkpoint
 
 Progress: [░░░░░░░░░░░] 0/11 phases
 
@@ -37,6 +38,10 @@ Progress: [░░░░░░░░░░░] 0/11 phases
 - Раскладки — данными (XML), формат должен допускать латиницу Zamanälif позже.
 - Рабочее название «Tatar Keyboard»; финальное имя и applicationId — до публикации (фаза 11), applicationId фиксируется в фазе 1.
 - План Б (форк HeliBoard, цена GPL-3.0) — решение принимать до больших вложений в iOS-скин (т.е. до фазы 6).
+- [01-01] applicationId = `org.tatarkeyboard.ime` (провизорный, нейтральный вариант из ресерча) + `applicationIdSuffix ".debug"` в debug — сосуществование оригинала/debug/release.
+- [01-01] compileSdk/targetSdk остаются 37 (как в базе b40c70d9), вопреки «36» в CLAUDE.md — даунгрейд = лишний риск; CLAUDE.md обновить отдельным коммитом вне фазы.
+- [01-01] `gradle/wrapper/gradle-wrapper.jar` не трекается (upstream игнорирует `gradle/`); локально скачан официальный jar Gradle v9.6.0 — на новой машине его нужно восстановить (`gradle wrapper` или тот же URL).
+- [01-01] Kotlin — через built-in Kotlin AGP 9 (удалена строка `android.builtInKotlin=false`), плагин `org.jetbrains.kotlin.android` не подключён.
 
 ### Cross-cutting disciplines (каждая фаза)
 
