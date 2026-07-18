@@ -1,11 +1,28 @@
+---
+gsd_state_version: 1.0
+milestone: v1.0
+milestone_name: milestone
+current_phase: 1
+current_phase_name: Форк и hello-world
+status: executing
+last_updated: "2026-07-18T01:35:15.904Z"
+last_activity: 2026-07-18
+last_activity_desc: Phase 1 execution started
+progress:
+  total_phases: 1
+  completed_phases: 0
+  total_plans: 2
+  completed_plans: 0
+---
+
 # State: Tatar Keyboard
 
 ## Current Position
 
 **Milestone:** v1.0 — MVP + релиз (GitHub Releases + IzzyOnDroid)
-**Phase:** 1 of 11 — Форк и hello-world (planned)
-**Status:** Фаза 1 спланирована — 2 плана (2 волны) + SKELETON.md, готова к исполнению
-**Last activity:** 2026-07-17 — планы 01-01 (форк/appId/Kotlin) и 01-02 (подпись/CI PERF-04), walking skeleton зафиксирован
+**Phase:** 1 (Форк и hello-world) — EXECUTING
+**Status:** Executing Phase 1
+**Last activity:** 2026-07-18 — Phase 1 execution started
 
 Progress: [░░░░░░░░░░░] 0/11 phases
 
