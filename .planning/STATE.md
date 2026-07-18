@@ -4,16 +4,16 @@ milestone: v1.0
 milestone_name: milestone
 current_phase: 05
 current_phase_name: Механика ввода — жесты и multi-touch
-status: executing
-stopped_at: "Phase 4 complete-local (04-01: структурная верификация PASS, zero-code boundary доказан; on-device UAT отложен по standing-паттерну), ready to plan Phase 5"
-last_updated: "2026-07-18T13:43:09.083Z"
+status: complete
+stopped_at: "Phase 5 complete-local (05-01: double-space→period восстановлен, свайп-дефолт true, INPUT-07 запинован; on-device UAT отложен по standing-паттерну)"
+last_updated: "2026-07-18T13:48:44Z"
 last_activity: 2026-07-18
-last_activity_desc: Phase 05 execution started
+last_activity_desc: Phase 05 plan 05-01 complete-local (UAT deferred)
 progress:
   total_phases: 5
-  completed_phases: 4
+  completed_phases: 5
   total_plans: 6
-  completed_plans: 5
+  completed_plans: 6
 ---
 
 # State: Tatar Keyboard
@@ -21,10 +21,10 @@ progress:
 ## Current Position
 
 **Milestone:** v1.0 — MVP + релиз (GitHub Releases + IzzyOnDroid)
-**Phase:** 05 (Механика ввода — жесты и multi-touch) — EXECUTING
-**Plan:** 1 of 1
-**Status:** Executing Phase 05
-**Last activity:** 2026-07-18 — Phase 05 execution started
+**Phase:** 05 (Механика ввода — жесты и multi-touch) — COMPLETE-LOCAL
+**Plan:** 1 of 1 (05-01 done; Task 4 UAT deferred)
+**Status:** Phase 05 complete-local, on-device UAT deferred
+**Last activity:** 2026-07-18 — 05-01 complete-local (UAT deferred)
 
 Progress: [██████████] 100%
 
@@ -77,6 +77,8 @@ Progress: [██████████] 100%
 
 - ⚠️ [Phase 4, plan 04-01] Task 3 on-device UAT deferred — устройство не подключено (adb devices пуст), по standing-паттерну фаз 1–3. BUILD-критерии закрыты автоматикой (assembleDebug зелёный, check-no-internet OK, все структурные грепы INPUT-01..04 PASS, ZERO-CODE boundary: diff b19ce97..HEAD по app/ пуст). Чек-лист при появлении устройства (полные шаги — 04-01-SUMMARY.md § Deferred Verification; всё на татарской раскладке, shift/backspace выборочно повторить на русской): (1) установка текущего app-debug.apk (uninstall не обязателен — дефолты не менялись); (2) INPUT-01: тап shift → пятый ряд Ә Ө Ү Җ Ң Һ + ЙЦУКЕН заглавные, ввод буквы → возврат в строчные; двойной тап → caps lock (sticky-иконка), серия заглавных, тап → выход; long-press shift ~1.2 с → caps lock (бонус); (3) INPUT-02: новое сообщение в Telegram → shifted; после «. » → снова shifted; адресная строка Chrome и email-поле → НЕ shifted; выключить Auto-capitalization → эффект пропадает, включить обратно; (4) INPUT-03: «әни өй үрдәк», удержание backspace → после ~0.4 с серия ~20 удалений/сек; ә/җ/ң удаляются целиком за одно нажатие; (5) INPUT-04: Enter в поиске Chrome (лупа/поиск), Telegram (send), заметках multiline (перенос), форме actionDone (галка); (6) smoke SC5: backspace+Enter в WebView/поле формы Chrome (keyCode 229) и password-поле; (7) MIUI — при наличии Xiaomi (иначе пометить как не покрыто). 04-01-SUMMARY.md § Deferred Verification обновляется после резолва.
 
+- ⚠️ [Phase 5, plan 05-01] Task 4 on-device UAT deferred — устройство не подключено (adb devices пуст), по standing-паттерну фаз 1–4. BUILD-критерии закрыты автоматикой (assembleDebug зелёный, check-no-internet OK, все структурные грепы INPUT-05..07 PASS, boundary: diff 8e4693e..HEAD по app/ = только 5 объявленных файлов). Чек-лист при появлении устройства (полные шаги — 05-01-SUMMARY.md § Deferred Verification): (1) установка свежего app-debug.apk; uninstall ЖЕЛАТЕЛЕН — dev-prefs могли зафиксировать space_swipe=false до флипа default; (2) INPUT-05: в Telegram и заметках «әни» + двойной пробел (< 1.1 с) → «әни. » и shift поднят; backspace сразу → откат к двум пробелам; двойной пробел после точки/в начале поля → просто два пробела; медленный второй пробел (> 1.1 с) → без точки; (3) INPUT-05/password: в password-поле двойной пробел НЕ даёт точку; (4) INPUT-06: свайп по пробелу двигает курсор из коробки без настроек; поверх татарского текста с ә/җ курсор шагает по буквам; выключить pref → жест пропадает, включить обратно; (5) INPUT-07: быстрая печать двумя пальцами «әни өй үрдәк җир» — без потери букв и порядка; (6) smoke SC4: пп. 2/4/5 в Chrome WebView/поле формы (keyCode 229) + password без аномалий; (7) MIUI — при наличии Xiaomi (иначе пометить как не покрыто). Финальная простановка чек-боксов INPUT-05..07 — после UAT.
+
 ### Research pointers
 
 - `.planning/research/SUMMARY.md` — конденсат; детали в `research/00`–`08` в корне.
@@ -87,12 +89,12 @@ Progress: [██████████] 100%
 
 ## Session Continuity
 
-**Stopped at:** Phase 4 complete (zero-code, verification passed; UAT отложен, принят), ready to plan Phase 5
+**Stopped at:** Completed 05-01-PLAN.md (complete-local; Task 4 UAT deferred → Blockers)
 **Resume file:** None
 
-**Next step:** Phase 5 — Механика ввода: жесты и multi-touch.
+**Next step:** Phase 6 — iOS-скин: Canvas-отрисовка и темы (решение План Б GPL до старта фазы 6 — см. Decisions).
 
-Last session: 2026-07-18T08:29:50.584Z
+Last session: 2026-07-18T13:48:44Z
 
 ---
 *Last updated: 2026-07-18 — Phase 1 complete*
@@ -106,3 +108,4 @@ Last session: 2026-07-18T08:29:50.584Z
 | Phase 02 P01 | 9 min | 4 tasks | 8 files |
 | Phase 03 P01 | 8 min | 4 of 5 tasks (Task 5 UAT deferred) | 12 files |
 | Phase 04 P01 | 10 min | 2 of 3 tasks (Task 3 UAT deferred) | 3 files (zero code) |
+| Phase 05 P01 | 8 min | 3 of 4 tasks (Task 4 UAT deferred) | 5 code files + planning |

@@ -92,6 +92,7 @@
 **Mode:** mvp
 **Requirements:** INPUT-05, INPUT-06, INPUT-07
 **Depends on:** Phase 4
+**Progress:** 05-01 ✓ complete-local (Tasks 1–3: double-space→period восстановлен в InputLogic по AOSP-паттерну, pref_space_swipe default → true ×3, INPUT-07 доказан грепами; сборка/no-internet/boundary 8e4693e..HEAD = 5 объявленных файлов — зелёные); Task 4 device UAT — deferred, human verification pending, см. 05-01-SUMMARY.md § Deferred Verification
 
 **Success Criteria:**
 
