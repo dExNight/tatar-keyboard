@@ -28,13 +28,10 @@ import android.content.res.Resources;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Locale;
 
 import rkr.simplekeyboard.inputmethod.R;
 import rkr.simplekeyboard.inputmethod.latin.Subtype;
-import rkr.simplekeyboard.inputmethod.latin.common.LocaleUtils;
 
 /**
  * Utility methods for building subtypes for the supported locales.
@@ -113,7 +110,7 @@ public final class SubtypeLocaleUtils {
     private static final String LOCALE_SERBIAN_LATIN = "sr_ZZ";
     private static final String LOCALE_SWEDISH = "sv";
     private static final String LOCALE_SWAHILI = "sw";
-    private static final String LOCALE_TATAR = "tt";
+    private static final String LOCALE_TATAR = "tt_RU";
     private static final String LOCALE_TAMIL_INDIA = "ta_IN";
     private static final String LOCALE_TAMIL_SINGAPORE = "ta_SG";
     private static final String LOCALE_TELUGU_INDIA = "te_IN";
@@ -248,6 +245,7 @@ public final class SubtypeLocaleUtils {
     public static final String LAYOUT_NORDIC = "nordic";
     public static final String LAYOUT_QWERTY = "qwerty";
     public static final String LAYOUT_QWERTZ = "qwertz";
+    public static final String LAYOUT_RUSSIAN = "russian";
     public static final String LAYOUT_SAKHA = "sakha";
     public static final String LAYOUT_SERBIAN = "serbian";
     public static final String LAYOUT_SERBIAN_QWERTZ = "serbian_qwertz";
@@ -298,39 +296,20 @@ public final class SubtypeLocaleUtils {
     }
 
     /**
-     * Get the list subtypes corresponding to the system's languages.
+     * Get the default list of subtypes for a fresh install.
      * @param resources the resources to use.
-     * @return the default list of subtypes based on the system's languages.
+     * @return the default list of subtypes: Tatar (active), Russian, English (US).
      */
     public static List<Subtype> getDefaultSubtypes(final Resources resources) {
-        final ArrayList<Locale> supportedLocales = new ArrayList<>(sSupportedLocales.length);
-        for (final String localeString : sSupportedLocales) {
-            supportedLocales.add(LocaleUtils.constructLocaleFromString(localeString));
-        }
-
-        final List<Locale> systemLocales = LocaleUtils.getSystemLocales();
-
-        final ArrayList<Subtype> subtypes = new ArrayList<>();
-        final HashSet<Locale> addedLocales = new HashSet<>();
-        for (final Locale systemLocale : systemLocales) {
-            final Locale bestLocale = LocaleUtils.findBestLocale(systemLocale, supportedLocales);
-            if (bestLocale != null && !addedLocales.contains(bestLocale)) {
-                addedLocales.add(bestLocale);
-                final String bestLocaleString = LocaleUtils.getLocaleString(bestLocale);
-                final Subtype bestSubtype = getDefaultSubtype(bestLocaleString, resources);
-                if (bestSubtype != null) {
-                    subtypes.add(bestSubtype);
-                }
-            }
-        }
-        // MVP (phase 2): Tatar first — the keyboard opens with the Tatar layout on a
-        // fresh install regardless of system locales (ru/en systems never match tt).
-        // Full subtype selection (tt_RU/ru/en_US) comes with SWITCH-01/02 in phase 3.
-        subtypes.add(0, getSubtypes(LOCALE_TATAR, resources).get(0));
-        if (subtypes.size() == 0) {
-            // there needs to be at least one default subtype
-            subtypes.add(getSubtypes(LOCALE_ENGLISH_UNITED_STATES, resources).get(0));
-        }
+        // Default for a fresh install: Tatar active, Russian and English enabled
+        // (SWITCH-01). Deliberately independent of system locales — the app's
+        // audience is Tatar speakers whose system language is usually ru or en.
+        // Only applied when the subtype prefs are empty or invalid, so a user's
+        // own selection is never overwritten.
+        final ArrayList<Subtype> subtypes = new ArrayList<>(3);
+        subtypes.add(getDefaultSubtype(LOCALE_TATAR, resources));
+        subtypes.add(getDefaultSubtype(LOCALE_RUSSIAN, resources));
+        subtypes.add(getDefaultSubtype(LOCALE_ENGLISH_UNITED_STATES, resources));
         return subtypes;
     }
 
@@ -484,9 +463,11 @@ public final class SubtypeLocaleUtils {
                 case LOCALE_BELARUSIAN_BELARUS:
                 case LOCALE_KAZAKH:
                 case LOCALE_KYRGYZ:
-                case LOCALE_RUSSIAN:
                 case LOCALE_UKRAINIAN:
                     addLayout(LAYOUT_EAST_SLAVIC);
+                    break;
+                case LOCALE_RUSSIAN:
+                    addLayout(LAYOUT_RUSSIAN);
                     break;
                 case LOCALE_BULGARIAN:
                     addLayout(LAYOUT_BULGARIAN);
