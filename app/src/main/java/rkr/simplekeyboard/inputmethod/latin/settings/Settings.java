@@ -244,7 +244,7 @@ public final class Settings extends BroadcastReceiver implements SharedPreferenc
     }
 
     public static boolean readSpaceSwipeEnabled(final SharedPreferences prefs) {
-        return prefs.getBoolean(PREF_SPACE_SWIPE, false);
+        return prefs.getBoolean(PREF_SPACE_SWIPE, true);
     }
 
     public static boolean readDeleteSwipeEnabled(final SharedPreferences prefs) {

@@ -44,7 +44,7 @@
         android:key="pref_space_swipe"
         android:title="@string/pref_enable_ime_switch"
         android:restrictionType="bool"
-        android:defaultValue="false" />
+        android:defaultValue="true" />
     <restriction
         android:key="pref_delete_swipe"
         android:title="@string/delete_swipe"
