@@ -2,18 +2,18 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-current_phase: 2
+current_phase: 02
 current_phase_name: Татарская раскладка
-status: planning
-stopped_at: Completed 01-02-PLAN.md (GitHub repo/push/CI runs deferred — нет gh/origin; device checkpoints 01-01 Task 5 и 01-02 Task 4 deferred — устройство не подключено)
-last_updated: "2026-07-18T07:25:58.340Z"
+status: executing
+stopped_at: Plan 02-01 Tasks 1-4 committed (980a9b4..80418e5); Task 5 on-device UAT deferred (no device) — SUMMARY deferred until checkpoint resolves
+last_updated: "2026-07-18T08:26:31.682Z"
 last_activity: 2026-07-18
+last_activity_desc: Phase 02 execution started
 progress:
-  total_phases: 1
+  total_phases: 2
   completed_phases: 1
-  total_plans: 2
+  total_plans: 3
   completed_plans: 2
-last_activity_desc: Plan 01-02 executed — keystore, signed release, ci.yml authored; GitHub-side steps deferred
 ---
 
 # State: Tatar Keyboard
@@ -21,10 +21,10 @@ last_activity_desc: Plan 01-02 executed — keystore, signed release, ci.yml aut
 ## Current Position
 
 **Milestone:** v1.0 — MVP + релиз (GitHub Releases + IzzyOnDroid)
-**Phase:** 2 — Татарская раскладка
-**Plan:** Not started
-**Status:** Ready to plan
-**Last activity:** 2026-07-18
+**Phase:** 02 (Татарская раскладка) — EXECUTING
+**Plan:** 1 of 1
+**Status:** Executing Phase 02
+**Last activity:** 2026-07-18 — Phase 02 execution started
 
 Progress: [████████░░] 80%
 
@@ -62,6 +62,7 @@ Progress: [████████░░] 80%
 ### Blockers/Concerns
 
 - ⚠️ [Phase 1] Отложенная ручная проверка (принята пользователем 2026-07-18): on-device smoke debug/release, создание GitHub-репо + зелёный CI + красный ci-negative-test (доказательство PERF-04 на Actions), бэкап release.jks. Точные шаги — 01-01/01-02-SUMMARY.md § Deferred; прогнать при первой возможности (устройство + GitHub).
+- ⚠️ [Phase 2, plan 02-01] Task 5 on-device UAT deferred — устройство не подключено (adb devices пуст), по образцу фазы 1. BUILD-критерии закрыты автоматикой (assembleDebug зелёный, aapt2 видит *_tatar ресурсы, check-no-internet OK, Java-diff = только SubtypeLocaleUtils.java). Чек-лист при появлении устройства: (1) чистая установка adb uninstall org.tatarkeyboard.ime.debug → adb install app-debug.apk → выбрать «Tatar Keyboard (dev)»; (2) клавиатура открывается ТАТАРСКОЙ: пятый ряд ә ө ү җ ң һ СВЕРХУ над ЙЦУКЕН; (3) напечатать «әни өй үрдәк җир таң һава» + «щи, ыл, эш, ике» — все 37 букв тапом, щ/ы/э/и не пустые; (4) shift → Ә Ө Ү Җ Ң Һ; (5) 5 рядов + action row без обрезки, adb logcat | grep -i "too tall" пуст; (6) ?123 → #+= → АБВ туда-обратно; (7) Number row ON: цифры НАД пятым рядом, 6 рядов помещаются, выключить обратно; (8) smoke-матрица SC4: «әни өй үрдәк җир таң һава» в Telegram, Chrome (адресная строка + поле формы/WebView keyCode 229), password-поле — без потерь/дублей. 02-01-SUMMARY.md создаётся после резолва чекпойнта.
 
 ### Research pointers
 
@@ -73,12 +74,12 @@ Progress: [████████░░] 80%
 
 ## Session Continuity
 
-**Stopped at:** Phase 1 complete (verification passed; ручные проверки отложены и приняты), ready to plan Phase 2
+**Stopped at:** Plan 02-01 Tasks 1-4 committed (980a9b4..80418e5); Task 5 on-device UAT deferred (no device) — SUMMARY deferred until checkpoint resolves
 **Resume file:** None
 
 **Next step:** Phase 2 — Татарская раскладка (autonomous run continues). Отложенные ручные проверки фазы 1 — см. Blockers/Concerns.
 
-Last session: 2026-07-18T07:26:00.000Z
+Last session: 2026-07-18T08:26:16.828Z
 
 ---
 *Last updated: 2026-07-18 — Phase 1 complete*
