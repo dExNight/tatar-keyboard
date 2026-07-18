@@ -107,6 +107,9 @@ public final class InputLogic {
         final InputTransaction inputTransaction = new InputTransaction(settingsValues);
         final String text = performSpecificTldProcessingOnTextInput(rawText);
         mConnection.commitText(text, 1);
+        // The committed text (".com" key, paste) may itself end in ". " — a pending
+        // double-space revert would corrupt it, so the state must be dropped.
+        mJustDoubleSpaced = false;
         // Space state must be updated before calling updateShiftState
         inputTransaction.requireShiftUpdate(InputTransaction.SHIFT_UPDATE_NOW);
         return inputTransaction;
@@ -182,6 +185,8 @@ public final class InputLogic {
         final CharSequence textToCommit = event.getTextToCommit();
         if (!TextUtils.isEmpty(textToCommit)) {
             mConnection.commitText(textToCommit, 1);
+            // Committed combiner text invalidates a pending double-space revert.
+            mJustDoubleSpaced = false;
         }
     }
 
