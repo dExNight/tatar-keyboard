@@ -12,6 +12,8 @@
 
 ### Validated
 
+- ✓ Онбординг: SetupActivity 2 шага со статусами (live-детект, guards, a11y), лаунчер→онбординг, legacy-диалог удалён; настройки звук/вибро работают — Phase 10 (device UAT отложен, принят)
+
 - ✓ TalkBack: полные виртуальные узлы (описания «татарская э» и т.п., 27 строк en+ru, ACTION_CLICK реально печатает через штатный touch-путь) — Phase 9 (on-device TalkBack UAT отложен, принят)
 
 - ✓ Совместимость: edge-to-edge insets (upstream, подтверждено), directBoot device-protected prefs, no-composing (WebView-229 safe), password-подавление, ландшафт без fullscreen-extract (флип) — Phase 8; UAT-матрица 12×8 написана, прогон отложен
@@ -112,4 +114,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-07-19 after Phase 9*
+*Last updated: 2026-07-19 after Phase 10*

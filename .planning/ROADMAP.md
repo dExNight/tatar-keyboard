@@ -178,7 +178,7 @@ Smoke-тесты шли в каждой фазе; здесь — система�
 **Mode:** mvp
 **Requirements:** SETUP-01, SETUP-02
 **Depends on:** Phase 9
-**Plans:** 1/1 plans executed
+**Plans:** 1/1 plans complete
 
 - [x] 10-01-PLAN.md — SetupActivity онбординг (2 шага, детект статусов, LAUNCHER-переезд, удаление legacy-диалога) + zero-code верификация настроек звука/вибрации (SETUP-02)
 

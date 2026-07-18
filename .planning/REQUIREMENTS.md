@@ -76,10 +76,10 @@ Requirements for initial release (майлстоун v1.0 MVP: release-ready APK
 
 ### Онбординг и настройки
 
-- [ ] **SETUP-01**: Онбординг-экран проводит через включение IME и выбор клавиатуры (два шага со статусами)
+- [x] **SETUP-01**: Онбординг-экран проводит через включение IME и выбор клавиатуры (два шага со статусами)
   — *Аннотация (2026-07-19): Онбординг — новый SetupActivity.kt (Kotlin, classic View/XML — декларативный UI отклонён по бюджету APK): 2 карточки шагов со статусами, детект живьём из системы (шаг 1 getEnabledInputMethodList-паттерн форка, шаг 2 Settings.Secure.DEFAULT_INPUT_METHOD по префиксу пакета — устойчиво к debug-суффиксу), кнопки → ACTION_INPUT_METHOD_SETTINGS / showInputMethodPicker, рефреш onWindowFocusChanged+onResume, done-блок → SettingsActivity + подсказка «печатайте ә». MAIN/LAUNCHER переехал на SetupActivity; legacy not-enabled диалог старого бренда удалён из SettingsActivity.onStart (IME→настройки цел: класс-интент launchSettings). Проход SC3 на устройстве — deferred UAT. См. 10-RESEARCH.md.*
 
-- [ ] **SETUP-02**: Минимальные настройки: звук клика вкл/выкл, вибрация вкл/выкл
+- [x] **SETUP-02**: Минимальные настройки: звук клика вкл/выкл, вибрация вкл/выкл
   — *Аннотация (2026-07-19): Уже реализовано базой форка и живо-реактивно (подтверждено фазой 7): vibrate_on/sound_on/громкость в prefs_screen_key_press.xml (KeyPressSettingsFragment, экран «Нажатие клавиши» из корня настроек), вибро авто-скрыт без вибратора, живой отклик Settings-listener→loadSettings→AudioAndHapticFeedbackManager.onSettingsChanged. Работа фазы = верификация грепами, кода 0 строк. Live-проверка на устройстве — deferred UAT. См. 10-RESEARCH.md § SETUP-02 Audit.*
 
 ### Производительность и приватность
