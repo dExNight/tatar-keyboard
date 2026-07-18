@@ -33,7 +33,9 @@ import android.graphics.drawable.Drawable;
 import android.util.AttributeSet;
 import android.view.View;
 
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 
 import rkr.simplekeyboard.inputmethod.R;
 import rkr.simplekeyboard.inputmethod.compat.PreferenceManagerCompat;
@@ -100,6 +102,9 @@ public class KeyboardView extends View {
     // TODO: Consider having a dummy keyboard object to make this @NonNull
     private Keyboard mKeyboard;
     private final KeyDrawParams mKeyDrawParams = new KeyDrawParams();
+    /** Per-key draw params cache; key attrs are immutable after keyboard construction,
+     * so cloned params are cached to keep the draw path allocation-free. */
+    private final HashMap<Key, KeyDrawParams> mKeyDrawParamsCache = new HashMap<>();
 
     // Drawing
     /** True if all keys should be drawn */
@@ -170,6 +175,7 @@ public class KeyboardView extends View {
         final int keyHeight = keyboard.mMostCommonKeyHeight;
         mKeyDrawParams.updateParams(keyHeight, mKeyVisualAttributes);
         mKeyDrawParams.updateParams(keyHeight, keyboard.mKeyVisualAttributes);
+        mKeyDrawParamsCache.clear();
         final SharedPreferences prefs = PreferenceManagerCompat.getDeviceSharedPreferences(getContext());
         mCustomColor = Settings.readKeyboardColor(prefs, getContext());
         mTheme = Settings.getKeyboardTheme(getContext());
@@ -276,9 +282,10 @@ public class KeyboardView extends View {
                 canvas.drawColor(Color.BLACK, PorterDuff.Mode.CLEAR);
                 background.draw(canvas);
             }
-            // Draw all keys.
-            for (final Key key : keyboard.getSortedKeys()) {
-                onDrawKey(key, canvas, paint);
+            // Draw all keys. Indexed loop to avoid iterator allocation on every frame.
+            final List<Key> sortedKeys = keyboard.getSortedKeys();
+            for (int i = 0; i < sortedKeys.size(); i++) {
+                onDrawKey(sortedKeys.get(i), canvas, paint);
             }
         } else {
             for (final Key key : mInvalidatedKeys) {
@@ -311,7 +318,11 @@ public class KeyboardView extends View {
         canvas.translate(keyDrawX, keyDrawY);
 
         final KeyVisualAttributes attr = key.getVisualAttributes();
-        final KeyDrawParams params = mKeyDrawParams.mayCloneAndUpdateParams(key.getHeight(), attr);
+        KeyDrawParams params = (attr == null) ? mKeyDrawParams : mKeyDrawParamsCache.get(key);
+        if (params == null) {
+            params = mKeyDrawParams.mayCloneAndUpdateParams(key.getHeight(), attr);
+            mKeyDrawParamsCache.put(key, params);
+        }
         params.mAnimAlpha = Constants.Color.ALPHA_OPAQUE;
 
         if (!key.isSpacer()) {

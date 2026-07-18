@@ -69,6 +69,10 @@ public final class MainKeyboardView extends KeyboardView implements MoreKeysPane
     // Stuff to draw language name on spacebar.
     private final int mLanguageOnSpacebarFinalAlpha;
     private int mLanguageOnSpacebarFormatType;
+    /** Cached spacebar language text and its scale; recomputed only when the subtype or
+     * keyboard changes, keeping string allocation out of the draw path. */
+    private String mLanguageOnSpacebarText;
+    private float mLanguageOnSpacebarTextScaleX = 1.0f;
     private final float mLanguageOnSpacebarTextRatio;
     private float mLanguageOnSpacebarTextSize;
     private final int mLanguageOnSpacebarTextColor;
@@ -260,6 +264,7 @@ public final class MainKeyboardView extends KeyboardView implements MoreKeysPane
         mSpaceKey = keyboard.getKey(Constants.CODE_SPACE);
         final int keyHeight = keyboard.mMostCommonKeyHeight;
         mLanguageOnSpacebarTextSize = keyHeight * mLanguageOnSpacebarTextRatio;
+        mLanguageOnSpacebarText = null;
     }
 
     /**
@@ -517,6 +522,7 @@ public final class MainKeyboardView extends KeyboardView implements MoreKeysPane
             KeyPreviewView.clearTextCache();
         }
         mLanguageOnSpacebarFormatType = languageOnSpacebarFormatType;
+        mLanguageOnSpacebarText = null;
         invalidateKey(mSpaceKey);
     }
 
@@ -554,25 +560,31 @@ public final class MainKeyboardView extends KeyboardView implements MoreKeysPane
         return TypefaceUtils.getStringWidth(text, paint) < maxTextWidth;
     }
 
-    // Layout language name on spacebar.
-    private String layoutLanguageOnSpacebar(final Paint paint,
-                                            final Subtype subtype, final int width) {
+    // Compute and cache the language name for the spacebar. Called only when the cache is
+    // empty (subtype or keyboard changed) — never on the steady-state draw path.
+    private void cacheLanguageOnSpacebarText(final Paint paint,
+                                             final Subtype subtype, final int width) {
         // Choose appropriate language name to fit into the width.
         if (mLanguageOnSpacebarFormatType == LanguageOnSpacebarUtils.FORMAT_TYPE_FULL_LOCALE) {
             final String fullText =
                     LocaleResourceUtils.getLocaleDisplayNameInLocale(subtype.getLocale());
             if (fitsTextIntoWidth(width, fullText, paint)) {
-                return fullText;
+                mLanguageOnSpacebarText = fullText;
+                mLanguageOnSpacebarTextScaleX = paint.getTextScaleX();
+                return;
             }
         }
 
         final String middleText =
                 LocaleResourceUtils.getLanguageDisplayNameInLocale(subtype.getLocale());
         if (fitsTextIntoWidth(width, middleText, paint)) {
-            return middleText;
+            mLanguageOnSpacebarText = middleText;
+            mLanguageOnSpacebarTextScaleX = paint.getTextScaleX();
+            return;
         }
 
-        return "";
+        mLanguageOnSpacebarText = "";
+        mLanguageOnSpacebarTextScaleX = 1.0f;
     }
 
     private void drawLanguageOnSpacebar(final Key key, final Canvas canvas, final Paint paint) {
@@ -585,7 +597,11 @@ public final class MainKeyboardView extends KeyboardView implements MoreKeysPane
         paint.setTextAlign(Align.CENTER);
         paint.setTypeface(Typeface.DEFAULT);
         paint.setTextSize(mLanguageOnSpacebarTextSize);
-        final String language = layoutLanguageOnSpacebar(paint, keyboard.mId.mSubtype, width);
+        if (mLanguageOnSpacebarText == null) {
+            cacheLanguageOnSpacebarText(paint, keyboard.mId.mSubtype, width);
+        }
+        paint.setTextScaleX(mLanguageOnSpacebarTextScaleX);
+        final String language = mLanguageOnSpacebarText;
         // Draw language text with shadow
         final float descent = paint.descent();
         final float textHeight = -paint.ascent() + descent;
