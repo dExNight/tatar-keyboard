@@ -9,7 +9,7 @@ APK="${1:-app/build/outputs/apk/debug/app-debug.apk}"
 MANIFEST="app/src/main/AndroidManifest.xml"
 
 # Level 1: source manifest
-if grep -q "android.permission.INTERNET" "$MANIFEST"; then
+if grep -qF "android.permission.INTERNET" "$MANIFEST"; then
     echo "ERROR: android.permission.INTERNET found in $MANIFEST" >&2
     exit 1
 fi
@@ -29,7 +29,7 @@ if [ -f "$APK" ]; then
     fi
     PERMS=$("$AAPT2" dump permissions "$APK")
     echo "$PERMS"
-    if grep -q "android.permission.INTERNET" <<< "$PERMS"; then
+    if grep -qF "android.permission.INTERNET" <<< "$PERMS"; then
         echo "ERROR: android.permission.INTERNET found in built APK $APK" >&2
         exit 1
     fi
