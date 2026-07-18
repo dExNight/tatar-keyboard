@@ -23,8 +23,10 @@ Requirements for initial release (майлстоун v1.0 MVP: release-ready APK
 ### Механика ввода
 
 - [ ] **INPUT-01**: Shift работает в трёх состояниях: off / shift (один тап) / caps-lock (двойной тап); регистр букв на клавишах визуально меняется
+  — *Аннотация (2026-07-18): бонус сверх требования — caps lock также long-press'ом shift (1200 мс). См. 04-RESEARCH.md § INPUT-01.*
 - [ ] **INPUT-02**: Автокапитализация первой буквы предложения по типу поля (InputType/imeOptions)
 - [ ] **INPUT-03**: Backspace удаляет по кодпоинтам (deleteSurroundingTextInCodePoints) и ускоряется при удержании
+  — *Аннотация (2026-07-18, принято пользователем): реализовано эквивалентом — подсчёт chars по кодпоинту (`supplementary ? 2 : 1`) + `deleteSurroundingText`; семантика идентична `deleteSurroundingTextInCodePoints` (суррогатная пара удаляется целиком). «Ускоряется» = AOSP-автоповтор: 400 мс старт → серия 50 мс. Прогрессивный разгон (удаление словами) — backlog post-MVP. См. 04-RESEARCH.md § INPUT-03.*
 - [ ] **INPUT-04**: Клавиша Enter показывает и выполняет действие поля по imeOptions (поиск/перенос/готово/отправить)
 - [ ] **INPUT-05**: Двойной тап по пробелу вставляет точку с пробелом
 - [ ] **INPUT-06**: Свайп по пробелу перемещает курсор
@@ -119,10 +121,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | LAYOUT-05 | Phase 2 | Complete |
 | SWITCH-01 | Phase 3 | Complete |
 | SWITCH-02 | Phase 3 | Complete |
-| INPUT-01 | Phase 4 | Pending |
-| INPUT-02 | Phase 4 | Pending |
-| INPUT-03 | Phase 4 | Pending |
-| INPUT-04 | Phase 4 | Pending |
+| INPUT-01 | Phase 4 | Verifying (04-01: structural PASS; on-device UAT deferred) |
+| INPUT-02 | Phase 4 | Verifying (04-01: structural PASS; on-device UAT deferred) |
+| INPUT-03 | Phase 4 | Verifying (04-01: structural PASS; on-device UAT deferred) |
+| INPUT-04 | Phase 4 | Verifying (04-01: structural PASS; on-device UAT deferred) |
 | INPUT-05 | Phase 5 | Pending |
 | INPUT-06 | Phase 5 | Pending |
 | INPUT-07 | Phase 5 | Pending |

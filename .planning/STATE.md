@@ -2,18 +2,18 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-current_phase: 4
+current_phase: 04
 current_phase_name: Механика ввода — регистр и служебные клавиши
-status: planning
+status: executing
 stopped_at: "Plan 03-01 complete-local (Tasks 1–4 committed: e321fc6, a0c6e05, a37a124, b19ce97; Task 5 device UAT deferred в Blockers)"
-last_updated: "2026-07-18T10:13:51.248Z"
+last_updated: "2026-07-18T13:20:28.969Z"
 last_activity: 2026-07-18
+last_activity_desc: Phase 04 execution started
 progress:
-  total_phases: 3
+  total_phases: 4
   completed_phases: 3
-  total_plans: 4
+  total_plans: 5
   completed_plans: 4
-last_activity_desc: Phase 03 plan 03-01 executed (Tasks 1–4; device UAT deferred)
 ---
 
 # State: Tatar Keyboard
@@ -21,10 +21,10 @@ last_activity_desc: Phase 03 plan 03-01 executed (Tasks 1–4; device UAT deferr
 ## Current Position
 
 **Milestone:** v1.0 — MVP + релиз (GitHub Releases + IzzyOnDroid)
-**Phase:** 4 — Механика ввода — регистр и служебные клавиши
-**Plan:** Not started
-**Status:** Ready to plan
-**Last activity:** 2026-07-18
+**Phase:** 04 (Механика ввода — регистр и служебные клавиши) — EXECUTING
+**Plan:** 1 of 1
+**Status:** Executing Phase 04
+**Last activity:** 2026-07-18 — Phase 04 execution started
 
 Progress: [██████████] 100%
 
@@ -51,6 +51,8 @@ Progress: [██████████] 100%
 
 - [03-01] Long-press дубли — литеральные `latin:moreKeys` одиночными кодпоинтами (10 клавиш вкл. е→ё/ь→ъ из F1), без KeyboardTextsTable; заглавные не прописываются (MoreKeySpec auto-upcase). Русская раскладка — собственный layout set `russian` (6 XML, копия tatar-рядов без пятого ряда) — shared east_slavic (be_BY/kk/ky/uk) не тронут. Реестр: LOCALE_TATAR мигрирован на "tt_RU" (prefs-миграцию не писали — dev-строка tt:tatar самовосстанавливается), getDefaultSubtypes = детерминированная тройка tt_RU→ru→en_US (MVP-хак и мёртвый fallback F2 удалены). «Татарча» через locale_exception_keys. SWITCH-01/02 (глобус/цикл/пикер/персистентность) — ноль нового кода, штатные механизмы форка; pref_enable_ime_switch остаётся false (цикл строго внутри IME). Трактовка A3: «система видит три subtype» = виртуальный subtype-реестр форка — при простановке SWITCH-01 в REQUIREMENTS.md добавить аннотацию.
 
+- [04-01] Фаза 4 — zero-code верификация: вердикт ресерча 04-RESEARCH.md ALL WORKS (INPUT-01..04 работают в базе форка), все доказательства запинованы fail-capable-грепами. Принята трактовка INPUT-03 (2026-07-18): эквивалент deleteSurroundingText с подсчётом по кодпоинту + AOSP-автоповтор 400 мс → 50 мс. Бонус INPUT-01: caps lock long-press'ом shift (1200 мс). Диф кода фазы пуст (boundary-check b19ce97..HEAD по app/ = пусто).
+
 ### Cross-cutting disciplines (каждая фаза)
 
 - Smoke-тест матрицы InputConnection (Telegram, Chrome/WebView keyCode 229, password-поля, MIUI/One UI) — в критериях каждой фазы ввода/UI; полный проход — фаза 8.
@@ -62,6 +64,7 @@ Progress: [██████████] 100%
 - Порядок клавиш пятого ряда (алфавитный vs частотный) — юзер-тест после MVP.
 - minSdk 24 vs 26 — решить перед фазой 11.
 - Финальное название приложения и applicationId — до публикации.
+- Прогрессивный разгон backspace (удаление словами после N повторов, как в Gboard) — post-MVP, после юзер-теста; `repeatCount` уже пробрасывается в `onKeyRepeat` (TimerHandler.java:53).
 
 ### Blockers/Concerns
 
