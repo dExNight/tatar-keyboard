@@ -2,18 +2,18 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-current_phase: 02
-current_phase_name: Татарская раскладка
-status: verifying
+current_phase: 3
+current_phase_name: Языки и переключение
+status: planning
 stopped_at: Completed 02-01-PLAN.md (Task 5 device UAT deferred — устройство не подключено; SUMMARY committed 851697c)
-last_updated: "2026-07-18T08:29:50.588Z"
+last_updated: "2026-07-18T08:50:49.563Z"
 last_activity: 2026-07-18
-last_activity_desc: Phase 02 execution started
 progress:
   total_phases: 2
   completed_phases: 2
   total_plans: 3
   completed_plans: 3
+last_activity_desc: Phase 02 execution started
 ---
 
 # State: Tatar Keyboard
@@ -21,10 +21,10 @@ progress:
 ## Current Position
 
 **Milestone:** v1.0 — MVP + релиз (GitHub Releases + IzzyOnDroid)
-**Phase:** 02 (Татарская раскладка) — EXECUTING
-**Plan:** 1 of 1
-**Status:** Phase complete — ready for verification
-**Last activity:** 2026-07-18 — Phase 02 execution started
+**Phase:** 3 — Языки и переключение
+**Plan:** Not started
+**Status:** Ready to plan
+**Last activity:** 2026-07-18
 
 Progress: [██████████] 100%
 
@@ -46,6 +46,8 @@ Progress: [██████████] 100%
 - [01-02] Подпись release: условный signingConfig через `keystore.properties` (Pattern 3); `release.jks` (RSA 4096, validity 10950, alias `tatarkeyboard`) и `keystore.properties` — только локально, оба gitignored (проверено `git check-ignore` + grep истории). Без файла assembleRelease даёт unsigned APK — CI живёт без секретов.
 - [01-02] CI (`.github/workflows/ci.yml`): официальные actions на мажорных тегах, `permissions: contents: read`; вызывает `scripts/check-no-internet.sh` дважды (fast-fail до сборки + по собранному APK); gradle-wrapper.jar восстанавливается шагом workflow из тега v9.6.0 gradle/gradle с pin по sha256 (jar не в git).
 - [01-02] GitHub-репозиторий НЕ создан (на машине нет `gh`, remote только `upstream`) — создание репо/push/прогоны CI отложены; точные шаги в 01-02-SUMMARY.md § Deferred.
+
+- [02-01] Татарская раскладка: rowkeys литеральными кодпоинтами (без !text/ — обход DEFAULT-ловушки KeyboardTextsTable), высоты 5×20%p / 6×16.667%p; Java-диф ограничен реестром SubtypeLocaleUtils (case с break, tt первым в getDefaultSubtypes). Ревью F1: ё и ъ недостижимы до phase-3 long-press — включить в LAYOUT-02.
 
 ### Cross-cutting disciplines (каждая фаза)
 
@@ -74,10 +76,10 @@ Progress: [██████████] 100%
 
 ## Session Continuity
 
-**Stopped at:** Completed 02-01-PLAN.md (Task 5 device UAT deferred — устройство не подключено; SUMMARY committed 851697c)
+**Stopped at:** Phase 2 complete (verification passed; on-device UAT отложен, принят), ready to plan Phase 3
 **Resume file:** None
 
-**Next step:** Phase 2 — Татарская раскладка (autonomous run continues). Отложенные ручные проверки фазы 1 — см. Blockers/Concerns.
+**Next step:** Phase 3 — Языки и переключение (LAYOUT-02 long-press дубли — вкл. ё/ъ из ревью F1, LAYOUT-03 ru/en, SWITCH-01/02 subtypes+глобус).
 
 Last session: 2026-07-18T08:29:50.584Z
 

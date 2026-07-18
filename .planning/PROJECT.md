@@ -12,6 +12,8 @@
 
 ### Validated
 
+- ✓ Татарская раскладка как XML-данные: ЙЦУКЕН + пятый ряд `ә ө ү җ ң һ` (алфавитный, сверху), слои ?123/#+= работают, новая раскладка = только XML + 4 строки реестра — Phase 2 (on-device подтверждение отложено, принято)
+
 - ✓ Форк собирается и подписывается под уникальным applicationId (`org.tatarkeyboard.ime` + `.debug`); Kotlin interop работает; манифест без INTERNET с двухуровневой проверкой + CI-workflow — Phase 1 (on-device и GitHub-side доказательства отложены, приняты пользователем)
 
 ### Active
@@ -96,4 +98,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-07-18 after Phase 1*
+*Last updated: 2026-07-18 after Phase 2*
