@@ -39,9 +39,10 @@
     <!-- U+0442: "т" CYRILLIC SMALL LETTER TE -->
     <Key
         latin:keySpec="&#x0442;" />
-    <!-- U+044C: "ь" CYRILLIC SMALL LETTER SOFT SIGN -->
+    <!-- U+044C: "ь" CYRILLIC SMALL LETTER SOFT SIGN; long-press U+044A: "ъ" (ревью F1) -->
     <Key
-        latin:keySpec="&#x044C;" />
+        latin:keySpec="&#x044C;"
+        latin:moreKeys="&#x044A;" />
     <!-- U+0431: "б" CYRILLIC SMALL LETTER BE -->
     <Key
         latin:keySpec="&#x0431;" />
