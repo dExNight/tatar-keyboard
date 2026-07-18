@@ -2,18 +2,18 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-current_phase: 9
+current_phase: 09
 current_phase_name: Доступность
-status: planning
+status: executing
 stopped_at: Completed 08-01-PLAN.md — Phase 8 complete-local (Task 4 UAT deferred, см. Blockers)
-last_updated: "2026-07-18T19:14:46.015Z"
+last_updated: "2026-07-18T20:06:55.623Z"
 last_activity: 2026-07-18
+last_activity_desc: Phase 09 execution started
 progress:
-  total_phases: 8
+  total_phases: 9
   completed_phases: 8
-  total_plans: 9
+  total_plans: 10
   completed_plans: 9
-last_activity_desc: Phase 08 plan 08-01 complete-local (UAT deferred)
 ---
 
 # State: Tatar Keyboard
@@ -21,10 +21,10 @@ last_activity_desc: Phase 08 plan 08-01 complete-local (UAT deferred)
 ## Current Position
 
 **Milestone:** v1.0 — MVP + релиз (GitHub Releases + IzzyOnDroid)
-**Phase:** 9 — Доступность
-**Plan:** Not started
-**Status:** Ready to plan
-**Last activity:** 2026-07-18
+**Phase:** 09 (Доступность) — EXECUTING
+**Plan:** 1 of 1
+**Status:** Executing Phase 09
+**Last activity:** 2026-07-18 — Phase 09 execution started
 
 Progress: [██████████] 100%
 
@@ -61,6 +61,8 @@ Progress: [██████████] 100%
 
 - [08-01] Фаза 8 — data-only совместимость: единственная правка под app/ = 1 строка values-land/config.xml (config_use_fullscreen_mode true→false) — extract mode мёртв во всех 5 config-вариантах (true=0, false=5), onEvaluateFullscreenMode() всегда false штатным ресурсным путём (Java-override отклонён ресерчем). Все 5 COMPAT-вердиктов запинованы fail-capable-грепами: insets-линия upstream 827da4f/2885ae5 (fitsSystemWindows v28-сплит, requestApplyInsets, onComputeInsets, contrast off), directBoot (манифест + device-protected prefs, ноль обходных call-sites), no-composing (0 вхождений) + commitText/deleteSurroundingText, password (mIsPasswordField-гейт + ноль словаря). Матрица SC5 написана — 08-UAT-MATRIX.md (CLOSED-STRUCTURAL + DEFERRED, ни одного PASS до device-прогона). Java/Kotlin-дифф фазы = 0 строк (boundary-чек d2ae619..HEAD).
 
+- [09-01] Фаза 9 — TalkBack достроен до полной A11Y-01/02: 4 гэпа ресерча закрыты — G2 описания только через KeyDescriptionMapper (когда по key.getCode(), 6 татарских кодпоинтов hex-литералами + шаблон «Заглавная %s», shift ×4 по mElementId, enter ×7 по imeAction с приоритетом custom label; строки en base values/strings-a11y.xml + values-ru/strings-a11y.xml, AOSP-имена spoken_*), G1 клик = синтез MotionEvent DOWN/UP в видимый центр → public MainKeyboardView.processMotionEvent (штатный touch-путь, AOSP-паттерн), G3 isClickable/isTextEntryKey (androidx.core транзитив — новых зависимостей нет), G4 TYPE_VIEW_CLICKED + return true. Fork-Java-дифф = 0 строк (boundary 0a280ce: ровно 2 .kt + 2 .xml). Password: собственных announceForAccessibility ноль (запиновано), описания клавиш не обскьюрены осознанно (ACCESSIBILITY_SPEAK_PASSWORD deprecated c API 26 — озвучка = зона TalkBack).
+
 ### Cross-cutting disciplines (каждая фаза)
 
 - Smoke-тест матрицы InputConnection (Telegram, Chrome/WebView keyCode 229, password-поля, MIUI/One UI) — в критериях каждой фазы ввода/UI; полный проход — фаза 8.
@@ -74,6 +76,8 @@ Progress: [██████████] 100%
 - Финальное название приложения и applicationId — до публикации.
 - app_restrictions.xml: android:title перепутаны между pref_enable_ime_switch и pref_space_swipe (pre-existing upstream, ~строки 40/45) — поправить отдельным коммитом вне фазы 5.
 - Прогрессивный разгон backspace (удаление словами после N повторов, как в Gboard) — post-MVP, после юзер-теста; `repeatCount` уже пробрасывается в `onKeyRepeat` (TimerHandler.java:53).
+- [09-01] moreKeys-панель вне a11y-дерева: ё/ъ (long-press е/ь) недостижимы с TalkBack — не блокер MVP (все 6 татарских букв на собственных клавишах пятого ряда, long-press для татарского ввода не нужен); отдельный делегат на MoreKeysKeyboardView — backlog.
+- [09-01] values-tt (татарские названия букв в описаниях) + announce смены shift-режима (AOSP spoken_description_shiftmode_*) — post-MVP backlog.
 
 ### Blockers/Concerns
 
