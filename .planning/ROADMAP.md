@@ -143,6 +143,7 @@
 **Mode:** mvp
 **Requirements:** COMPAT-01, COMPAT-02, COMPAT-03, COMPAT-04, COMPAT-05
 **Depends on:** Phase 7
+**Progress:** 08-01 ✓ complete-local (Tasks 1–3: флип config_use_fullscreen_mode values-land → false — extract mode мёртв во всех 5 config-вариантах; все 5 COMPAT-вердиктов запинованы fail-capable-грепами — insets-линия upstream 827da4f/2885ae5, directBoot + device-protected prefs, no-composing + commitText/deleteSurroundingText, password-гейт + ноль словаря; 08-UAT-MATRIX.md — письменный деливерабл SC5: 12 окружений × 8 сценариев, CLOSED-STRUCTURAL + DEFERRED; сборки/no-internet/zero-Java boundary d2ae619..HEAD = 1 строка values-land — зелёные); Task 4 device UAT — deferred, human verification pending, см. 08-UAT-MATRIX.md + STATE.md § Blockers
 
 Smoke-тесты шли в каждой фазе; здесь — систематический полный проход и добивание найденного: password-поля, WebView/keyCode 229, edge-to-edge API 35+ (insets через InputViewContainer), ландшафт, directBootAware, MIUI/HyperOS/One UI.
 

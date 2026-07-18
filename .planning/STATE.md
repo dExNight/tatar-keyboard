@@ -5,15 +5,15 @@ milestone_name: milestone
 current_phase: 08
 current_phase_name: Совместимость
 status: executing
-stopped_at: Phase 7 complete-local (structural verification passed; Task 3 UAT отложен, принят), ready to plan Phase 8
-last_updated: "2026-07-18T18:59:41.597Z"
+stopped_at: Phase 8 complete-local (structural verification passed; Task 4 UAT отложен, принят), ready to plan Phase 9
+last_updated: "2026-07-18T19:12:00.000Z"
 last_activity: 2026-07-18
-last_activity_desc: Phase 08 execution started
+last_activity_desc: Phase 08 plan 08-01 complete-local (UAT deferred)
 progress:
   total_phases: 8
-  completed_phases: 7
+  completed_phases: 8
   total_plans: 9
-  completed_plans: 8
+  completed_plans: 9
 ---
 
 # State: Tatar Keyboard
@@ -21,10 +21,10 @@ progress:
 ## Current Position
 
 **Milestone:** v1.0 — MVP + релиз (GitHub Releases + IzzyOnDroid)
-**Phase:** 08 (Совместимость) — EXECUTING
-**Plan:** 1 of 1
-**Status:** Executing Phase 08
-**Last activity:** 2026-07-18 — Phase 08 execution started
+**Phase:** 08 (Совместимость) — COMPLETE-LOCAL (UAT deferred)
+**Plan:** 1 of 1 — complete
+**Status:** Phase 08 complete-local, ready to plan Phase 9
+**Last activity:** 2026-07-18 — Phase 08 plan 08-01 complete-local (UAT deferred)
 
 Progress: [██████████] 100%
 
@@ -89,6 +89,8 @@ Progress: [██████████] 100%
 
 - ⚠️ [Phase 7, plan 07-01] Task 3 on-device UAT deferred — устройство не подключено (adb devices пуст), по standing-паттерну фаз 1–6. BUILD-критерии закрыты автоматикой (assembleDebug + assembleRelease зелёные, check-no-internet OK, все структурные грепы UI-02/03/04 PASS, пин sound-default false PASS, zero-Java boundary: diff fbfd66a..HEAD по app/ = 3 объявленных XML, ни одного .java/.kt). Чек-лист при появлении устройства (полные шаги — 07-01-SUMMARY.md § Deferred Verification): (1) установка свежего app-debug.apk; (2) SC1 баллон (UI-02): нажатие буквы → баллон МГНОВЕННО на касании (down, не up), iOS-вид: light — белый с 1dp-тенью, dark — #6B6B6B, текст читаем, исчезает при отпускании; (3) SC1/SC4 края: баллон пятого ряда (ә — рисуется НАД клавиатурой в прозрачной зоне окна IME, не обрезан) и крайних колонок (левая й, правая ъ/э/һ — клампинг сдвигает внутрь); MIUI/HyperOS особо при наличии Xiaomi; (4) SC2 панель (UI-03): long-press а → панель с ә; НЕ отрывая пальца скольжение — подсветка следует, отпускание коммитит; уход в сторону — отмена; панель в iOS-палитре (серый фон, радиус 5dp, pressed-подсветка); (5) SC3 отклик (UI-04): вибрация + подсветка в момент КАСАНИЯ; звук по умолчанию НЕ звучит (default off — решение пользователя) — включить sound_on → звук на касании → выключить; выключить vibrate_on → вибрация пропала → включить; (6) SC4 smoke: пп. 2/4/5 в Telegram, Chrome WebView (keyCode 229), password-поле; MIUI при наличии (иначе пометить как не покрыто); (7) регрессии фаз 2–6: печать, глобус, shift, double-space, свайп-курсор — без аномалий. Финальная простановка чек-боксов UI-02/03/04 — после UAT.
 
+- ⚠️ [Phase 8, plan 08-01] Task 4 on-device UAT deferred — устройство не подключено (adb devices пуст), по standing-паттерну фаз 1–7. BUILD-критерии закрыты автоматикой (assembleDebug + assembleRelease зелёные, check-no-internet OK, все 5 COMPAT-вердиктов запинованы fail-capable-грепами, extract mode мёртв во всех 5 config-вариантах, zero-Java boundary: diff d2ae619..HEAD по app/ = ровно values-land/config.xml, ни одного .java/.kt). Исполняемый чеклист — **08-UAT-MATRIX.md** (self-contained: 12 окружений × 8 сценариев, структурные механизмы CLOSED-STRUCTURAL со ссылками, все runtime-ячейки DEFERRED; подготовка/порядок прогона/спец-блоки E8 эмулятор API 35–36, E9 ландшафт без extract mode, E10 Direct Boot PIN, E11 MIUI, E12 One UI — внутри документа). Прогнать вместе с UAT-бандлом фаз 1–7; блок E8 исполним на эмуляторе отдельно, раньше телефона (A4). Финальная простановка чек-боксов COMPAT-01..05 в REQUIREMENTS.md — только после реального прогона.
+
 ### Research pointers
 
 - `.planning/research/SUMMARY.md` — конденсат; детали в `research/00`–`08` в корне.
@@ -99,12 +101,12 @@ Progress: [██████████] 100%
 
 ## Session Continuity
 
-**Stopped at:** Phase 7 complete (verification passed; UAT отложен, принят), ready to plan Phase 8
+**Stopped at:** Completed 08-01-PLAN.md — Phase 8 complete-local (Task 4 UAT deferred, см. Blockers)
 **Resume file:** None
 
-**Next step:** Phase 8 — Совместимость (InputConnection-матрица, MIUI/HyperOS, WebView, edge-to-edge, ландшафт).
+**Next step:** Phase 9 — Доступность (TalkBack: ExploreByTouchHelper полная реализация, контент-описания татарских букв).
 
-Last session: 2026-07-18T18:20:00Z
+Last session: 2026-07-18T19:12:00Z
 
 ---
 *Last updated: 2026-07-18 — Phase 1 complete*
@@ -121,3 +123,4 @@ Last session: 2026-07-18T18:20:00Z
 | Phase 05 P01 | 8 min | 3 of 4 tasks (Task 4 UAT deferred) | 5 code files + planning |
 | Phase 06 P01 | 15 min | 6 of 7 tasks (Task 7 UAT deferred) | 18 files (17 app + gradle.properties) |
 | Phase 07 P01 | 25 min | 2 of 3 tasks (Task 3 UAT deferred) | 3 app files (zero Java) + planning |
+| Phase 08 P01 | 12 min | 3 of 4 tasks (Task 4 UAT deferred) | 1 app file (1 line, zero Java) + planning |
