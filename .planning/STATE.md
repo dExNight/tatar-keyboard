@@ -2,18 +2,18 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-current_phase: 3
+current_phase: 03
 current_phase_name: Языки и переключение
-status: planning
-stopped_at: Completed 02-01-PLAN.md (Task 5 device UAT deferred — устройство не подключено; SUMMARY committed 851697c)
-last_updated: "2026-07-18T08:50:49.563Z"
+status: executing
+stopped_at: Completed 03-01-PLAN.md (Task 5 device UAT deferred — устройство не подключено; SUMMARY written)
+last_updated: "2026-07-18T09:38:13Z"
 last_activity: 2026-07-18
+last_activity_desc: Phase 03 plan 03-01 executed (Tasks 1–4; device UAT deferred)
 progress:
-  total_phases: 2
+  total_phases: 3
   completed_phases: 2
-  total_plans: 3
-  completed_plans: 3
-last_activity_desc: Phase 02 execution started
+  total_plans: 4
+  completed_plans: 4
 ---
 
 # State: Tatar Keyboard
@@ -21,10 +21,10 @@ last_activity_desc: Phase 02 execution started
 ## Current Position
 
 **Milestone:** v1.0 — MVP + релиз (GitHub Releases + IzzyOnDroid)
-**Phase:** 3 — Языки и переключение
-**Plan:** Not started
-**Status:** Ready to plan
-**Last activity:** 2026-07-18
+**Phase:** 03 (Языки и переключение) — plan 03-01 complete-local (device UAT deferred)
+**Plan:** 1 of 1
+**Status:** Plan 03-01 executed; Task 5 checkpoint deferred to Blockers
+**Last activity:** 2026-07-18 — Phase 03 plan 03-01 executed (Tasks 1–4 committed, UAT deferred)
 
 Progress: [██████████] 100%
 
@@ -49,6 +49,8 @@ Progress: [██████████] 100%
 
 - [02-01] Татарская раскладка: rowkeys литеральными кодпоинтами (без !text/ — обход DEFAULT-ловушки KeyboardTextsTable), высоты 5×20%p / 6×16.667%p; Java-диф ограничен реестром SubtypeLocaleUtils (case с break, tt первым в getDefaultSubtypes). Ревью F1: ё и ъ недостижимы до phase-3 long-press — включить в LAYOUT-02.
 
+- [03-01] Long-press дубли — литеральные `latin:moreKeys` одиночными кодпоинтами (10 клавиш вкл. е→ё/ь→ъ из F1), без KeyboardTextsTable; заглавные не прописываются (MoreKeySpec auto-upcase). Русская раскладка — собственный layout set `russian` (6 XML, копия tatar-рядов без пятого ряда) — shared east_slavic (be_BY/kk/ky/uk) не тронут. Реестр: LOCALE_TATAR мигрирован на "tt_RU" (prefs-миграцию не писали — dev-строка tt:tatar самовосстанавливается), getDefaultSubtypes = детерминированная тройка tt_RU→ru→en_US (MVP-хак и мёртвый fallback F2 удалены). «Татарча» через locale_exception_keys. SWITCH-01/02 (глобус/цикл/пикер/персистентность) — ноль нового кода, штатные механизмы форка; pref_enable_ime_switch остаётся false (цикл строго внутри IME). Трактовка A3: «система видит три subtype» = виртуальный subtype-реестр форка — при простановке SWITCH-01 в REQUIREMENTS.md добавить аннотацию.
+
 ### Cross-cutting disciplines (каждая фаза)
 
 - Smoke-тест матрицы InputConnection (Telegram, Chrome/WebView keyCode 229, password-поля, MIUI/One UI) — в критериях каждой фазы ввода/UI; полный проход — фаза 8.
@@ -65,6 +67,7 @@ Progress: [██████████] 100%
 
 - ⚠️ [Phase 1] Отложенная ручная проверка (принята пользователем 2026-07-18): on-device smoke debug/release, создание GitHub-репо + зелёный CI + красный ci-negative-test (доказательство PERF-04 на Actions), бэкап release.jks. Точные шаги — 01-01/01-02-SUMMARY.md § Deferred; прогнать при первой возможности (устройство + GitHub).
 - ⚠️ [Phase 2, plan 02-01] Task 5 on-device UAT deferred — устройство не подключено (adb devices пуст), по образцу фазы 1. BUILD-критерии закрыты автоматикой (assembleDebug зелёный, aapt2 видит *_tatar ресурсы, check-no-internet OK, Java-diff = только SubtypeLocaleUtils.java). Чек-лист при появлении устройства: (1) чистая установка adb uninstall org.tatarkeyboard.ime.debug → adb install app-debug.apk → выбрать «Tatar Keyboard (dev)»; (2) клавиатура открывается ТАТАРСКОЙ: пятый ряд ә ө ү җ ң һ СВЕРХУ над ЙЦУКЕН; (3) напечатать «әни өй үрдәк җир таң һава» + «щи, ыл, эш, ике» — все 37 букв тапом, щ/ы/э/и не пустые; (4) shift → Ә Ө Ү Җ Ң Һ; (5) 5 рядов + action row без обрезки, adb logcat | grep -i "too tall" пуст; (6) ?123 → #+= → АБВ туда-обратно; (7) Number row ON: цифры НАД пятым рядом, 6 рядов помещаются, выключить обратно; (8) smoke-матрица SC4: «әни өй үрдәк җир таң һава» в Telegram, Chrome (адресная строка + поле формы/WebView keyCode 229), password-поле — без потерь/дублей. 02-01-SUMMARY.md создаётся после резолва чекпойнта.
+- ⚠️ [Phase 3, plan 03-01] Task 5 on-device UAT deferred — устройство не подключено (adb devices пуст), по standing-паттерну фаз 1–2. BUILD-критерии закрыты автоматикой (assembleDebug зелёный, aapt2 видит все 6 *_russian ресурсов, check-no-internet OK, Java-diff b0b4606..HEAD = только SubtypeLocaleUtils.java, diff по *east_slavic*/KeyboardTextsTable.java пуст). Чек-лист при появлении устройства (полные шаги — 03-01-SUMMARY.md § Deferred Verification): (1) чистая установка adb uninstall org.tatarkeyboard.ime.debug → adb install (ОБЯЗАТЕЛЬНО — dev-prefs tt:tatar фазы 2 маскируют новую тройку, Pitfall 4); (2) открывается татарской; Languages: ровно три — «Татарча», «Русский»/ICU, «English (US)»; (3) тап глобуса циклит tt→ru→en→tt, русская = стандартная ЙЦУКЕН без пятого ряда, английская = QWERTY; (4) long-press глобуса → пикер: три наших subtype + другие IME; (5) 10 long-press дублей на ТАТАРСКОЙ (а→ә о→ө у→ү ж→җ н→ң х→һ э→ә г→һ + е→ё ь→ъ); (6) те же 10 на РУССКОЙ; (7) shift + long-press а → Ә; (8) персистентность: переключить на ru, force-stop, открыть → русская; (9) smoke-матрица SC5: Telegram/Chrome-WebView(229)/password с переключением языков; (10) MIUI — при наличии Xiaomi. Bookkeeping: при простановке SWITCH-01 аннотировать трактовку «виртуальные subtypes форка» (A3).
 
 ### Research pointers
 
@@ -76,10 +79,10 @@ Progress: [██████████] 100%
 
 ## Session Continuity
 
-**Stopped at:** Phase 2 complete (verification passed; on-device UAT отложен, принят), ready to plan Phase 3
+**Stopped at:** Plan 03-01 complete-local (Tasks 1–4 committed: e321fc6, a0c6e05, a37a124, b19ce97; Task 5 device UAT deferred в Blockers)
 **Resume file:** None
 
-**Next step:** Phase 3 — Языки и переключение (LAYOUT-02 long-press дубли — вкл. ё/ъ из ревью F1, LAYOUT-03 ru/en, SWITCH-01/02 subtypes+глобус).
+**Next step:** Phase 3 verification / phase close-out, затем Phase 4 — Механика ввода (INPUT-01..04). Device UAT фаз 1–3 — одним заходом при появлении устройства.
 
 Last session: 2026-07-18T08:29:50.584Z
 
@@ -93,3 +96,4 @@ Last session: 2026-07-18T08:29:50.584Z
 | Phase 1 P01 | 35 min | 4 tasks | 7 files |
 | Phase 1 P02 | 20 min | 2 of 4 tasks (2 deferred) | 3 files (+2 local secrets) |
 | Phase 02 P01 | 9 min | 4 tasks | 8 files |
+| Phase 03 P01 | 8 min | 4 of 5 tasks (Task 5 UAT deferred) | 12 files |

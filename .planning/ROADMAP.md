@@ -57,6 +57,7 @@
 **Mode:** mvp
 **Requirements:** LAYOUT-02, LAYOUT-03, SWITCH-01, SWITCH-02
 **Depends on:** Phase 2
+**Progress:** 03-01 ✓ complete-local (Tasks 1–4: 10 long-press дублей на tatar+russian, layout set russian данными, реестр tt_RU/ru/en_US тройкой, «Татарча»; сборка/aapt2/no-internet/границы зелёные); Task 5 device-verify — deferred, human verification pending, см. 03-01-SUMMARY.md § Deferred Verification
 
 **Success Criteria:**
 
