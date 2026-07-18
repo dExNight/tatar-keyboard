@@ -120,6 +120,15 @@ public final class InputLogic {
      * @param newSelEnd new selection end
      */
     public void onUpdateSelection(final int newSelStart, final int newSelEnd) {
+        if (newSelStart != mConnection.getExpectedSelectionStart()
+                || newSelEnd != mConnection.getExpectedSelectionEnd()) {
+            // The cursor moved in a way the keyboard did not cause (tap, arrow keys, app edit):
+            // a pending double-space-to-period revert would target unrelated text, and a stale
+            // space timestamp could trigger a period at the new position. Drop both, like AOSP
+            // does in resetEntireInputState() on unexpected cursor moves.
+            mJustDoubleSpaced = false;
+            mLastSpaceDownTime = 0;
+        }
         mConnection.updateSelection(newSelStart, newSelEnd);
     }
 
