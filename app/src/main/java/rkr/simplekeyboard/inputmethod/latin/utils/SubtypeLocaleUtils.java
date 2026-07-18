@@ -323,6 +323,10 @@ public final class SubtypeLocaleUtils {
                 }
             }
         }
+        // MVP (phase 2): Tatar first — the keyboard opens with the Tatar layout on a
+        // fresh install regardless of system locales (ru/en systems never match tt).
+        // Full subtype selection (tt_RU/ru/en_US) comes with SWITCH-01/02 in phase 3.
+        subtypes.add(0, getSubtypes(LOCALE_TATAR, resources).get(0));
         if (subtypes.size() == 0) {
             // there needs to be at least one default subtype
             subtypes.add(getSubtypes(LOCALE_ENGLISH_UNITED_STATES, resources).get(0));
