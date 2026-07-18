@@ -41,7 +41,7 @@
         </service>
 
         <activity
-            android:name=".latin.settings.SettingsActivity"
+            android:name=".latin.setup.SetupActivity"
             android:label="@string/english_ime_name"
             android:exported="true"
             android:theme="@style/platformSettingsTheme">
@@ -50,6 +50,12 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <activity
+            android:name=".latin.settings.SettingsActivity"
+            android:label="@string/english_ime_name"
+            android:exported="true"
+            android:theme="@style/platformSettingsTheme" />
 
         <receiver
             android:name=".latin.SystemBroadcastReceiver"
