@@ -60,7 +60,7 @@ Requirements for initial release (майлстоун v1.0 MVP: release-ready APK
 - [ ] **PERF-01**: Release-APK ≤ 3 МБ
 - [ ] **PERF-02**: PSS показанной клавиатуры ≤ 30 МБ; холодный старт до показа < 400 мс
 - [ ] **PERF-03**: Ноль аллокаций в onDraw/onTouchEvent; 0 GC-событий во время печати
-- [ ] **PERF-04**: В манифесте нет разрешения INTERNET; CI-проверка это гарантирует на каждом коммите
+- [x] **PERF-04**: В манифесте нет разрешения INTERNET; CI-проверка это гарантирует на каждом коммите
 
 ### Релиз
 
@@ -142,17 +142,19 @@ Which phases cover which requirements. Updated during roadmap creation.
 | PERF-01 | Phase 11 | Pending |
 | PERF-02 | Phase 11 | Pending |
 | PERF-03 | Phase 11 | Pending |
-| PERF-04 | Phase 1 | Pending |
+| PERF-04 | Phase 1 | Complete |
 | REL-01 | Phase 11 | Pending |
 | REL-02 | Phase 11 | Pending |
 | REL-03 | Phase 11 | Pending |
 
 **Coverage:**
+
 - v1 requirements: 34 total *(исправлено: при определении требований в счётчике стояло 30, фактический подсчёт по списку — 34)*
 - Mapped to phases: 34
 - Unmapped: 0 ✓
 
 Примечания к маппингу:
+
 - **PERF-01..03** — сквозная дисциплина (ноль аллокаций и лёгкость закладываются при написании кода в фазах 6–7 и далее), но замеренная верификация — Phase 11.
 - **PERF-04** — CI-проверка ставится и наблюдаема с Phase 1, далее действует на каждом коммите.
 - **REL-01** — keystore создаётся в Phase 1 (задел), требование верифицируется подписанным release-APK в Phase 11.

@@ -12,7 +12,7 @@
 
 ### Validated
 
-(None yet — ship to validate)
+- ✓ Форк собирается и подписывается под уникальным applicationId (`org.tatarkeyboard.ime` + `.debug`); Kotlin interop работает; манифест без INTERNET с двухуровневой проверкой + CI-workflow — Phase 1 (on-device и GitHub-side доказательства отложены, приняты пользователем)
 
 ### Active
 
@@ -61,15 +61,15 @@
 
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
-| Форк Simple Keyboard, не с нуля и не HeliBoard | Лёгкость (0.65 МБ), Apache-2.0, посильно новичку; HeliBoard = GPL + 20 МБ (research/06) | — Pending |
+| Форк Simple Keyboard, не с нуля и не HeliBoard | Лёгкость (0.65 МБ), Apache-2.0, посильно новичку; HeliBoard = GPL + 20 МБ (research/06) | ✓ Good — Phase 1: merge b40c70d9, сборка/подпись работают |
 | Пятый видимый ряд для ә ө ү җ ң һ, не long-press-only | ә — 5-я по частоте буква (6.65%), 6 букв = 10.6% буквоупотреблений | — Pending |
 | Kotlin + Canvas-View, без Compose в IME | Compose: +20–40 МБ RAM, медленный холодный старт (research/01, 02) | — Pending |
-| Без разрешения INTERNET | Проверяемая ОС-гарантия приватности, Data Safety = «No data collected» | — Pending |
+| Без разрешения INTERNET | Проверяемая ОС-гарантия приватности, Data Safety = «No data collected» | ✓ Good — Phase 1: манифест чист, script+CI написаны |
 | Без composing-текста в MVP | Минимизация багов зоопарка InputConnection | — Pending |
 | Этап 0 (прототип HeliBoard) пропущен | Решение о форке окончательное, контрольная точка не нужна (ответ при инициализации) | — Pending |
 | Майлстоун v1.0 = release-ready APK + GitHub Releases + IzzyOnDroid | RuStore/Play/F-Droid — отдельный майлстоун (ответ при инициализации) | — Pending |
 | Vertical MVP: фазы = сквозные способности, каждая даёт собирающийся APK | Соло-новичок, ранняя рабочая клавиатура для самотестирования | — Pending |
-| Рабочее название «Tatar Keyboard», финальное имя и applicationId — позже | Имени в брифе нет; applicationId зафиксировать в фазе форка | — Pending |
+| Рабочее название «Tatar Keyboard», финальное имя и applicationId — позже | Имени в брифе нет; applicationId зафиксировать в фазе форка | ✓ Done — Phase 1: org.tatarkeyboard.ime (провизорный) |
 
 ## Open Questions
 
@@ -96,4 +96,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-07-18 after initialization*
+*Last updated: 2026-07-18 after Phase 1*

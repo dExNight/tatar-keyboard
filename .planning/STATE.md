@@ -2,18 +2,18 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-current_phase: 1
-current_phase_name: Форк и hello-world
-status: executing
-stopped_at: Completed 01-02-PLAN.md (GitHub repo/push/CI runs + device checkpoint deferred)
-last_updated: "2026-07-18T06:55:00.000Z"
+current_phase: 2
+current_phase_name: Татарская раскладка
+status: planning
+stopped_at: Completed 01-02-PLAN.md (GitHub repo/push/CI runs deferred — нет gh/origin; device checkpoints 01-01 Task 5 и 01-02 Task 4 deferred — устройство не подключено)
+last_updated: "2026-07-18T07:25:58.340Z"
 last_activity: 2026-07-18
-last_activity_desc: Plan 01-02 executed — keystore, signed release, ci.yml authored; GitHub-side steps deferred
 progress:
   total_phases: 1
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 2
   completed_plans: 2
+last_activity_desc: Plan 01-02 executed — keystore, signed release, ci.yml authored; GitHub-side steps deferred
 ---
 
 # State: Tatar Keyboard
@@ -21,10 +21,10 @@ progress:
 ## Current Position
 
 **Milestone:** v1.0 — MVP + релиз (GitHub Releases + IzzyOnDroid)
-**Phase:** 1 (Форк и hello-world) — EXECUTING
-**Plan:** 01-01 — CLOSED (Task 5 on-device smoke DEFERRED, human_needed). 01-02 — CLOSED locally (Task 1 keystore/signing done: ba4bf38, 1721fa7; Task 2 ci.yml authored: 7c63621). DEFERRED (среда без gh/origin): создание GitHub-репо + push, зелёный прогон CI на main, негативный прогон ветки ci-negative-test (Task 3, GitHub-часть; локальный негативный тест скрипта продемонстрирован), Task 4 device-verify + бэкап ключа (human_needed). Next: phase verification после закрытия deferred-пунктов.
-**Status:** Executing Phase 1 (both plans executed; GitHub + device verification pending)
-**Last activity:** 2026-07-18 — Plan 01-02 executed; GitHub-side steps deferred
+**Phase:** 2 — Татарская раскладка
+**Plan:** Not started
+**Status:** Ready to plan
+**Last activity:** 2026-07-18
 
 Progress: [████████░░] 80%
 
@@ -59,6 +59,10 @@ Progress: [████████░░] 80%
 - minSdk 24 vs 26 — решить перед фазой 11.
 - Финальное название приложения и applicationId — до публикации.
 
+### Blockers/Concerns
+
+- ⚠️ [Phase 1] Отложенная ручная проверка (принята пользователем 2026-07-18): on-device smoke debug/release, создание GitHub-репо + зелёный CI + красный ci-negative-test (доказательство PERF-04 на Actions), бэкап release.jks. Точные шаги — 01-01/01-02-SUMMARY.md § Deferred; прогнать при первой возможности (устройство + GitHub).
+
 ### Research pointers
 
 - `.planning/research/SUMMARY.md` — конденсат; детали в `research/00`–`08` в корне.
@@ -69,15 +73,15 @@ Progress: [████████░░] 80%
 
 ## Session Continuity
 
-**Stopped at:** Completed 01-02-PLAN.md (GitHub repo/push/CI runs deferred — нет gh/origin; device checkpoints 01-01 Task 5 и 01-02 Task 4 deferred — устройство не подключено)
+**Stopped at:** Phase 1 complete (verification passed; ручные проверки отложены и приняты), ready to plan Phase 2
 **Resume file:** None
 
-**Next step:** закрыть deferred-пункты (создать GitHub-репо + push → зелёный CI на main → негативный прогон ci-negative-test; on-device проверки debug и release + бэкап ключа), затем phase 1 verification. Точные шаги — 01-02-SUMMARY.md § Deferred.
+**Next step:** Phase 2 — Татарская раскладка (autonomous run continues). Отложенные ручные проверки фазы 1 — см. Blockers/Concerns.
 
-Last session: 2026-07-18T06:55:00.000Z
+Last session: 2026-07-18T07:26:00.000Z
 
 ---
-*Last updated: 2026-07-18 — roadmap created*
+*Last updated: 2026-07-18 — Phase 1 complete*
 
 ## Performance Metrics
 
