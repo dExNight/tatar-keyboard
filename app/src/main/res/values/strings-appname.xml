@@ -19,7 +19,7 @@
 -->
 
 <resources>
-    <string name="english_ime_name" translatable="false">Tatar Keyboard (dev)</string>
+    <string name="english_ime_name" translatable="false">Tatar Keyboard</string>
     <string name="english_ime_settings" translatable="false">Tatar Keyboard Settings</string>
     <!-- Provisional placeholders (RFC 2606 .invalid — never resolves); the real
          published locations of this repo's PRIVACY.md and LICENSE are set at
