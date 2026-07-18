@@ -4,16 +4,16 @@ milestone: v1.0
 milestone_name: milestone
 current_phase: 07
 current_phase_name: iOS-скин — превью, панель, отклик
-status: executing
-stopped_at: Phase 6 complete-local (structural verification passed; Task 7 UAT отложен по standing-схеме), ready to plan Phase 7
-last_updated: "2026-07-18T17:59:10.359Z"
+status: executed
+stopped_at: Phase 7 complete-local (structural verification passed; Task 3 UAT отложен по standing-схеме), ready to plan Phase 8
+last_updated: "2026-07-18T18:20:00.000Z"
 last_activity: 2026-07-18
-last_activity_desc: Phase 07 execution started
+last_activity_desc: Phase 07 plan 07-01 complete-local (UAT deferred)
 progress:
   total_phases: 7
-  completed_phases: 6
+  completed_phases: 7
   total_plans: 8
-  completed_plans: 7
+  completed_plans: 8
 ---
 
 # State: Tatar Keyboard
@@ -21,10 +21,10 @@ progress:
 ## Current Position
 
 **Milestone:** v1.0 — MVP + релиз (GitHub Releases + IzzyOnDroid)
-**Phase:** 07 (iOS-скин — превью, панель, отклик) — EXECUTING
-**Plan:** 1 of 1
-**Status:** Executing Phase 07
-**Last activity:** 2026-07-18 — Phase 07 execution started
+**Phase:** 07 (iOS-скин — превью, панель, отклик) — COMPLETE-LOCAL (UAT deferred)
+**Plan:** 1 of 1 complete
+**Status:** Phase 07 complete-local, ready to plan Phase 8
+**Last activity:** 2026-07-18 — Phase 07 plan 07-01 complete-local (UAT deferred)
 
 Progress: [██████████] 100%
 
@@ -85,6 +85,8 @@ Progress: [██████████] 100%
 
 - ⚠️ [Phase 6, plan 06-01] Task 7 on-device UAT deferred — устройство не подключено (adb devices пуст), по standing-паттерну фаз 1–5. BUILD-критерии закрыты автоматикой (assembleDebug + assembleRelease зелёные, check-no-internet OK, палитра/тема/PERF/boundary запинованы грепами, APK-гейт числовой PASS). Чек-лист при появлении устройства (полные шаги — 06-01-SUMMARY.md § Deferred Verification): (1) установка свежего APK; uninstall ЖЕЛАТЕЛЕН — dev-prefs могли зафиксировать старую тему (pref_keyboard_theme_20140509, риск R6); (2) SC1 палитра: светлая — фон #D4D6DD, клавиши белые, служебные #B3B7C0, радиус ~5dp, резкая 1dp-тень; тёмная — #2C2C2C/#6B6B6B/#474747; pressed: обычная темнеет, служебная белеет; (3) SC1 смена темы light↔dark при показанной клавиатуре без перезапуска IME (Android 12+ особо — live-reload, риск R3; если не подхватилась — снять условие < S в KeyboardSwitcher.java:91-93, 1 строка); (4) SC4 ввод фаз 2–5 поверх нового рендера: пятый ряд ә ө ү җ ң һ видим/нажимаем (гапы не съели ряд, риск R4), глобус tt/ru/en, shift/caps (иконка меняется на залитую), long-press дубли, double-space→период, свайп-курсор, двупальцевая печать; (5) SC3 профайлер: минута печати — ноль GC-событий, janky ~0; (6) smoke: Telegram, Chrome WebView (229), password; MIUI при наличии; (7) TalkBack НЕ верифицируется (фаза 9) — только отсутствие touch-регрессий без TalkBack.
 
+- ⚠️ [Phase 7, plan 07-01] Task 3 on-device UAT deferred — устройство не подключено (adb devices пуст), по standing-паттерну фаз 1–6. BUILD-критерии закрыты автоматикой (assembleDebug + assembleRelease зелёные, check-no-internet OK, все структурные грепы UI-02/03/04 PASS, пин sound-default false PASS, zero-Java boundary: diff fbfd66a..HEAD по app/ = 3 объявленных XML, ни одного .java/.kt). Чек-лист при появлении устройства (полные шаги — 07-01-SUMMARY.md § Deferred Verification): (1) установка свежего app-debug.apk; (2) SC1 баллон (UI-02): нажатие буквы → баллон МГНОВЕННО на касании (down, не up), iOS-вид: light — белый с 1dp-тенью, dark — #6B6B6B, текст читаем, исчезает при отпускании; (3) SC1/SC4 края: баллон пятого ряда (ә — рисуется НАД клавиатурой в прозрачной зоне окна IME, не обрезан) и крайних колонок (левая й, правая ъ/э/һ — клампинг сдвигает внутрь); MIUI/HyperOS особо при наличии Xiaomi; (4) SC2 панель (UI-03): long-press а → панель с ә; НЕ отрывая пальца скольжение — подсветка следует, отпускание коммитит; уход в сторону — отмена; панель в iOS-палитре (серый фон, радиус 5dp, pressed-подсветка); (5) SC3 отклик (UI-04): вибрация + подсветка в момент КАСАНИЯ; звук по умолчанию НЕ звучит (default off — решение пользователя) — включить sound_on → звук на касании → выключить; выключить vibrate_on → вибрация пропала → включить; (6) SC4 smoke: пп. 2/4/5 в Telegram, Chrome WebView (keyCode 229), password-поле; MIUI при наличии (иначе пометить как не покрыто); (7) регрессии фаз 2–6: печать, глобус, shift, double-space, свайп-курсор — без аномалий. Финальная простановка чек-боксов UI-02/03/04 — после UAT.
+
 ### Research pointers
 
 - `.planning/research/SUMMARY.md` — конденсат; детали в `research/00`–`08` в корне.
@@ -95,12 +97,12 @@ Progress: [██████████] 100%
 
 ## Session Continuity
 
-**Stopped at:** Phase 6 complete (verification passed; UAT отложен, принят), ready to plan Phase 7
+**Stopped at:** Phase 7 complete-local (structural verification passed; Task 3 UAT отложен, принят), ready to plan Phase 8
 **Resume file:** None
 
-**Next step:** Phase 7 — iOS-скин: превью, панель, отклик.
+**Next step:** Phase 8 — Совместимость (полный проход матрицы InputConnection).
 
-Last session: 2026-07-18T14:56:00Z
+Last session: 2026-07-18T18:20:00Z
 
 ---
 *Last updated: 2026-07-18 — Phase 1 complete*
@@ -116,3 +118,4 @@ Last session: 2026-07-18T14:56:00Z
 | Phase 04 P01 | 10 min | 2 of 3 tasks (Task 3 UAT deferred) | 3 files (zero code) |
 | Phase 05 P01 | 8 min | 3 of 4 tasks (Task 4 UAT deferred) | 5 code files + planning |
 | Phase 06 P01 | 15 min | 6 of 7 tasks (Task 7 UAT deferred) | 18 files (17 app + gradle.properties) |
+| Phase 07 P01 | 25 min | 2 of 3 tasks (Task 3 UAT deferred) | 3 app files (zero Java) + planning |

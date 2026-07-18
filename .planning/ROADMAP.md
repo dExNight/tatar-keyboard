@@ -126,6 +126,8 @@
 **Requirements:** UI-02, UI-03, UI-04
 **Depends on:** Phase 6
 
+**Progress:** 07-01 ✓ complete-local (Tasks 1–2: in-layer превью/панель подтверждены грепами — PopupWindow в исходниках отсутствует, перенос не понадобился; iOS-баллон ios_key_preview_background + ios_popup_panel_background + 2 item themes-tatar.xml; отклик на ACTION_DOWN запинован; sound default оставлен false по решению пользователя; сборки/no-internet/zero-Java boundary fbfd66a..HEAD = 3 XML — зелёные); Task 3 device UAT — deferred, human verification pending, см. 07-01-SUMMARY.md § Deferred Verification
+
 Баллон и панель рисуются в слое клавиатуры (не PopupWindow — на MIUI PopupWindow-превью режутся и лагают).
 
 **Success Criteria:**
