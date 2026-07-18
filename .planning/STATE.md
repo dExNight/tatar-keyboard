@@ -4,16 +4,16 @@ milestone: v1.0
 milestone_name: milestone
 current_phase: 04
 current_phase_name: Механика ввода — регистр и служебные клавиши
-status: executing
-stopped_at: "Plan 03-01 complete-local (Tasks 1–4 committed: e321fc6, a0c6e05, a37a124, b19ce97; Task 5 device UAT deferred в Blockers)"
+status: phase_complete
+stopped_at: "Plan 04-01 complete-local (Tasks 1–2 committed; Task 3 device UAT deferred в Blockers)"
 last_updated: "2026-07-18T13:20:28.969Z"
 last_activity: 2026-07-18
-last_activity_desc: Phase 04 execution started
+last_activity_desc: Phase 04 plan 04-01 executed (zero-code verification; device UAT deferred)
 progress:
   total_phases: 4
-  completed_phases: 3
+  completed_phases: 4
   total_plans: 5
-  completed_plans: 4
+  completed_plans: 5
 ---
 
 # State: Tatar Keyboard
@@ -21,10 +21,10 @@ progress:
 ## Current Position
 
 **Milestone:** v1.0 — MVP + релиз (GitHub Releases + IzzyOnDroid)
-**Phase:** 04 (Механика ввода — регистр и служебные клавиши) — EXECUTING
+**Phase:** 04 (Механика ввода — регистр и служебные клавиши) — COMPLETE-LOCAL
 **Plan:** 1 of 1
-**Status:** Executing Phase 04
-**Last activity:** 2026-07-18 — Phase 04 execution started
+**Status:** Phase 04 complete-local (Task 3 device UAT deferred)
+**Last activity:** 2026-07-18 — Phase 04 plan 04-01 executed (zero-code verification; device UAT deferred)
 
 Progress: [██████████] 100%
 
@@ -72,6 +72,8 @@ Progress: [██████████] 100%
 - ⚠️ [Phase 2, plan 02-01] Task 5 on-device UAT deferred — устройство не подключено (adb devices пуст), по образцу фазы 1. BUILD-критерии закрыты автоматикой (assembleDebug зелёный, aapt2 видит *_tatar ресурсы, check-no-internet OK, Java-diff = только SubtypeLocaleUtils.java). Чек-лист при появлении устройства: (1) чистая установка adb uninstall org.tatarkeyboard.ime.debug → adb install app-debug.apk → выбрать «Tatar Keyboard (dev)»; (2) клавиатура открывается ТАТАРСКОЙ: пятый ряд ә ө ү җ ң һ СВЕРХУ над ЙЦУКЕН; (3) напечатать «әни өй үрдәк җир таң һава» + «щи, ыл, эш, ике» — все 37 букв тапом, щ/ы/э/и не пустые; (4) shift → Ә Ө Ү Җ Ң Һ; (5) 5 рядов + action row без обрезки, adb logcat | grep -i "too tall" пуст; (6) ?123 → #+= → АБВ туда-обратно; (7) Number row ON: цифры НАД пятым рядом, 6 рядов помещаются, выключить обратно; (8) smoke-матрица SC4: «әни өй үрдәк җир таң һава» в Telegram, Chrome (адресная строка + поле формы/WebView keyCode 229), password-поле — без потерь/дублей. 02-01-SUMMARY.md создаётся после резолва чекпойнта.
 - ⚠️ [Phase 3, plan 03-01] Task 5 on-device UAT deferred — устройство не подключено (adb devices пуст), по standing-паттерну фаз 1–2. BUILD-критерии закрыты автоматикой (assembleDebug зелёный, aapt2 видит все 6 *_russian ресурсов, check-no-internet OK, Java-diff b0b4606..HEAD = только SubtypeLocaleUtils.java, diff по *east_slavic*/KeyboardTextsTable.java пуст). Чек-лист при появлении устройства (полные шаги — 03-01-SUMMARY.md § Deferred Verification): (1) чистая установка adb uninstall org.tatarkeyboard.ime.debug → adb install (ОБЯЗАТЕЛЬНО — dev-prefs tt:tatar фазы 2 маскируют новую тройку, Pitfall 4); (2) открывается татарской; Languages: ровно три — «Татарча», «Русский»/ICU, «English (US)»; (3) тап глобуса циклит tt→ru→en→tt, русская = стандартная ЙЦУКЕН без пятого ряда, английская = QWERTY; (4) long-press глобуса → пикер: три наших subtype + другие IME; (5) 10 long-press дублей на ТАТАРСКОЙ (а→ә о→ө у→ү ж→җ н→ң х→һ э→ә г→һ + е→ё ь→ъ); (6) те же 10 на РУССКОЙ; (7) shift + long-press а → Ә; (8) персистентность: переключить на ru, force-stop, открыть → русская; (9) smoke-матрица SC5: Telegram/Chrome-WebView(229)/password с переключением языков; (10) MIUI — при наличии Xiaomi. Bookkeeping: при простановке SWITCH-01 аннотировать трактовку «виртуальные subtypes форка» (A3).
 
+- ⚠️ [Phase 4, plan 04-01] Task 3 on-device UAT deferred — устройство не подключено (adb devices пуст), по standing-паттерну фаз 1–3. BUILD-критерии закрыты автоматикой (assembleDebug зелёный, check-no-internet OK, все структурные грепы INPUT-01..04 PASS, ZERO-CODE boundary: diff b19ce97..HEAD по app/ пуст). Чек-лист при появлении устройства (полные шаги — 04-01-SUMMARY.md § Deferred Verification; всё на татарской раскладке, shift/backspace выборочно повторить на русской): (1) установка текущего app-debug.apk (uninstall не обязателен — дефолты не менялись); (2) INPUT-01: тап shift → пятый ряд Ә Ө Ү Җ Ң Һ + ЙЦУКЕН заглавные, ввод буквы → возврат в строчные; двойной тап → caps lock (sticky-иконка), серия заглавных, тап → выход; long-press shift ~1.2 с → caps lock (бонус); (3) INPUT-02: новое сообщение в Telegram → shifted; после «. » → снова shifted; адресная строка Chrome и email-поле → НЕ shifted; выключить Auto-capitalization → эффект пропадает, включить обратно; (4) INPUT-03: «әни өй үрдәк», удержание backspace → после ~0.4 с серия ~20 удалений/сек; ә/җ/ң удаляются целиком за одно нажатие; (5) INPUT-04: Enter в поиске Chrome (лупа/поиск), Telegram (send), заметках multiline (перенос), форме actionDone (галка); (6) smoke SC5: backspace+Enter в WebView/поле формы Chrome (keyCode 229) и password-поле; (7) MIUI — при наличии Xiaomi (иначе пометить как не покрыто). 04-01-SUMMARY.md § Deferred Verification обновляется после резолва.
+
 ### Research pointers
 
 - `.planning/research/SUMMARY.md` — конденсат; детали в `research/00`–`08` в корне.
@@ -82,10 +84,10 @@ Progress: [██████████] 100%
 
 ## Session Continuity
 
-**Stopped at:** Phase 3 complete (verification passed; on-device UAT отложен, принят), ready to plan Phase 4
+**Stopped at:** Phase 4 complete-local (04-01: структурная верификация PASS, zero-code boundary доказан; on-device UAT отложен по standing-паттерну), ready to plan Phase 5
 **Resume file:** None
 
-**Next step:** Phase 4 — Механика ввода: регистр и служебные клавиши.
+**Next step:** Phase 5 — Механика ввода: жесты и multi-touch.
 
 Last session: 2026-07-18T08:29:50.584Z
 
@@ -100,3 +102,4 @@ Last session: 2026-07-18T08:29:50.584Z
 | Phase 1 P02 | 20 min | 2 of 4 tasks (2 deferred) | 3 files (+2 local secrets) |
 | Phase 02 P01 | 9 min | 4 tasks | 8 files |
 | Phase 03 P01 | 8 min | 4 of 5 tasks (Task 5 UAT deferred) | 12 files |
+| Phase 04 P01 | 10 min | 2 of 3 tasks (Task 3 UAT deferred) | 3 files (zero code) |

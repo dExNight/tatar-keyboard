@@ -76,6 +76,8 @@
 
 Механика до скина: скин рисует состояния механики (регистр, подсветка), обратный порядок — двойная работа. Без composing-текста: коммит сразу, удаление `deleteSurroundingTextInCodePoints` (митигация зоопарка InputConnection).
 
+**Progress:** 04-01 ✓ complete-local (zero-code верификация: вердикт ресерча ALL WORKS запинован fail-capable-грепами по INPUT-01..04; сборка/no-internet зелёные; boundary-check b19ce97..HEAD по app/ пуст; bookkeeping — аннотации INPUT-01/03, Traceability → Verifying); Task 3 device UAT — deferred, human verification pending, см. 04-01-SUMMARY.md § Deferred Verification
+
 **Success Criteria:**
 
 1. Shift в трёх состояниях: off / один тап (одна заглавная) / двойной тап (caps-lock); регистр букв на клавишах визуально меняется (INPUT-01).
