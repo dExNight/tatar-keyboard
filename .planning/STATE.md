@@ -2,18 +2,18 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-current_phase: 7
+current_phase: 07
 current_phase_name: iOS-скин — превью, панель, отклик
-status: planning
+status: executing
 stopped_at: Phase 6 complete-local (structural verification passed; Task 7 UAT отложен по standing-схеме), ready to plan Phase 7
-last_updated: "2026-07-18T17:40:36.832Z"
+last_updated: "2026-07-18T17:59:10.359Z"
 last_activity: 2026-07-18
+last_activity_desc: Phase 07 execution started
 progress:
-  total_phases: 6
+  total_phases: 7
   completed_phases: 6
-  total_plans: 7
+  total_plans: 8
   completed_plans: 7
-last_activity_desc: Phase 06 plan 06-01 complete-local (UAT deferred)
 ---
 
 # State: Tatar Keyboard
@@ -21,10 +21,10 @@ last_activity_desc: Phase 06 plan 06-01 complete-local (UAT deferred)
 ## Current Position
 
 **Milestone:** v1.0 — MVP + релиз (GitHub Releases + IzzyOnDroid)
-**Phase:** 7 — iOS-скин — превью, панель, отклик
-**Plan:** Not started
-**Status:** Ready to plan
-**Last activity:** 2026-07-18
+**Phase:** 07 (iOS-скин — превью, панель, отклик) — EXECUTING
+**Plan:** 1 of 1
+**Status:** Executing Phase 07
+**Last activity:** 2026-07-18 — Phase 07 execution started
 
 Progress: [██████████] 100%
 
@@ -56,6 +56,8 @@ Progress: [██████████] 100%
 - [06-01] iOS-скин маршрутом (b) 06-RESEARCH.md: тема id=7 «Tatar» поверх штатной системы тем (KeyboardTheme.KEYBOARD_THEMES, DEFAULT_THEME_ID=7), палитра ТОЛЬКО ресурсами ios_* в values/ (#D4D6DD/#FFFFFF/#B3B7C0/#40000000) + values-night/ (#2C2C2C/#6B6B6B/#474747/#B3000000) — dark mode штатным механизмом; тень — layer-list из двух roundRect 5dp со смещением 1dp (setShadowLayer отклонён); иконки shift/shift_locked/globe — собственные path'ы, тонировка ?attr/functionalTextColor сохранена. 3 PERF-фикса: индексный цикл onDrawKeyboard, HashMap-кэш клонов KeyDrawParams (инвалидация в setKeyboard), кэш строки+textScaleX языка пробела (инвалидация в setKeyboard/startDisplayLanguageOnSpacebar). A11y-каркас ExploreByTouchHelper (Kotlin) + androidx.customview:customview:1.1.0 — первая внешняя зависимость; APK-гейт пройден: release 645 830 → 700 679 байт (+54 849, ≤ 3 145 728); транзитивы только annotation/core/collection. Попутно gradle.properties: android.useAndroidX=false→true (обязательно для androidx-зависимостей).
 
 - [04-01] Фаза 4 — zero-code верификация: вердикт ресерча 04-RESEARCH.md ALL WORKS (INPUT-01..04 работают в базе форка), все доказательства запинованы fail-capable-грепами. Принята трактовка INPUT-03 (2026-07-18): эквивалент deleteSurroundingText с подсчётом по кодпоинту + AOSP-автоповтор 400 мс → 50 мс. Бонус INPUT-01: caps lock long-press'ом shift (1200 мс). Диф кода фазы пуст (boundary-check b19ce97..HEAD по app/ = пусто).
+
+- [07-01] Фаза 7 — zero-Java стилизация: in-layer превью/панель подтверждены (DrawingPreviewPlacerView в android.R.id.content окна IME, PopupWindow в исходниках отсутствует — перенос не понадобился); баллон/панель — 2 новых drawable (ios_key_preview_background: layer-list roundRect ios_key_normal + 1dp-тень, радиус 5dp, size/padding зеркалят старый feedback-drawable; ios_popup_panel_background: радиус 5dp, padding 5dp сохранён) + 2 item в themes-tatar.xml; sound default оставлен false по решению пользователя (тумблер — фаза 10); Java/Kotlin-дифф фазы = 0 строк (boundary-чек fbfd66a..HEAD).
 
 ### Cross-cutting disciplines (каждая фаза)
 
