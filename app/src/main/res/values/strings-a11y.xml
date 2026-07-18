@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+/*
+ * Copyright (C) 2026 Tatar Keyboard contributors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+-->
+
+<!-- Spoken descriptions for TalkBack (base: English). Names follow the AOSP
+     strings-talkback-descriptions.xml convention (spoken_*) so any future
+     comparison with LatinIME maps one-to-one. Consumed by KeyDescriptionMapper. -->
+<resources>
+    <!-- Tatar letters (lowercase); uppercase is built via spoken_description_upper_case. -->
+    <string name="spoken_letter_04d9">Tatar schwa</string>
+    <string name="spoken_letter_04e9">Tatar o</string>
+    <string name="spoken_letter_04af">Tatar u</string>
+    <string name="spoken_letter_0497">Tatar zhe</string>
+    <string name="spoken_letter_04a3">Tatar en</string>
+    <string name="spoken_letter_04bb">Tatar he</string>
+
+    <!-- Template for uppercase letters: "Capital <lowercase description>". -->
+    <string name="spoken_description_upper_case">Capital %s</string>
+
+    <!-- Shift key, per keyboard element state. -->
+    <string name="spoken_description_shift">Shift</string>
+    <string name="spoken_description_shift_shifted">Shift on</string>
+    <string name="spoken_description_caps_lock">Caps lock on</string>
+    <string name="spoken_description_symbols_shift">More symbols</string>
+    <string name="spoken_description_symbols_shift_shifted">Symbols</string>
+
+    <!-- Other functional keys. -->
+    <string name="spoken_description_delete">Delete</string>
+    <string name="spoken_description_space">Space</string>
+    <string name="spoken_description_return">Enter</string>
+    <string name="spoken_description_search">Search</string>
+    <string name="spoken_description_action_go">Go</string>
+    <string name="spoken_description_action_send">Send</string>
+    <string name="spoken_description_action_next">Next</string>
+    <string name="spoken_description_action_previous">Previous</string>
+    <string name="spoken_description_action_done">Done</string>
+    <string name="spoken_description_to_symbol">Symbols</string>
+    <string name="spoken_description_to_alpha">Letters</string>
+    <string name="spoken_description_language_switch">Switch language</string>
+    <string name="spoken_description_settings">Settings</string>
+    <string name="spoken_description_unknown">Unknown</string>
+</resources>

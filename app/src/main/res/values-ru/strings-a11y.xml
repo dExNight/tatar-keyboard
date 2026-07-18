@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+/*
+ * Copyright (C) 2026 Tatar Keyboard contributors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+-->
+
+<!-- Русские spoken-описания для TalkBack (оверлей strings-a11y.xml).
+     Формулировки — по образцу AOSP values-ru/strings-talkback-descriptions.xml. -->
+<resources>
+    <!-- Татарские буквы (строчные); заглавные — через spoken_description_upper_case. -->
+    <string name="spoken_letter_04d9">татарская э</string>
+    <string name="spoken_letter_04e9">татарская о</string>
+    <string name="spoken_letter_04af">татарская у</string>
+    <string name="spoken_letter_0497">татарская ж</string>
+    <string name="spoken_letter_04a3">татарская н</string>
+    <string name="spoken_letter_04bb">татарская х</string>
+
+    <!-- Шаблон заглавной буквы: «Заглавная <описание строчной>». -->
+    <string name="spoken_description_upper_case">Заглавная %s</string>
+
+    <!-- Shift по состояниям раскладки. -->
+    <string name="spoken_description_shift">Клавиша верхнего регистра</string>
+    <string name="spoken_description_shift_shifted">Верхний регистр включён</string>
+    <string name="spoken_description_caps_lock">Caps Lock включён</string>
+    <string name="spoken_description_symbols_shift">Дополнительные символы</string>
+    <string name="spoken_description_symbols_shift_shifted">Символы</string>
+
+    <!-- Остальные служебные клавиши. -->
+    <string name="spoken_description_delete">Удалить</string>
+    <string name="spoken_description_space">Пробел</string>
+    <string name="spoken_description_return">Ввод</string>
+    <string name="spoken_description_search">Поиск</string>
+    <string name="spoken_description_action_go">Перейти</string>
+    <string name="spoken_description_action_send">Отправить</string>
+    <string name="spoken_description_action_next">Далее</string>
+    <string name="spoken_description_action_previous">Назад</string>
+    <string name="spoken_description_action_done">Готово</string>
+    <string name="spoken_description_to_symbol">Символы</string>
+    <string name="spoken_description_to_alpha">Буквы</string>
+    <string name="spoken_description_language_switch">Сменить язык</string>
+    <string name="spoken_description_settings">Настройки</string>
+    <string name="spoken_description_unknown">Неизвестный символ</string>
+</resources>
