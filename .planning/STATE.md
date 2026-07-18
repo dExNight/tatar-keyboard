@@ -2,18 +2,18 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-current_phase: 04
-current_phase_name: Механика ввода — регистр и служебные клавиши
-status: phase_complete
-stopped_at: "Plan 04-01 complete-local (Tasks 1–2 committed; Task 3 device UAT deferred в Blockers)"
-last_updated: "2026-07-18T13:20:28.969Z"
+current_phase: 5
+current_phase_name: Механика ввода — жесты и multi-touch
+status: planning
+stopped_at: "Phase 4 complete-local (04-01: структурная верификация PASS, zero-code boundary доказан; on-device UAT отложен по standing-паттерну), ready to plan Phase 5"
+last_updated: "2026-07-18T13:27:13.566Z"
 last_activity: 2026-07-18
-last_activity_desc: Phase 04 plan 04-01 executed (zero-code verification; device UAT deferred)
 progress:
   total_phases: 4
   completed_phases: 4
   total_plans: 5
   completed_plans: 5
+last_activity_desc: Phase 04 plan 04-01 executed (zero-code verification; device UAT deferred)
 ---
 
 # State: Tatar Keyboard
@@ -21,10 +21,10 @@ progress:
 ## Current Position
 
 **Milestone:** v1.0 — MVP + релиз (GitHub Releases + IzzyOnDroid)
-**Phase:** 04 (Механика ввода — регистр и служебные клавиши) — COMPLETE-LOCAL
-**Plan:** 1 of 1
-**Status:** Phase 04 complete-local (Task 3 device UAT deferred)
-**Last activity:** 2026-07-18 — Phase 04 plan 04-01 executed (zero-code verification; device UAT deferred)
+**Phase:** 5 — Механика ввода — жесты и multi-touch
+**Plan:** Not started
+**Status:** Ready to plan
+**Last activity:** 2026-07-18
 
 Progress: [██████████] 100%
 
@@ -84,7 +84,7 @@ Progress: [██████████] 100%
 
 ## Session Continuity
 
-**Stopped at:** Phase 4 complete-local (04-01: структурная верификация PASS, zero-code boundary доказан; on-device UAT отложен по standing-паттерну), ready to plan Phase 5
+**Stopped at:** Phase 4 complete (zero-code, verification passed; UAT отложен, принят), ready to plan Phase 5
 **Resume file:** None
 
 **Next step:** Phase 5 — Механика ввода: жесты и multi-touch.

@@ -12,6 +12,8 @@
 
 ### Validated
 
+- ✓ Механика символьного ввода (shift 3 состояния, автокапитализация, backspace по кодпоинтам с автоповтором, Enter по imeOptions) подтверждена в базе форка структурно, zero-code фаза — Phase 4 (on-device UAT отложен, принят)
+
 - ✓ Три языка (tt_RU «Татарча» / ru / en_US), long-press дубли 10 пар на обеих кириллических раскладках, глобус цикл+пикер, персистентность subtype — Phase 3 (on-device подтверждение отложено, принято)
 
 - ✓ Татарская раскладка как XML-данные: ЙЦУКЕН + пятый ряд `ә ө ү җ ң һ` (алфавитный, сверху), слои ?123/#+= работают, новая раскладка = только XML + 4 строки реестра — Phase 2 (on-device подтверждение отложено, принято)
@@ -100,4 +102,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-07-18 after Phase 3*
+*Last updated: 2026-07-18 after Phase 4*
