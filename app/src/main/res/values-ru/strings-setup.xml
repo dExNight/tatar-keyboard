@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Copyright (C) 2026 Tatar Keyboard contributors
+
+     Licensed under the Apache License, Version 2.0 (the "License");
+     you may not use this file except in compliance with the License.
+     You may obtain a copy of the License at
+
+          http://www.apache.org/licenses/LICENSE-2.0
+
+     Unless required by applicable law or agreed to in writing, software
+     distributed under the License is distributed on an "AS IS" BASIS,
+     WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+     See the License for the specific language governing permissions and
+     limitations under the License.
+-->
+
+<!-- Русский оверлей онбординг-строк (SETUP-01). -->
+<resources>
+    <string name="setup_subtitle">Два быстрых шага — и можно печатать по-татарски</string>
+
+    <string name="setup_step1_title">Включить клавиатуру</string>
+    <string name="setup_step1_instruction">Включите эту клавиатуру в списке клавиатур системы</string>
+    <string name="setup_step1_button">Включить клавиатуру</string>
+
+    <string name="setup_step2_title">Выбрать клавиатуру</string>
+    <string name="setup_step2_instruction">Выберите эту клавиатуру текущим способом ввода</string>
+    <string name="setup_step2_button">Выбрать клавиатуру</string>
+
+    <string name="setup_done_title">Готово!</string>
+    <string name="setup_done_hint">Печатайте ә в любом приложении</string>
+    <string name="setup_done_button">Открыть настройки</string>
+</resources>

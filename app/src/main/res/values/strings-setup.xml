@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Copyright (C) 2026 Tatar Keyboard contributors
+
+     Licensed under the Apache License, Version 2.0 (the "License");
+     you may not use this file except in compliance with the License.
+     You may obtain a copy of the License at
+
+          http://www.apache.org/licenses/LICENSE-2.0
+
+     Unless required by applicable law or agreed to in writing, software
+     distributed under the License is distributed on an "AS IS" BASIS,
+     WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+     See the License for the specific language governing permissions and
+     limitations under the License.
+-->
+
+<!-- Onboarding (SETUP-01) strings, English base. The screen title shows the
+     brand via @string/english_ime_name directly in the layout — the brand
+     name is never hardcoded in these strings. -->
+<resources>
+    <string name="setup_subtitle">Two quick steps to start typing in Tatar</string>
+
+    <string name="setup_step1_number" translatable="false">1</string>
+    <string name="setup_step2_number" translatable="false">2</string>
+    <string name="setup_step_done_mark" translatable="false">✓</string>
+
+    <string name="setup_step1_title">Enable the keyboard</string>
+    <string name="setup_step1_instruction">Turn this keyboard on in the system keyboard list</string>
+    <string name="setup_step1_button">Enable keyboard</string>
+
+    <string name="setup_step2_title">Select the keyboard</string>
+    <string name="setup_step2_instruction">Choose this keyboard as your current input method</string>
+    <string name="setup_step2_button">Select keyboard</string>
+
+    <string name="setup_done_title">Done!</string>
+    <string name="setup_done_hint">Type ә in any app</string>
+    <string name="setup_done_button">Open settings</string>
+</resources>
