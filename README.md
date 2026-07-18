@@ -1,40 +1,55 @@
-# Simple Keyboard
+# Tatar Keyboard
 
-[![Crowdin](https://d322cqt584bo4o.cloudfront.net/simple-keyboard/localized.svg)](https://crowdin.com/project/simple-keyboard)
+A native Android IME with a Tatar Cyrillic layout: the standard ЙЦУКЕН plus a dedicated, always-visible fifth row for **ә ө ү җ ң һ**. Fully offline — the app has no INTERNET permission at all (verified by CI on every commit). Lightweight, fast on budget devices, open source under Apache-2.0.
 
-<img src="images/screenshot-0.png"
-      alt="closeup"
-      width="500"/>
-      
-## About
+---
 
-Features:
-- Small size (<1MB)
-- Adjustable keyboard height for more screen space
-- Number row
-- Swipe space to move pointer
-- Delete swipe
-- Custom theme colors
-- Minimal permissions (only Vibrate)
-- Ads-free
+## О проекте
 
-Feature it doesn't have and probably will never have:
-- Emojis
-- GIFs
-- Spell checker
-- Swipe typing
+**Tatar Keyboard** — татарская клавиатура для Android. Стандартная раскладка ЙЦУКЕН плюс отдельный видимый пятый ряд татарских букв **ә ө ү җ ң һ** — не нужно ничего зажимать и искать: все 39 букв татарского алфавита доступны одним нажатием. Такого нет ни в Gboard, ни в SwiftKey.
 
-## Downloads
+Печатать по-татарски — так же быстро и удобно, как по-русски. На самом дешёвом телефоне. Без интернета.
 
-[<img src="https://f-droid.org/badge/get-it-on.png"
-      alt="Get it on F-Droid"
-      height="80">](https://f-droid.org/packages/rkr.simplekeyboard.inputmethod/)
-[<img src="https://play.google.com/intl/en_us/badges/images/generic/en-play-badge.png"
-      alt="Get it on Google Play"
-      height="80">](https://play.google.com/store/apps/details?id=rkr.simplekeyboard.inputmethod)
+### Возможности
 
-## Credits
+- **Татарская раскладка**: ЙЦУКЕН + видимый пятый ряд ә ө ү җ ң һ
+- **Три языка**: татарский (tt_RU), русский, английский (en_US) — переключение клавишей-глобусом
+- **Long-press дубли**: на русской раскладке татарские буквы доступны долгим нажатием (а→ә, о→ө, у→ү, ж→җ, н→ң, х→һ), плюс е→ё и ь→ъ
+- **Знакомая эргономика**: аккуратный минималистичный вид, светлая и тёмная темы
+- **Быстрая печать**: двойной пробел → точка, свайп по пробелу двигает курсор, multi-touch без потери букв
+- **Мгновенный отклик**: баллон-превью при нажатии, панель альтернатив, звук и вибрация (настраиваются)
+- **Доступность**: полная поддержка TalkBack с татарскими описаниями букв («татарская э» для ә)
+- **Онбординг**: два шага от установки до первой татарской буквы
+- **Работает до первой разблокировки** (directBoot) — клавиатура доступна для ввода PIN сразу после перезагрузки
 
-Licensed under Apache License Version 2
+### Установка
 
-This keyboard is based on AOSP LatinIME keyboard. You can get the original source code in https://android.googlesource.com/platform/packages/inputmethods/LatinIME/
+1. Скачайте APK из [GitHub Releases](../../releases) этого репозитория.
+2. Разрешите установку из неизвестных источников (система спросит сама).
+3. Откройте приложение — онбординг из двух шагов проведёт через включение и выбор клавиатуры.
+
+**Требования:** Android 7.0+ (minSdk 24).
+
+### Приватность
+
+**Данные не собираются. Вообще.** В манифесте приложения нет разрешения INTERNET — клавиатуре физически некуда отправлять то, что вы печатаете. Это не обещание, а проверяемое свойство: CI проверяет манифест и собранный APK на каждом коммите. Нет аналитики, нет рекламных SDK, нет Firebase.
+
+Подробнее: [PRIVACY.md](PRIVACY.md).
+
+### Сборка из исходников
+
+Требуется JDK 17 и Android SDK. Файл `gradle/wrapper/gradle-wrapper.jar` намеренно не хранится в репозитории — восстановите его командой `gradle wrapper` (Gradle 9.6) или скачайте из официального тега [gradle/gradle v9.6.0](https://github.com/gradle/gradle/blob/v9.6.0/gradle/wrapper/gradle-wrapper.jar) (CI делает так же, с проверкой sha256). Затем:
+
+```
+./gradlew assembleDebug
+```
+
+### Лицензия
+
+[Apache License 2.0](LICENSE).
+
+Проект — форк [Simple Keyboard](https://github.com/rkkr/simple-keyboard) (Apache-2.0), который в свою очередь основан на клавиатуре AOSP LatinIME. Спасибо авторам обоих проектов.
+
+### Для мейнтейнера
+
+Пошаговая инструкция публикации релиза: [docs/PUBLISH-CHECKLIST.md](docs/PUBLISH-CHECKLIST.md).
