@@ -41,4 +41,5 @@ android {
 }
 
 dependencies {
+    implementation 'androidx.customview:customview:1.1.0'
 }

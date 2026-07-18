@@ -35,9 +35,12 @@ import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
 
+import androidx.core.view.ViewCompat;
+
 import java.util.WeakHashMap;
 
 import rkr.simplekeyboard.inputmethod.R;
+import rkr.simplekeyboard.inputmethod.accessibility.KeyboardAccessibilityDelegate;
 import rkr.simplekeyboard.inputmethod.keyboard.internal.DrawingPreviewPlacerView;
 import rkr.simplekeyboard.inputmethod.keyboard.internal.DrawingProxy;
 import rkr.simplekeyboard.inputmethod.keyboard.internal.KeyDrawParams;
@@ -106,6 +109,7 @@ public final class MainKeyboardView extends KeyboardView implements MoreKeysPane
 
     private final TimerHandler mTimerHandler;
     private final int mLanguageOnSpacebarHorizontalMargin;
+    private final KeyboardAccessibilityDelegate mAccessibilityDelegate;
 
     public MainKeyboardView(final Context context, final AttributeSet attrs) {
         this(context, attrs, R.attr.mainKeyboardViewStyle);
@@ -176,6 +180,15 @@ public final class MainKeyboardView extends KeyboardView implements MoreKeysPane
 
         mLanguageOnSpacebarHorizontalMargin = (int)getResources().getDimension(
                 R.dimen.config_language_on_spacebar_horizontal_margin);
+
+        mAccessibilityDelegate = new KeyboardAccessibilityDelegate(this, mKeyDetector);
+        ViewCompat.setAccessibilityDelegate(this, mAccessibilityDelegate);
+    }
+
+    @Override
+    public boolean dispatchHoverEvent(final MotionEvent event) {
+        return mAccessibilityDelegate.dispatchHoverEvent(event)
+                || super.dispatchHoverEvent(event);
     }
 
     private ObjectAnimator loadObjectAnimator(final int resId, final Object target) {
@@ -265,6 +278,7 @@ public final class MainKeyboardView extends KeyboardView implements MoreKeysPane
         final int keyHeight = keyboard.mMostCommonKeyHeight;
         mLanguageOnSpacebarTextSize = keyHeight * mLanguageOnSpacebarTextRatio;
         mLanguageOnSpacebarText = null;
+        mAccessibilityDelegate.invalidateRoot();
     }
 
     /**
