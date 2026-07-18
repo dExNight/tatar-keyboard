@@ -4,16 +4,16 @@ milestone: v1.0
 milestone_name: milestone
 current_phase: 06
 current_phase_name: iOS-скин — Canvas-отрисовка и темы
-status: executing
-stopped_at: Completed 05-01-PLAN.md (complete-local; Task 4 UAT deferred → Blockers)
-last_updated: "2026-07-18T14:39:39.422Z"
+status: phase_complete
+stopped_at: Completed 06-01-PLAN.md (complete-local; Task 7 UAT deferred → Blockers)
+last_updated: "2026-07-18T14:56:00.000Z"
 last_activity: 2026-07-18
-last_activity_desc: Phase 06 execution started
+last_activity_desc: Phase 06 plan 06-01 complete-local (UAT deferred)
 progress:
   total_phases: 6
-  completed_phases: 5
+  completed_phases: 6
   total_plans: 7
-  completed_plans: 6
+  completed_plans: 7
 ---
 
 # State: Tatar Keyboard
@@ -21,10 +21,10 @@ progress:
 ## Current Position
 
 **Milestone:** v1.0 — MVP + релиз (GitHub Releases + IzzyOnDroid)
-**Phase:** 06 (iOS-скин — Canvas-отрисовка и темы) — EXECUTING
-**Plan:** 1 of 1
-**Status:** Executing Phase 06
-**Last activity:** 2026-07-18 — Phase 06 execution started
+**Phase:** 06 (iOS-скин — Canvas-отрисовка и темы) — COMPLETE-LOCAL (UAT deferred)
+**Plan:** 1 of 1 complete
+**Status:** Phase 06 complete-local; ready to plan Phase 7
+**Last activity:** 2026-07-18 — Phase 06 plan 06-01 complete-local (UAT deferred)
 
 Progress: [██████████] 100%
 
@@ -93,12 +93,12 @@ Progress: [██████████] 100%
 
 ## Session Continuity
 
-**Stopped at:** Phase 5 complete (verification passed; UAT отложен, принят), ready to plan Phase 6
+**Stopped at:** Phase 6 complete-local (structural verification passed; Task 7 UAT отложен по standing-схеме), ready to plan Phase 7
 **Resume file:** None
 
-**Next step:** Phase 6 — iOS-скин: Canvas-отрисовка и темы. Перед стартом — решение Плана Б (см. Decisions).
+**Next step:** Phase 7 — iOS-скин: превью, панель, отклик (баллон/long-press панель/хаптика той же темой).
 
-Last session: 2026-07-18T13:48:44Z
+Last session: 2026-07-18T14:56:00Z
 
 ---
 *Last updated: 2026-07-18 — Phase 1 complete*
@@ -113,3 +113,4 @@ Last session: 2026-07-18T13:48:44Z
 | Phase 03 P01 | 8 min | 4 of 5 tasks (Task 5 UAT deferred) | 12 files |
 | Phase 04 P01 | 10 min | 2 of 3 tasks (Task 3 UAT deferred) | 3 files (zero code) |
 | Phase 05 P01 | 8 min | 3 of 4 tasks (Task 4 UAT deferred) | 5 code files + planning |
+| Phase 06 P01 | 15 min | 6 of 7 tasks (Task 7 UAT deferred) | 18 files (17 app + gradle.properties) |

@@ -107,6 +107,7 @@
 **Mode:** mvp
 **Requirements:** UI-01
 **Depends on:** Phase 5
+**Progress:** 06-01 ✓ complete-local (Tasks 1–6: тема id=7 «Tatar» дефолтная с LOCKED-палитрой light/night ресурсами ios_*, 3 layer-list drawable с 1dp-тенью, собственные иконки shift/shift_locked/globe, 3 PERF-фикса горячего пути, a11y-каркас ExploreByTouchHelper + androidx.customview — APK-гейт 646→701 КБ ≤ 3 МБ; сборки/no-internet/boundary e0d470b..HEAD зелёные); Task 7 device UAT — deferred, human verification pending, см. 06-01-SUMMARY.md § Deferred Verification
 
 Самая объёмная переписка кода в проекте — потому отдельная фаза и после стабильной механики. Дисциплина PERF-03 пишется в код здесь: все Paint/Rect — поля, точечный invalidate, ноль аллокаций в onDraw (финальный замер — фаза 11). Каркас ExploreByTouchHelper закладывается при первой версии KeyboardView (прикручивать потом — больно); полная верификация TalkBack — фаза 9. Юридические границы: геометрия и палитра — можно; SF Pro, SF Symbols, звуки Apple — запрещены (Roboto, свои VectorDrawable).
 
