@@ -112,13 +112,51 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| (populated by roadmapper) | | |
+| LAYOUT-01 | Phase 2 | Pending |
+| LAYOUT-02 | Phase 3 | Pending |
+| LAYOUT-03 | Phase 3 | Pending |
+| LAYOUT-04 | Phase 2 | Pending |
+| LAYOUT-05 | Phase 2 | Pending |
+| SWITCH-01 | Phase 3 | Pending |
+| SWITCH-02 | Phase 3 | Pending |
+| INPUT-01 | Phase 4 | Pending |
+| INPUT-02 | Phase 4 | Pending |
+| INPUT-03 | Phase 4 | Pending |
+| INPUT-04 | Phase 4 | Pending |
+| INPUT-05 | Phase 5 | Pending |
+| INPUT-06 | Phase 5 | Pending |
+| INPUT-07 | Phase 5 | Pending |
+| UI-01 | Phase 6 | Pending |
+| UI-02 | Phase 7 | Pending |
+| UI-03 | Phase 7 | Pending |
+| UI-04 | Phase 7 | Pending |
+| A11Y-01 | Phase 9 | Pending |
+| A11Y-02 | Phase 9 | Pending |
+| COMPAT-01 | Phase 8 | Pending |
+| COMPAT-02 | Phase 8 | Pending |
+| COMPAT-03 | Phase 8 | Pending |
+| COMPAT-04 | Phase 8 | Pending |
+| COMPAT-05 | Phase 8 | Pending |
+| SETUP-01 | Phase 10 | Pending |
+| SETUP-02 | Phase 10 | Pending |
+| PERF-01 | Phase 11 | Pending |
+| PERF-02 | Phase 11 | Pending |
+| PERF-03 | Phase 11 | Pending |
+| PERF-04 | Phase 1 | Pending |
+| REL-01 | Phase 11 | Pending |
+| REL-02 | Phase 11 | Pending |
+| REL-03 | Phase 11 | Pending |
 
 **Coverage:**
-- v1 requirements: 30 total
-- Mapped to phases: 0
-- Unmapped: 30 ⚠️
+- v1 requirements: 34 total *(исправлено: при определении требований в счётчике стояло 30, фактический подсчёт по списку — 34)*
+- Mapped to phases: 34
+- Unmapped: 0 ✓
+
+Примечания к маппингу:
+- **PERF-01..03** — сквозная дисциплина (ноль аллокаций и лёгкость закладываются при написании кода в фазах 6–7 и далее), но замеренная верификация — Phase 11.
+- **PERF-04** — CI-проверка ставится и наблюдаема с Phase 1, далее действует на каждом коммите.
+- **REL-01** — keystore создаётся в Phase 1 (задел), требование верифицируется подписанным release-APK в Phase 11.
 
 ---
 *Requirements defined: 2026-07-18*
-*Last updated: 2026-07-18 after initial definition*
+*Last updated: 2026-07-18 — traceability populated during roadmap creation*
