@@ -19,77 +19,19 @@
 package rkr.simplekeyboard.inputmethod.latin.settings;
 
 import android.app.ActionBar;
-import android.app.AlertDialog;
-import android.content.Context;
-import android.content.DialogInterface;
 import android.content.Intent;
 import android.os.Build;
 import android.os.Bundle;
 import android.preference.PreferenceActivity;
-import android.util.Log;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.WindowInsets;
-import android.view.inputmethod.InputMethodInfo;
-import android.view.inputmethod.InputMethodManager;
 
-import rkr.simplekeyboard.inputmethod.R;
 import rkr.simplekeyboard.inputmethod.latin.utils.FragmentUtils;
 
 public class SettingsActivity extends PreferenceActivity {
     private static final String DEFAULT_FRAGMENT = SettingsFragment.class.getName();
-    private static final String TAG = SettingsActivity.class.getSimpleName();
-
-    @Override
-    protected void onStart() {
-        super.onStart();
-
-        boolean enabled = false;
-        try {
-            enabled = isInputMethodOfThisImeEnabled();
-        } catch (Exception e) {
-            Log.e(TAG, "Exception in check if input method is enabled", e);
-        }
-
-        if (!enabled) {
-            final Context context = this;
-            AlertDialog.Builder builder = new AlertDialog.Builder(this);
-            builder.setMessage(R.string.setup_message);
-            builder.setPositiveButton(android.R.string.ok, new DialogInterface.OnClickListener() {
-                public void onClick(DialogInterface dialog, int id) {
-                    Intent intent = new Intent(android.provider.Settings.ACTION_INPUT_METHOD_SETTINGS);
-                    intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                    context.startActivity(intent);
-                    dialog.dismiss();
-                }
-            });
-            builder.setNegativeButton(android.R.string.cancel, new DialogInterface.OnClickListener() {
-                public void onClick(DialogInterface dialog, int id) {
-                    finish();
-                }
-            });
-            builder.setCancelable(false);
-
-            builder.create().show();
-        }
-    }
-
-    /**
-     * Check if this IME is enabled in the system.
-     * @return whether this IME is enabled in the system.
-     */
-    private boolean isInputMethodOfThisImeEnabled() {
-        final InputMethodManager imm =
-                (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
-        final String imePackageName = getPackageName();
-        for (final InputMethodInfo imi : imm.getEnabledInputMethodList()) {
-            if (imi.getPackageName().equals(imePackageName)) {
-                return true;
-            }
-        }
-        return false;
-    }
 
     @Override
     protected void onCreate(final Bundle savedState) {
