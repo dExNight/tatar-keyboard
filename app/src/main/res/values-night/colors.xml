@@ -41,6 +41,9 @@
     <color name="ios_key_spacebar">#6B6B6B</color>
     <color name="ios_key_spacebar_pressed">#7D7D7D</color>
     <color name="ios_key_shadow">#B3000000</color>
+    <!-- Slide-to-select highlight on the more-keys panel: must clearly differ
+         from ios_keyboard_background_secondary (the panel fill). -->
+    <color name="ios_popup_key_pressed">#7D7D7D</color>
     <color name="ios_key_text_color">#FFFFFF</color>
     <color name="ios_key_functional_text_color">#FFFFFF</color>
     <color name="ios_key_text_inactive_color">#80FFFFFF</color>
