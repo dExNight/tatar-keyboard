@@ -1,5 +1,11 @@
 apply plugin: 'com.android.application'
 
+def keystoreProps = new Properties()
+def keystorePropsFile = rootProject.file("keystore.properties")
+if (keystorePropsFile.exists()) {
+    keystorePropsFile.withInputStream { keystoreProps.load(it) }
+}
+
 android {
     defaultConfig {
         applicationId "org.tatarkeyboard.ime"
@@ -9,6 +15,16 @@ android {
         versionCode 1
         versionName "0.1.0"
     }
+    signingConfigs {
+        if (keystorePropsFile.exists()) {
+            release {
+                storeFile file(keystoreProps['storeFile'])
+                storePassword keystoreProps['storePassword']
+                keyAlias keystoreProps['keyAlias']
+                keyPassword keystoreProps['keyPassword']
+            }
+        }
+    }
     buildTypes {
         debug {
             applicationIdSuffix ".debug"
@@ -16,6 +32,9 @@ android {
         release {
             minifyEnabled true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            if (keystorePropsFile.exists()) {
+                signingConfig signingConfigs.release
+            }
         }
     }
     namespace 'rkr.simplekeyboard.inputmethod'
