@@ -84,16 +84,27 @@ Requirements for initial release (майлстоун v1.0 MVP: release-ready APK
 
 ### Производительность и приватность
 
-- [ ] **PERF-01**: Release-APK ≤ 3 МБ
+- [x] **PERF-01**: Release-APK ≤ 3 МБ
+  — *Аннотация (2026-07-19): Release-APK 681 070 байт ≤ 3 145 728 (запас ~4.6×) при minifyEnabled+shrinkResources+keep.xml (locale_name_* и layout-ресурсы защищены от стрипа — живой эксперимент ресерча). Гейт продублирован в CI (stat в ci.yml). См. 11-RESEARCH.md §1, §6.*
+
 - [ ] **PERF-02**: PSS показанной клавиатуры ≤ 30 МБ; холодный старт до показа < 400 мс
+  — *Аннотация (2026-07-19): Deferred device UAT: adb-команды и пороги (PSS ≤ 30 МБ ×3 замера, холодный старт < 400 мс медиана ×5) — 11-PERF-CHECKLIST.md. Прогнать на бюджетном устройстве (Xiaomi/Redmi или Samsung A).*
+
 - [ ] **PERF-03**: Ноль аллокаций в onDraw/onTouchEvent; 0 GC-событий во время печати
+  — *Аннотация (2026-07-19): Deferred device UAT: Profiler (0 аллокаций onDraw/onTouchEvent, 0 GC при печати) + gfxinfo (janky ≤ 1%) — 11-PERF-CHECKLIST.md. Дисциплина заложена фазой 6 (3 PERF-фикса горячего пути).*
+
 - [x] **PERF-04**: В манифесте нет разрешения INTERNET; CI-проверка это гарантирует на каждом коммите
 
 ### Релиз
 
-- [ ] **REL-01**: Настроен keystore, релизная сборка подписана
+- [x] **REL-01**: Настроен keystore, релизная сборка подписана
+  — *Аннотация (2026-07-19): Keystore существует с фазы 1 (release.jks RSA-4096/SHA-384, alias tatarkeyboard, до 2056; gitignored, в истории git отсутствует); release-APK подписан и верифицирован apksigner verify. Бэкап jks вне репо — шаг 1 PUBLISH-CHECKLIST (standing blocker фазы 1). См. 11-RESEARCH.md §4.*
+
 - [ ] **REL-02**: Privacy policy («данные не собираются») опубликована
+  — *Аннотация (2026-07-19): Подготовлено: PRIVACY.md (данные не собираются, no-INTERNET проверяемо CI, Apache-2.0) + ссылка из README. «Опубликована» = после ручного пуша репо (PUBLISH-CHECKLIST шаги 2–4); URL-плейсхолдеры strings-appname.xml заменяются на реальном owner (шаг 3).*
+
 - [ ] **REL-03**: Релиз опубликован на GitHub Releases и подана заявка в IzzyOnDroid
+  — *Аннотация (2026-07-19): Подготовлено: CHANGELOG.md v1.0.0 + docs/PUBLISH-CHECKLIST.md (repo→push→CI+негативный тест→тег v1.0.0→GitHub Release с подписанным APK→заявка IzzyOnDroid, точные URL/команды). Исполнение — строго ручное (locked decision).*
 
 ## v2 Requirements
 
@@ -166,13 +177,13 @@ Which phases cover which requirements. Updated during roadmap creation.
 | COMPAT-05 | Phase 8 | Verifying (08-01: structural PASS; on-device UAT deferred) |
 | SETUP-01 | Phase 10 | Verifying (10-01: structural PASS; on-device UAT deferred) |
 | SETUP-02 | Phase 10 | Verifying (10-01: structural PASS; on-device UAT deferred) |
-| PERF-01 | Phase 11 | Pending |
-| PERF-02 | Phase 11 | Pending |
-| PERF-03 | Phase 11 | Pending |
+| PERF-01 | Phase 11 | Complete (11-01: mechanical stat gate) |
+| PERF-02 | Phase 11 | Verifying (11-01: checklist prepared; on-device UAT deferred) |
+| PERF-03 | Phase 11 | Verifying (11-01: checklist prepared; on-device UAT deferred) |
 | PERF-04 | Phase 1 | Complete |
-| REL-01 | Phase 11 | Pending |
-| REL-02 | Phase 11 | Pending |
-| REL-03 | Phase 11 | Pending |
+| REL-01 | Phase 11 | Complete (11-01: apksigner verified) |
+| REL-02 | Phase 11 | Verifying (11-01: docs prepared; manual publication pending) |
+| REL-03 | Phase 11 | Verifying (11-01: docs prepared; manual publication pending) |
 
 **Coverage:**
 

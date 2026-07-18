@@ -4,16 +4,16 @@ milestone: v1.0
 milestone_name: milestone
 current_phase: 11
 current_phase_name: Производительность и релиз
-status: planning
+status: executing
 stopped_at: Completed 10-01-PLAN.md — Phase 10 complete-local (Task 5 device UAT deferred)
-last_updated: "2026-07-18T22:32:11.885Z"
+last_updated: "2026-07-18T23:45:15.515Z"
 last_activity: 2026-07-19
+last_activity_desc: Phase 11 execution started
 progress:
-  total_phases: 10
+  total_phases: 11
   completed_phases: 10
-  total_plans: 11
+  total_plans: 12
   completed_plans: 11
-last_activity_desc: Phase 10 execution started
 ---
 
 # State: Tatar Keyboard
@@ -21,10 +21,10 @@ last_activity_desc: Phase 10 execution started
 ## Current Position
 
 **Milestone:** v1.0 — MVP + релиз (GitHub Releases + IzzyOnDroid)
-**Phase:** 11 — Производительность и релиз
-**Plan:** Not started
-**Status:** Ready to plan
-**Last activity:** 2026-07-19
+**Phase:** 11 (Производительность и релиз) — EXECUTING
+**Plan:** 1 of 1
+**Status:** Executing Phase 11
+**Last activity:** 2026-07-19 — Phase 11 execution started
 
 Progress: [██████████] 100%
 
@@ -65,6 +65,8 @@ Progress: [██████████] 100%
 
 - [10-01] Фаза 10 — онбординг SetupActivity + zero-code верификация SETUP-02: новый SetupActivity.kt (Kotlin, classic View/XML, наследует android.app.Activity — ноль новых зависимостей/gradle-правок) детектит 2 статуса живьём из системы (шаг 1 imm.enabledInputMethodList.any{packageName}, шаг 2 Settings.Secure.DEFAULT_INPUT_METHOD.startsWith("$packageName/") — префикс устойчив к debug-суффиксу), кнопки стартуют только системные экраны (ACTION_INPUT_METHOD_SETTINGS + showInputMethodPicker), рефреш идемпотентен в onWindowFocusChanged(true)+onResume, done-блок → SettingsActivity; собственный флаг завершения НЕ хранится (источник истины — система). Манифест: MAIN/LAUNCHER переехал на SetupActivity (блок ПЕРЕД SettingsActivity), у SettingsActivity LAUNCHER снят но exported=true сохранён (IME→настройки цел — launchSettings класс-интент LatinIME.java:881). Legacy not-enabled AlertDialog старого бренда + private isInputMethodOfThisImeEnabled удалены из SettingsActivity.onStart (проверка зависимостей грепом: оба символа были только в SettingsActivity.java), осиротевшие импорты вычищены, ресурс setup_message оставлен нетронутым (ребрендинг = фаза 11). SETUP-02 = уже реализовано, доказано грепами (тумблеры/громкость + hasVibrator→removePreference + живой отклик Settings→loadSettings→AudioAndHapticFeedbackManager), кода 0 строк. Строки — strings-setup.xml (en base + values-ru), бренд через @string/english_ime_name, «ә»-подсказка. Boundary 13ce533 = ровно 6 файлов app/ (1 .kt + 2 strings-setup.xml + 1 layout + манифест + SettingsActivity.java), без gradle/ic_launcher/старых strings.xml. Обе сборки зелёные, check-no-internet OK, release-APK ≤ 3 МБ. Device-UAT (SC2-live/SC3/SC4) — deferred по standing-паттерну фаз 1–9.
 
+- [11-01] Фаза 11 — финальный релиз-конфиг v1.0 (zero-code): shrinkResources true включён строго в паре с res/raw/keep.xml (R1 снят живым экспериментом ресерча: враг — locale_name_*-строки, не раскладки; маски keep покрывают все 4 getIdentifier call-site: keyboard_layout_set_*/kbd_*/rows_*/rowkeys_*/row_* + locale_name_* + label_*; пост-сборочный aapt2-гейт: locale_name = 8, layout set tatar жив). Ребрендинг минимальный: english_ime_name → «Tatar Keyboard» (единая точка 4 label манифеста), versionName 1.0.0/versionCode 1; setup_message НЕ удалён, а нейтрализован до «Tatar Keyboard» — деviation A4: lintVitalRelease падает ExtraTranslation на 35 сиротах-переводах values-*/ (fallback плана; чистка 35 файлов = backlog post-v1.0). CI дополнен assembleRelease (unsigned by design, keystore.properties нет в CI) + stat-size-гейтом ≤ 3145728. Release-APK 681 070 байт, подписан, apksigner verify OK (PERF-01+REL-01 закрыты механически). 5 док-файлов: README (переписан, без мёртвых бейджей/скриншот-плейсхолдеров/iOS-маркетинга), PRIVACY (двуязычная, no-INTERNET проверяемо), CHANGELOG v1.0.0, docs/PUBLISH-CHECKLIST (10 ручных шагов, бэкап jks шагом 1), 11-PERF-CHECKLIST (adb-замеры PERF-02/03). Публикация строго ручная по PUBLISH-CHECKLIST; URL-плейсхолдеры .invalid до создания репо (owner неизвестен).
+
 ### Cross-cutting disciplines (каждая фаза)
 
 - Smoke-тест матрицы InputConnection (Telegram, Chrome/WebView keyCode 229, password-поля, MIUI/One UI) — в критериях каждой фазы ввода/UI; полный проход — фаза 8.
@@ -103,6 +105,8 @@ Progress: [██████████] 100%
 
 - ⚠️ [Phase 9, plan 09-01] Task 4 on-device TalkBack UAT deferred — устройство не подключено (adb devices пуст), по standing-паттерну фаз 1–8. BUILD-критерии закрыты автоматикой (assembleDebug + assembleRelease зелёные, check-no-internet OK, release-APK 718 695 байт ≤ 3 МБ, все линии A11Y запинованы fail-capable-грепами, zero-fork-Java boundary: diff 0a280ce..HEAD по app/ = ровно 4 файла — 2 .kt + 2 .xml, ни одного .java). Чек-лист при появлении устройства (установить свежий app-debug.apk, включить TalkBack: Настройки → Спец. возможности): (1) SC1/SC2 explore-by-touch: медленно вести палец по всем рядам татарской раскладки — TalkBack называет КАЖДУЮ клавишу; пятый ряд: ә → «татарская э», ө → «татарская о», ү → «татарская у», җ → «татарская ж», ң → «татарская н», һ → «татарская х»; shift → Ә → «Заглавная татарская э»; служебные: shift/«Клавиша верхнего регистра» (после тапа — «Верхний регистр включён», после двойного — «Caps Lock включён»), delete/«Удалить», пробел/«Пробел», enter в Telegram/«Отправить», ?123/«Символы» → АБВ/«Буквы», глобус/«Сменить язык»; ни одного «shift_key»/сырого имени. (2) SC3 — главный критерий: в Telegram двойным тапом (и, если работает, lift-to-type — A2) набрать «әни» и отправить: каждая буква печатается, слышен earcon клика, слово ушло в чат; проверить и русскую раскладку (глобус двойным тапом → «привет»). (3) Динамика: тап shift → описания букв меняются на заглавные; смена раскладки → узлы новой раскладки озвучиваются. (4) Password: поле пароля — клавиши озвучиваются по именам (описания не обскьюрены — осознанное решение), набранное IME сам не произносит. (5) SC4 — не-TalkBack смоук: ВЫКЛЮЧИТЬ TalkBack → обычная печать в Telegram и Chrome/WebView (буквы, backspace-удержание, double-space→точка, свайп-курсор, long-press панель, баллон) — без деградации. Финальная простановка чек-боксов A11Y-01/02 в REQUIREMENTS.md — только после прогона.
 
+- ⚠️ [Phase 11, plan 11-01] Task 5 deferred (device UAT + ручная публикация) — устройство не подключено, по standing-паттерну фаз 1–10; публикация всегда ручная (locked decision). BUILD-критерии закрыты автоматикой (обе сборки зелёные, release-APK 681 070 байт ≤ 3 145 728 подписан apksigner-verified, check-no-internet оба уровня, aapt2: locale_name = 8/layout set tatar/label_pause+wait = 2, boundary 7f99505 = ровно 5 файлов без .java/.kt/манифеста). Три ручных блока при появлении устройства/решении публиковать: **(a) PERF-02/03 замеры** — по 11-PERF-CHECKLIST.md на бюджетном устройстве (Xiaomi/Redmi или Samsung A) с release-APK: PSS ≤ 30 МБ ×3 (открытие/ротация/цикл tt→ru→en), холодный старт < 400 мс медиана ×5 (force-stop → тап, logcat или скринрекорд 60fps), Profiler 30 с печати (0 аллокаций onDraw/onTouchEvent, 0 GC), gfxinfo reset → 60 с → janky ≤ 1%; числа вписать в таблицы чек-листа → чек-боксы PERF-02/03 в REQUIREMENTS.md. **(b) Финальный QA v1.0** — чистая установка release-APK (adb uninstall org.tatarkeyboard.ime → install), онбординг от иконки до «ә» в Telegram (SC3 фазы 10), smoke всех фич CHANGELOG (пятый ряд, глобус tt/ru/en, long-press дубли, shift/caps, backspace-удержание, double-space, свайп-курсор, ?123/#+=, баллон/панель, звук/вибро тумблеры, password, ландшафт, тёмная тема); заодно UAT-бандл фаз 1–10 (чек-листы выше). **(c) Публикация (REL-03, строго вручную)** — по docs/PUBLISH-CHECKLIST.md: бэкап jks (шаг 1 — сделать ДАЖЕ при отложенной публикации) → GitHub-репо → URL-фикс strings-appname.xml → push → зелёный CI + красный негативный тест PERF-04 → тег v1.0.0 → GitHub Release с подписанным APK → заявка IzzyOnDroid; после — чек-боксы REL-02/03, Traceability → Complete, v1.0 закрыт.
+
 ### Research pointers
 
 - `.planning/research/SUMMARY.md` — конденсат; детали в `research/00`–`08` в корне.
@@ -113,10 +117,10 @@ Progress: [██████████] 100%
 
 ## Session Continuity
 
-**Stopped at:** Phase 10 complete (verification passed; UAT отложен, принят), ready to plan Phase 11 — последняя фаза
+**Stopped at:** Phase 11 complete-local — v1.0 milestone locally done; остались device-UAT бандл (фазы 1–11) + ручная публикация (PUBLISH-CHECKLIST)
 **Resume file:** None
 
-**Next step:** Phase 11 — Производительность и релиз (последняя фаза v1.0).
+**Next step:** Ручные блоки Task 5 фазы 11: (a) PERF-02/03 замеры по 11-PERF-CHECKLIST.md, (b) финальный QA + UAT-бандл фаз 1–10, (c) публикация по docs/PUBLISH-CHECKLIST.md (бэкап release.jks — шаг 1, сделать в любом случае).
 
 Last session: 2026-07-18T21:59:44.720Z
 
