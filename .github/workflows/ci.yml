@@ -45,9 +45,13 @@ jobs:
       - name: Check release APK size (PERF-01 ≤ 3 MB)
         run: test $(stat -c%s app/build/outputs/apk/release/app-release-unsigned.apk) -le 3145728
 
-      # PERF-04, both levels: source manifest + aapt2 dump permissions on the built APK
-      - name: Check no INTERNET permission (built APK)
+      # PERF-04, both levels: source manifest + aapt2 dump permissions on the built APK.
+      # Run against both debug and release; release uses the merged manifest and may differ
+      # if a buildType-specific library or manifest overlay were ever added.
+      - name: Check no INTERNET permission (debug APK)
         run: bash scripts/check-no-internet.sh app/build/outputs/apk/debug/app-debug.apk
+      - name: Check no INTERNET permission (release APK)
+        run: bash scripts/check-no-internet.sh app/build/outputs/apk/release/app-release-unsigned.apk
 
       - uses: actions/upload-artifact@v4
         with:

@@ -123,9 +123,9 @@
     <string name="show_number_row">Show separate number row</string>
     <string name="space_swipe">Space swipe cursor move</string>
     <string name="delete_swipe">Delete swipe</string>
-    <!-- Dead string (no code references since phase 10); kept only because 35 legacy
+    <!-- Dead string (no code references since phase 10); kept only because 44 legacy
          translations in values-*/ would fail lintVital ExtraTranslation without a
-         default-locale entry. Full cleanup of the 35 files is post-v1.0 backlog. -->
+         default-locale entry. Full cleanup of the 44 files is post-v1.0 backlog. -->
     <string name="setup_message">Tatar Keyboard</string>
     <string name="user_languages">Enabled keyboard languages</string>
     <string name="add_language">Add language</string>

@@ -1,27 +1,26 @@
-This keyboard is created for those who only need a keyboard and nothing more.
+A native Android keyboard (IME) with a Tatar Cyrillic layout: the standard ЙЦУКЕН plus a dedicated, always-visible fifth row for <b>ә ө ү җ ң һ</b>. All 39 letters of the Tatar alphabet are one tap away — no long-pressing, no hunting through popups.
 
 To enable the keyboard:
 
-* Open "Simple Keyboard" from your launcher
-* Enable the Simple Keyboard (default system warning about tracking will be shown)
-* Switch to Simple Keyboard from current Input Method (differs between keyboards, usually long-press space)
-* To edit Simple Keyboard settings long-press "," or open system Settings, Languages &amp; Input, Simple Keyboard.
-* You can enable/disable all the input methods in Settings, Languages &amp; Input, Manage Keyboards (differs between phones)
+* Open "Tatar Keyboard" from your launcher — a two-step onboarding walks you through enabling and selecting the keyboard
+* Or do it manually: system Settings → Languages &amp; input → On-screen keyboard → enable Tatar Keyboard, then switch to it from your current input method (usually via the keyboard icon or long-press space)
 
 <b>Features:</b>
 
-* Small size (&lt;1MB)
-* Adjustable keyboard height for more screen space
-* Number row
-* Swipe space to move pointer
-* Delete swipe
-* Custom theme colors
-* Minimal permissions (only Vibrate)
-* Ads-free
+* Tatar layout: ЙЦУКЕН + a visible fifth row with ә ө ү җ ң һ
+* Three languages: Tatar, Russian, English — switch with the globe key
+* Long-press duplicates on the Russian layout: а→ә, о→ө, у→ү, ж→җ, н→ң, х→һ, plus е→ё and ь→ъ
+* Clean, minimalist look with light and dark themes
+* Fast typing: double-space → period, swipe on space to move the cursor, multi-touch
+* Key-press preview, alternatives popup, sound and vibration (all configurable)
+* Accessibility: full TalkBack support with Tatar letter descriptions
+* Works before the first unlock (Direct Boot) — available for PIN entry right after reboot
+* Small size (&lt;1 MB)
 
-<b>Features it doesn’t have and probably will never have:</b>
+<b>Privacy:</b>
 
-* Emojis
-* GIFs
-* Spell checker
-* Swipe typing
+* No INTERNET permission at all — the keyboard physically cannot send what you type anywhere (verified by CI on every commit)
+* No ads, no analytics, no tracking SDKs
+* The only permission is Vibrate
+
+Free and open source under Apache-2.0. A fork of Simple Keyboard, which is based on the AOSP LatinIME keyboard.
