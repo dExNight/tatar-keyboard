@@ -4,9 +4,9 @@ milestone: v1.0
 milestone_name: milestone
 current_phase: 11
 current_phase_name: Производительность и релиз
-status: executing
-stopped_at: Completed 10-01-PLAN.md — Phase 10 complete-local (Task 5 device UAT deferred)
-last_updated: "2026-07-18T23:45:15.515Z"
+status: verifying
+stopped_at: Completed 11-01-PLAN.md — Phase 11 complete-local (Task 5 device UAT + manual publication deferred)
+last_updated: "2026-07-18T23:58:36.893Z"
 last_activity: 2026-07-19
 last_activity_desc: Phase 11 execution started
 progress:
@@ -23,10 +23,10 @@ progress:
 **Milestone:** v1.0 — MVP + релиз (GitHub Releases + IzzyOnDroid)
 **Phase:** 11 (Производительность и релиз) — EXECUTING
 **Plan:** 1 of 1
-**Status:** Executing Phase 11
+**Status:** Phase complete — ready for verification
 **Last activity:** 2026-07-19 — Phase 11 execution started
 
-Progress: [██████████] 100%
+Progress: [█████████░] 92%
 
 ## Accumulated Context
 
@@ -117,12 +117,12 @@ Progress: [██████████] 100%
 
 ## Session Continuity
 
-**Stopped at:** Phase 11 complete-local — v1.0 milestone locally done; остались device-UAT бандл (фазы 1–11) + ручная публикация (PUBLISH-CHECKLIST)
+**Stopped at:** Completed 11-01-PLAN.md — Phase 11 complete-local (Task 5 device UAT + manual publication deferred)
 **Resume file:** None
 
 **Next step:** Ручные блоки Task 5 фазы 11: (a) PERF-02/03 замеры по 11-PERF-CHECKLIST.md, (b) финальный QA + UAT-бандл фаз 1–10, (c) публикация по docs/PUBLISH-CHECKLIST.md (бэкап release.jks — шаг 1, сделать в любом случае).
 
-Last session: 2026-07-18T21:59:44.720Z
+Last session: 2026-07-18T23:58:36.888Z
 
 ---
 *Last updated: 2026-07-18 — Phase 1 complete*
@@ -142,3 +142,4 @@ Last session: 2026-07-18T21:59:44.720Z
 | Phase 08 P01 | 12 min | 3 of 4 tasks (Task 4 UAT deferred) | 1 app file (1 line, zero Java) + planning |
 | Phase 09 P01 | 12 min | 4 tasks | 6 files |
 | Phase 10 P01 | 10 min | 4 of 5 tasks (Task 5 UAT deferred) tasks | 6 app files (4 new + 2 edits) + planning files |
+| Phase 11 P01 | 12 min | 4 of 5 tasks (Task 5 UAT+publication deferred) | 10 app/docs files + planning |

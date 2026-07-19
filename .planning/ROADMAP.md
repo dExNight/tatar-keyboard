@@ -195,6 +195,7 @@ Smoke-тесты шли в каждой фазе; здесь — система�
 **Mode:** mvp
 **Requirements:** PERF-01, PERF-02, PERF-03, REL-01, REL-02, REL-03
 **Depends on:** Phase 10
+**Progress:** 11-01 ✓ complete-local (Tasks 1–4: shrinkResources+keep.xml, ребрендинг «Tatar Keyboard» 1.0.0, подписанный release-APK 681 070 байт ≤ 3 МБ apksigner-verified, CI size-гейт, README/PRIVACY/CHANGELOG/PUBLISH-CHECKLIST/PERF-CHECKLIST; PERF-01+REL-01 закрыты механически); Task 5 — deferred: (a) PERF-02/03 device-замеры по 11-PERF-CHECKLIST.md, (b) финальный QA + UAT-бандл фаз 1–10, (c) ручная публикация по docs/PUBLISH-CHECKLIST.md (REL-02/03), см. 11-01-SUMMARY.md
 
 Дисциплина (ноль аллокаций, ленивая инициализация, minify) закладывалась по ходу — здесь финальная измеренная верификация на бюджетном устройстве (Xiaomi/Redmi или Samsung A-серия) и публикация. Перед релизом закрыть открытые вопросы: minSdk 24 vs 26, финальное название/applicationId.
 
