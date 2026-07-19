@@ -12,6 +12,8 @@
 
 ### Validated
 
+- ✓ Релиз v1.0.0: подписанный APK 681 070 байт (бюджет ≤3 МБ, 4.6× запас), shrinkResources+keep.xml, «Tatar Keyboard» ребренд, CI с size-гейтом, 5 релизных документов — Phase 11 (device-замеры PERF-02/03 и публикация — ручные шаги по чек-листам)
+
 - ✓ Онбординг: SetupActivity 2 шага со статусами (live-детект, guards, a11y), лаунчер→онбординг, legacy-диалог удалён; настройки звук/вибро работают — Phase 10 (device UAT отложен, принят)
 
 - ✓ TalkBack: полные виртуальные узлы (описания «татарская э» и т.п., 27 строк en+ru, ACTION_CLICK реально печатает через штатный touch-путь) — Phase 9 (on-device TalkBack UAT отложен, принят)
@@ -114,4 +116,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-07-19 after Phase 10*
+*Last updated: 2026-07-19 after Phase 11 — all 11 phases complete-local*
