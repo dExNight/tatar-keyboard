@@ -21,9 +21,6 @@
 <resources>
     <string name="english_ime_name" translatable="false">Tatar Keyboard</string>
     <string name="english_ime_settings" translatable="false">Tatar Keyboard Settings</string>
-    <!-- Provisional placeholders (RFC 2606 .invalid — never resolves); the real
-         published locations of this repo's PRIVACY.md and LICENSE are set at
-         publication (phase 11). -->
-    <string name="privacy_policy_url" translatable="false">https://tatarkeyboard.invalid/PRIVACY.md</string>
-    <string name="license_url" translatable="false">https://tatarkeyboard.invalid/LICENSE</string>
+    <string name="privacy_policy_url" translatable="false">https://github.com/dExNight/tatar-keyboard/blob/main/PRIVACY.md</string>
+    <string name="license_url" translatable="false">https://github.com/dExNight/tatar-keyboard/blob/main/LICENSE</string>
 </resources>
