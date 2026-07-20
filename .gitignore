@@ -48,3 +48,6 @@ captures/
 keystore.properties
 
 .idea
+
+# Локальные релизные артефакты (APK не коммитим)
+dist/
