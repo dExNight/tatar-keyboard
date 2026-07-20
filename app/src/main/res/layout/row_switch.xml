@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Copyright (C) 2026 Tatar Keyboard contributors
+
+     Licensed under the Apache License, Version 2.0 (the "License");
+     you may not use this file except in compliance with the License.
+     You may obtain a copy of the License at
+
+          http://www.apache.org/licenses/LICENSE-2.0
+
+     Unless required by applicable law or agreed to in writing, software
+     distributed under the License is distributed on an "AS IS" BASIS,
+     WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+     See the License for the specific language governing permissions and
+     limitations under the License.
+-->
+
+<!-- Toggle row: title (+ optional summary) with the iOS-style Switch
+     (wave D track/thumb). The whole row is the single click and
+     accessibility target — the Switch itself is decorative here, it is
+     toggled by SettingsHostActivity, which also mirrors the checked
+     state into the row's accessibility node. splitTrack must stay off:
+     the Material default punches a hole around the thumb, which would
+     break the solid iOS capsule. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:minHeight="44dp"
+    android:orientation="horizontal"
+    android:gravity="center_vertical"
+    android:paddingStart="16dp"
+    android:paddingEnd="16dp"
+    android:paddingTop="10dp"
+    android:paddingBottom="10dp"
+    android:foreground="?android:attr/selectableItemBackground"
+    android:clickable="true"
+    android:focusable="true">
+
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:layout_marginEnd="8dp"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/row_title"
+            style="@style/AppText.Cell"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:labelFor="@+id/row_switch" />
+
+        <TextView
+            android:id="@+id/row_summary"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:textSize="13sp"
+            android:fontFamily="sans-serif"
+            android:textColor="@color/app_text_secondary"
+            android:visibility="gone" />
+    </LinearLayout>
+
+    <Switch
+        android:id="@+id/row_switch"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:track="@drawable/app_switch_track"
+        android:thumb="@drawable/app_switch_thumb"
+        android:switchMinWidth="51dp"
+        android:splitTrack="false"
+        android:showText="false"
+        android:background="@null"
+        android:clickable="false"
+        android:focusable="false"
+        android:importantForAccessibility="no" />
+</LinearLayout>

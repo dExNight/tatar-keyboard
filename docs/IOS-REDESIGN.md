@@ -64,32 +64,40 @@ implement → build+gates → adversarial review → commit → push.
   радиус 12dp высота 50dp белый текст, вторичная — текстовая #007AFF, тест-поле —
   в карточке. Код не трогаем, только layout/стили. TalkBack-атрибуты сохранить
 
+Долг ревью (закрыт в S1): SetupActivity изначально завёл собственные токены
+setup_* (setup_colors.xml, setup_card_bg.xml, setup_accent*). После D-волны они
+дублировали app_*-палитру. Консолидация: setup_* удалены, setup_activity.xml и
+setup_button_filled.xml переведены на общие app_-токены (+ app_accent_pressed для
+pressed-state кнопок). Единый источник цвета для всех экранов приложения.
+
 ## Волна S1 — статические экраны настроек на своих View
 
 Уход с deprecated android.preference на собственные экраны (вердикт аудита: iOS-вид
 на legacy-стеке недостижим, androidx.preference = +0.5–1 МБ ради Material). Паттерн —
 SetupActivity (classic View, ноль зависимостей).
 
-- [ ] S1.1. Каркас: одна SettingsHostActivity (без ActionBar, свой заголовок 34sp,
+- [x] S1.1. Каркас: одна SettingsHostActivity (без ActionBar, свой заголовок 34sp,
   кнопка «назад» ← chevron) с навигацией по 4 статическим экранам; строки-виджеты
   три типа: link (title+chevron), switch (title+ios-тумблер), value (title+значение,
   тап → существующий seek_bar_dialog в AlertDialog)
-- [ ] S1.2. Экраны: корень (Языки → S2, Настройки, Нажатие клавиши, Внешний вид,
+- [x] S1.2. Экраны: корень (Языки → S2, Настройки, Нажатие клавиши, Внешний вид,
   Политика, Лицензия), Preferences (7 switch), Key press (2 switch + звук-switch +
   2 value), Appearance (1 switch + 2 value) — состав пунктов 1:1 текущий, ничего
   не добавляем
-- [ ] S1.3. Перенос обвязки (риски поимённо, из SubScreenFragment/FragmentUtils):
+- [x] S1.3. Перенос обвязки (риски поимённо, из SubScreenFragment/FragmentUtils):
   device-protected SharedPreferences (PreferenceManagerCompat как есть),
   BackupManager.dataChanged() при изменении, enterprise restrictions → disable пунктов,
-  android:dependency-связи (громкость⇢звук, отступ⇢высота — проверить фактические),
-  вход из системных настроек (settingsActivity в method.xml → SettingsHostActivity,
-  EXTRA_SHOW_FRAGMENT-совместимость: чужой extra игнорируется, открывается корень)
-- [ ] S1.4. Живой отклик клавиатуры на изменения: то, что сейчас делает
-  Settings.onSharedPreferenceChanged + точечные вызовы (KeyboardLayoutSet.onKeyboardThemeChanged
-  для ряда цифр и т.п.) — проверить каждый пункт после переноса
-- [ ] S1.5. Старые фрагменты пока НЕ удалять (S2 ими ещё пользуется для языков);
+  android:dependency-связи (фактические: громкость⇢звук, IME-switch⇢кнопка языка;
+  у отступа зависимости нет), вход из системных настроек: method.xml не тронут,
+  SettingsActivity остался входом-роутером (языковые фрагменты → legacy-путь,
+  всё остальное → redirect на SettingsHostActivity + finish, без циклов)
+- [x] S1.4. Живой отклик клавиатуры на изменения: Settings слушает те же
+  device-protected prefs; KeyboardLayoutSet.onKeyboardThemeChanged перенесён для
+  ряда цифр И спецсимволов (как в legacy-фрагментах); девайс-проверка — в V4
+- [x] S1.5. Старые фрагменты пока НЕ удалять (S2 ими ещё пользуется для языков);
   SettingsActivity остаётся тонким входом-роутером либо заменяется — решить в
-  реализации по минимуму диффа
+  реализации по минимуму диффа (итог: роутер; языковой мост через
+  EXTRA_SHOW_FRAGMENT=LanguagesSettingsFragment)
 
 ## Волна S2 — языки + финальный выпил legacy
 
@@ -108,10 +116,11 @@ SetupActivity (classic View, ноль зависимостей).
 ## Верификация (каждая волна)
 
 - [x] V1. assembleDebug + assembleRelease зелёные; check-no-internet оба уровня
-  (волна D, 2026-07-20)
+  (волна D, 2026-07-20; волна S1, 2026-07-20)
 - [x] V2. Release-APK ≤ 3 145 728 байт (следить: свои экраны ≈ +единицы КБ) —
-  волна D: 813 267 байт (~794 КБ)
-- [ ] V3. Адверсариальное ревью диффа — без critical/major
+  волна D: 813 267 байт (~794 КБ); волна S1: 831 720 байт (~812 КБ, +18 КБ)
+- [x] V3. Адверсариальное ревью диффа — без critical/major (волна D, 2026-07-20;
+  волна S1, 2026-07-20 — ревью прошло)
 - [ ] V4. Скриншот-проверка на устройстве (пользователь): light + dark
 
 ## Не делаем (осознанно)

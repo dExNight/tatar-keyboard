@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Copyright (C) 2026 Tatar Keyboard contributors
+
+     Licensed under the Apache License, Version 2.0 (the "License");
+     you may not use this file except in compliance with the License.
+     You may obtain a copy of the License at
+
+          http://www.apache.org/licenses/LICENSE-2.0
+
+     Unless required by applicable law or agreed to in writing, software
+     distributed under the License is distributed on an "AS IS" BASIS,
+     WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+     See the License for the specific language governing permissions and
+     limitations under the License.
+-->
+
+<!-- Hairline between rows inside a grouped card: the separator line is
+     inset 16dp from the start, the inset area is filled with the card
+     color so the screen background cannot bleed through the 1px strip. -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item>
+        <shape android:shape="rectangle">
+            <solid android:color="@color/app_card_bg" />
+        </shape>
+    </item>
+    <item android:start="16dp">
+        <shape android:shape="rectangle">
+            <solid android:color="@color/app_separator" />
+        </shape>
+    </item>
+</layer-list>

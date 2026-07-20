@@ -33,9 +33,41 @@ import rkr.simplekeyboard.inputmethod.latin.utils.FragmentUtils;
 public class SettingsActivity extends PreferenceActivity {
     private static final String DEFAULT_FRAGMENT = SettingsFragment.class.getName();
 
+    /**
+     * Fragments that must still be served by the legacy PreferenceActivity
+     * path (language screens, until S2 migrates them). Any other entry
+     * — including a bare launch from LatinIME.launchSettings or the system
+     * settings panel — is redirected to SettingsHostActivity.
+     */
+    private static boolean isLegacyFragment(final String fragmentName) {
+        return LanguagesSettingsFragment.class.getName().equals(fragmentName)
+                || SingleLanguageSettingsFragment.class.getName().equals(fragmentName);
+    }
+
     @Override
     protected void onCreate(final Bundle savedState) {
+        // Redirect to the new View-based host unless this is a legacy
+        // fragment request (languages screens, until S2). The decision reads
+        // the raw intent — the getIntent() override below injects
+        // DEFAULT_FRAGMENT and must not mask a bare launch. Restores from a
+        // saved state never redirect: such an instance already survived the
+        // check as a legacy screen. The host never starts this activity
+        // without a legacy fragment extra, so this cannot loop.
+        final String rawFragment = super.getIntent().getStringExtra(EXTRA_SHOW_FRAGMENT);
+        final boolean redirect = savedState == null
+                && (rawFragment == null || !isLegacyFragment(rawFragment));
+
         super.onCreate(savedState);
+
+        if (redirect) {
+            final Intent host = new Intent(this, SettingsHostActivity.class);
+            // Reuse a host instance already in this task (repeated taps on the
+            // keyboard's settings key) instead of stacking a second one.
+            host.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+            startActivity(host);
+            finish();
+            return;
+        }
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             // com.android.internal.R.id.prefs_container in

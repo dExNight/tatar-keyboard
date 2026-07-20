@@ -21,4 +21,14 @@
 <resources>
     <style name="platformSettingsTheme" parent="@android:style/Theme.Material.Light.LightStatusBar" />
     <style name="platformDialogTheme" parent="@android:style/Theme.DeviceDefault.Light.Dialog" />
+
+    <!-- SettingsHostActivity: platformSettingsTheme without the ActionBar —
+         the screens draw their own 34sp large title (IOS-REDESIGN.md S1.1).
+         Defined once: the parent and colors resolve their night variants at
+         runtime. windowBackground avoids a launch flash on the grouped field. -->
+    <style name="settingsHostTheme" parent="@style/platformSettingsTheme">
+        <item name="android:windowActionBar">false</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:windowBackground">@color/app_screen_bg</item>
+    </style>
 </resources>

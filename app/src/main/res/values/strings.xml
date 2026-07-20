@@ -35,6 +35,8 @@
     <string name="settings_screen_appearance">Appearance</string>
     <!-- Settings screen title for keyboard theme settings [CHAR LIMIT=33] -->
     <string name="settings_screen_theme">Theme</string>
+    <!-- Spoken description of the back button on the settings screens [CHAR LIMIT=33] -->
+    <string name="settings_back">Back</string>
 
     <!-- Units abbreviation for the duration (milliseconds) [CHAR LIMIT=10] -->
     <string name="abbreviation_unit_milliseconds"><xliff:g id="MILLISECONDS">%s</xliff:g>ms</string>

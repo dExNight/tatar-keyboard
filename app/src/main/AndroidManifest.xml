@@ -57,6 +57,12 @@
             android:exported="true"
             android:theme="@style/platformSettingsTheme" />
 
+        <activity
+            android:name=".latin.settings.SettingsHostActivity"
+            android:label="@string/english_ime_name"
+            android:exported="false"
+            android:theme="@style/settingsHostTheme" />
+
         <receiver
             android:name=".latin.SystemBroadcastReceiver"
             android:exported="false">
