@@ -17,14 +17,14 @@
 <!-- Two-step onboarding (SETUP-01). Classic View/XML on purpose: no new
      dependencies, system Material widgets under platformSettingsTheme.
      iOS grouped-table restyle (IOS-REDESIGN.md D6): flat cards on a
-     #F2F2F7 field, 34sp large title, system-blue filled actions. All
-     colors/drawables are setup_*-local so the parallel app_* work cannot
-     collide. View ids are load-bearing (SetupActivity.kt) — do not rename. -->
+     grouped-table field, 34sp large title, system-blue filled actions,
+     all colored by the shared app_* design tokens (wave D). View ids
+     are load-bearing (SetupActivity.kt) — do not rename. -->
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/setup_root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/setup_screen_bg"
+    android:background="@color/app_screen_bg"
     android:fillViewport="true">
 
     <LinearLayout
@@ -56,7 +56,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
-            android:background="@drawable/setup_card_bg"
+            android:background="@drawable/app_card_bg"
             android:padding="16dp">
 
             <TextView
@@ -93,10 +93,11 @@
                     android:layout_height="50dp"
                     android:layout_marginTop="12dp"
                     android:background="@drawable/setup_button_filled"
+                    android:stateListAnimator="@null"
                     android:fontFamily="sans-serif-medium"
                     android:textSize="17sp"
                     android:textAllCaps="false"
-                    android:textColor="#FFFFFF"
+                    android:textColor="@color/setup_button_text"
                     android:text="@string/setup_step1_button" />
             </LinearLayout>
         </LinearLayout>
@@ -108,7 +109,7 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
             android:orientation="horizontal"
-            android:background="@drawable/setup_card_bg"
+            android:background="@drawable/app_card_bg"
             android:padding="16dp">
 
             <TextView
@@ -143,10 +144,11 @@
                     android:layout_height="50dp"
                     android:layout_marginTop="12dp"
                     android:background="@drawable/setup_button_filled"
+                    android:stateListAnimator="@null"
                     android:fontFamily="sans-serif-medium"
                     android:textSize="17sp"
                     android:textAllCaps="false"
-                    android:textColor="#FFFFFF"
+                    android:textColor="@color/setup_button_text"
                     android:text="@string/setup_step2_button" />
             </LinearLayout>
         </LinearLayout>
@@ -182,7 +184,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="12dp"
-                android:background="@drawable/setup_card_bg"
+                android:background="@drawable/app_card_bg"
                 android:padding="16dp"
                 android:hint="@string/setup_test_field_hint"
                 android:imeOptions="actionDone"
@@ -195,7 +197,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="12dp"
-                android:textColor="@color/setup_accent"
+                android:textColor="@color/app_accent"
                 android:textAllCaps="false"
                 android:text="@string/setup_done_button" />
         </LinearLayout>

@@ -14,10 +14,9 @@
      limitations under the License.
 -->
 
-<!-- Dark counterpart of values/setup_colors.xml (IOS-REDESIGN.md D6). -->
-<resources>
-    <color name="setup_screen_bg">#000000</color>
-    <color name="setup_card">#1C1C1E</color>
-    <color name="setup_accent">#0A84FF</color>
-    <color name="setup_accent_disabled">#660A84FF</color>
-</resources>
+<!-- Label color for the filled primary button: white on the blue fill,
+     muted white when the button is disabled (locked setup step). -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_enabled="false" android:color="#B3FFFFFF" />
+    <item android:color="#FFFFFF" />
+</selector>

@@ -57,6 +57,8 @@
     <color name="app_text_secondary">#98989E</color>
     <color name="app_separator">#38383A</color>
     <color name="app_accent">#0A84FF</color>
+    <color name="app_accent_pressed">#0A76E6</color>
+    <color name="app_accent_disabled">#660A84FF</color>
     <color name="app_switch_on">#30D158</color>
     <color name="app_switch_off">#39393D</color>
 </resources>
