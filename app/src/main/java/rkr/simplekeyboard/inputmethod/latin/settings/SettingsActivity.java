@@ -38,19 +38,27 @@ public class SettingsActivity extends PreferenceActivity {
         super.onCreate(savedState);
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            final View container = (View) getListView().getParent().getParent();
             // com.android.internal.R.id.prefs_container in
             // https://android.googlesource.com/platform/frameworks/base/+/refs/heads/main/core/res/res/layout/preference_list_content.xml
-            container.setOnApplyWindowInsetsListener((view, windowInsets) -> {
-                android.graphics.Insets insets = windowInsets.getInsets(WindowInsets.Type.systemBars());
-                ViewGroup.MarginLayoutParams mlp = (ViewGroup.MarginLayoutParams) view.getLayoutParams();
-                mlp.topMargin = insets.top;
-                mlp.leftMargin = insets.left;
-                mlp.bottomMargin = insets.bottom;
-                mlp.rightMargin = insets.right;
-                view.setLayoutParams(mlp);
-                return WindowInsets.CONSUMED;
-            });
+            // OEM overlays may replace this layout with a different view hierarchy, so skip
+            // the edge-to-edge margin fix instead of crashing on an unexpected parent.
+            final android.view.ViewParent parent = getListView().getParent();
+            final android.view.ViewParent grandparent = parent == null ? null : parent.getParent();
+            if (grandparent instanceof View) {
+                final View container = (View) grandparent;
+                container.setOnApplyWindowInsetsListener((view, windowInsets) -> {
+                    android.graphics.Insets insets = windowInsets.getInsets(WindowInsets.Type.systemBars());
+                    if (view.getLayoutParams() instanceof ViewGroup.MarginLayoutParams) {
+                        ViewGroup.MarginLayoutParams mlp = (ViewGroup.MarginLayoutParams) view.getLayoutParams();
+                        mlp.topMargin = insets.top;
+                        mlp.leftMargin = insets.left;
+                        mlp.bottomMargin = insets.bottom;
+                        mlp.rightMargin = insets.right;
+                        view.setLayoutParams(mlp);
+                    }
+                    return WindowInsets.CONSUMED;
+                });
+            }
         }
 
         final ActionBar actionBar = getActionBar();
@@ -73,7 +81,10 @@ public class SettingsActivity extends PreferenceActivity {
     public Intent getIntent() {
         final Intent intent = super.getIntent();
         final String fragment = intent.getStringExtra(EXTRA_SHOW_FRAGMENT);
-        if (fragment == null) {
+        // Some OEM settings apps launch this activity with a foreign fragment name in the
+        // extra, which would make PreferenceActivity throw in isValidFragment. Fall back to
+        // the default fragment for anything that isn't in our allow-list.
+        if (fragment == null || !FragmentUtils.isValidFragment(fragment)) {
             intent.putExtra(EXTRA_SHOW_FRAGMENT, DEFAULT_FRAGMENT);
         }
         intent.putExtra(EXTRA_NO_HEADERS, true);
