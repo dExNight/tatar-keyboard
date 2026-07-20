@@ -37,9 +37,14 @@ public final class SubtypePreferenceUtils {
     private static final int INDEX_OF_LOCALE = 0;
     private static final int INDEX_OF_KEYBOARD_LAYOUT = 1;
     private static final int PREF_ELEMENTS_LENGTH = (INDEX_OF_KEYBOARD_LAYOUT + 1);
-    private static final String PREF_SUBTYPE_SEPARATOR = ";";
+    public static final String PREF_SUBTYPE_SEPARATOR = ";";
 
-    private static String getPrefString(final Subtype subtype) {
+    // Legacy pref values from earlier development phases that need to be migrated
+    private static final String LEGACY_LOCALE_TATAR = "tt";
+    private static final String LOCALE_TATAR = "tt_RU";
+    private static final String LOCALE_RUSSIAN = "ru";
+
+    public static String getPrefString(final Subtype subtype) {
         final String localeString = subtype.getLocale();
         final String keyboardLayoutSetName = subtype.getKeyboardLayoutSet();
         return localeString + LOCALE_AND_LAYOUT_SEPARATOR + keyboardLayoutSetName;
@@ -60,9 +65,21 @@ public final class SubtypePreferenceUtils {
                 continue;
             }
             final String localeString = elements[INDEX_OF_LOCALE];
-            final String keyboardLayoutSetName = elements[INDEX_OF_KEYBOARD_LAYOUT];
-            final Subtype subtype =
-                    SubtypeLocaleUtils.getSubtype(localeString, keyboardLayoutSetName, resources);
+            String keyboardLayoutSetName = elements[INDEX_OF_KEYBOARD_LAYOUT];
+            // migrate legacy pref entries from earlier development phases before looking
+            // them up so old selections aren't silently dropped
+            final String migratedLocaleString;
+            if (LEGACY_LOCALE_TATAR.equals(localeString)) {
+                migratedLocaleString = LOCALE_TATAR;
+            } else {
+                migratedLocaleString = localeString;
+            }
+            if (LOCALE_RUSSIAN.equals(migratedLocaleString)
+                    && SubtypeLocaleUtils.LAYOUT_EAST_SLAVIC.equals(keyboardLayoutSetName)) {
+                keyboardLayoutSetName = SubtypeLocaleUtils.LAYOUT_RUSSIAN;
+            }
+            final Subtype subtype = SubtypeLocaleUtils.getSubtype(migratedLocaleString,
+                    keyboardLayoutSetName, resources);
             if (subtype == null) {
                 continue;
             }

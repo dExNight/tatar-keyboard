@@ -159,8 +159,36 @@ public class RichInputMethodManager {
                 mSubtypes = SubtypeLocaleUtils.getDefaultSubtypes(context.getResources());
             } else {
                 mSubtypes = subtypes;
+                if (!TextUtils.isEmpty(prefSubtypes) && subtypes.size() < prefSubtypes.split(
+                        SubtypePreferenceUtils.PREF_SUBTYPE_SEPARATOR).length) {
+                    // some entries in the preference couldn't be parsed (eg: unmigratable
+                    // legacy entries), so add any missing default subtypes to be safe
+                    for (final Subtype subtype
+                            : SubtypeLocaleUtils.getDefaultSubtypes(context.getResources())) {
+                        if (!mSubtypes.contains(subtype)) {
+                            mSubtypes.add(subtype);
+                        }
+                    }
+                }
+                // persist any changes from migrating or dropping legacy entries
+                final String updatedPrefSubtypes =
+                        SubtypePreferenceUtils.createPrefSubtypes(mSubtypes);
+                if (!updatedPrefSubtypes.equals(prefSubtypes)) {
+                    Settings.writePrefSubtypes(mPrefs, updatedPrefSubtypes);
+                }
             }
             mCurrentSubtypeIndex = 0;
+            // restore the last explicitly selected subtype
+            final String prefCurrentSubtype = Settings.readPrefCurrentSubtype(mPrefs);
+            if (!TextUtils.isEmpty(prefCurrentSubtype)) {
+                for (int i = 0; i < mSubtypes.size(); i++) {
+                    if (prefCurrentSubtype.equals(
+                            SubtypePreferenceUtils.getPrefString(mSubtypes.get(i)))) {
+                        mCurrentSubtypeIndex = i;
+                        break;
+                    }
+                }
+            }
         }
 
         /**
@@ -243,6 +271,15 @@ public class RichInputMethodManager {
         }
 
         /**
+         * Update the preference for the currently selected subtype so the selection survives
+         * the process getting killed.
+         */
+        private void saveCurrentSubtypePref() {
+            Settings.writePrefCurrentSubtype(mPrefs,
+                    SubtypePreferenceUtils.getPrefString(getCurrentSubtype()));
+        }
+
+        /**
          * Add a subtype to the list.
          * @param subtype the subtype to add.
          * @return whether the subtype was added to the list (or already existed in the list).
@@ -293,6 +330,7 @@ public class RichInputMethodManager {
             mSubtypes.remove(index);
             saveSubtypeListPref();
             if (subtypeChanged) {
+                saveCurrentSubtypePref();
                 notifySubtypeChanged();
             }
             return true;
@@ -321,13 +359,9 @@ public class RichInputMethodManager {
          * @return whether the current subtype was set to the requested subtype.
          */
         public synchronized boolean setCurrentSubtype(final Subtype subtype) {
-            if (getCurrentSubtype().equals(subtype)) {
-                // nothing to do
-                return true;
-            }
             for (int i = 0; i < mSubtypes.size(); i++) {
                 if (mSubtypes.get(i).equals(subtype)) {
-                    setCurrentSubtype(i);
+                    setCurrentSubtype(i, true);
                     return true;
                 }
             }
@@ -335,7 +369,9 @@ public class RichInputMethodManager {
         }
 
         /**
-         * Set the current subtype to match a specified locale.
+         * Set the current subtype to match a specified locale. This is only a temporary switch
+         * (eg: for an editor field hinting a language), so it isn't persisted and doesn't affect
+         * the cycle order or the user's explicit selection.
          * @param locale the locale to use.
          * @return whether the current subtype was set to the requested locale.
          */
@@ -350,7 +386,7 @@ public class RichInputMethodManager {
                 for (int i = 0; i < mSubtypes.size(); i++) {
                     final Subtype subtype = mSubtypes.get(i);
                     if (bestLocale.equals(subtype.getLocaleObject())) {
-                        setCurrentSubtype(i);
+                        setCurrentSubtype(i, false);
                         return true;
                     }
                 }
@@ -362,18 +398,31 @@ public class RichInputMethodManager {
          * Set the current subtype to a specified index. This should only be used when setting the
          * subtype to something specific (not when just iterating through the subtypes).
          * @param index the index of the subtype to set as current.
+         * @param persist whether this is an explicit selection by the user that should be
+         *               persisted, as opposed to a temporary switch (eg: from a hint locale).
          */
-        private void setCurrentSubtype(final int index) {
+        private void setCurrentSubtype(final int index, final boolean persist) {
             if (mCurrentSubtypeIndex == index)
             {
-                // nothing to do
+                if (persist) {
+                    // the subtype may have previously been set temporarily, so the explicit
+                    // selection still needs to be persisted
+                    if (index != 0) {
+                        resetSubtypeCycleOrder();
+                    }
+                    saveCurrentSubtypePref();
+                }
                 return;
             }
             mCurrentSubtypeIndex = index;
-            if (index != 0) {
-                // since the subtype was selected directly, the cycle should be reset so switching
-                // to the next subtype can iterate through all of the rest of the subtypes
-                resetSubtypeCycleOrder();
+            if (persist) {
+                if (index != 0) {
+                    // since the subtype was selected directly, the cycle should be reset so
+                    // switching to the next subtype can iterate through all of the rest of the
+                    // subtypes
+                    resetSubtypeCycleOrder();
+                }
+                saveCurrentSubtypePref();
             }
             notifySubtypeChanged();
         }
@@ -390,11 +439,13 @@ public class RichInputMethodManager {
             if (nextIndex >= mSubtypes.size()) {
                 mCurrentSubtypeIndex = 0;
                 if (!notifyChangeOnCycle) {
+                    saveCurrentSubtypePref();
                     return false;
                 }
             } else {
                 mCurrentSubtypeIndex = nextIndex;
             }
+            saveCurrentSubtypePref();
             notifySubtypeChanged();
             return true;
         }
@@ -471,7 +522,8 @@ public class RichInputMethodManager {
     }
 
     /**
-     * Set the current subtype to match a specified locale.
+     * Temporarily set the current subtype to match a specified locale (eg: for an editor field
+     * hinting a language) without persisting the change as an explicit user selection.
      * @param locale the locale to use.
      * @return whether the current subtype was set to the requested locale.
      */
