@@ -20,7 +20,7 @@
 -->
 
 <resources>
-    <color name="ic_launcher_background">#ECEFF1</color>
+    <color name="ic_launcher_background">#FEFEFE</color>
 
     <!-- Color resources for LXX_System theme. -->
     <!-- Material theme values @color/material_* are private, so they are copied here. -->
