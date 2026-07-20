@@ -15,12 +15,16 @@
 -->
 
 <!-- Two-step onboarding (SETUP-01). Classic View/XML on purpose: no new
-     dependencies, system Material widgets under platformSettingsTheme,
-     visually consistent with SettingsActivity (not the iOS keyboard skin). -->
+     dependencies, system Material widgets under platformSettingsTheme.
+     iOS grouped-table restyle (IOS-REDESIGN.md D6): flat cards on a
+     #F2F2F7 field, 34sp large title, system-blue filled actions. All
+     colors/drawables are setup_*-local so the parallel app_* work cannot
+     collide. View ids are load-bearing (SetupActivity.kt) — do not rename. -->
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/setup_root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:background="@color/setup_screen_bg"
     android:fillViewport="true">
 
     <LinearLayout
@@ -29,11 +33,14 @@
         android:orientation="vertical"
         android:padding="24dp">
 
+        <!-- iOS large title: 34sp sans-serif bold (inline, no AppText.* dep) -->
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="@string/english_ime_name"
-            android:textAppearance="?android:attr/textAppearanceLarge" />
+            android:fontFamily="sans-serif"
+            android:textStyle="bold"
+            android:textSize="34sp" />
 
         <TextView
             android:layout_width="wrap_content"
@@ -49,8 +56,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
-            android:background="?android:attr/colorBackgroundFloating"
-            android:elevation="2dp"
+            android:background="@drawable/setup_card_bg"
             android:padding="16dp">
 
             <TextView
@@ -83,9 +89,14 @@
 
                 <Button
                     android:id="@+id/setup_step1_button"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
+                    android:layout_width="match_parent"
+                    android:layout_height="50dp"
+                    android:layout_marginTop="12dp"
+                    android:background="@drawable/setup_button_filled"
+                    android:fontFamily="sans-serif-medium"
+                    android:textSize="17sp"
+                    android:textAllCaps="false"
+                    android:textColor="#FFFFFF"
                     android:text="@string/setup_step1_button" />
             </LinearLayout>
         </LinearLayout>
@@ -97,8 +108,7 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
             android:orientation="horizontal"
-            android:background="?android:attr/colorBackgroundFloating"
-            android:elevation="2dp"
+            android:background="@drawable/setup_card_bg"
             android:padding="16dp">
 
             <TextView
@@ -129,9 +139,14 @@
 
                 <Button
                     android:id="@+id/setup_step2_button"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
+                    android:layout_width="match_parent"
+                    android:layout_height="50dp"
+                    android:layout_marginTop="12dp"
+                    android:background="@drawable/setup_button_filled"
+                    android:fontFamily="sans-serif-medium"
+                    android:textSize="17sp"
+                    android:textAllCaps="false"
+                    android:textColor="#FFFFFF"
                     android:text="@string/setup_step2_button" />
             </LinearLayout>
         </LinearLayout>
@@ -158,25 +173,30 @@
                 android:text="@string/setup_done_hint"
                 android:textAppearance="?android:attr/textAppearanceMedium" />
 
-            <!-- Try-it field: the moment of victory — the freshly selected
-                 keyboard opens right here. The hint is also the field's
-                 TalkBack label (no contentDescription on an EditText). -->
+            <!-- Try-it field in its own card. The moment of victory — the
+                 freshly selected keyboard opens right here. The hint is also
+                 the field's TalkBack label (no contentDescription on an
+                 EditText). -->
             <EditText
                 android:id="@+id/setup_test_field"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="12dp"
+                android:background="@drawable/setup_card_bg"
+                android:padding="16dp"
                 android:hint="@string/setup_test_field_hint"
                 android:imeOptions="actionDone"
                 android:inputType="text" />
 
-            <!-- Borderless: secondary next to the try-it field above. -->
+            <!-- Borderless secondary: system-blue text, iOS accent. -->
             <Button
                 android:id="@+id/setup_done_button"
                 style="?android:attr/borderlessButtonStyle"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="12dp"
+                android:textColor="@color/setup_accent"
+                android:textAllCaps="false"
                 android:text="@string/setup_done_button" />
         </LinearLayout>
     </LinearLayout>
