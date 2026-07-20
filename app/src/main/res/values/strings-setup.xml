@@ -17,7 +17,7 @@
 <!-- Onboarding (SETUP-01) strings, English base. The screen title shows the
      brand via @string/english_ime_name directly in the layout — the brand
      name is never hardcoded in these strings. -->
-<resources>
+<resources xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
     <string name="setup_subtitle">Two quick steps to start typing in Tatar</string>
 
     <string name="setup_step1_number" translatable="false">1</string>
@@ -32,7 +32,7 @@
     <string name="setup_error_no_settings">Open Settings and turn on this keyboard in the keyboard list manually</string>
 
     <string name="setup_step1_title">Enable the keyboard</string>
-    <string name="setup_step1_instruction">Turn this keyboard on in the system keyboard list</string>
+    <string name="setup_step1_instruction">Turn on “<xliff:g id="KEYBOARD_NAME" example="Tatar Keyboard">%s</xliff:g>” in the system keyboard list</string>
     <string name="setup_step1_button">Enable keyboard</string>
 
     <string name="setup_step2_title">Select the keyboard</string>
@@ -41,5 +41,7 @@
 
     <string name="setup_done_title">Done!</string>
     <string name="setup_done_hint">Type ә in any app</string>
+    <!-- Hint doubles as the TalkBack label of the try-it field. -->
+    <string name="setup_test_field_hint">Try it: type “сәлам”</string>
     <string name="setup_done_button">Open settings</string>
 </resources>

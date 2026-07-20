@@ -62,11 +62,20 @@ class SetupActivity : Activity() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             val root = findViewById<View>(R.id.setup_root)
             root.setOnApplyWindowInsetsListener { view, windowInsets ->
-                val insets = windowInsets.getInsets(WindowInsets.Type.systemBars())
+                // ime() keeps the try-it field visible above the keyboard
+                // once the done block opens it (edge-to-edge on 35+).
+                val insets = windowInsets.getInsets(
+                        WindowInsets.Type.systemBars() or WindowInsets.Type.ime())
                 view.setPadding(insets.left, insets.top, insets.right, insets.bottom)
                 WindowInsets.CONSUMED
             }
         }
+
+        // The step-1 instruction names the keyboard exactly as it appears
+        // in the system list — substituted here, never hardcoded in strings.
+        findViewById<TextView>(R.id.setup_step1_instruction).text =
+                getString(R.string.setup_step1_instruction,
+                        getString(R.string.english_ime_name))
 
         findViewById<Button>(R.id.setup_step1_button).setOnClickListener {
             // Some stripped OEM/enterprise builds ship without the

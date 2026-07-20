@@ -72,11 +72,13 @@
                     android:text="@string/setup_step1_title"
                     android:textAppearance="?android:attr/textAppearanceMedium" />
 
+                <!-- Text is set in SetupActivity: the string takes the
+                     keyboard name as a format argument. -->
                 <TextView
+                    android:id="@+id/setup_step1_instruction"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="2dp"
-                    android:text="@string/setup_step1_instruction"
                     android:textAppearance="?android:attr/textAppearanceSmall" />
 
                 <Button
@@ -156,8 +158,22 @@
                 android:text="@string/setup_done_hint"
                 android:textAppearance="?android:attr/textAppearanceMedium" />
 
+            <!-- Try-it field: the moment of victory — the freshly selected
+                 keyboard opens right here. The hint is also the field's
+                 TalkBack label (no contentDescription on an EditText). -->
+            <EditText
+                android:id="@+id/setup_test_field"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:hint="@string/setup_test_field_hint"
+                android:imeOptions="actionDone"
+                android:inputType="text" />
+
+            <!-- Borderless: secondary next to the try-it field above. -->
             <Button
                 android:id="@+id/setup_done_button"
+                style="?android:attr/borderlessButtonStyle"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="12dp"
