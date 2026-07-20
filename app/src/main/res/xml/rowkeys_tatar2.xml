@@ -33,6 +33,7 @@
     <!-- U+0430: "а" CYRILLIC SMALL LETTER A; long-press U+04D9: "ә" -->
     <Key
         latin:keySpec="&#x0430;"
+        latin:keyHintLabel="&#x04D9;"
         latin:moreKeys="&#x04D9;" />
     <!-- U+043F: "п" CYRILLIC SMALL LETTER PE -->
     <Key
@@ -43,6 +44,7 @@
     <!-- U+043E: "о" CYRILLIC SMALL LETTER O; long-press U+04E9: "ө" -->
     <Key
         latin:keySpec="&#x043E;"
+        latin:keyHintLabel="&#x04E9;"
         latin:moreKeys="&#x04E9;" />
     <!-- U+043B: "л" CYRILLIC SMALL LETTER EL -->
     <Key
@@ -53,9 +55,11 @@
     <!-- U+0436: "ж" CYRILLIC SMALL LETTER ZHE; long-press U+0497: "җ" -->
     <Key
         latin:keySpec="&#x0436;"
+        latin:keyHintLabel="&#x0497;"
         latin:moreKeys="&#x0497;" />
     <!-- U+044D: "э" CYRILLIC SMALL LETTER E; long-press U+04D9: "ә" -->
     <Key
         latin:keySpec="&#x044D;"
+        latin:keyHintLabel="&#x04D9;"
         latin:moreKeys="&#x04D9;" />
 </merge>

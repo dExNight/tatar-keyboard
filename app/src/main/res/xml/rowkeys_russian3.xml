@@ -42,6 +42,7 @@
     <!-- U+044C: "ь" CYRILLIC SMALL LETTER SOFT SIGN; long-press U+044A: "ъ" (ревью F1) -->
     <Key
         latin:keySpec="&#x044C;"
+        latin:keyHintLabel="&#x044A;"
         latin:moreKeys="&#x044A;" />
     <!-- U+0431: "б" CYRILLIC SMALL LETTER BE -->
     <Key

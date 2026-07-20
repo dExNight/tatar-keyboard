@@ -30,6 +30,7 @@
     <!-- U+0443: "у" CYRILLIC SMALL LETTER U; long-press U+04AF: "ү" -->
     <Key
         latin:keySpec="&#x0443;"
+        latin:keyHintLabel="&#x04AF;"
         latin:moreKeys="&#x04AF;" />
     <!-- U+043A: "к" CYRILLIC SMALL LETTER KA -->
     <Key
@@ -37,14 +38,17 @@
     <!-- U+0435: "е" CYRILLIC SMALL LETTER IE; long-press U+0451: "ё" (ревью F1) -->
     <Key
         latin:keySpec="&#x0435;"
+        latin:keyHintLabel="&#x0451;"
         latin:moreKeys="&#x0451;" />
     <!-- U+043D: "н" CYRILLIC SMALL LETTER EN; long-press U+04A3: "ң" -->
     <Key
         latin:keySpec="&#x043D;"
+        latin:keyHintLabel="&#x04A3;"
         latin:moreKeys="&#x04A3;" />
     <!-- U+0433: "г" CYRILLIC SMALL LETTER GHE; long-press U+04BB: "һ" -->
     <Key
         latin:keySpec="&#x0433;"
+        latin:keyHintLabel="&#x04BB;"
         latin:moreKeys="&#x04BB;" />
     <!-- U+0448: "ш" CYRILLIC SMALL LETTER SHA -->
     <Key
@@ -58,5 +62,6 @@
     <!-- U+0445: "х" CYRILLIC SMALL LETTER HA; long-press U+04BB: "һ" -->
     <Key
         latin:keySpec="&#x0445;"
+        latin:keyHintLabel="&#x04BB;"
         latin:moreKeys="&#x04BB;" />
 </merge>
