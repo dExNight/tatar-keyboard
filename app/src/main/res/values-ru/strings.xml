@@ -48,7 +48,7 @@
     <string name="prefs_bottom_offset_portrait_settings">Сдвиг снизу</string>
     <string name="keyboard_color">Установить пользовательский цвет клавиатуры</string>
     <string name="show_special_chars">Показать специальные символы</string>
-    <string name="show_special_chars_summary">Дополнительные символы на клавишах раскладки QWERTY</string>
+    <string name="show_special_chars_summary">Дополнительные символы на некоторых раскладках (QWERTY и другие)</string>
     <string name="show_language_switch_key">Показать кнопку переключения языка</string>
     <string name="show_language_switch_key_summary">Клавиша для переключения языков клавиатуры</string>
     <string name="pref_use_on_screen">Показать экранную клавиатуру</string>

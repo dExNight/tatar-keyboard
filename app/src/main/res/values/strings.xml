@@ -118,7 +118,7 @@
     <string name="show_special_chars">Show special characters</string>
     <!-- Description for option to show extra characters; only affects layouts with extra
          character variants (e.g. QWERTY), not the Tatar or Russian layouts -->
-    <string name="show_special_chars_summary">Extra symbols on the QWERTY layout keys</string>
+    <string name="show_special_chars_summary">Extra symbols on some layouts (QWERTY and others)</string>
     <string name="show_language_switch_key">Show language switch key</string>
     <!-- Description for option to show the language switch key -->
     <string name="show_language_switch_key_summary">Key for switching between keyboard languages</string>
