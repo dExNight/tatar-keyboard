@@ -41,7 +41,8 @@
     <!-- Башка хезмәти төймәләр. -->
     <string name="spoken_description_tab">Табуляция</string>
     <string name="spoken_description_delete">Бетерү</string>
-    <string name="spoken_description_space">Буш урын</string>
+    <!-- Буш урын: тасвирлама һәрвакыт керү телен атый («Буш урын, Татарча»). -->
+    <string name="spoken_description_space_language">Буш урын, %s</string>
     <string name="spoken_description_return">Кертү</string>
     <string name="spoken_description_search">Эзләү</string>
     <string name="spoken_description_action_go">Күчү</string>
@@ -54,4 +55,13 @@
     <string name="spoken_description_language_switch">Тел алыштыру</string>
     <string name="spoken_description_settings">Көйләүләр</string>
     <string name="spoken_description_unknown">Билгесез символ</string>
+
+    <!-- Озын басу панеле (moreKeys) ачылу/ябылу хәбәрләре. -->
+    <string name="spoken_open_more_keys_keyboard">Өстәмә символлар бар</string>
+    <string name="spoken_close_more_keys_keyboard">Өстәмә символлар яшерелде</string>
+
+    <!-- Шифт режиме алмашуын тавышландыру (AOSP исемнәре). -->
+    <string name="spoken_description_shiftmode_on">Баш хәрефләр кабызылган</string>
+    <string name="spoken_description_shiftmode_locked">Caps Lock кабызылган</string>
+    <string name="spoken_description_shiftmode_off">Баш хәрефләр сүндерелгән</string>
 </resources>

@@ -131,4 +131,13 @@ public interface MoreKeysPanel {
      * Return whether the panel is currently being shown.
      */
     boolean isShowingInParent();
+
+    /**
+     * Return true when the up event that would normally commit a key and dismiss this panel
+     * should instead leave the panel on screen. Used while touch exploration (TalkBack) is
+     * enabled: the finger lift after the long-press that opened the panel must not commit
+     * anything, so the user can explore the panel through its accessibility nodes and commit
+     * a key by double-tapping.
+     */
+    boolean shouldKeepPanelOnUpEvent();
 }

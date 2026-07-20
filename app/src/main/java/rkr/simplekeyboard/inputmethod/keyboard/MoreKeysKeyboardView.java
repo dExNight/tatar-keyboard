@@ -23,8 +23,12 @@ import android.util.AttributeSet;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.accessibility.AccessibilityManager;
+
+import androidx.core.view.ViewCompat;
 
 import rkr.simplekeyboard.inputmethod.R;
+import rkr.simplekeyboard.inputmethod.accessibility.MoreKeysKeyboardAccessibilityDelegate;
 import rkr.simplekeyboard.inputmethod.latin.common.Constants;
 import rkr.simplekeyboard.inputmethod.latin.common.CoordinateUtils;
 
@@ -44,6 +48,9 @@ public class MoreKeysKeyboardView extends KeyboardView implements MoreKeysPanel 
 
     private int mActivePointerId;
 
+    private final AccessibilityManager mAccessibilityManager;
+    private final MoreKeysKeyboardAccessibilityDelegate mAccessibilityDelegate;
+
     public MoreKeysKeyboardView(final Context context, final AttributeSet attrs) {
         this(context, attrs, R.attr.moreKeysKeyboardViewStyle);
     }
@@ -56,6 +63,26 @@ public class MoreKeysKeyboardView extends KeyboardView implements MoreKeysPanel 
         moreKeysKeyboardViewAttr.recycle();
         mKeyDetector = new MoreKeysDetector(getResources().getDimension(
                 R.dimen.config_more_keys_keyboard_slide_allowance));
+
+        // Installed unconditionally like MainKeyboardView's delegate: the
+        // ExploreByTouchHelper is inert unless an accessibility service asks
+        // for nodes, so this costs nothing in normal use.
+        mAccessibilityManager =
+                (AccessibilityManager) context.getSystemService(Context.ACCESSIBILITY_SERVICE);
+        mAccessibilityDelegate = new MoreKeysKeyboardAccessibilityDelegate(this, mKeyDetector,
+                getVerticalCorrection());
+        ViewCompat.setAccessibilityDelegate(this, mAccessibilityDelegate);
+    }
+
+    @Override
+    public boolean dispatchHoverEvent(final MotionEvent event) {
+        return mAccessibilityDelegate.dispatchHoverEvent(event)
+                || super.dispatchHoverEvent(event);
+    }
+
+    private boolean isTouchExplorationEnabled() {
+        return mAccessibilityManager.isEnabled()
+                && mAccessibilityManager.isTouchExplorationEnabled();
     }
 
     @Override
@@ -75,6 +102,9 @@ public class MoreKeysKeyboardView extends KeyboardView implements MoreKeysPanel 
         super.setKeyboard(keyboard);
         mKeyDetector.setKeyboard(
                 keyboard, -getPaddingLeft(), -getPaddingTop() + getVerticalCorrection());
+        // The view is reused across long-presses with a different keyboard
+        // each time — the virtual accessibility hierarchy must follow.
+        mAccessibilityDelegate.invalidateRoot();
     }
 
     @Override
@@ -100,6 +130,11 @@ public class MoreKeysKeyboardView extends KeyboardView implements MoreKeysPanel 
         mOriginX = x + container.getPaddingLeft();
         mOriginY = y + container.getPaddingTop();
         controller.onShowMoreKeysPanel(this);
+        if (isTouchExplorationEnabled()) {
+            // The panel is attached now — announce it and refresh the
+            // virtual nodes so TalkBack exploration lands on panel keys.
+            mAccessibilityDelegate.onPanelShown();
+        }
     }
 
     /**
@@ -239,8 +274,19 @@ public class MoreKeysKeyboardView extends KeyboardView implements MoreKeysPanel 
         final View containerView = getContainerView();
         final ViewGroup currentParent = (ViewGroup)containerView.getParent();
         if (currentParent != null) {
+            // Announce before detaching: announceForAccessibility needs an
+            // attached view. Covers every dismissal path — they all funnel
+            // through here.
+            if (isTouchExplorationEnabled()) {
+                mAccessibilityDelegate.onPanelDismissed();
+            }
             currentParent.removeView(containerView);
         }
+    }
+
+    @Override
+    public boolean shouldKeepPanelOnUpEvent() {
+        return isTouchExplorationEnabled();
     }
 
     @Override

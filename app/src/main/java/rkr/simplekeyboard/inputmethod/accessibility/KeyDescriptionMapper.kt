@@ -23,6 +23,7 @@ import rkr.simplekeyboard.inputmethod.keyboard.Key
 import rkr.simplekeyboard.inputmethod.keyboard.Keyboard
 import rkr.simplekeyboard.inputmethod.keyboard.KeyboardId
 import rkr.simplekeyboard.inputmethod.latin.common.Constants
+import rkr.simplekeyboard.inputmethod.latin.utils.LocaleResourceUtils
 
 /**
  * Maps a key to its spoken (TalkBack) description, following the AOSP
@@ -73,7 +74,16 @@ object KeyDescriptionMapper {
             }
             Constants.CODE_DELETE -> R.string.spoken_description_delete
             Constants.CODE_TAB -> R.string.spoken_description_tab
-            Constants.CODE_SPACE -> R.string.spoken_description_space
+            Constants.CODE_SPACE -> {
+                // A blind user cannot glance at the spacebar hint, so the
+                // description always names the current input language
+                // ("Space, Татарча") — same source and same own-locale
+                // rendering as the visual hint painted by MainKeyboardView.
+                return context.getString(
+                    R.string.spoken_description_space_language,
+                    LocaleResourceUtils.getLanguageDisplayNameInLocale(
+                        keyboard.mId.mSubtype.locale))
+            }
             Constants.CODE_ENTER -> {
                 // A custom action label (e.g. a web form's own label) wins.
                 key.label?.takeIf { it.isNotEmpty() }?.let { return it }

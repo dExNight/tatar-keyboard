@@ -144,19 +144,24 @@ class SetupActivity : Activity() {
 
         // The visual marks ("1"/"2"/"✓") mean nothing to TalkBack — each
         // status mark carries a spoken done/pending description instead.
+        // Both marks are live regions (setup_activity.xml), and TextView
+        // fires a content-change event even when the new text equals the
+        // old one — while this method re-runs on every resume/focus gain.
+        // Setting text only on a real change keeps the live region from
+        // re-announcing an unchanged status.
         val step1Status = findViewById<TextView>(R.id.setup_step1_status)
-        step1Status.text =
+        setTextIfChanged(step1Status,
                 getString(if (enabled) R.string.setup_step_done_mark
-                          else R.string.setup_step1_number)
+                          else R.string.setup_step1_number))
         step1Status.contentDescription =
                 getString(if (enabled) R.string.setup_step_status_done
                           else R.string.setup_step_status_pending)
         findViewById<Button>(R.id.setup_step1_button).isEnabled = !enabled
 
         val step2Status = findViewById<TextView>(R.id.setup_step2_status)
-        step2Status.text =
+        setTextIfChanged(step2Status,
                 getString(if (current) R.string.setup_step_done_mark
-                          else R.string.setup_step2_number)
+                          else R.string.setup_step2_number))
         step2Status.contentDescription =
                 getString(if (current) R.string.setup_step_status_done
                           else R.string.setup_step_status_pending)
@@ -167,5 +172,11 @@ class SetupActivity : Activity() {
 
         findViewById<View>(R.id.setup_done_block).visibility =
                 if (current) View.VISIBLE else View.GONE
+    }
+
+    private fun setTextIfChanged(view: TextView, text: String) {
+        if (view.text.toString() != text) {
+            view.text = text
+        }
     }
 }

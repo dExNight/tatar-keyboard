@@ -268,6 +268,7 @@ public final class MainKeyboardView extends KeyboardView implements MoreKeysPane
     public void setKeyboard(final Keyboard keyboard) {
         // Remove any pending messages, except dismissing preview and key repeat.
         mTimerHandler.cancelLongPressTimers();
+        final Keyboard lastKeyboard = getKeyboard();
         super.setKeyboard(keyboard);
         mKeyDetector.setKeyboard(
                 keyboard, -getPaddingLeft(), -getPaddingTop() + getVerticalCorrection());
@@ -279,6 +280,8 @@ public final class MainKeyboardView extends KeyboardView implements MoreKeysPane
         mLanguageOnSpacebarTextSize = keyHeight * mLanguageOnSpacebarTextRatio;
         mLanguageOnSpacebarText = null;
         mAccessibilityDelegate.invalidateRoot();
+        // Spoken shift-mode change (no-op unless accessibility is enabled).
+        mAccessibilityDelegate.onKeyboardChanged(lastKeyboard, keyboard);
     }
 
     /**
@@ -504,6 +507,15 @@ public final class MainKeyboardView extends KeyboardView implements MoreKeysPane
         final int index = event.getActionIndex();
         final int id = event.getPointerId(index);
         final PointerTracker tracker = PointerTracker.getPointerTracker(id);
+        // A panel kept on screen for accessibility touch exploration has no owning tracker
+        // (see PointerTracker#onUpEventInternal). A new touch on the keyboard dismisses it,
+        // like tapping outside a popup; the touch itself then proceeds normally. This state
+        // is unreachable without accessibility: a panel otherwise always has a live tracker.
+        if (isShowingMoreKeysPanel() && !tracker.isShowingMoreKeysPanel()
+                && PointerTracker.getActivePointerTrackerCount() == 0
+                && event.getActionMasked() == MotionEvent.ACTION_DOWN) {
+            mMoreKeysPanel.dismissMoreKeysPanel();
+        }
         // When a more keys panel is showing, we should ignore other fingers' single touch events
         // other than the finger that is showing the more keys panel.
         if (isShowingMoreKeysPanel() && !tracker.isShowingMoreKeysPanel()
@@ -518,6 +530,11 @@ public final class MainKeyboardView extends KeyboardView implements MoreKeysPane
         mTimerHandler.cancelAllMessages();
         PointerTracker.setReleasedKeyGraphicsToAllKeys();
         PointerTracker.dismissAllMoreKeysPanels();
+        // A panel kept on screen for accessibility touch exploration has no
+        // owning tracker (see PointerTracker#onUpEventInternal), so the
+        // per-tracker dismissal above misses it — e.g. when the input field
+        // changes while the panel is up. Dismiss it directly.
+        onDismissMoreKeysPanel();
         PointerTracker.cancelAllPointerTrackers();
     }
 

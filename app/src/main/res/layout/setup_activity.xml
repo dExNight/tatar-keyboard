@@ -59,10 +59,13 @@
             android:background="@drawable/app_card_bg"
             android:padding="16dp">
 
+            <!-- Live region: TalkBack announces the pending→done change on
+                 its own when updateStepStates swaps text/description. -->
             <TextView
                 android:id="@+id/setup_step1_status"
                 android:layout_width="32dp"
                 android:layout_height="wrap_content"
+                android:accessibilityLiveRegion="polite"
                 android:text="@string/setup_step1_number"
                 android:textAppearance="?android:attr/textAppearanceLarge" />
 
@@ -116,6 +119,7 @@
                 android:id="@+id/setup_step2_status"
                 android:layout_width="32dp"
                 android:layout_height="wrap_content"
+                android:accessibilityLiveRegion="polite"
                 android:text="@string/setup_step2_number"
                 android:textAppearance="?android:attr/textAppearanceLarge" />
 
@@ -153,13 +157,15 @@
             </LinearLayout>
         </LinearLayout>
 
-        <!-- Done block: both steps complete -->
+        <!-- Done block: both steps complete. Live region so TalkBack
+             announces the block's content when it appears (gone→visible). -->
         <LinearLayout
             android:id="@+id/setup_done_block"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="24dp"
             android:orientation="vertical"
+            android:accessibilityLiveRegion="polite"
             android:visibility="gone">
 
             <TextView

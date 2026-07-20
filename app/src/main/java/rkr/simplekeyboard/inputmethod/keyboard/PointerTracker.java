@@ -706,6 +706,15 @@ public final class PointerTracker implements PointerTrackerQueue.Element {
         }
 
         if (isShowingMoreKeysPanel()) {
+            if (mMoreKeysPanel.shouldKeepPanelOnUpEvent()) {
+                // Touch exploration (TalkBack) is active: leave the panel on
+                // screen so it can be explored through its accessibility
+                // nodes, and just detach it from this tracker. The panel is
+                // dismissed later by its accessibility delegate (on commit)
+                // or by a new touch on the main keyboard.
+                mMoreKeysPanel = null;
+                return;
+            }
             if (!mIsTrackingForActionDisabled) {
                 final int translatedX = mMoreKeysPanel.translateX(x);
                 final int translatedY = mMoreKeysPanel.translateY(y);

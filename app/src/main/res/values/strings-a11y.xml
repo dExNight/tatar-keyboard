@@ -42,7 +42,10 @@
     <!-- Other functional keys. -->
     <string name="spoken_description_tab">Tab</string>
     <string name="spoken_description_delete">Delete</string>
-    <string name="spoken_description_space">Space</string>
+    <!-- Spacebar: always includes the current input language, the way the
+         visual spacebar hint does ("Space, Татарча"). %s is the language
+         display name rendered in its own locale. -->
+    <string name="spoken_description_space_language">Space, %s</string>
     <string name="spoken_description_return">Enter</string>
     <string name="spoken_description_search">Search</string>
     <string name="spoken_description_action_go">Go</string>
@@ -55,4 +58,13 @@
     <string name="spoken_description_language_switch">Switch language</string>
     <string name="spoken_description_settings">Settings</string>
     <string name="spoken_description_unknown">Unknown</string>
+
+    <!-- Long-press (moreKeys) panel open/close announcements (AOSP naming). -->
+    <string name="spoken_open_more_keys_keyboard">Alternative characters are available</string>
+    <string name="spoken_close_more_keys_keyboard">Alternative characters are dismissed</string>
+
+    <!-- Shift-mode change announcements (AOSP naming). -->
+    <string name="spoken_description_shiftmode_on">Shift enabled</string>
+    <string name="spoken_description_shiftmode_locked">Caps lock enabled</string>
+    <string name="spoken_description_shiftmode_off">Shift disabled</string>
 </resources>

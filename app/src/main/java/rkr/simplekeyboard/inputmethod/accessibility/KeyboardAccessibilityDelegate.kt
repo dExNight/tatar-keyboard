@@ -16,14 +16,20 @@
 
 package rkr.simplekeyboard.inputmethod.accessibility
 
+import android.content.Context
 import android.graphics.Rect
 import android.os.SystemClock
+import android.util.SparseArray
 import android.view.MotionEvent
 import android.view.accessibility.AccessibilityEvent
+import android.view.accessibility.AccessibilityManager
 import androidx.core.view.accessibility.AccessibilityNodeInfoCompat
 import androidx.customview.widget.ExploreByTouchHelper
+import rkr.simplekeyboard.inputmethod.R
 import rkr.simplekeyboard.inputmethod.keyboard.Key
 import rkr.simplekeyboard.inputmethod.keyboard.KeyDetector
+import rkr.simplekeyboard.inputmethod.keyboard.Keyboard
+import rkr.simplekeyboard.inputmethod.keyboard.KeyboardId
 import rkr.simplekeyboard.inputmethod.keyboard.MainKeyboardView
 
 /**
@@ -39,9 +45,55 @@ class KeyboardAccessibilityDelegate(
 ) : ExploreByTouchHelper(keyboardView) {
 
     private val tempBounds = Rect()
+    private val accessibilityManager = keyboardView.context
+        .getSystemService(Context.ACCESSIBILITY_SERVICE) as AccessibilityManager
+
+    /** Lazily filled resId → string cache so keyboard switches while
+     * accessibility is on never re-resolve resources (no allocations on the
+     * repeated announce path; the delegate lives as long as the view). */
+    private val announceCache = SparseArray<String>(3)
+
+    private fun cachedString(resId: Int): String {
+        var text = announceCache.get(resId)
+        if (text == null) {
+            text = keyboardView.context.getString(resId)
+            announceCache.put(resId, text)
+        }
+        return text
+    }
 
     private fun sortedKeys(): List<Key> =
         keyboardView.keyboard?.sortedKeys ?: emptyList()
+
+    /**
+     * Announces shift-mode changes (AOSP spoken_description_shiftmode_*
+     * pattern), called by MainKeyboardView.setKeyboard on every keyboard
+     * swap. Transitions between ALPHABET and ALPHABET_AUTOMATIC_SHIFTED are
+     * deliberately silent, as in AOSP: auto-caps flips on every sentence
+     * start and would drown the user in announcements.
+     */
+    fun onKeyboardChanged(lastKeyboard: Keyboard?, newKeyboard: Keyboard) {
+        if (!accessibilityManager.isEnabled) return
+        val lastElementId = lastKeyboard?.mId?.mElementId ?: return
+        val newElementId = newKeyboard.mId.mElementId
+        if (lastElementId == newElementId) return
+        val resId = when (newElementId) {
+            KeyboardId.ELEMENT_ALPHABET_MANUAL_SHIFTED ->
+                R.string.spoken_description_shiftmode_on
+            KeyboardId.ELEMENT_ALPHABET_SHIFT_LOCKED ->
+                R.string.spoken_description_shiftmode_locked
+            KeyboardId.ELEMENT_ALPHABET -> when (lastElementId) {
+                KeyboardId.ELEMENT_ALPHABET_MANUAL_SHIFTED,
+                KeyboardId.ELEMENT_ALPHABET_SHIFT_LOCKED,
+                -> R.string.spoken_description_shiftmode_off
+                // Auto-shift release or a return from symbols — not a
+                // shift-mode change the user performed.
+                else -> return
+            }
+            else -> return
+        }
+        keyboardView.announceForAccessibility(cachedString(resId))
+    }
 
     override fun getVirtualViewAt(x: Float, y: Float): Int {
         val key = keyDetector.detectHitKey(x.toInt(), y.toInt()) ?: return INVALID_ID
