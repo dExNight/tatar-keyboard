@@ -87,12 +87,6 @@
     <!-- Description for Hcesar keyboard layout. -->
     <string name="subtype_hcesar">HCESAR</string>
 
-    <string name="keyboard_theme_dark_border" translatable="false">Material Dark Border</string>
-    <string name="keyboard_theme_light_border" translatable="false">Material Light Border</string>
-    <string name="keyboard_theme_dark" translatable="false">Material Dark</string>
-    <string name="keyboard_theme_light" translatable="false">Material Light</string>
-    <string name="keyboard_theme_system" translatable="false">System Default</string>
-    <string name="keyboard_theme_system_border" translatable="false">System Default Border</string>
     <string name="keyboard_theme_tatar" translatable="false">Tatar</string>
 
     <!-- Title of the button to add a language in the settings dialog [CHAR LIMIT=15] -->
@@ -142,7 +136,6 @@
     <!-- Dead string (no code references since phase 10); kept only because 44 legacy
          translations in values-*/ would fail lintVital ExtraTranslation without a
          default-locale entry. Full cleanup of the 44 files is post-v1.0 backlog. -->
-    <string name="setup_message">Tatar Keyboard</string>
     <!-- Title of the preference item that opens the keyboard languages screen -->
     <string name="keyboard_languages">Keyboard languages</string>
     <!-- Summary of the preference item that opens the keyboard languages screen -->

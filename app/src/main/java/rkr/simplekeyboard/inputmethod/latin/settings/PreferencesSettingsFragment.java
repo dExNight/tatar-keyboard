@@ -30,7 +30,6 @@ import rkr.simplekeyboard.inputmethod.keyboard.KeyboardLayoutSet;
  *
  * This settings sub screen handles the following input preferences.
  * - Auto-capitalization
- * - Show separate number row
  * - Show special characters
  * - Show language switch key
  * - Show on-screen keyboard
@@ -51,8 +50,7 @@ public final class PreferencesSettingsFragment extends SubScreenFragment {
 
     @Override
     public void onSharedPreferenceChanged(final SharedPreferences prefs, final String key) {
-        if (key.equals(Settings.PREF_SHOW_SPECIAL_CHARS) ||
-                key.equals(Settings.PREF_SHOW_NUMBER_ROW)) {
+        if (key.equals(Settings.PREF_SHOW_SPECIAL_CHARS)) {
             KeyboardLayoutSet.onKeyboardThemeChanged();
         }
     }

@@ -83,7 +83,7 @@
         android:restrictionType="choice"
         android:entries="@array/keyboard_theme_names"
         android:entryValues="@array/keyboard_theme_ids_string"
-        android:defaultValue="5" />
+        android:defaultValue="7" />
     <restriction
         android:key="pref_keyboard_color"
         android:title="@string/keyboard_color"

@@ -64,7 +64,6 @@
     <string name="space_swipe_summary">Проведите по пробелу, чтобы переместить курсор</string>
     <string name="delete_swipe">Удалить смахиванием</string>
     <string name="delete_swipe_summary">Проведите по клавише удаления, чтобы стереть больше текста</string>
-    <string name="setup_message">Simple Keyboard не включена. Нажмите «ОК», чтобы выбрать языки в настройках ввода. Вам нужно будет выбрать Simple Keyboard текущей клавиатурой, чтобы использовать её.</string>
     <string name="keyboard_languages">Языки клавиатуры</string>
     <string name="keyboard_languages_summary">Добавить или убрать язык</string>
     <string name="user_languages">Включённые языки</string>
