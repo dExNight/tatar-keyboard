@@ -140,6 +140,7 @@ public final class LanguagesSettingsFragment extends PreferenceFragment {
 
         buildLanguagePreferences(usedLocales, group, context);
         setLocaleEntries(usedLocales, unusedLocales);
+        buildActionPreferences(usedLocales.size() > 1, group, context);
     }
 
     /**
@@ -198,6 +199,44 @@ public final class LanguagesSettingsFragment extends PreferenceFragment {
             final SingleLanguagePreference pref =
                     new SingleLanguagePreference(context, localeString);
             group.addPreference(pref);
+        }
+    }
+
+    /**
+     * Create visible preferences for adding and removing languages at the bottom of the language
+     * list so that the actions are discoverable without the options menu. Clicking them shows the
+     * same popups as the corresponding menu items.
+     * @param showRemove whether the remove language preference should be shown (mirrors the
+     *                   visibility of the remove language menu item).
+     * @param group the preference group to add preferences to.
+     * @param context the context for this application.
+     */
+    private void buildActionPreferences(final boolean showRemove, final PreferenceGroup group,
+                                        final Context context) {
+        final Preference addLanguagePreference = new Preference(context);
+        addLanguagePreference.setTitle(R.string.add_language);
+        addLanguagePreference.setOnPreferenceClickListener(
+                new Preference.OnPreferenceClickListener() {
+                    @Override
+                    public boolean onPreferenceClick(final Preference preference) {
+                        showAddLanguagePopup();
+                        return true;
+                    }
+                });
+        group.addPreference(addLanguagePreference);
+
+        if (showRemove) {
+            final Preference removeLanguagePreference = new Preference(context);
+            removeLanguagePreference.setTitle(R.string.remove_language);
+            removeLanguagePreference.setOnPreferenceClickListener(
+                    new Preference.OnPreferenceClickListener() {
+                        @Override
+                        public boolean onPreferenceClick(final Preference preference) {
+                            showRemoveLanguagePopup();
+                            return true;
+                        }
+                    });
+            group.addPreference(removeLanguagePreference);
         }
     }
 
