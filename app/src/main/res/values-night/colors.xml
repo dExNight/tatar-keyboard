@@ -48,4 +48,15 @@
     <color name="ios_key_functional_text_color">#FFFFFF</color>
     <color name="ios_key_text_inactive_color">#80FFFFFF</color>
     <color name="ios_key_hint_color">#B2FFFFFF</color>
+
+    <!-- Color resources for iOS-style app screens (dark). App-screen palette,
+         kept separate from the keyboard ios_* colors above. -->
+    <color name="app_screen_bg">#000000</color>
+    <color name="app_card_bg">#1C1C1E</color>
+    <color name="app_text_primary">#FFFFFF</color>
+    <color name="app_text_secondary">#98989E</color>
+    <color name="app_separator">#38383A</color>
+    <color name="app_accent">#0A84FF</color>
+    <color name="app_switch_on">#30D158</color>
+    <color name="app_switch_off">#39393D</color>
 </resources>

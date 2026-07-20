@@ -71,4 +71,15 @@
     <color name="ios_key_functional_text_color">#3C3C43</color>
     <color name="ios_key_text_inactive_color">#70000000</color>
     <color name="ios_key_hint_color">#90000000</color>
+
+    <!-- Color resources for iOS-style app screens (light). App-screen palette,
+         kept separate from the keyboard ios_* colors above. -->
+    <color name="app_screen_bg">#F2F2F7</color>
+    <color name="app_card_bg">#FFFFFF</color>
+    <color name="app_text_primary">#000000</color>
+    <color name="app_text_secondary">#8A8A8E</color>
+    <color name="app_separator">#C6C6C8</color>
+    <color name="app_accent">#007AFF</color>
+    <color name="app_switch_on">#34C759</color>
+    <color name="app_switch_off">#E9E9EA</color>
  </resources>
