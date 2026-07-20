@@ -1,0 +1,5 @@
+• Fixed a crash when opening keyboard settings and the language picker
+• Selected language now survives process restarts
+• Settings migration for early dev builds
+• New app icon; visible long-press hints on keys; onboarding with a try-it field
+• Key preview popup is suppressed in password fields
