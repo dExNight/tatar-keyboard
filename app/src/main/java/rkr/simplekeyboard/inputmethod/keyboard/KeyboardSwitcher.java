@@ -147,8 +147,11 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
         final Keyboard oldKeyboard = keyboardView.getKeyboard();
         final Keyboard newKeyboard = mKeyboardLayoutSet.getKeyboard(keyboardId);
         keyboardView.setKeyboard(newKeyboard);
+        // Suppress the key preview popup in password fields so typed characters are not
+        // exposed on screen, regardless of the user preference.
         keyboardView.setKeyPreviewPopupEnabled(
-                currentSettingsValues.mKeyPreviewPopupOn,
+                currentSettingsValues.mKeyPreviewPopupOn
+                        && !currentSettingsValues.mInputAttributes.mIsPasswordField,
                 currentSettingsValues.mKeyPreviewPopupDismissDelay);
         final boolean subtypeChanged = (oldKeyboard == null)
                 || !newKeyboard.mId.mSubtype.equals(oldKeyboard.mId.mSubtype);

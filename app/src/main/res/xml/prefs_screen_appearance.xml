@@ -22,6 +22,7 @@
     <SwitchPreference
         android:key="pref_show_number_row"
         android:title="@string/show_number_row"
+        android:summary="@string/show_number_row_summary"
         android:defaultValue="false" />
     <rkr.simplekeyboard.inputmethod.latin.settings.SeekBarDialogPreference
         android:key="pref_keyboard_height"

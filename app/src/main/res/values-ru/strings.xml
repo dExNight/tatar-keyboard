@@ -49,6 +49,10 @@
     <string name="keyboard_color">Установить пользовательский цвет клавиатуры</string>
     <string name="show_special_chars">Показать специальные символы</string>
     <string name="show_special_chars_summary">Дополнительные символы на некоторых раскладках (QWERTY и другие)</string>
+    <string name="vibrate_on_keypress_summary">Короткая вибрация при каждом нажатии</string>
+    <string name="sound_on_keypress_summary">Звук щелчка при каждом нажатии</string>
+    <string name="popup_on_keypress_summary">Показывать увеличенную букву над клавишей (в полях пароля отключено)</string>
+    <string name="show_number_row_summary">Дополнительный ряд с цифрами над буквами</string>
     <string name="show_language_switch_key">Показать кнопку переключения языка</string>
     <string name="show_language_switch_key_summary">Клавиша для переключения языков клавиатуры</string>
     <string name="pref_use_on_screen">Показать экранную клавиатуру</string>
