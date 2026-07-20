@@ -17,6 +17,7 @@
 package rkr.simplekeyboard.inputmethod.latin.settings
 
 import android.app.Activity
+import android.app.AlertDialog
 import android.app.backup.BackupManager
 import android.content.ActivityNotFoundException
 import android.content.Intent
@@ -28,6 +29,7 @@ import android.os.Bundle
 import android.preference.PreferenceActivity
 import android.util.Log
 import android.view.View
+import android.view.ViewGroup
 import android.view.WindowInsets
 import android.view.accessibility.AccessibilityNodeInfo
 import android.widget.ImageButton
@@ -90,6 +92,7 @@ class SettingsHostActivity : Activity() {
     private lateinit var titleView: TextView
 
     private val backStack = ArrayDeque<Screen>()
+    private var currentDialog: AlertDialog? = null
     private var currentScreen = Screen.ROOT
     private var restrictionKeys: Set<String> = emptySet()
 
@@ -141,6 +144,12 @@ class SettingsHostActivity : Activity() {
     }
 
     override fun onDestroy() {
+        // Dismiss any open slider dialog: AlertDialog is not lifecycle-aware,
+        // and leaving it attached across a configuration change leaks the
+        // window (WindowLeaked). The uncommitted slider value is discarded,
+        // matching the legacy DialogPreference behavior closely enough.
+        currentDialog?.dismiss()
+        currentDialog = null
         prefs.unregisterOnSharedPreferenceChangeListener(prefChangeListener)
         super.onDestroy()
     }
@@ -244,7 +253,10 @@ class SettingsHostActivity : Activity() {
         var volumeRow: View? = null
         rows.add(switchRow(Settings.PREF_SOUND_ON, soundDefault,
                 R.string.sound_on_keypress, R.string.sound_on_keypress_summary) { checked ->
-            volumeRow?.let { setRowEnabled(it, checked) }
+            volumeRow?.let {
+                setRowEnabled(it,
+                        checked && !isRestricted(Settings.PREF_KEYPRESS_SOUND_VOLUME))
+            }
         })
         val volume = valueRow(Settings.PREF_KEYPRESS_SOUND_VOLUME,
                 R.string.prefs_keypress_sound_volume_settings,
@@ -261,8 +273,10 @@ class SettingsHostActivity : Activity() {
                 resources.getInteger(R.integer.config_longpress_timeout_step),
                 keyLongpressTimeoutProxy()))
         addCard(rows)
-        // android:dependency="sound_on" from the legacy screen.
-        setRowEnabled(volume, prefs.getBoolean(Settings.PREF_SOUND_ON, soundDefault))
+        // android:dependency="sound_on" from the legacy screen. A managed
+        // restriction on the volume key must win over the dependency.
+        setRowEnabled(volume, prefs.getBoolean(Settings.PREF_SOUND_ON, soundDefault)
+                && !isRestricted(Settings.PREF_KEYPRESS_SOUND_VOLUME))
     }
 
     private fun buildAppearanceScreen() {
@@ -342,7 +356,8 @@ class SettingsHostActivity : Activity() {
         val valueView = row.findViewById<TextView>(R.id.row_value)
         valueView.text = proxy.getValueText(proxy.readValue(key))
         row.setOnClickListener {
-            SeekBarDialogHelper.show(this, getString(titleRes), key,
+            currentDialog?.dismiss()
+            currentDialog = SeekBarDialogHelper.show(this, getString(titleRes), key,
                     minValue, maxValue, stepValue, proxy) {
                 valueView.text = proxy.getValueText(proxy.readValue(key))
             }
@@ -381,7 +396,16 @@ class SettingsHostActivity : Activity() {
 
     private fun setRowEnabled(row: View, enabled: Boolean) {
         row.isEnabled = enabled
-        row.alpha = if (enabled) 1f else DISABLED_ALPHA
+        // Dim the row contents, not the row itself: the row carries the card
+        // background segment, and fading it would punch a hole in the card.
+        if (row is ViewGroup) {
+            val childAlpha = if (enabled) 1f else DISABLED_ALPHA
+            for (i in 0 until row.childCount) {
+                row.getChildAt(i).alpha = childAlpha
+            }
+        } else {
+            row.alpha = if (enabled) 1f else DISABLED_ALPHA
+        }
         row.findViewById<Switch>(R.id.row_switch)?.isEnabled = enabled
     }
 

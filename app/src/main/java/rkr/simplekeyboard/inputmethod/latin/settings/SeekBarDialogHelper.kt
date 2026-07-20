@@ -52,7 +52,7 @@ object SeekBarDialogHelper {
         stepValue: Int,
         proxy: ValueProxy,
         onValueChanged: () -> Unit
-    ) {
+    ): AlertDialog {
         fun clipValue(value: Int): Int {
             val clipped = value.coerceIn(minValue, maxValue)
             return if (stepValue <= 1) clipped else clipped - clipped % stepValue
@@ -78,7 +78,7 @@ object SeekBarDialogHelper {
         valueView.text = proxy.getValueText(value)
         seekBar.progress = clipValue(value) - minValue
 
-        AlertDialog.Builder(activity)
+        return AlertDialog.Builder(activity)
             .setTitle(title)
             .setView(view)
             .setPositiveButton(android.R.string.ok) { _, _ ->
