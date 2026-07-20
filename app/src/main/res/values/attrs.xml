@@ -388,10 +388,4 @@
         <!-- Indicates if the keyboard layout supports being split or not. false by default -->
         <attr name="allowRedundantMoreKeys" format="boolean" />
     </declare-styleable>
-
-    <declare-styleable name="SeekBarDialogPreference">
-        <attr name="maxValue" format="integer" />
-        <attr name="minValue" format="integer" />
-        <attr name="stepValue" format="integer" />
-    </declare-styleable>
 </resources>

@@ -24,16 +24,15 @@ import rkr.simplekeyboard.inputmethod.R
 
 /**
  * Seek-bar value dialog for the View-based settings screens: the dialog
- * half of [SeekBarDialogPreference] extracted into a plain AlertDialog
- * over the same layout/seek_bar_dialog.xml. The preference class itself
- * stays untouched — the legacy language screens still use it until S2.
+ * half of the legacy SeekBarDialogPreference (removed in S2) extracted
+ * into a plain AlertDialog over the same layout/seek_bar_dialog.xml.
  *
  * Value semantics (progress↔value mapping, step clipping, the
  * OK/Cancel/Default button contract) are ported 1:1.
  */
 object SeekBarDialogHelper {
 
-    /** Mirror of [SeekBarDialogPreference.ValueProxy] for the new screens. */
+    /** Mirror of the legacy SeekBarDialogPreference.ValueProxy. */
     interface ValueProxy {
         fun readValue(key: String): Int
         fun readDefaultValue(key: String): Int
