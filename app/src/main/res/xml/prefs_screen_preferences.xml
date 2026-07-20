@@ -23,16 +23,14 @@
         android:defaultValue="true"
         android:persistent="true" />
     <SwitchPreference
-        android:key="pref_show_number_row"
-        android:title="@string/show_number_row"
-        android:defaultValue="false" />
-    <SwitchPreference
         android:key="pref_show_special_chars"
         android:title="@string/show_special_chars"
+        android:summary="@string/show_special_chars_summary"
         android:defaultValue="true" />
     <SwitchPreference
         android:key="pref_show_language_switch_key"
         android:title="@string/show_language_switch_key"
+        android:summary="@string/show_language_switch_key_summary"
         android:defaultValue="true" />
     <SwitchPreference
         android:key="pref_use_on_screen"
@@ -42,14 +40,17 @@
     <SwitchPreference
         android:key="pref_enable_ime_switch"
         android:title="@string/pref_enable_ime_switch"
+        android:summary="@string/pref_enable_ime_switch_summary"
         android:dependency="pref_show_language_switch_key"
         android:defaultValue="false" />
     <SwitchPreference
         android:key="pref_space_swipe"
         android:title="@string/space_swipe"
+        android:summary="@string/space_swipe_summary"
         android:defaultValue="true" />
     <SwitchPreference
         android:key="pref_delete_swipe"
         android:title="@string/delete_swipe"
+        android:summary="@string/delete_swipe_summary"
         android:defaultValue="false" />
 </PreferenceScreen>

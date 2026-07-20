@@ -20,43 +20,21 @@
 -->
 <resources>
     <!-- For keyboard color scheme option dialog. -->
+    <!-- Only the Tatar theme is user-facing; the legacy LXX themes are hidden and stored ids
+         for them fall back to the default theme (see KeyboardTheme.getKeyboardTheme). -->
     <string-array name="keyboard_theme_names" translatable="false">
         <item>@string/keyboard_theme_tatar</item>
-        <item>@string/keyboard_theme_system</item>
-        <item>@string/keyboard_theme_system_border</item>
-        <item>@string/keyboard_theme_light</item>
-        <item>@string/keyboard_theme_dark</item>
-        <item>@string/keyboard_theme_light_border</item>
-        <item>@string/keyboard_theme_dark_border</item>
     </string-array>
 
     <integer-array name="keyboard_theme_ids" translatable="false">
         <item>7</item>
-        <item>5</item>
-        <item>6</item>
-        <item>3</item>
-        <item>4</item>
-        <item>1</item>
-        <item>2</item>
     </integer-array>
 
     <string-array name="keyboard_theme_ids_string" translatable="false">
         <item>7</item>
-        <item>5</item>
-        <item>6</item>
-        <item>3</item>
-        <item>4</item>
-        <item>1</item>
-        <item>2</item>
     </string-array>
 
     <array name="keyboard_theme_colors" translatable="false">
         <item>@color/ios_keyboard_background</item>
-        <item>@color/background_lxx_system</item>
-        <item>@color/background_lxx_system</item>
-        <item>@color/background_lxx_light</item>
-        <item>@color/background_lxx_dark</item>
-        <item>@color/background_lxx_light</item>
-        <item>@color/background_lxx_dark</item>
     </array>
 </resources>

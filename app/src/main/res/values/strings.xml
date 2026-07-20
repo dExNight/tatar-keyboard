@@ -116,13 +116,24 @@
     <string name="prefs_bottom_offset_portrait_settings">Bottom offset</string>
     <string name="keyboard_color">Set custom keyboard color</string>
     <string name="show_special_chars">Show special characters</string>
+    <!-- Description for option to show extra characters; only affects layouts with extra
+         character variants (e.g. QWERTY), not the Tatar or Russian layouts -->
+    <string name="show_special_chars_summary">Extra symbols on the QWERTY layout keys</string>
     <string name="show_language_switch_key">Show language switch key</string>
+    <!-- Description for option to show the language switch key -->
+    <string name="show_language_switch_key_summary">Key for switching between keyboard languages</string>
     <string name="pref_use_on_screen">Show on-screen keyboard</string>
     <string name="pref_use_on_screen_summary">Show on-screen keyboard while using physical keyboard</string>
     <string name="pref_enable_ime_switch">Switch to other keyboards</string>
+    <!-- Description for option to also switch to other input methods with the language key -->
+    <string name="pref_enable_ime_switch_summary">The language key also switches to other keyboard apps</string>
     <string name="show_number_row">Show separate number row</string>
     <string name="space_swipe">Space swipe cursor move</string>
+    <!-- Description for option to move the cursor by swiping on the space bar -->
+    <string name="space_swipe_summary">Swipe the space bar to move the cursor</string>
     <string name="delete_swipe">Delete swipe</string>
+    <!-- Description for option to delete more text by swiping on the delete key -->
+    <string name="delete_swipe_summary">Swipe the delete key to delete more text</string>
     <!-- Dead string (no code references since phase 10); kept only because 44 legacy
          translations in values-*/ would fail lintVital ExtraTranslation without a
          default-locale entry. Full cleanup of the 44 files is post-v1.0 backlog. -->

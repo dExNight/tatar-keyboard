@@ -19,13 +19,10 @@
     xmlns:latin="http://schemas.android.com/apk/res-auto"
     android:key="screen_appearance"
     android:title="@string/settings_screen_appearance">
-    <PreferenceScreen
-        android:fragment="rkr.simplekeyboard.inputmethod.latin.settings.ThemeSettingsFragment"
-        android:key="screen_theme"
-        android:title="@string/settings_screen_theme" />
-    <rkr.simplekeyboard.inputmethod.latin.settings.ColorDialogPreference
-        android:key="pref_keyboard_color"
-        android:title="@string/keyboard_color" />
+    <SwitchPreference
+        android:key="pref_show_number_row"
+        android:title="@string/show_number_row"
+        android:defaultValue="false" />
     <rkr.simplekeyboard.inputmethod.latin.settings.SeekBarDialogPreference
         android:key="pref_keyboard_height"
         android:title="@string/prefs_keyboard_height_settings"

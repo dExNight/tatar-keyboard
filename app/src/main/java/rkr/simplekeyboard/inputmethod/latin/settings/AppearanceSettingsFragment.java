@@ -18,14 +18,12 @@
 
 package rkr.simplekeyboard.inputmethod.latin.settings;
 
-import android.content.Context;
 import android.content.SharedPreferences;
 import android.content.res.Resources;
 import android.os.Bundle;
-import android.preference.Preference;
 
 import rkr.simplekeyboard.inputmethod.R;
-import rkr.simplekeyboard.inputmethod.keyboard.KeyboardTheme;
+import rkr.simplekeyboard.inputmethod.keyboard.KeyboardLayoutSet;
 
 /**
  * "Appearance" settings sub screen.
@@ -38,30 +36,12 @@ public final class AppearanceSettingsFragment extends SubScreenFragment {
 
         setupKeyboardHeightSettings();
         setupBottomOffsetPortraitSettings();
-        setupKeyboardColorSettings();
-    }
-
-    @Override
-    public void onResume() {
-        super.onResume();
-
-        ThemeSettingsFragment.updateKeyboardThemeSummary(findPreference(Settings.SCREEN_THEME));
-
-        final Preference colorPreference = findPreference(Settings.PREF_KEYBOARD_COLOR);
-        if (colorPreference.isEnabled()) {
-            final SharedPreferences prefs = getSharedPreferences();
-            final KeyboardTheme theme = KeyboardTheme.getKeyboardTheme(prefs);
-            colorPreference.setEnabled(theme.mCustomColorSupport);
-        }
     }
 
     @Override
     public void onSharedPreferenceChanged(final SharedPreferences prefs, final String key) {
-        if (KeyboardTheme.KEYBOARD_THEME_KEY.equals(key)) {
-            ThemeSettingsFragment.updateKeyboardThemeSummary(findPreference(Settings.SCREEN_THEME));
-
-            final KeyboardTheme theme = KeyboardTheme.getKeyboardTheme(prefs);
-            setPreferenceEnabled(Settings.PREF_KEYBOARD_COLOR, theme.mCustomColorSupport);
+        if (Settings.PREF_SHOW_NUMBER_ROW.equals(key)) {
+            KeyboardLayoutSet.onKeyboardThemeChanged();
         }
     }
 
@@ -156,32 +136,6 @@ public final class AppearanceSettingsFragment extends SubScreenFragment {
 
             @Override
             public void feedbackValue(final int value) {}
-        });
-    }
-
-    private void setupKeyboardColorSettings() {
-        final ColorDialogPreference pref = (ColorDialogPreference)findPreference(
-                Settings.PREF_KEYBOARD_COLOR);
-        if (pref == null) {
-            return;
-        }
-        final SharedPreferences prefs = getSharedPreferences();
-        final Context context = this.getActivity().getApplicationContext();
-        pref.setInterface(new ColorDialogPreference.ValueProxy() {
-            @Override
-            public void writeValue(final int value, final String key) {
-                prefs.edit().putInt(key, value).apply();
-            }
-
-            @Override
-            public int readValue(final String key) {
-                return Settings.readKeyboardColor(prefs, context);
-            }
-
-            @Override
-            public void writeDefaultValue(final String key) {
-                Settings.removeKeyboardColor(prefs);
-            }
         });
     }
 }
