@@ -527,6 +527,7 @@ public final class SubtypeLocaleUtils {
                     break;
                 case LOCALE_SAKHA:
                     addLayout(LAYOUT_SAKHA);
+                    break;
                 case LOCALE_SERBIAN:
                     addLayout(LAYOUT_SERBIAN);
                     break;
