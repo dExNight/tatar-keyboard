@@ -19,6 +19,7 @@ Requirements for initial release (майлстоун v1.0 MVP: release-ready APK
 
 - [x] **SWITCH-01**: Система видит три subtype: tt_RU, ru, en_US; клавиатура запоминает активный
 - [x] **SWITCH-02**: Тап по глобусу циклически переключает раскладки; long-press по глобусу открывает системный пикер IME
+  — *Аннотация (2026-07-20): в v1.0.0 пикер был де-факто сломан крашем (LocaleResourceUtils: getIdentifier по namespace ≠ applicationId → getString(0)); исправлено в 1.0.1; глобус-цикл tt→ru→en и пикер подтверждены первым device-UAT 2026-07-20 (Samsung).*
 
 ### Механика ввода
 
@@ -48,6 +49,7 @@ Requirements for initial release (майлстоун v1.0 MVP: release-ready APK
 - [x] **UI-03**: Long-press панель альтернатив с выбором скольжением пальца
 - [x] **UI-04**: Визуальная реакция, хаптика (KEYBOARD_TAP) и системный звук клика срабатывают на ACTION_DOWN; звук и вибрация отключаемы в настройках
   — *Аннотация (2026-07-18): (а) хаптика: на API ≥ Q форк использует VibrationEffect.EFFECT_CLICK — прямой современный эквивалент KEYBOARD_TAP (KEYBOARD_TAP — фолбэк < Q); трактуется как соответствие. (б) Звук клика по умолчанию ВЫКЛЮЧЕН (config_default_sound_enabled=false) — решение пользователя (как в Gboard); требование выполняется: звук срабатывает при включённом pref sound_on, отключаемость — программно; тумблер UI — фаза 10. См. 07-RESEARCH.md §3*
+  — *Аннотация (2026-07-20): отключаемость в настройках в v1.0.0 была де-факто сломана крашем SettingsActivity (LocaleResourceUtils, namespace ≠ applicationId); исправлено в 1.0.1; подтверждено первым device-UAT 2026-07-20 (Samsung).*
 
 ### Доступность
 
@@ -81,6 +83,7 @@ Requirements for initial release (майлстоун v1.0 MVP: release-ready APK
 
 - [x] **SETUP-02**: Минимальные настройки: звук клика вкл/выкл, вибрация вкл/выкл
   — *Аннотация (2026-07-19): Уже реализовано базой форка и живо-реактивно (подтверждено фазой 7): vibrate_on/sound_on/громкость в prefs_screen_key_press.xml (KeyPressSettingsFragment, экран «Нажатие клавиши» из корня настроек), вибро авто-скрыт без вибратора, живой отклик Settings-listener→loadSettings→AudioAndHapticFeedbackManager.onSettingsChanged. Работа фазы = верификация грепами, кода 0 строк. Live-проверка на устройстве — deferred UAT. См. 10-RESEARCH.md § SETUP-02 Audit.*
+  — *Аннотация (2026-07-20): в v1.0.0 требование было де-факто сломано крашем SettingsActivity/пикера (LocaleResourceUtils, namespace ≠ applicationId); исправлено в 1.0.1; подтверждено первым device-UAT 2026-07-20 (Samsung).*
 
 ### Производительность и приватность
 
