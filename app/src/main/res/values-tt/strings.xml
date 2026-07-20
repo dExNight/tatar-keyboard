@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+/*
+**
+** Copyright 2008, The Android Open Source Project
+**
+** Licensed under the Apache License, Version 2.0 (the "License");
+** you may not use this file except in compliance with the License.
+** You may obtain a copy of the License at
+**
+**     http://www.apache.org/licenses/LICENSE-2.0
+**
+** Unless required by applicable law or agreed to in writing, software
+** distributed under the License is distributed on an "AS IS" BASIS,
+** WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+** See the License for the specific language governing permissions and
+** limitations under the License.
+*/
+-->
+<!-- Machine-assisted translation; awaiting native-speaker proofread (T5) -->
+<resources xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
+    <string name="vibrate_on_keypress">Төймәгә баскач вибрация</string>
+    <string name="sound_on_keypress">Төймәгә баскач тавыш</string>
+    <string name="popup_on_keypress">Баскач зурайтып күрсәтү</string>
+    <string name="settings_screen_preferences">Көйләүләр</string>
+    <string name="settings_screen_key_press">Төймәгә басу</string>
+    <string name="settings_screen_appearance">Тышкы кыяфәт</string>
+    <string name="settings_screen_theme">Тема</string>
+    <string name="settings_back">Артка</string>
+    <string name="abbreviation_unit_milliseconds"><xliff:g id="MILLISECONDS">%s</xliff:g> мс</string>
+    <string name="settings_system_default">Системадагыча</string>
+    <string name="auto_cap">Автоматик баш хәреф</string>
+    <string name="auto_cap_summary">Һәр җөмләнең беренче сүзен баш хәрефтән башлау</string>
+    <string name="select_language">Телләр</string>
+    <string name="locale_name_en_GB">Инглизчә (Бөекбритания)</string>
+    <string name="locale_name_en_US">Инглизчә (АКШ)</string>
+    <string name="locale_name_es_US">Испанча (АКШ)</string>
+    <string name="locale_name_hi_ZZ">Хинглиш</string>
+    <string name="locale_name_sr_ZZ">Сербча (латин)</string>
+    <string name="subtype_traditional">традицион</string>
+    <string name="subtype_compact">җыйнак</string>
+
+    <string name="add">Өстәү</string>
+    <string name="remove">Бетерү</string>
+    <string name="prefs_keypress_sound_volume_settings">Төймә тавышы көче</string>
+    <string name="prefs_key_longpress_timeout_settings">Озак басу вакыты</string>
+    <string name="button_default">Гадәттәгечә</string>
+    <string name="prefs_keyboard_height_settings">Төймәсар биеклеге</string>
+    <string name="prefs_bottom_offset_portrait_settings">Астан чигенеш</string>
+    <string name="keyboard_color">Төймәсарга үз төсен кую</string>
+    <string name="show_special_chars">Махсус символларны күрсәтү</string>
+    <string name="show_special_chars_summary">Кайбер раскладкаларда өстәмә символлар (QWERTY һ.б.)</string>
+    <string name="vibrate_on_keypress_summary">Һәр басуга кыска вибрация</string>
+    <string name="sound_on_keypress_summary">Һәр басуга чиртү тавышы</string>
+    <string name="popup_on_keypress_summary">Төймә өстендә зурайтылган хәрефне күрсәтү (серсүз кырларында эшләми)</string>
+    <string name="show_number_row_summary">Хәрефләр өстендә өстәмә саннар рәте</string>
+    <string name="show_language_switch_key">Тел алыштыру төймәсен күрсәтү</string>
+    <string name="show_language_switch_key_summary">Төймәсар телләрен алыштыру өчен төймә</string>
+    <string name="pref_use_on_screen">Экран төймәсарын күрсәтү</string>
+    <string name="pref_use_on_screen_summary">Физик төймәсар белән эшләгәндә экран төймәсарын да күрсәтү</string>
+    <string name="pref_enable_ime_switch">Башка төймәсарларга күчү</string>
+    <string name="pref_enable_ime_switch_summary">Тел төймәсе башка төймәсар кушымталарына да күчерә</string>
+    <string name="show_number_row">Аерым саннар рәтен күрсәтү</string>
+    <string name="space_swipe">Буш урын белән курсор йөртү</string>
+    <string name="space_swipe_summary">Курсорны күчерү өчен буш урын төймәсе буйлап шудырыгыз</string>
+    <string name="delete_swipe">Шудырып бетерү</string>
+    <string name="delete_swipe_summary">Күбрәк текст бетерү өчен бетерү төймәсе буйлап шудырыгыз</string>
+    <string name="keyboard_languages">Төймәсар телләре</string>
+    <string name="keyboard_languages_summary">Тел өстәү яки бетерү</string>
+    <string name="user_languages">Кабызылган телләр</string>
+    <string name="add_language">Тел өстәү</string>
+    <string name="remove_language">Телне бетерү</string>
+    <string name="generic_language_layouts"><xliff:g id="LANGUAGE_NAME" example="English (US)">%s</xliff:g> раскладкалары</string>
+    <string name="change_keyboard">Төймәсарны алыштыру</string>
+    <string name="privacy_policy">Хосусыйлык сәясәте</string>
+    <string name="license">Лицензия</string>
+</resources>

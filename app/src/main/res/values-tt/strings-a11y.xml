@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+/*
+ * Copyright (C) 2026 Tatar Keyboard contributors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+-->
+<!-- Machine-assisted translation; awaiting native-speaker proofread (T5) -->
+<!-- Татарча spoken-тасвирламалар TalkBack өчен (strings-a11y.xml оверлее).
+     Хәреф исемнәре — татар әлифбасындагы традицион исемнәр буенча. -->
+<resources>
+    <!-- Татар хәрефләре (юл хәрефләре); баш хәрефләр — spoken_description_upper_case аша. -->
+    <string name="spoken_letter_04d9">ә хәрефе</string>
+    <string name="spoken_letter_04e9">ө хәрефе</string>
+    <string name="spoken_letter_04af">ү хәрефе</string>
+    <string name="spoken_letter_0497">җэ хәрефе</string>
+    <string name="spoken_letter_04a3">эң хәрефе</string>
+    <string name="spoken_letter_04bb">һэ хәрефе</string>
+
+    <!-- Баш хәреф шаблоны: «Баш <юл хәрефе тасвирламасы>». -->
+    <string name="spoken_description_upper_case">Баш %s</string>
+
+    <!-- Shift төймәсе, раскладка халәте буенча. -->
+    <string name="spoken_description_shift">Баш хәреф төймәсе</string>
+    <string name="spoken_description_shift_shifted">Баш хәрефләр кабызылган</string>
+    <string name="spoken_description_caps_lock">Caps Lock кабызылган</string>
+    <string name="spoken_description_symbols_shift">Өстәмә символлар</string>
+    <string name="spoken_description_symbols_shift_shifted">Символлар</string>
+
+    <!-- Башка хезмәти төймәләр. -->
+    <string name="spoken_description_tab">Табуляция</string>
+    <string name="spoken_description_delete">Бетерү</string>
+    <string name="spoken_description_space">Буш урын</string>
+    <string name="spoken_description_return">Кертү</string>
+    <string name="spoken_description_search">Эзләү</string>
+    <string name="spoken_description_action_go">Күчү</string>
+    <string name="spoken_description_action_send">Җибәрү</string>
+    <string name="spoken_description_action_next">Алга</string>
+    <string name="spoken_description_action_previous">Артка</string>
+    <string name="spoken_description_action_done">Әзер</string>
+    <string name="spoken_description_to_symbol">Символлар</string>
+    <string name="spoken_description_to_alpha">Хәрефләр</string>
+    <string name="spoken_description_language_switch">Тел алыштыру</string>
+    <string name="spoken_description_settings">Көйләүләр</string>
+    <string name="spoken_description_unknown">Билгесез символ</string>
+</resources>
