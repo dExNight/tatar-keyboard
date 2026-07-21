@@ -1,0 +1,3 @@
+• Tatar localization for app settings, onboarding, and TalkBack labels
+• Improved TalkBack support for long-press alternatives, language announcements on the spacebar, and shift/onboarding state changes
+• Redesigned onboarding, settings, and language management screens with light and dark appearances
