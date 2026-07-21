@@ -61,7 +61,7 @@
     <string name="pref_enable_ime_switch">Башка төймәсарларга күчү</string>
     <string name="pref_enable_ime_switch_summary">Тел төймәсе башка төймәсар кушымталарына да күчерә</string>
     <string name="show_number_row">Аерым саннар рәтен күрсәтү</string>
-    <string name="space_swipe">Буш урын белән курсор йөртү</string>
+    <string name="space_swipe">Буш урын белән курсорны күчерү</string>
     <string name="space_swipe_summary">Курсорны күчерү өчен бармагыгызны буш урын төймәсе буйлап шудырыгыз</string>
     <string name="delete_swipe">Шудырып бетерү</string>
     <string name="delete_swipe_summary">Күбрәк текст бетерү өчен бармагыгызны бетерү төймәсе буйлап шудырыгыз</string>

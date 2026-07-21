@@ -16,7 +16,7 @@
 <!-- Machine-assisted translation; awaiting native-speaker proofread (T5) -->
 <!-- Татарча онбординг-строкалар (SETUP-01). -->
 <resources xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
-    <string name="setup_subtitle">Ике адым — һәм татарча яза аласыз</string>
+    <string name="setup_subtitle">Ике генә адым — һәм татарча яза аласыз</string>
 
     <string name="setup_step1_title">Төймәсарны кабызу</string>
     <string name="setup_step1_instruction">Системаның төймәсарлар исемлегендә „<xliff:g id="KEYBOARD_NAME" example="Tatar Keyboard">%s</xliff:g>“ төймәсарын кабызыгыз</string>
