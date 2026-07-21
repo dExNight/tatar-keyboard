@@ -5,7 +5,8 @@
 
 ## Состояние на 2026-07-22
 
-- `main` и `origin/main` указывают на `45f9831` (`chore(release): prepare v1.1.0`)
+- Release-preparation commit `45f9831` (`chore(release): prepare v1.1.0`) присутствует
+  в истории `main`; локальный `main` и `origin/main` синхронизированы
 - Версия `1.1.0` (`versionCode 3`), CHANGELOG и release metadata закоммичены и запушены
 - Репозиторий доступен через authenticated Git remote, но публичный URL отдаёт 404;
   перед релизом нужно переключить visibility на Public
@@ -113,10 +114,10 @@ SHA-256 выше. Совпадение SHA-256 между отдельными �
 
 ## Шаг 6. Коммит и push релизной подготовки
 
-- [ ] Проверить `git diff` и `git status --short`; `HANDOFF.md`, ключи и старые APK не
-  должны попасть в коммит
-- [x] Проверенные изменения релиза закоммичены в `45f9831`
-- [x] `main` запушен; `origin/main` указывает на `45f9831`
+- [x] Перед коммитом проверены `git diff` и `git status --short`; `HANDOFF.md`, ключи и
+  APK не попали в release-preparation commit
+- [x] Проверенные изменения релиза закоммичены; commit `45f9831` присутствует в `main`
+- [x] `main` запушен; локальный `main` и `origin/main` синхронизированы
 - [ ] Дождаться зелёного CI именно на релизном коммите
 
 ## Шаг 7. Тег v1.1.0
