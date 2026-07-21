@@ -50,6 +50,7 @@ Requirements for initial release (майлстоун v1.0 MVP: release-ready APK
 - [x] **UI-04**: Визуальная реакция, хаптика (KEYBOARD_TAP) и системный звук клика срабатывают на ACTION_DOWN; звук и вибрация отключаемы в настройках
   — *Аннотация (2026-07-18): (а) хаптика: на API ≥ Q форк использует VibrationEffect.EFFECT_CLICK — прямой современный эквивалент KEYBOARD_TAP (KEYBOARD_TAP — фолбэк < Q); трактуется как соответствие. (б) Звук клика по умолчанию ВЫКЛЮЧЕН (config_default_sound_enabled=false) — решение пользователя (как в Gboard); требование выполняется: звук срабатывает при включённом pref sound_on, отключаемость — программно; тумблер UI — фаза 10. См. 07-RESEARCH.md §3*
   — *Аннотация (2026-07-20): отключаемость в настройках в v1.0.0 была де-факто сломана крашем SettingsActivity (LocaleResourceUtils, namespace ≠ applicationId); исправлено в 1.0.1; подтверждено первым device-UAT 2026-07-20 (Samsung).*
+  — *Аннотация (2026-07-22): пользователь подтвердил PASS UI на устройстве Samsung; отдельные скриншоты/сырой лог этого прогона не записаны.*
 
 ### Доступность
 
@@ -58,6 +59,7 @@ Requirements for initial release (майлстоун v1.0 MVP: release-ready APK
 
 - [x] **A11Y-02**: Татарские буквы имеют контент-описания (напр. «татарская э» для ә)
   — *Аннотация (2026-07-18): Описания — KeyDescriptionMapper (прямой when по key.getCode(), без reflection): 6 татарских букв «татарская э/о/у/ж/н/х» ресурсами values/strings-a11y.xml (en base) + values-ru/strings-a11y.xml (AOSP-совместимые имена spoken_*); заглавные — шаблон «Заглавная %s»; 19 служебных (shift ×4 состояний по elementId, enter ×7 по imeAction, приоритет custom label); обычные буквы — label (ru-TTS). values-tt — backlog. См. 09-RESEARCH.md § 2–3.*
+  — *Аннотация (2026-07-22): после реализации v1.1 (values-tt и TalkBack A1–A4) пользователь подтвердил on-device TalkBack-UAT PASS; отдельный сырой лог прогона не записан.*
 
 ### Совместимость
 
@@ -90,8 +92,8 @@ Requirements for initial release (майлстоун v1.0 MVP: release-ready APK
 - [x] **PERF-01**: Release-APK ≤ 3 МБ
   — *Аннотация (2026-07-19): Release-APK 681 070 байт ≤ 3 145 728 (запас ~4.6×) при minifyEnabled+shrinkResources+keep.xml (locale_name_* и layout-ресурсы защищены от стрипа — живой эксперимент ресерча). Гейт продублирован в CI (stat в ci.yml). См. 11-RESEARCH.md §1, §6.*
 
-- [ ] **PERF-02**: PSS показанной клавиатуры ≤ 30 МБ; холодный старт до показа < 400 мс
-  — *Аннотация (2026-07-19): Deferred device UAT: adb-команды и пороги (PSS ≤ 30 МБ ×3 замера, холодный старт < 400 мс медиана ×5) — 11-PERF-CHECKLIST.md. Прогнать на бюджетном устройстве (Xiaomi/Redmi или Samsung A).*
+- [x] **PERF-02**: PSS показанной клавиатуры ≤ 30 МБ; холодный старт до показа < 400 мс
+  — *Аннотация (2026-07-22): пользователь подтвердил PASS замеров PSS и холодного старта на устройстве Samsung. Исходные три значения PSS, пять времён старта, медиана и точная модель устройства не записаны; числовые таблицы в 11-PERF-CHECKLIST.md намеренно оставлены пустыми.*
 
 - [ ] **PERF-03**: Ноль аллокаций в onDraw/onTouchEvent; 0 GC-событий во время печати
   — *Аннотация (2026-07-19): Deferred device UAT: Profiler (0 аллокаций onDraw/onTouchEvent, 0 GC при печати) + gfxinfo (janky ≤ 1%) — 11-PERF-CHECKLIST.md. Дисциплина заложена фазой 6 (3 PERF-фикса горячего пути).*
@@ -105,6 +107,7 @@ Requirements for initial release (майлстоун v1.0 MVP: release-ready APK
 
 - [ ] **REL-02**: Privacy policy («данные не собираются») опубликована
   — *Аннотация (2026-07-19): Подготовлено: PRIVACY.md (данные не собираются, no-INTERNET проверяемо CI, Apache-2.0) + ссылка из README. «Опубликована» = после ручного пуша репо (PUBLISH-CHECKLIST шаги 2–4); URL-плейсхолдеры strings-appname.xml заменяются на реальном owner (шаг 3).*
+  — *Аннотация (2026-07-22): пользователь сообщил, что переключил репозиторий в Public, но независимая анонимная проверка GitHub web/API/raw получила HTTP 404 для репозитория, LICENSE и PRIVACY.md. REL-02 остаётся открытым до повторной успешной проверки; по прямому решению пользователя это не блокирует создание тега v1.1.0.*
 
 - [ ] **REL-03**: Релиз опубликован на GitHub Releases и подана заявка в IzzyOnDroid
   — *Аннотация (2026-07-19): Подготовлено: CHANGELOG.md v1.0.0 + docs/PUBLISH-CHECKLIST.md (repo→push→CI+негативный тест→тег v1.0.0→GitHub Release с подписанным APK→заявка IzzyOnDroid, точные URL/команды). Исполнение — строго ручное (locked decision).*
@@ -167,12 +170,12 @@ Which phases cover which requirements. Updated during roadmap creation.
 | INPUT-05 | Phase 5 | Verifying (05-01: structural PASS; on-device UAT deferred) |
 | INPUT-06 | Phase 5 | Verifying (05-01: structural PASS; on-device UAT deferred) |
 | INPUT-07 | Phase 5 | Verifying (05-01: structural PASS; on-device UAT deferred) |
-| UI-01 | Phase 6 | Verifying (06-01: structural PASS; on-device UAT deferred) |
-| UI-02 | Phase 7 | Verifying (07-01: structural PASS; on-device UAT deferred) |
-| UI-03 | Phase 7 | Verifying (07-01: structural PASS; on-device UAT deferred) |
-| UI-04 | Phase 7 | Verifying (07-01: structural PASS; on-device UAT deferred) |
-| A11Y-01 | Phase 9 | Verifying (09-01: structural PASS; on-device UAT deferred) |
-| A11Y-02 | Phase 9 | Verifying (09-01: structural PASS; on-device UAT deferred) |
+| UI-01 | Phase 6 | Complete (on-device UI PASS confirmed by user 2026-07-22) |
+| UI-02 | Phase 7 | Complete (on-device UI PASS confirmed by user 2026-07-22) |
+| UI-03 | Phase 7 | Complete (on-device UI PASS confirmed by user 2026-07-22) |
+| UI-04 | Phase 7 | Complete (on-device UI PASS confirmed by user 2026-07-22) |
+| A11Y-01 | Phase 9 | Complete (on-device TalkBack-UAT PASS confirmed by user 2026-07-22) |
+| A11Y-02 | Phase 9 | Complete (on-device TalkBack-UAT PASS confirmed by user 2026-07-22) |
 | COMPAT-01 | Phase 8 | Verifying (08-01: structural PASS; on-device UAT deferred) |
 | COMPAT-02 | Phase 8 | Verifying (08-01: structural PASS; on-device UAT deferred) |
 | COMPAT-03 | Phase 8 | Verifying (08-01: structural PASS; on-device UAT deferred) |
@@ -181,7 +184,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | SETUP-01 | Phase 10 | Verifying (10-01: structural PASS; on-device UAT deferred) |
 | SETUP-02 | Phase 10 | Verifying (10-01: structural PASS; on-device UAT deferred) |
 | PERF-01 | Phase 11 | Complete (11-01: mechanical stat gate) |
-| PERF-02 | Phase 11 | Verifying (11-01: checklist prepared; on-device UAT deferred) |
+| PERF-02 | Phase 11 | Complete (user-confirmed PSS/cold-start PASS 2026-07-22; raw values not recorded) |
 | PERF-03 | Phase 11 | Verifying (11-01: checklist prepared; on-device UAT deferred) |
 | PERF-04 | Phase 1 | Complete |
 | REL-01 | Phase 11 | Complete (11-01: apksigner verified) |
@@ -202,4 +205,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 ---
 *Requirements defined: 2026-07-18*
-*Last updated: 2026-07-18 — traceability populated during roadmap creation*
+*Last updated: 2026-07-22 — device UI/TalkBack and PERF-02 confirmations recorded; raw PERF values unavailable*
