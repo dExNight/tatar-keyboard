@@ -19,7 +19,7 @@
 -->
 <!-- Machine-assisted translation; awaiting native-speaker proofread (T5) -->
 <resources xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
-    <string name="vibrate_on_keypress">Төймәгә баскач вибрация</string>
+    <string name="vibrate_on_keypress">Төймәгә баскач тибрәнү</string>
     <string name="sound_on_keypress">Төймәгә баскач тавыш</string>
     <string name="popup_on_keypress">Баскач зурайтып күрсәтү</string>
     <string name="settings_screen_preferences">Көйләүләр</string>
@@ -49,8 +49,8 @@
     <string name="prefs_bottom_offset_portrait_settings">Астан чигенеш</string>
     <string name="keyboard_color">Төймәсарга үз төсен кую</string>
     <string name="show_special_chars">Махсус символларны күрсәтү</string>
-    <string name="show_special_chars_summary">Кайбер раскладкаларда өстәмә символлар (QWERTY һ.б.)</string>
-    <string name="vibrate_on_keypress_summary">Һәр басуга кыска вибрация</string>
+    <string name="show_special_chars_summary">Кайбер җәемнәрдә өстәмә символлар (QWERTY һ.б.)</string>
+    <string name="vibrate_on_keypress_summary">Һәр басуга кыска тибрәнү</string>
     <string name="sound_on_keypress_summary">Һәр басуга чиртү тавышы</string>
     <string name="popup_on_keypress_summary">Төймә өстендә зурайтылган хәрефне күрсәтү (серсүз кырларында эшләми)</string>
     <string name="show_number_row_summary">Хәрефләр өстендә өстәмә саннар рәте</string>
@@ -62,15 +62,15 @@
     <string name="pref_enable_ime_switch_summary">Тел төймәсе башка төймәсар кушымталарына да күчерә</string>
     <string name="show_number_row">Аерым саннар рәтен күрсәтү</string>
     <string name="space_swipe">Буш урын белән курсор йөртү</string>
-    <string name="space_swipe_summary">Курсорны күчерү өчен буш урын төймәсе буйлап шудырыгыз</string>
+    <string name="space_swipe_summary">Курсорны күчерү өчен бармагыгызны буш урын төймәсе буйлап шудырыгыз</string>
     <string name="delete_swipe">Шудырып бетерү</string>
-    <string name="delete_swipe_summary">Күбрәк текст бетерү өчен бетерү төймәсе буйлап шудырыгыз</string>
+    <string name="delete_swipe_summary">Күбрәк текст бетерү өчен бармагыгызны бетерү төймәсе буйлап шудырыгыз</string>
     <string name="keyboard_languages">Төймәсар телләре</string>
     <string name="keyboard_languages_summary">Тел өстәү яки бетерү</string>
     <string name="user_languages">Кабызылган телләр</string>
     <string name="add_language">Тел өстәү</string>
     <string name="remove_language">Телне бетерү</string>
-    <string name="generic_language_layouts"><xliff:g id="LANGUAGE_NAME" example="English (US)">%s</xliff:g> раскладкалары</string>
+    <string name="generic_language_layouts"><xliff:g id="LANGUAGE_NAME" example="English (US)">%s</xliff:g> җәемнәре</string>
     <string name="change_keyboard">Төймәсарны алыштыру</string>
     <string name="privacy_policy">Хосусыйлык сәясәте</string>
     <string name="license">Лицензия</string>

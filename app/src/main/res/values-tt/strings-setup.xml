@@ -27,7 +27,7 @@
     <string name="setup_step2_button">Төймәсарны сайлау</string>
 
     <string name="setup_done_title">Әзер!</string>
-    <string name="setup_done_hint">Теләсә кайсы кушымтада ә языгыз</string>
+    <string name="setup_done_hint">Теләсә кайсы кушымтада ә хәрефен языгыз</string>
     <string name="setup_test_field_hint">Сынап карагыз: „сәлам“ дип языгыз</string>
     <string name="setup_done_button">Көйләүләрне ачу</string>
 
