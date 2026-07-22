@@ -62,18 +62,29 @@ def normalize_word(raw_word: str) -> tuple[str | None, str | None]:
     return word, None
 
 
+def _parse_positive_ascii_decimal(
+    value_text: str, source: str, line_number: int, field: str
+) -> int:
+    if not value_text or any(
+        character < "0" or character > "9" for character in value_text
+    ):
+        raise MalformedRowError(
+            f"{source}:{line_number}: {field} must contain only ASCII decimal digits"
+        )
+    value = int(value_text)
+    if value <= 0:
+        raise MalformedRowError(
+            f"{source}:{line_number}: {field} must be positive"
+        )
+    return value
+
+
 def parse_row(line: str, source: str, line_number: int) -> tuple[str, int]:
     """Parse either id<TAB>word<TAB>frequency or word<TAB>frequency."""
     fields = line.rstrip("\r\n").split("\t")
     if len(fields) == 3:
         identifier, word, frequency_text = fields
-        try:
-            if int(identifier) <= 0:
-                raise ValueError
-        except ValueError as error:
-            raise MalformedRowError(
-                f"{source}:{line_number}: id must be a positive integer"
-            ) from error
+        _parse_positive_ascii_decimal(identifier, source, line_number, "id")
     elif len(fields) == 2:
         word, frequency_text = fields
     else:
@@ -82,16 +93,9 @@ def parse_row(line: str, source: str, line_number: int) -> tuple[str, int]:
             f"got {len(fields)}"
         )
 
-    try:
-        frequency = int(frequency_text)
-    except ValueError as error:
-        raise MalformedRowError(
-            f"{source}:{line_number}: frequency must be an integer"
-        ) from error
-    if frequency <= 0:
-        raise MalformedRowError(
-            f"{source}:{line_number}: frequency must be positive"
-        )
+    frequency = _parse_positive_ascii_decimal(
+        frequency_text, source, line_number, "frequency"
+    )
     return word, frequency
 
 

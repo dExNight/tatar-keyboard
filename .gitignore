@@ -55,3 +55,6 @@ keystore.properties
 
 # Локальные релизные артефакты (APK не коммитим)
 dist/
+
+tat_*.tar.gz
+tat_*-words.txt

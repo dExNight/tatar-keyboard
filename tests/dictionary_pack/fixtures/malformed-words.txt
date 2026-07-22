@@ -1,0 +1,4 @@
+1	дөрес	3
+0	хата	2
+3	хата	not-a-number
+too	many	fields	here

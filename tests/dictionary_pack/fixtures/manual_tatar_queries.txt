@@ -1,0 +1,23 @@
+# Freely selected Tatar prefixes for the D1a automated project self-review.
+сә
+рәх
+исәнм
+хәерл
+безн
+татарч
+кеш
+бал
+мәкт
+китап
+эшл
+йорт
+авыл
+шәһ
+вак
+көн
+тел
+гаил
+әни
+әти
+дус
+яң

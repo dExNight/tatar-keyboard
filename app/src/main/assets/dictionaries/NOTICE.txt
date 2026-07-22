@@ -1,0 +1,22 @@
+Tatar top-100k dictionary data notice
+
+This dictionary is derived from the Leipzig Corpora Collection downloadable
+Tatar text corpora tat_mixed_2015_1M, tat_news_2015_1M, and tat_web_2018_1M.
+
+Source catalogue: https://wortschatz.uni-leipzig.de/en/download/tat
+Terms: https://wortschatz.uni-leipzig.de/en/usage
+License: Creative Commons Attribution 4.0 International (CC BY 4.0)
+https://creativecommons.org/licenses/by/4.0/
+
+Recommended citation:
+D. Goldhahn, T. Eckart, U. Quasthoff, "Building Large Monolingual
+Dictionaries at the Leipzig Corpora Collection: From 100 to 200 Languages",
+LREC 2012.
+
+Changes by the Tatar Keyboard project: the three word-frequency lists were
+decoded, validated, normalized to NFC lowercase, filtered to the modern Tatar
+Cyrillic alphabet and a 64-code-point limit, merged with summed frequencies,
+ranked, cut to 100,000 forms, lexically reordered, packed into a versioned
+binary format with SHA-256, and zlib-compressed. The dictionary data remains a
+separate CC BY 4.0 component; the application's Apache-2.0 license does not
+replace that data license.
