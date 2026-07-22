@@ -1,0 +1,79 @@
+package rkr.simplekeyboard.inputmethod.latin.dictionary.storage
+
+import android.content.Context
+import android.content.res.AssetManager
+import android.system.Os
+import android.system.OsConstants
+import android.system.ErrnoException
+import androidx.annotation.Keep
+import java.io.File
+import java.io.FileDescriptor
+import java.io.IOException
+import java.util.concurrent.Executor
+
+@Keep
+object AndroidDictionaryStorageFactory {
+    @JvmStatic
+    fun create(context: Context, executor: Executor): DictionaryStorageController {
+        val deviceProtectedContext = context.createDeviceProtectedStorageContext()
+        val artifact = DictionaryArtifactSpec.TATAR_TOP100K_V1
+        val store = AtomicDictionaryStore(
+            directoryProvider = DeviceProtectedDirectoryProvider {
+                File(deviceProtectedContext.filesDir, "dictionaries")
+            },
+            assetInputProvider = AssetInputProvider { spec ->
+                context.assets.open(spec.assetPath, AssetManager.ACCESS_STREAMING)
+            },
+            clock = StorageClock(System::currentTimeMillis),
+            spaceProbe = SpaceProbe(File::getUsableSpace),
+            fileOps = AndroidDurableFileOps,
+            supportedArtifacts = listOf(artifact),
+        )
+        return DictionaryStorageController(
+            BackgroundDictionaryPreparer(executor, store, artifact),
+            store,
+        )
+    }
+}
+
+private object AndroidDurableFileOps : DurableFileOps {
+    override fun createNewFile(file: File): Boolean = file.createNewFile()
+
+    override fun syncFile(fileDescriptor: FileDescriptor) {
+        fileDescriptor.sync()
+    }
+
+    override fun atomicRename(source: File, destination: File) {
+        if (destination.exists()) throw IOException("versioned destination already exists")
+        translateErrno("rename dictionary") {
+            Os.rename(source.absolutePath, destination.absolutePath)
+        }
+    }
+
+    override fun syncDirectory(directory: File) {
+        val descriptor = translateErrno("open dictionary directory") {
+            Os.open(directory.absolutePath, OsConstants.O_RDONLY, 0)
+        }
+        var failure: IOException? = null
+        try {
+            translateErrno("fsync dictionary directory") { Os.fsync(descriptor) }
+        } catch (error: IOException) {
+            failure = error
+        } finally {
+            try {
+                translateErrno("close dictionary directory") { Os.close(descriptor) }
+            } catch (closeError: IOException) {
+                if (failure == null) failure = closeError else failure.addSuppressed(closeError)
+            }
+        }
+        failure?.let { throw it }
+    }
+
+    override fun delete(file: File): Boolean = file.delete()
+
+    private inline fun <T> translateErrno(operation: String, block: () -> T): T = try {
+        block()
+    } catch (error: ErrnoException) {
+        throw IOException("$operation failed: errno=${error.errno}", error)
+    }
+}

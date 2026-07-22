@@ -113,6 +113,11 @@ matrix, а не заменяется накопленными быстрыми �
 
 ## D1b — compressed storage и безопасная смена версии
 
+> Автоматизируемое ядро и отдельная APK delta зафиксированы в
+> `docs/DICTIONARY-D1B.md`. JVM/build/privacy gates зелёные, но физические direct-boot,
+> power-loss/no-space и startup проверки остаются в D1f; полная device acceptance здесь не
+> заявляется.
+
 ### Scope и deliverable
 
 - Background pipeline: asset → temp-файл в device-protected `filesDir` → flush/fsync →
