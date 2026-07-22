@@ -28,6 +28,7 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.content.res.Configuration;
+import android.graphics.Rect;
 import android.inputmethodservice.InputMethodService;
 import android.media.AudioManager;
 import android.os.Build;
@@ -92,6 +93,7 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
 
     // TODO: Move these {@link View}s to {@link KeyboardSwitcher}.
     private View mInputView;
+    private final Rect mVisibleInputBounds = new Rect();
 
     private RichInputMethodManager mRichImm;
     final KeyboardSwitcher mKeyboardSwitcher;
@@ -327,10 +329,33 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
 
     @Override
     public void setInputView(final View view) {
+        if (mInputView instanceof InputView) {
+            if (mInputView != view) {
+                ((InputView) mInputView).release();
+            } else {
+                ((InputView) mInputView).setInsetsChangedListener(null);
+            }
+        }
         super.setInputView(view);
         mInputView = view;
+        if (view instanceof InputView) {
+            ((InputView) view).setInsetsChangedListener(this::onInputGeometryChanged);
+        }
         updateSoftInputWindowLayoutParameters();
         view.requestApplyInsets();
+    }
+
+    private void onInputGeometryChanged() {
+        if (mInputView == null) {
+            return;
+        }
+        mInputView.requestLayout();
+        mInputView.requestApplyInsets();
+        final Window window = getWindow().getWindow();
+        if (window != null) {
+            window.getDecorView().requestLayout();
+            window.getDecorView().requestApplyInsets();
+        }
     }
 
     @Override
@@ -548,15 +573,31 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
             // no visual element will be shown on the screen.
             outInsets.contentTopInsets = inputHeight;
             outInsets.visibleTopInsets = inputHeight;
+            outInsets.touchableInsets = InputMethodService.Insets.TOUCHABLE_INSETS_REGION;
+            outInsets.touchableRegion.setEmpty();
             return;
         }
-        final int visibleTopY = inputHeight - visibleKeyboardView.getHeight();
+        boolean hasTruthfulBounds = false;
+        if (mInputView instanceof InputView) {
+            hasTruthfulBounds = ((InputView) mInputView).getVisibleInputBounds(
+                    visibleKeyboardView, mVisibleInputBounds);
+        }
+        if (!hasTruthfulBounds) {
+            final int visibleTopY = inputHeight - visibleKeyboardView.getHeight();
+            mVisibleInputBounds.set(0, visibleTopY,
+                    visibleKeyboardView.getWidth(), inputHeight);
+        }
+        final int visibleTopY = Math.max(0,
+                Math.min(inputHeight, mVisibleInputBounds.top));
         // Need to set expanded touchable region only if a keyboard view is being shown.
         if (visibleKeyboardView.isShown()) {
-            final int touchLeft = 0;
-            final int touchTop = mKeyboardSwitcher.isShowingMoreKeysPanel() ? 0 : visibleTopY;
-            final int touchRight = visibleKeyboardView.getWidth();
-            final int touchBottom = inputHeight
+            final boolean showingMoreKeys = mKeyboardSwitcher.isShowingMoreKeysPanel();
+            final int touchLeft = showingMoreKeys ? 0 : mVisibleInputBounds.left;
+            final int touchTop = showingMoreKeys ? 0 : visibleTopY;
+            final int touchRight = showingMoreKeys
+                    ? Math.max(mInputView.getWidth(), visibleKeyboardView.getWidth())
+                    : mVisibleInputBounds.right;
+            final int touchBottom = Math.max(inputHeight, mVisibleInputBounds.bottom)
                     // Extend touchable region below the keyboard.
                     + EXTENDED_TOUCHABLE_REGION_HEIGHT;
             outInsets.touchableInsets = InputMethodService.Insets.TOUCHABLE_INSETS_REGION;

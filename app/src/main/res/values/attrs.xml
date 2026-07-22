@@ -111,6 +111,12 @@
     <declare-styleable name="MoreKeysKeyboardView">
     </declare-styleable>
 
+    <declare-styleable name="SuggestionStripView">
+        <attr name="keyTextColor" />
+        <attr name="keyPressedBackgroundColor" />
+        <attr name="functionalTextColor" />
+    </declare-styleable>
+
     <declare-styleable name="Keyboard">
         <!-- Keyboard top, bottom, left, right edges paddings, in pixels or in the propotion of
              keyboard height. -->
