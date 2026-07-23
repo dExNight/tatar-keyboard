@@ -109,6 +109,15 @@ class SuggestionStripView @JvmOverloads constructor(
         rebuildDisplaySuggestions()
         accessibilityHelper.invalidateRoot()
         invalidate()
+        val available = listOfNotNull(first, second, third)
+        if (available.isNotEmpty()) {
+            announceForAccessibility(
+                context.getString(
+                    R.string.spoken_suggestions_available,
+                    available.joinToString(", "),
+                ),
+            )
+        }
     }
 
     fun clearSuggestions() {

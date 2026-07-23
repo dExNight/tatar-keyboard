@@ -75,6 +75,24 @@ public final class InputView extends FrameLayout {
         return strip;
     }
 
+    /**
+     * Reserves the fixed-height strip: makes it VISIBLE with no words (empty band) so the keyboard
+     * keeps a stable height across an eligible input session. Mirrors {@link #showSuggestionStrip}
+     * but with no suggestions.
+     */
+    public SuggestionStripView reserveSuggestionStrip() {
+        final SuggestionStripView strip = getOrCreateSuggestionStripView();
+        if (strip == null) {
+            return null;
+        }
+        strip.clearSuggestions();
+        if (strip.getVisibility() != VISIBLE) {
+            strip.setVisibility(VISIBLE);
+            notifyInsetsChanged();
+        }
+        return strip;
+    }
+
     /** Clears stale contents and removes all layout and touch impact without creating the strip. */
     public void clearAndHideSuggestionStrip() {
         if (mSuggestionStripView == null) {

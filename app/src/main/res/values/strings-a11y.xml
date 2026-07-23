@@ -67,4 +67,7 @@
     <string name="spoken_description_shiftmode_on">Shift enabled</string>
     <string name="spoken_description_shiftmode_locked">Caps lock enabled</string>
     <string name="spoken_description_shiftmode_off">Shift disabled</string>
+
+    <!-- Announced when word suggestions become available; %s is the joined suggestion list. -->
+    <string name="spoken_suggestions_available">Suggestions available: %s</string>
 </resources>

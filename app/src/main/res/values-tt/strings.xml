@@ -65,6 +65,8 @@
     <string name="space_swipe_summary">Курсорны күчерү өчен бармагыгызны буш урын төймәсе буйлап шудырыгыз</string>
     <string name="delete_swipe">Шудырып бетерү</string>
     <string name="delete_swipe_summary">Күбрәк текст бетерү өчен бармагыгызны бетерү төймәсе буйлап шудырыгыз</string>
+    <string name="tatar_suggestions">Татарча сүзләр тәкъдиме</string>
+    <string name="tatar_suggestions_summary">Язган вакытта клавиатура өстендә татарча сүз тәкъдимнәрен күрсәтү</string>
     <string name="keyboard_languages">Төймәсар телләре</string>
     <string name="keyboard_languages_summary">Тел өстәү яки бетерү</string>
     <string name="user_languages">Кабызылган телләр</string>

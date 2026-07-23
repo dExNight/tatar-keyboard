@@ -279,6 +279,8 @@ class SettingsHostActivity : Activity() {
                 R.string.space_swipe, R.string.space_swipe_summary))
         rows.add(switchRow(Settings.PREF_DELETE_SWIPE, false,
                 R.string.delete_swipe, R.string.delete_swipe_summary))
+        rows.add(switchRow(Settings.PREF_TATAR_SUGGESTIONS, false,
+                R.string.tatar_suggestions, R.string.tatar_suggestions_summary))
         addCard(rows)
         // android:dependency="pref_show_language_switch_key" from the legacy screen.
         setRowEnabled(imeRow,

@@ -64,4 +64,7 @@
     <string name="spoken_description_shiftmode_on">Баш хәрефләр кабызылган</string>
     <string name="spoken_description_shiftmode_locked">Caps Lock кабызылган</string>
     <string name="spoken_description_shiftmode_off">Баш хәрефләр сүндерелгән</string>
+
+    <!-- Тәкъдимнәр барлыкка килгәндә тавышландырыла; %s — тәкъдимнәр исемлеге. -->
+    <string name="spoken_suggestions_available">Тәкъдимнәр бар: %s</string>
 </resources>

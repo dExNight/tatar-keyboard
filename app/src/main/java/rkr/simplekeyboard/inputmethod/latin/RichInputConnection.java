@@ -292,6 +292,20 @@ public final class RichInputConnection {
                 spacingAndPunctuations);
     }
 
+    /**
+     * Returns the cached text before the cursor without any IPC to the editor.
+     *
+     * <p>Like {@link #getCursorCapsMode}, this reads only the local cache and never calls
+     * {@link android.view.inputmethod.InputConnection}. Must be called on the UI thread. The
+     * returned text is potentially sensitive and must never be logged.
+     *
+     * @return the cached before-cursor text, or the empty string if it is not available.
+     */
+    public CharSequence getCachedTextBeforeCursor() {
+        // Never initiates IPC; reads only the local cache. Do not log the returned value.
+        return mTextBeforeCursor == null ? "" : mTextBeforeCursor;
+    }
+
     public int getCodePointBeforeCursor() {
         final int length = mTextBeforeCursor.length();
         if (length < 1) return Constants.NOT_A_CODE;

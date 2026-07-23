@@ -65,6 +65,8 @@
     <string name="space_swipe_summary">Проведите по пробелу, чтобы переместить курсор</string>
     <string name="delete_swipe">Удалить смахиванием</string>
     <string name="delete_swipe_summary">Проведите по клавише удаления, чтобы стереть больше текста</string>
+    <string name="tatar_suggestions">Подсказки татарских слов</string>
+    <string name="tatar_suggestions_summary">Показывать подсказки татарских слов над клавиатурой при вводе</string>
     <string name="keyboard_languages">Языки клавиатуры</string>
     <string name="keyboard_languages_summary">Добавить или убрать язык</string>
     <string name="user_languages">Включённые языки</string>

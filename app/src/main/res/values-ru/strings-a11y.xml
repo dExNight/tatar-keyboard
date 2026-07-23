@@ -64,4 +64,7 @@
     <string name="spoken_description_shiftmode_on">Верхний регистр включён</string>
     <string name="spoken_description_shiftmode_locked">Caps Lock включён</string>
     <string name="spoken_description_shiftmode_off">Верхний регистр выключен</string>
+
+    <!-- Озвучивается, когда появляются подсказки; %s — перечень подсказок. -->
+    <string name="spoken_suggestions_available">Доступны подсказки: %s</string>
 </resources>

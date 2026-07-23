@@ -53,6 +53,8 @@ import java.io.PrintWriter;
 import java.util.Locale;
 import java.util.concurrent.TimeUnit;
 
+import kotlin.jvm.functions.Function1;
+
 import rkr.simplekeyboard.inputmethod.compat.EditorInfoCompatUtils;
 import rkr.simplekeyboard.inputmethod.compat.PreferenceManagerCompat;
 import rkr.simplekeyboard.inputmethod.event.Event;
@@ -68,6 +70,15 @@ import rkr.simplekeyboard.inputmethod.latin.inputlogic.InputLogic;
 import rkr.simplekeyboard.inputmethod.latin.settings.Settings;
 import rkr.simplekeyboard.inputmethod.latin.settings.SettingsActivity;
 import rkr.simplekeyboard.inputmethod.latin.settings.SettingsValues;
+import rkr.simplekeyboard.inputmethod.latin.suggestions.EditorSurface;
+import rkr.simplekeyboard.inputmethod.latin.suggestions.EngineHandle;
+import rkr.simplekeyboard.inputmethod.latin.suggestions.MappedEngineHandle;
+import rkr.simplekeyboard.inputmethod.latin.suggestions.ResultCallback;
+import rkr.simplekeyboard.inputmethod.latin.suggestions.StripSurface;
+import rkr.simplekeyboard.inputmethod.latin.suggestions.SuggestionStripView;
+import rkr.simplekeyboard.inputmethod.latin.suggestions.SuggestionTapListener;
+import rkr.simplekeyboard.inputmethod.latin.suggestions.SuggestionsController;
+import rkr.simplekeyboard.inputmethod.latin.suggestions.TatarWordUtils;
 import rkr.simplekeyboard.inputmethod.latin.utils.ApplicationUtils;
 import rkr.simplekeyboard.inputmethod.latin.utils.KotlinInteropCheck;
 import rkr.simplekeyboard.inputmethod.latin.utils.LeakGuardHandlerWrapper;
@@ -99,6 +110,9 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
     final KeyboardSwitcher mKeyboardSwitcher;
 
     private AlertDialog mOptionsDialog;
+
+    // Optional opt-in Tatar suggestions controller. Null until set up in onCreate().
+    private SuggestionsController mSuggestionsController;
 
     public final UIHandler mHandler = new UIHandler(this);
 
@@ -268,6 +282,8 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         // {@link #resetDictionaryFacilitatorIfNecessary()}.
         loadSettings();
 
+        setUpSuggestionsController();
+
         // Register to receive ringer mode change.
         final IntentFilter filter = new IntentFilter();
         filter.addAction(AudioManager.RINGER_MODE_CHANGED_ACTION);
@@ -283,8 +299,100 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         AudioAndHapticFeedbackManager.getInstance().onSettingsChanged(currentSettingsValues);
     }
 
+    /**
+     * Builds the opt-in Tatar suggestions controller and wires thin adapters over the input
+     * view strip and the editor. The strip adapter resolves {@link #mInputView} lazily at call
+     * time because the input view does not exist yet when this runs during onCreate().
+     */
+    private void setUpSuggestionsController() {
+        final StripSurface stripSurface = new StripSurface() {
+            @Override
+            public void showSuggestions(final String first, final String second,
+                    final String third) {
+                final InputView inputView = getInputViewForSuggestions();
+                if (inputView != null) {
+                    inputView.showSuggestionStrip(first, second, third);
+                }
+            }
+
+            @Override
+            public void reserve() {
+                final InputView inputView = getInputViewForSuggestions();
+                if (inputView != null) {
+                    inputView.reserveSuggestionStrip();
+                }
+            }
+
+            @Override
+            public void hideSuggestions() {
+                final InputView inputView = getInputViewForSuggestions();
+                if (inputView != null) {
+                    inputView.clearAndHideSuggestionStrip();
+                }
+            }
+
+            @Override
+            public void setTapListener(final SuggestionTapListener listener) {
+                final InputView inputView = getInputViewForSuggestions();
+                if (inputView == null) {
+                    return;
+                }
+                final SuggestionStripView strip = inputView.getOrCreateSuggestionStripView();
+                if (strip == null) {
+                    return;
+                }
+                strip.setOnSuggestionClickListener(
+                        (cellId, suggestion) -> listener.onTap(suggestion));
+            }
+        };
+
+        final EditorSurface editorSurface = new EditorSurface() {
+            @Override
+            public String cachedWordBeforeCursor() {
+                return TatarWordUtils.INSTANCE.extractTrailingWord(
+                        mInputLogic.mConnection.getCachedTextBeforeCursor());
+            }
+
+            @Override
+            public boolean commitSuggestion(final String expectedPrefix,
+                    final String suggestion) {
+                return mInputLogic.commitChosenSuggestion(expectedPrefix, suggestion);
+            }
+
+            @Override
+            public boolean hasKnownCursor() {
+                return mInputLogic.mConnection.hasCursorPosition();
+            }
+        };
+
+        final Function1<ResultCallback, EngineHandle> engineFactory =
+                resultCallback -> MappedEngineHandle.create(this, resultCallback);
+
+        mSuggestionsController = new SuggestionsController(
+                this, stripSurface, editorSurface, mHandler, engineFactory);
+        mSuggestionsController.onCreate();
+    }
+
+    private InputView getInputViewForSuggestions() {
+        return (mInputView instanceof InputView) ? (InputView) mInputView : null;
+    }
+
+    /**
+     * Computes whether opt-in Tatar suggestions may run for the current field and subtype.
+     */
+    private boolean isTatarSuggestionsEligible() {
+        final SettingsValues settingsValues = mSettings.getCurrent();
+        return settingsValues.mTatarSuggestionsEnabled
+                && "tt_RU".equals(mRichImm.getCurrentSubtype().getLocale())
+                && settingsValues.mInputAttributes.mShouldShowSuggestions
+                && mInputLogic.mConnection.hasCursorPosition();
+    }
+
     @Override
     public void onDestroy() {
+        if (mSuggestionsController != null) {
+            mSuggestionsController.onDestroy();
+        }
         mSettings.onDestroy();
         unregisterReceiver(mRingerModeChangeReceiver);
         super.onDestroy();
@@ -389,6 +497,9 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
     public void onCurrentSubtypeChanged() {
         mInputLogic.onSubtypeChanged();
         loadKeyboard();
+        if (mSuggestionsController != null) {
+            mSuggestionsController.onSubtypeChanged(isTatarSuggestionsEligible());
+        }
     }
 
     void onStartInputInternal(final EditorInfo editorInfo, final boolean restarting) {
@@ -486,6 +597,10 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
                     getCurrentRecapitalizeState());
         }
 
+        if (mSuggestionsController != null) {
+            mSuggestionsController.onStartInput(isTatarSuggestionsEligible());
+        }
+
         if (TRACE) Debug.startMethodTracing("/data/trace/latinime");
     }
 
@@ -516,6 +631,9 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
 
     void onFinishInputViewInternal(final boolean finishingInput) {
         super.onFinishInputView(finishingInput);
+        if (mSuggestionsController != null) {
+            mSuggestionsController.onFinishInput();
+        }
     }
 
     protected void deallocateMemory() {
@@ -535,7 +653,14 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
 
         Log.i(TAG, "Update Selection. Cursor position = " + newSelStart + "," + newSelEnd);
 
+        final boolean externalMove =
+                newSelStart != mInputLogic.mConnection.getExpectedSelectionStart()
+                        || newSelEnd != mInputLogic.mConnection.getExpectedSelectionEnd();
+
         mInputLogic.onUpdateSelection(newSelStart, newSelEnd);
+        if (externalMove && mSuggestionsController != null) {
+            mSuggestionsController.onSelectionChanged();
+        }
         if (isInputViewShown()) {
             mInputLogic.reloadTextCache();
 
@@ -850,6 +975,10 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
                     getCurrentRecapitalizeState());
             break;
         default: // SHIFT_NO_UPDATE
+        }
+
+        if (mSuggestionsController != null) {
+            mSuggestionsController.onTextChanged();
         }
     }
 

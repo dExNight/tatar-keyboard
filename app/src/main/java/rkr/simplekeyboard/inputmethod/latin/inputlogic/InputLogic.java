@@ -34,6 +34,7 @@ import rkr.simplekeyboard.inputmethod.latin.RichInputConnection;
 import rkr.simplekeyboard.inputmethod.latin.common.Constants;
 import rkr.simplekeyboard.inputmethod.latin.common.StringUtils;
 import rkr.simplekeyboard.inputmethod.latin.settings.SettingsValues;
+import rkr.simplekeyboard.inputmethod.latin.suggestions.TatarWordUtils;
 import rkr.simplekeyboard.inputmethod.latin.utils.InputTypeUtils;
 import rkr.simplekeyboard.inputmethod.latin.utils.RecapitalizeStatus;
 import rkr.simplekeyboard.inputmethod.latin.utils.SubtypeLocaleUtils;
@@ -475,6 +476,39 @@ public final class InputLogic {
         // Warning: this depends on mSpaceState, which may not be the most current value. If
         // mSpaceState gets updated later, whoever called this may need to be told about it.
         return mConnection.getCursorCapsMode(inputType, settingsValues.mSpacingAndPunctuations);
+    }
+
+    /**
+     * Commits a suggestion chosen from the Tatar suggestion strip, replacing the trailing word.
+     *
+     * <p>This is a stale-tap-safe operation: it re-derives the trailing word from the local
+     * cache and only performs the edit if it still matches {@code expectedPrefix}. If anything
+     * has changed since the suggestion was shown (selection present, cursor moved, word edited),
+     * no edit is made and {@code false} is returned. All work happens on the UI thread and reads
+     * only the cached before-cursor text (no IPC to recompute the word).
+     *
+     * @param expectedPrefix the trailing word the suggestion was computed for.
+     * @param suggestion the replacement text to commit.
+     * @return {@code true} if the replacement was committed, {@code false} otherwise (no edit).
+     */
+    public boolean commitChosenSuggestion(final String expectedPrefix, final String suggestion) {
+        if (TextUtils.isEmpty(expectedPrefix) || TextUtils.isEmpty(suggestion)) {
+            return false;
+        }
+        if (mConnection.hasSelection()) {
+            return false;
+        }
+        final String currentWord =
+                TatarWordUtils.extractTrailingWord(mConnection.getCachedTextBeforeCursor());
+        if (!expectedPrefix.equals(currentWord)) {
+            // Stale tap: the trailing word no longer matches. Do not edit.
+            return false;
+        }
+        mConnection.beginBatchEdit();
+        mConnection.deleteTextBeforeCursor(expectedPrefix.length());
+        mConnection.commitText(suggestion, 1);
+        mConnection.endBatchEdit();
+        return true;
     }
 
     private boolean layoutUsesAutoCaps(final String layoutSetName) {
