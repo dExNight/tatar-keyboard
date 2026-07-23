@@ -15,6 +15,23 @@
 выбранной формой. Любой отказ словаря отключает только подсказки; обычный ввод всегда
 остаётся рабочим.
 
+## Статус выполнения
+
+Обновлено 23.07.2026. Ветка `codex/d1-sequential` (от `2e72f6c`); `main` не изменялся; `origin` на `80f332c` (D1e ещё не запушен).
+
+| Фаза | Статус | Коммит | Примечание |
+|---|---|---|---|
+| D1a — формат, generator, top-100k asset | ✅ выполнено | `95f98d3` | воспроизводимый asset, строгий validator, held-out gap 0.72 п.п. |
+| D1b — атомарное сжатое хранилище | ✅ выполнено | `037f3ea` | lease/lifecycle, fail-closed, device-protected storage |
+| D1c — сенсорная Canvas-полоса | ✅ выполнено | `f47000a` | 40dp, insets/touchable-region, a11y virtual nodes |
+| D1d — mmap prefix engine | ✅ выполнено | `80f332c` | latest-only/coalescing, immutable prefix, без гонок |
+| D1e — интеграция, opt-in, privacy, a11y | ✅ выполнено (не запушено) | `7c7777c` | движок+полоса подключены; privacy через `mShouldShowSuggestions`; безопасный delete+commit; TalkBack-анонс; высота полосы зарезервирована на весь подходящий сеанс (без «прыжка»). Проверено на устройстве. |
+| D1f — общие gates + device-UAT | ⏳ осталось | — | нужен реальный Samsung/эмулятор: полная clean matrix (touch/insets/rotation/TalkBack/moreKeys, PSS, cold start, latency, allocation/jank, first-run/update/corruption/direct-boot) |
+
+Гейты D1e (прогнаны на Mac, Gradle 9.6): сборка debug+release `BUILD SUCCESSFUL`; весь JVM тест-набор + `lintVitalRelease` зелёные; no-INTERNET на release-APK (только `VIBRATE`); release APK **1 440 751 B** (+10 416 B к D1d, значительно ниже лимита 1.7 МБ). Подробности — `docs/DICTIONARY-D1E.md`.
+
+Осталось вне scope фаз перед фактическим выпуском: пуш ветки, подписанный release-APK (сейчас собирается `-unsigned`), вычитка татарских строк носителем.
+
 ## Инварианты и бюджеты D1
 
 - Функция работает только для татарского subtype, opt-in, default OFF.
