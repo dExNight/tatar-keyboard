@@ -146,7 +146,7 @@ class SuggestionsControllerTest {
         override fun awaitTermination(timeout: Long, unit: TimeUnit): Boolean = true
     }
 
-    private class Harness {
+    private class Harness(dictionaryReady: Boolean = true) {
         val strip = FakeStrip()
         val editor = FakeEditor()
         val engine = FakeEngine()
@@ -165,6 +165,7 @@ class SuggestionsControllerTest {
                 factoryResult
             },
             executor,
+            dictionaryReady,
         )
     }
 
@@ -344,11 +345,13 @@ class SuggestionsControllerTest {
     // --- Tap routing ---------------------------------------------------------------------------
 
     @Test
-    fun tapCommitsPendingPrefixAndReservesOnSuccess() {
+    fun tapCommitsDisplayedPrefixAndReservesOnSuccess() {
         val h = Harness()
         h.controller.onStartInput(eligible = true)
         h.editor.word = "сүз"
         h.controller.onTextChanged()
+        // A tap only commits against a prefix that is actually DISPLAYED, so deliver a result first.
+        h.capturedCallback!!.onResult(FakeEngine.TOKEN, listOf("сүзләр", "сүзлек"))
         val reserveBefore = h.strip.reserveCount
         val hideBefore = h.strip.hideCount
 
@@ -366,6 +369,7 @@ class SuggestionsControllerTest {
         h.controller.onStartInput(eligible = true)
         h.editor.word = "сүз"
         h.controller.onTextChanged()
+        h.capturedCallback!!.onResult(FakeEngine.TOKEN, listOf("сүзләр", "сүзлек"))
         val reserveBefore = h.strip.reserveCount
         val hideBefore = h.strip.hideCount
 
@@ -375,6 +379,118 @@ class SuggestionsControllerTest {
         assertEquals(listOf("сүз" to "сүзләр"), h.editor.commits)
         assertEquals(reserveBefore, h.strip.reserveCount)
         assertEquals(hideBefore, h.strip.hideCount)
+    }
+
+    @Test
+    fun tapWithNothingDisplayedIsNoOp() {
+        val h = Harness()
+        h.controller.onStartInput(eligible = true)
+        h.editor.word = "сүз"
+        h.controller.onTextChanged()
+        // No result was ever delivered, so nothing is bound/displayed: a tap must not commit.
+        h.strip.listener!!.onTap("сүзләр")
+
+        assertTrue(h.editor.commits.isEmpty())
+    }
+
+    // --- D1e regression: readiness / eligibility lifecycle (BUG 1) -----------------------------
+
+    @Test
+    fun readinessCallbackAfterEligibleStartStartsEngineAndRequestsCurrentPrefix() {
+        val h = Harness(dictionaryReady = false)
+        h.editor.word = "сүз"
+
+        // Field opens (eligible) before the dictionary is ready: no engine, no request yet.
+        h.controller.onStartInput(eligible = true)
+        assertEquals(0, h.factoryCalls)
+        assertTrue(h.engine.requestedPrefixes.isEmpty())
+
+        // Readiness fires later: the engine must start AND the current cached prefix must be looked
+        // up without waiting for another keystroke.
+        h.controller.signalDictionaryReadyForTest()
+
+        assertEquals(1, h.factoryCalls)
+        assertEquals(1, h.engine.requestedPrefixes.size)
+        assertTrue(
+            h.engine.requestedPrefixes.single()
+                .contentEquals("сүз".toByteArray(Charsets.UTF_8)),
+        )
+    }
+
+    @Test
+    fun subtypeChangeToEligibleStartsEngineAndRequestsCurrentPrefix() {
+        val h = Harness()
+
+        // Field opens ineligible (e.g. non-Tatar subtype): engine never started.
+        h.controller.onStartInput(eligible = false)
+        assertEquals(0, h.factoryCalls)
+
+        // Switch INTO the Tatar subtype in the already-open field.
+        h.editor.word = "сүз"
+        h.controller.onSubtypeChanged(eligible = true)
+
+        assertEquals(1, h.factoryCalls)
+        assertEquals(1, h.engine.requestedPrefixes.size)
+        assertTrue(
+            h.engine.requestedPrefixes.single()
+                .contentEquals("сүз".toByteArray(Charsets.UTF_8)),
+        )
+    }
+
+    @Test
+    fun lateReadinessCallbackAfterDestroyStartsNothingAndRequestsNothing() {
+        val h = Harness(dictionaryReady = false)
+        h.editor.word = "сүз"
+        h.controller.onStartInput(eligible = true)
+
+        h.controller.onDestroy()
+
+        // A readiness notification that lands after teardown must start nothing and request nothing.
+        h.controller.signalDictionaryReadyForTest()
+
+        assertEquals(0, h.factoryCalls)
+        assertTrue(h.engine.requestedPrefixes.isEmpty())
+    }
+
+    // --- D1e regression: atomic candidate binding (BUG 2) --------------------------------------
+
+    @Test
+    fun tapOnStaleCandidateAfterTextChangeIsNoOp() {
+        val h = Harness()
+        h.controller.onStartInput(eligible = true)
+
+        // Type A ("сүз") and receive a real result: candidates are displayed and bound to A.
+        h.editor.word = "сүз"
+        h.controller.onTextChanged()
+        h.capturedCallback!!.onResult(FakeEngine.TOKEN, listOf("сүзләр", "сүзлек"))
+        assertEquals(1, h.strip.shown.size)
+
+        // Text changes to B ("сүзл"): the displayed A candidates must be invalidated immediately.
+        h.editor.word = "сүзл"
+        h.controller.onTextChanged()
+
+        // Tapping the now-stale A candidate is a no-op: no commit, text unchanged.
+        h.strip.listener!!.onTap("сүзләр")
+
+        assertTrue(h.editor.commits.isEmpty())
+    }
+
+    @Test
+    fun tapAfterRealResultForCurrentPrefixCommitsSafely() {
+        val h = Harness()
+        h.controller.onStartInput(eligible = true)
+
+        // A real result for B ("сүз") is delivered and shown.
+        h.editor.word = "сүз"
+        h.controller.onTextChanged()
+        h.capturedCallback!!.onResult(FakeEngine.TOKEN, listOf("сүзләр", "сүзлек"))
+        assertEquals(1, h.strip.shown.size)
+
+        // Tapping the displayed candidate commits against the displayed prefix.
+        h.editor.commitResult = true
+        h.strip.listener!!.onTap("сүзләр")
+
+        assertEquals(listOf("сүз" to "сүзләр"), h.editor.commits)
     }
 
     // --- Teardown ------------------------------------------------------------------------------

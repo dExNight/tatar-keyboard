@@ -62,7 +62,8 @@ fun interface UiPoster {
  * Threading: every public method must be called on the UI thread. The single-thread background
  * executor is used only for the (blocking) engine start and dictionary preparation. Engine results
  * arrive on a worker thread via [ResultCallback] and are re-marshaled onto [uiPoster] before any
- * state is touched.
+ * state is touched. Dictionary-readiness notifications are likewise marshaled onto [uiPoster] so
+ * every mutation of controller state happens on the single serialized UI owner.
  *
  * Eligibility (opt-in setting, tt_RU subtype, editor allows suggestions, known cursor) is computed
  * by LatinIME and passed in via [onStartInput]/[onSubtypeChanged]; dictionary readiness is tracked
@@ -103,6 +104,20 @@ class SuggestionsController private constructor(
         backgroundExecutor: ExecutorService,
     ) : this(null, strip, editor, uiPoster, engineFactory, backgroundExecutor, true)
 
+    /**
+     * Test entry point that lets a test drive the not-ready -> ready path: same as the primary test
+     * constructor but with an explicit initial readiness so a test can start ineligible/not-ready
+     * and later fire readiness via [signalDictionaryReadyForTest].
+     */
+    internal constructor(
+        strip: StripSurface,
+        editor: EditorSurface,
+        uiPoster: UiPoster,
+        engineFactory: (ResultCallback) -> EngineHandle?,
+        backgroundExecutor: ExecutorService,
+        dictionaryReady: Boolean,
+    ) : this(null, strip, editor, uiPoster, engineFactory, backgroundExecutor, dictionaryReady)
+
     private var executor: ExecutorService? = initialExecutor
     private var storage: DictionaryStorageController? = null
 
@@ -118,7 +133,16 @@ class SuggestionsController private constructor(
     // older editor state are dropped even if the engine's own generation check would still pass.
     private var sessionId: Long = 0L
     private var requestSessionId: Long = -1L
+
+    // The latest prefix a lookup was requested for. Not what is on screen; see [displayedPrefix].
     private var pendingPrefix: String = ""
+
+    // The prefix (and session) the candidates currently shown on the strip were computed for. Set
+    // ONLY in [applyResult] when non-empty suggestions are actually displayed; cleared to null the
+    // instant those words are cleared or superseded. A tap is bound to THIS value, never to the
+    // mutable [pendingPrefix], so a stale candidate can never commit against a newer prefix.
+    private var displayedPrefix: String? = null
+    private var displayedSessionId: Long = -1L
 
     fun onCreate() {
         strip.setTapListener(SuggestionTapListener { suggestion -> onTap(suggestion) })
@@ -130,13 +154,18 @@ class SuggestionsController private constructor(
         storage = controller
         controller.prepare { result ->
             if (result is PreparationResult.Published) {
-                dictionaryReady = true
+                // The prepare callback runs on the background executor. Marshal onto the serialized
+                // UI owner before touching any controller state, then start the engine (and look up
+                // whatever is already typed) so a field opened before the dictionary finished
+                // preparing still gets suggestions this session.
+                uiPoster.post { onDictionaryReady() }
             }
         }
     }
 
     fun onStartInput(eligible: Boolean) {
         sessionId++
+        displayedPrefix = null
         this.eligible = eligible
         if (!eligible) {
             strip.hideSuggestions()
@@ -149,32 +178,18 @@ class SuggestionsController private constructor(
     }
 
     fun onTextChanged() {
-        if (!eligible) return
-        if (!editor.hasKnownCursor()) {
-            strip.reserve()
-            return
-        }
-        val activeEngine = engine ?: return
-        val word = editor.cachedWordBeforeCursor()
-        if (word.isEmpty()) {
-            strip.reserve()
-            return
-        }
-        pendingPrefix = word
-        requestSessionId = sessionId
-        val prefixBytes = TatarWordUtils.toLookupBytes(TatarWordUtils.normalizeForLookup(word))
-        val token = activeEngine.request(sessionId, SUBTYPE_ID, prefixBytes)
-        if (token == null) {
-            strip.reserve()
-        }
+        requestCurrentPrefix()
     }
 
     fun onSelectionChanged() {
         sessionId++
         engine?.finishInput()
-        // Invalidate any in-flight request, but keep the reserved band while the field stays
-        // eligible so an external selection change never collapses the keyboard height. When the
-        // field is not eligible the strip is already GONE and must stay that way.
+        // Any in-flight request is invalidated and whatever was shown is no longer bound to the
+        // live editor state, so drop the displayed binding immediately.
+        displayedPrefix = null
+        // Keep the reserved band while the field stays eligible so an external selection change
+        // never collapses the keyboard height. When the field is not eligible the strip is already
+        // GONE and must stay that way.
         if (eligible) {
             strip.reserve()
         }
@@ -182,6 +197,7 @@ class SuggestionsController private constructor(
 
     fun onFinishInput() {
         sessionId++
+        displayedPrefix = null
         strip.hideSuggestions()
         engine?.finishInput()
     }
@@ -189,9 +205,14 @@ class SuggestionsController private constructor(
     fun onSubtypeChanged(eligible: Boolean) {
         sessionId++
         engine?.finishInput()
+        displayedPrefix = null
         this.eligible = eligible
         if (eligible) {
             strip.reserve()
+            // Switching INTO an eligible subtype in an already-open field must start the engine
+            // (if not already running); a freshly started engine looks up the current prefix from
+            // publishEngine().
+            maybeStartEngine()
         } else {
             strip.hideSuggestions()
         }
@@ -201,6 +222,7 @@ class SuggestionsController private constructor(
         // Set the guard first so an engine start that publishes after this point (posted onto the
         // UI thread from the background executor) is torn down instead of orphaned.
         destroyed = true
+        displayedPrefix = null
         val handle = engine
         if (handle != null && destroyHandle(handle)) {
             // Only drop the reference once the lease is actually released; a still-leaked lease
@@ -214,8 +236,27 @@ class SuggestionsController private constructor(
     /** Catalog for the production engine factory; available only after [onCreate]. */
     fun engineCatalog(): PublishedDictionaryCatalog? = storage
 
+    /**
+     * Test seam: drives the exact dictionary-ready path the production prepare callback drives
+     * (post [onDictionaryReady] onto the injected [uiPoster]). Lets a test start not-ready and fire
+     * readiness deterministically without a real storage controller.
+     */
+    internal fun signalDictionaryReadyForTest() {
+        uiPoster.post { onDictionaryReady() }
+    }
+
+    /**
+     * Handles the dictionary becoming ready. Always runs on the UI owner. A late notification that
+     * arrives after [onDestroy] (destroyed == true) starts nothing and requests nothing.
+     */
+    private fun onDictionaryReady() {
+        if (destroyed) return
+        dictionaryReady = true
+        maybeStartEngine()
+    }
+
     private fun maybeStartEngine() {
-        if (engine != null || starting || !dictionaryReady) return
+        if (engine != null || starting || !dictionaryReady || !eligible) return
         val backgroundExecutor = executor ?: return
         starting = true
         val callback = ResultCallback { token, suggestions ->
@@ -251,6 +292,14 @@ class SuggestionsController private constructor(
         if (!eligible) {
             handle.finishInput()
             strip.hideSuggestions()
+            return
+        }
+        // The engine became available while an eligible field is already open: look up whatever the
+        // user has already typed so the strip fills in without waiting for the next keystroke. Skip
+        // the empty-prefix case so a freshly opened empty field does not redundantly re-reserve the
+        // band that onStartInput()/onSubtypeChanged() already reserved.
+        if (editor.hasKnownCursor() && editor.cachedWordBeforeCursor().isNotEmpty()) {
+            requestCurrentPrefix()
         }
     }
 
@@ -264,15 +313,57 @@ class SuggestionsController private constructor(
         return handle.destroy(DESTROY_TIMEOUT_MS * 3)
     }
 
+    /**
+     * The single request path. Reads the current cached prefix and dispatches a lookup, clearing
+     * the displayed binding whenever the words are (or become) empty/unresolvable and whenever the
+     * prefix changes so stale candidates cannot be tapped in the window before the fresh result
+     * arrives. Reused verbatim by [onTextChanged] and by [publishEngine] right after a successful
+     * engine publish.
+     */
+    private fun requestCurrentPrefix() {
+        if (!eligible) return
+        if (!editor.hasKnownCursor()) {
+            displayedPrefix = null
+            strip.reserve()
+            return
+        }
+        val activeEngine = engine ?: return
+        val word = editor.cachedWordBeforeCursor()
+        if (word.isEmpty()) {
+            displayedPrefix = null
+            strip.reserve()
+            return
+        }
+        // Prefix changed relative to what is on screen: invalidate the displayed candidates NOW so
+        // a tap arriving before the new result can never commit the old candidate against the new
+        // prefix.
+        if (word != displayedPrefix) {
+            displayedPrefix = null
+        }
+        pendingPrefix = word
+        requestSessionId = sessionId
+        val prefixBytes = TatarWordUtils.toLookupBytes(TatarWordUtils.normalizeForLookup(word))
+        val token = activeEngine.request(sessionId, SUBTYPE_ID, prefixBytes)
+        if (token == null) {
+            displayedPrefix = null
+            strip.reserve()
+        }
+    }
+
     private fun applyResult(token: Any, suggestions: List<String>) {
         if (!eligible) return
         if (sessionId != requestSessionId) return
         val activeEngine = engine ?: return
         if (!activeEngine.isCurrent(token)) return
         if (suggestions.isEmpty()) {
+            displayedPrefix = null
             strip.reserve()
             return
         }
+        // The result passed the session and engine currency guards, so pendingPrefix is exactly the
+        // prefix these candidates were computed for. Bind the displayed candidates to it atomically.
+        displayedPrefix = pendingPrefix
+        displayedSessionId = sessionId
         strip.showSuggestions(
             suggestions[0],
             suggestions.getOrNull(1),
@@ -281,9 +372,19 @@ class SuggestionsController private constructor(
     }
 
     private fun onTap(suggestion: String) {
-        if (editor.commitSuggestion(pendingPrefix, suggestion)) {
+        val prefix = displayedPrefix
+        if (prefix == null || displayedSessionId != sessionId) {
+            // Nothing bound to the current session is displayed (e.g. the text changed and the old
+            // candidates were invalidated): a tap must be a no-op and must never commit.
+            return
+        }
+        // Commit against the DISPLAYED prefix, not the mutable pendingPrefix. The editor's own
+        // stale-tap guard (re-reads live cache, requires collapsed selection and live trailing word
+        // == expectedPrefix, deletes by code points) is the second line of defense.
+        if (editor.commitSuggestion(prefix, suggestion)) {
             // The field is still eligible after a commit; clear the words but keep the reserved
             // band so accepting a suggestion does not resize the keyboard.
+            displayedPrefix = null
             strip.reserve()
         }
     }

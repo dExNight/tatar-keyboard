@@ -17,7 +17,7 @@
 
 ## Статус выполнения
 
-Обновлено 23.07.2026. Ветка `codex/d1-sequential` (от `2e72f6c`); `main` не изменялся; `origin` на `80f332c` (D1e ещё не запушен).
+Обновлено 24.07.2026. Ветка `codex/d1-sequential` (от `2e72f6c`); `main` не изменялся; `origin` на `80f332c` (D1e ещё не запушен).
 
 | Фаза | Статус | Коммит | Примечание |
 |---|---|---|---|
@@ -25,12 +25,35 @@
 | D1b — атомарное сжатое хранилище | ✅ выполнено | `037f3ea` | lease/lifecycle, fail-closed, device-protected storage |
 | D1c — сенсорная Canvas-полоса | ✅ выполнено | `f47000a` | 40dp, insets/touchable-region, a11y virtual nodes |
 | D1d — mmap prefix engine | ✅ выполнено | `80f332c` | latest-only/coalescing, immutable prefix, без гонок |
-| D1e — интеграция, opt-in, privacy, a11y | ✅ выполнено (не запушено) | `7c7777c` | движок+полоса подключены; privacy через `mShouldShowSuggestions`; безопасный delete+commit; TalkBack-анонс; высота полосы зарезервирована на весь подходящий сеанс (без «прыжка»). Проверено на устройстве. |
-| D1f — общие gates + device-UAT | ⏳ осталось | — | нужен реальный Samsung/эмулятор: полная clean matrix (touch/insets/rotation/TalkBack/moreKeys, PSS, cold start, latency, allocation/jank, first-run/update/corruption/direct-boot) |
+| D1e — интеграция, opt-in, privacy, a11y | ✅ выполнено | `7c7777c` + текущий fix | два HIGH runtime interleaving устранены; пять обязательных regression tests и дополнительный no-op guard зелёные; независимый аудит `APPROVED` |
+| D1f — общие gates + device-UAT | ⏳ открыто | — | D1e больше не блокирует фазу; нужны финальная clean matrix и полная device-UAT |
 
-Гейты D1e (прогнаны на Mac, Gradle 9.6): сборка debug+release `BUILD SUCCESSFUL`; весь JVM тест-набор + `lintVitalRelease` зелёные; no-INTERNET на release-APK (только `VIBRATE`); release APK **1 440 751 B** (+10 416 B к D1d, значительно ниже лимита 1.7 МБ). Подробности — `docs/DICTIONARY-D1E.md`.
+Зафиксированные зелёные automated gates D1e (прогнаны на Mac, Gradle 9.6): после runtime-fix весь JVM-набор — **136 tests, 0 failures/errors** (`SuggestionsControllerTest` — 29), `assembleRelease` — `BUILD SUCCESSFUL`; подписанный APK проверен `apksigner` (v2), no-INTERNET на APK — PASS (только `VIBRATE`), размер **1 445 067 B**, значительно ниже целевого лимита 1.7 МБ. Ранее `lintVitalRelease` проходил на D1e до runtime-fix; его финальный clean-прогон вместе с полной release-матрицей остаётся в D1f. Это не device evidence. Подробности — `docs/DICTIONARY-D1E.md`.
 
-Осталось вне scope фаз перед фактическим выпуском: пуш ветки, подписанный release-APK (сейчас собирается `-unsigned`), вычитка татарских строк носителем.
+Осталось перед фактическим выпуском: финальная версия 1.2.0/vc4 и changelog, clean release-gates, versioned signed artifact, device-UAT, вычитка новых татарских строк носителем, push/merge/tag и публикация.
+
+## Устранённые D1e runtime-блокеры
+
+- ✅ **HIGH — readiness/eligibility lifecycle.** Readiness callback сериализован через
+  UI owner, запускает engine в уже активной eligible session и запрашивает текущий cached
+  prefix; переход ineligible→eligible запускает engine. Поздний callback после destroy
+  ничего не запускает и не запрашивает.
+- ✅ **HIGH — atomic candidate binding.** Displayed candidates атомарно привязаны к
+  exact displayed prefix/session. При переходе text A→text B binding старых A немедленно
+  инвалидируется; tap(old A) после B — no-op и не может выполнить
+  `commit(B, candidateA)`.
+
+Реализованные детерминированные regression tests, закрывающие D1e:
+
+- ✅ eligible start before prepare → readiness callback запускает engine и lookup текущего
+  prefix;
+- ✅ ineligible start → переход на tt subtype запускает engine и lookup текущего prefix;
+- ✅ late readiness callback after destroy → engine/lookup не запускаются;
+- ✅ `show(A) → text(B) → tap(old A)` → текст не изменяется;
+- ✅ актуальный result B и tap(B) по-прежнему безопасно выполняют commit.
+
+Все пять обязательных тестов и дополнительный `tapWithNothingDisplayedIsNoOp` проходят;
+D1e закрыто. Неблокирующий warm-engine re-lookup после tt→ru→tt вынесен в D1f hardening.
 
 ## Инварианты и бюджеты D1
 
@@ -220,9 +243,16 @@ matrix, а не заменяется накопленными быстрыми �
 - Смена subtype/editor/selection немедленно очищает UI и инвалидирует запросы.
 - Stale tap или рассинхрон кэша не меняет текст.
 - Полная editor/privacy matrix, word-boundary/casing и TalkBack tests зелёные.
+- Все пять детерминированных regression tests из раздела runtime-блокеров обязательны и
+  зелёные; без них D1e не выполнено, а D1f, merge и release запрещены.
 - No-go: обход gate, default не OFF или изменение текста без повторной валидации.
 
 ## D1f — общие gates и device-UAT
+
+**Gate:** D1f разблокирована: оба D1e runtime-блокера устранены, все пять обязательных
+детерминированных regression tests зелёные. Для завершения D1 всё ещё обязательны полная
+clean build/lint/no-INTERNET/signing matrix и device-UAT; накопленные отдельные gates их
+не заменяют.
 
 - Build/lint/no-INTERNET; signed APK, PSS, cold start, compute и end-to-end latency.
 - Allocation/frame tests полосы; race/lifecycle/failure/editor regression suite.
