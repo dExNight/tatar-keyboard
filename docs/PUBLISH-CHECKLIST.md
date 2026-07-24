@@ -1,192 +1,192 @@
-# PUBLISH-CHECKLIST — публикация v1.1.0
+# PUBLISH-CHECKLIST — публикация v1.2.0
 
-Пошаговая инструкция для ручной публикации. Галочки ниже отражают только подтверждённые
-факты; внешние шаги без проверки в GitHub не считаются выполненными.
+Пошаговый release gate для `versionName 1.2.0` / `versionCode 4`. Галочка означает
+только проверенный результат именно кандидата v1.2.0. Исторические результаты v1.1.0
+не переносятся на новый APK и явно помечены как справочные.
 
-## Состояние на 2026-07-22
+## Текущее состояние на 2026-07-24
 
-- Release-preparation commit `45f9831` (`chore(release): prepare v1.1.0`) присутствует
-  в истории `main`; локальный `main` и `origin/main` синхронизированы
-- Версия `1.1.0` (`versionCode 3`), CHANGELOG и release metadata закоммичены и запушены
-- Пользователь сообщил 2026-07-22, что переключил репозиторий в Public; независимая
-  анонимная проверка GitHub web/API/raw во время release-close всё ещё получила HTTP 404
-- Ветки `ci-negative-test` локально и на `origin` указывают на `468ee6a` с намеренно
-  добавленным разрешением `INTERNET`; green/red результаты Actions не проверены и не
-  утверждаются, пользователь явно снял их как блокер v1.1.0 2026-07-22
-- Подписанный `app/build/outputs/apk/release/app-release.apk` собран для `1.1.0`,
-  проверен и скопирован в `dist/tatar-keyboard-1.1.0.apk`; старый артефакт `1.0.1`
-  сохранён отдельно
-- Финальный артефакт в `dist/` зафиксирован после последней чистой сборки; отдельные
-  подписанные сборки не считаются побайтово воспроизводимыми
+- Release candidate объявляет плановые `1.2.0` / `versionCode 4`; CHANGELOG и Fastlane
+  changelog подготовлены, но должны пройти финальную freeze-проверку после объединения
+  всех правок.
+- D1a–D1e реализованы. Автоматические JVM-тесты и `lintVitalRelease` проходили на
+  текущем hardening-коде, но финальный clean artifact audit D1f ещё не записан.
+- Финальный подписанный APK v1.2.0, его размер, версия, permissions, сертификат и
+  SHA-256 пока не подтверждены. Поля evidence ниже заполняются только после повторного
+  аудита готового артефакта.
+- Device-UAT, Android runtime/performance measurements, проверка TalkBack и вычитка
+  новых татарских строк носителем языка не выполнены и не заявляются.
+- Анонимные GitHub web/API/raw проверки по-прежнему получают HTTP 404. SSH-аутентификация
+  позволяет push, но `gh` отсутствует, а доступный API token недействителен. Поэтому
+  Public-доступ, GitHub Actions, tag/Release и анонимное скачивание APK не подтверждены.
+- Для v1.1.0 был собран подписанный APK с валидной v2-подписью и проверенной цепочкой
+  обновления. Это полезный эталон сертификата, но не evidence для APK v1.2.0.
 
-## Шаг 1. ✅ ВЫПОЛНЕНО — Бэкап ключа подписи
+## 1. Freeze исходников и версии
 
-Бэкап `release.jks`, `keystore.properties` и паролей сделан минимум в двух местах вне
-репозитория. Не публикуй и не коммить эти файлы.
+- [ ] Все intended изменения v1.2.0 находятся в одной проверяемой ветке; рабочее дерево
+  не содержит случайных файлов, ключей или локальных конфигов.
+- [ ] `app/build.gradle` подтверждает `versionName "1.2.0"` и `versionCode 4`.
+- [ ] В `CHANGELOG.md` есть финальный раздел `[1.2.0]`, а
+  `metadata/en-US/changelogs/4.txt` соответствует ему.
+- [ ] Новые татарские строки вычитаны носителем; имя проверяющего, дата и исправления
+  записаны. Автоматическая/AI-проверка не заменяет этот пункт.
+- [ ] `git diff --check` и просмотр полного diff прошли перед release commit.
 
-## Шаг 2. Репозиторий и публичные страницы
+## 2. Автоматические локальные gates
 
-- [x] Репозиторий создан: https://github.com/dExNight/tatar-keyboard
-- [x] URL политики и лицензии в приложении указывают на этот репозиторий
-- [ ] Повторить анонимную проверку Public: пользователь сообщил о переключении 2026-07-22,
-  но web/API/raw endpoints во время release-close отвечали HTTP 404
-- [ ] Без авторизации открыть репозиторий, `PRIVACY.md` и `LICENSE`: на release-close все
-  три проверки получили HTTP 404, поэтому доступность для GitHub Release/Izzy не доказана
-
-Расхождение Public не блокирует создание тега по прямому решению пользователя, но должно
-быть закрыто до GitHub Release и заявки IzzyOnDroid.
-
-## Шаг 3. GitHub Actions и негативный тест no-INTERNET — waiver для v1.1.0
-
-- [x] Пользователь 2026-07-22 явно разрешил продолжить без проверки GitHub Actions;
-  green/red статусы не считаются подтверждёнными, но не блокируют тег `v1.1.0`
-- [ ] На вкладке **Actions** убедиться, что последний CI для `main` зелёный — не проверено,
-  waived для тега `v1.1.0`
-- [ ] Найти прогон ветки `ci-negative-test` для коммита `468ee6a` и убедиться, что он
-  красный именно из-за no-INTERNET-гейта — не проверено, waived для тега `v1.1.0`
-- [ ] Только после подтверждения удалить тестовую ветку:
+Запускать из чистого checkout с JDK 17 и Android SDK. Локальный signing config должен
+оставаться git-ignored; секреты не копируются в CI.
 
 ```sh
-git push origin --delete ci-negative-test
-git branch -D ci-negative-test
-```
-
-Ветку `ci-negative-test` не сливать: она основана на старом состоянии проекта и намеренно
-добавляет `android.permission.INTERNET`.
-
-## Шаг 4. Проверки на устройстве
-
-- [x] Татарский UI и экраны приложения — PASS по подтверждению пользователя 2026-07-22
-- [x] TalkBack-UAT A1–A4 — PASS по подтверждению пользователя 2026-07-22
-- [x] PERF-02a: PSS показанной клавиатуры не больше 30 720 КБ — PASS по подтверждению
-  пользователя 2026-07-22; исходные три числовых значения не записаны
-- [x] PERF-02b: холодный старт меньше 400 мс — PASS по подтверждению пользователя
-  2026-07-22; исходные пять значений и медиана не записаны
-- [ ] PERF-03: аллокации/GC/janky frames — нового результата пользователь не сообщал;
-  PASS не утверждается. Требование остаётся открытым и переносится после тега: прямая
-  команда пользователя создать `v1.1.0` делает его неблокирующим только для этого тега
-
-PERF-команды и место для результатов находятся в
-`.planning/milestones/v1.0-phases/11-proizvoditelnost-i-reliz/11-PERF-CHECKLIST.md`.
-
-## Шаг 5. Финальная локальная сборка
-
-- [x] В `app/build.gradle`: `versionName "1.1.0"`, `versionCode 3`
-- [x] В `CHANGELOG.md` подготовлен раздел `[1.1.0]`
-- [x] В `metadata/en-US/changelogs/3.txt` подготовлено краткое описание для
-  `versionCode 3`
-- [x] Выполнены локальные гейты:
-
-```sh
-./gradlew assembleDebug --rerun-tasks --console=plain
+./gradlew clean test lintVitalRelease assembleDebug assembleRelease \
+  --rerun-tasks --console=plain
 bash scripts/check-no-internet.sh app/build/outputs/apk/debug/app-debug.apk
-./gradlew test --rerun-tasks --console=plain
-./gradlew lintVitalRelease --rerun-tasks --console=plain
-./gradlew clean lintVitalRelease assembleRelease --rerun-tasks --console=plain
 bash scripts/check-no-internet.sh app/build/outputs/apk/release/app-release.apk
-apksigner verify --verbose app/build/outputs/apk/release/app-release.apk
-stat -f%z app/build/outputs/apk/release/app-release.apk
+apksigner verify --verbose --print-certs \
+  app/build/outputs/apk/release/app-release.apk
 ```
 
-- [x] `assembleDebug`, `lintVitalRelease` и финальный `assembleRelease` прошли; Gradle
-  завершил чистую release-сборку за 12 секунд (`45 actionable tasks`)
-- [x] `./gradlew test` прошёл, но тестовых исходников в проекте нет: задачи unit-тестов
-  имеют статус `NO-SOURCE`, поэтому это только проверка task graph, а не поведения
-- [x] `check-no-internet.sh` прошёл для debug и release APK; в merged manifest release
-  присутствует только `android.permission.VIBRATE`, разрешения `INTERNET` нет
-- [x] `apksigner verify --verbose` подтвердил одного подписанта и валидную подпись APK
-  Signature Scheme v2
-- [x] SHA-256 сертификата подписанта совпадает с APK `1.0.1`, поэтому цепочка обновления
-  сохранена; подпись копии в `dist/` также проверена
-- [x] Размер release APK — **832 442 байта**, что меньше лимита 3 145 728 байт
-- [x] `output-metadata.json` и `aapt2 dump badging` подтверждают `versionName 1.1.0` и
-  `versionCode 3`
-- [x] SHA-256 финального `dist/tatar-keyboard-1.1.0.apk`:
-  `071dcbc4ef513f208a4a77b4a600790f90d2f731067c5c4ce11f54d06046ff21`
-- [x] Текущий проверенный `app-release.apk` после последней чистой сборки атомарно
-  скопирован в `dist/`; сразу после копирования `cmp` подтвердил побайтовое совпадение:
+- [ ] Полный JVM unit suite прошёл без failures/errors; записано число тестов.
+- [ ] `lintVitalRelease` завершился `BUILD SUCCESSFUL`.
+- [ ] Debug и signed release APK собраны из того же frozen checkout.
+- [ ] Source, debug APK и release APK не содержат `android.permission.INTERNET`.
+- [ ] Release APK подписан APK Signature Scheme v2; signer certificate совпадает с
+  опубликованным v1.1.0, чтобы сохранить upgrade path.
+- [ ] `output-metadata.json` и `aapt2 dump badging` подтверждают versionCode 4 и
+  versionName 1.2.0.
+- [ ] Единственное запрошенное runtime/platform permission — `VIBRATE`; полный permission
+  dump просмотрен.
+- [ ] APK не превышает 3 145 728 байт; целевой бюджет D1 ≤ 1.7 MB также записан как
+  pass/fail, без подмены абсолютного лимита.
+
+### Evidence финального локального артефакта
+
+Заполнять после последней пересборки; `PENDING` не заменять промежуточными числами.
+
+| Проверка | Результат v1.2.0 |
+|---|---|
+| Frozen commit SHA | `PENDING` |
+| JVM tests | `PENDING` |
+| `lintVitalRelease` | `PENDING` |
+| Manifest version | `PENDING` |
+| Permissions / no-INTERNET | `PENDING` |
+| APK signing schemes | `PENDING` |
+| Signer certificate SHA-256 | `PENDING` |
+| APK size, bytes | `PENDING` |
+| Final APK SHA-256 | `PENDING` |
+
+## 3. Device-UAT и runtime budgets
+
+Host/JVM tests не являются device evidence. Записать устройство, Android/API, клавиатуру
+производителя и сырые измерения там, где требуется метрика.
+
+- [ ] Обычный ввод tt/ru/en не регрессировал; включение/выключение opt-in работает,
+  значение по умолчанию OFF.
+- [ ] Подсказки работают end-to-end для татарского subtype: 0–3 результата, все ячейки
+  и крайние пиксели нажимаются, tap безопасно выполняет exact delete+commit.
+- [ ] Полная privacy matrix скрывает полосу и запрещает lookup/commit в password,
+  email, URI, filter, autocomplete, `NO_SUGGESTIONS`, non-text и selection/mid-word.
+- [ ] TalkBack проверен вручную: обход только заполненных virtual nodes, полные labels,
+  click action, обновление/скрытие и отсутствие stale action.
+- [ ] Samsung/целевое устройство: rotation/recreation, navigation insets, moreKeys,
+  hardware keyboard и `onComputeInsets` не теряют touchable regions.
+- [ ] Total PSS показанной клавиатуры ≤ 30 MB; приложены сырые значения.
+- [ ] Cold start < 400 ms; приложены отдельные прогоны и медиана.
+- [ ] Prefix compute p95 ≤ 5 ms и request→guarded UI publish p95 ≤ 16 ms на целевом
+  устройстве; visible stale results = 0.
+- [ ] Hot draw/touch allocations = 0, janky frames ≤ 1%, FD/PSS не растут на повторных
+  lifecycle cycles; записаны инструменты и результаты.
+
+Полная матрица D1f описана в `PROPOSALS.md` и фазовых документах
+`docs/DICTIONARY-D1B.md`–`docs/DICTIONARY-D1E.md`.
+
+## 4. Финальный distributable
+
+Только после шагов 1–3 атомарно опубликовать проверенный APK в `dist/` и проверить, что
+копия побайтово совпадает с уже проаудированным build output.
 
 ```sh
-release_tmp=$(mktemp dist/.tatar-keyboard-1.1.0.apk.tmp.XXXXXX)
+release_tmp=$(mktemp dist/.tatar-keyboard-1.2.0.apk.tmp.XXXXXX)
 cp app/build/outputs/apk/release/app-release.apk "$release_tmp"
 cmp app/build/outputs/apk/release/app-release.apk "$release_tmp"
-mv -f "$release_tmp" dist/tatar-keyboard-1.1.0.apk
-cmp app/build/outputs/apk/release/app-release.apk dist/tatar-keyboard-1.1.0.apk
-shasum -a 256 dist/tatar-keyboard-1.1.0.apk
+mv -f "$release_tmp" dist/tatar-keyboard-1.2.0.apk
+cmp app/build/outputs/apk/release/app-release.apk dist/tatar-keyboard-1.2.0.apk
+shasum -a 256 dist/tatar-keyboard-1.2.0.apk
+apksigner verify --verbose --print-certs dist/tatar-keyboard-1.2.0.apk
 ```
 
-Новая `assembleRelease` создаёт нового кандидата: после любой пересборки повтори
-проверки подписи, версии, разрешений и размера, заново замени файл в `dist/` и обнови
-SHA-256 выше. Совпадение SHA-256 между отдельными подписанными сборками не требуется и
-не заявляется.
+- [ ] `dist/tatar-keyboard-1.2.0.apk` совпадает с audited build output.
+- [ ] SHA-256 и все поля evidence выше обновлены после копирования.
+- [ ] Повторная сборка после этого шага не выполнялась; иначе весь artifact audit и
+  публикация в `dist/` повторены.
 
-## Шаг 6. Коммит и push релизной подготовки
+## 5. Commit, push и CI
 
-- [x] Перед коммитом проверены `git diff` и `git status --short`; `HANDOFF.md`, ключи и
-  APK не попали в release-preparation commit
-- [x] Проверенные изменения релиза закоммичены; commit `45f9831` присутствует в `main`
-- [x] `main` запушен; локальный `main` и `origin/main` синхронизированы
-- [x] Ожидание green CI снято для `v1.1.0` явным решением пользователя 2026-07-22;
-  фактический результат Actions не проверен и не утверждается
+- [ ] Release-status commit содержит только проверенные исходники, metadata и
+  документацию; APK, keystore, passwords и локальные конфиги не попали в git.
+- [ ] `codex/d1-sequential` запушена по SSH; remote SHA совпадает с локальным.
+- [ ] После merge целевая `main` указывает на audited frozen commit.
+- [ ] Анонимно открываются репозиторий, `LICENSE`, `PRIVACY.md` и raw-файлы. Текущий
+  HTTP 404 означает, что этот gate пока открыт.
+- [ ] GitHub Actions для frozen commit зелёный и явно содержит unit tests,
+  `lintVitalRelease`, build, APK-size и no-INTERNET gates. Локальный pass не считается
+  подтверждением Actions.
+- [ ] Негативная no-INTERNET ветка/commit действительно даёт красный CI именно на
+  permission gate; после проверки она удалена и не слита.
 
-## Шаг 7. Тег v1.1.0
+## 6. Tag и GitHub Release
 
-Создавать тег только на запушенном финальном release-status commit после freeze-проверок
-версии и APK. Открытые Public, CI и PERF-03 явно записаны выше как неподтверждённые,
-waived/deferred и неблокирующие тег по прямому решению пользователя 2026-07-22.
+Не создавать tag/Release, пока шаги 1–5 не закрыты и GitHub не доступен анонимно.
 
 ```sh
-git tag v1.1.0
-git push origin v1.1.0
+git tag -a v1.2.0 -m "Tatar Keyboard 1.2.0"
+git push origin v1.2.0
 ```
 
-- [ ] Тег `v1.1.0` появился на GitHub и указывает на тот же commit SHA, что и проверенный
-  релизный коммит
+- [ ] Tag `v1.2.0` существует на remote и указывает на audited frozen commit.
+- [ ] GitHub Release имеет title `Tatar Keyboard 1.2.0`, release notes соответствуют
+  `[1.2.0]` в CHANGELOG и содержит только `tatar-keyboard-1.2.0.apk`.
+- [ ] APK скачан из Release без авторизации; его SHA-256, подпись, version и permissions
+  повторно совпали с локальным evidence.
 
-## Шаг 8. GitHub Release — готовый draft
+## 7. IzzyOnDroid — актуальный процесс Codeberg
 
-1. Открыть https://github.com/dExNight/tatar-keyboard/releases/new
-2. Выбрать тег **v1.1.0**
-3. Точный title: **Tatar Keyboard 1.1.0**
-4. Точный body (совпадает с разделом `[1.1.0]` в CHANGELOG):
+Старая инструкция через GitLab `IzzyOnDroid/repo` больше не используется. После
+публичного GitHub Release открыть
+https://codeberg.org/IzzyOnDroid/repodata/issues/new/choose и выбрать точный шаблон
+**App Inclusion Request** (`.forgejo/issue_template/app-inclusion-request.yaml`).
 
-```markdown
-Татарский интерфейс, обновлённые экраны приложения и улучшения доступности.
+В форме указать source URL, Apache-2.0 для кода, отдельную CC BY 4.0 атрибуцию данных
+словаря, категорию Writing, описание, CLI build instructions, Fastlane metadata и ссылку
+на публичный v1.2.0 Release. До подачи отдельно сверить актуальную
+[App Inclusion Policy](https://izzyondroid.org/docs/general/AppInclusionPolicy/).
 
-### Татарский интерфейс
+### Обязательное честное раскрытие AI assistance
 
-- Добавлен полный татарский перевод настроек, онбординга и строк TalkBack
-- Перевод прошёл лингвистическую проверку; финальные формулировки и терминология подтверждены носителем языка
+Для текущей разработки указывать как минимум:
 
-### Доступность
+- **Assistance Level:** `Substantial – Used throughout development`;
+- **AI Tool(s):** `OpenAI Codex; Kiro AI agent sessions`;
+- **What did the tools help with:** архитектура, реализация отдельных модулей, тесты,
+  adversarial review/debugging, документация и release automation.
 
-- Альтернативы по долгому нажатию стали доступны в TalkBack: символы можно услышать и выбрать проводкой пальца
-- Пробел озвучивает текущий язык клавиатуры
-- TalkBack сообщает об изменениях статусов онбординга и ручном переключении Shift/Caps Lock
+Не отмечать checkbox **“The human developer(s) reviewed and edited all AI-generated
+outputs”**, пока человек действительно не просмотрел и при необходимости не исправил
+все AI-generated изменения. Не отмечать **“ran manual tests and manually verified all
+changes”**, пока шаг 3 не выполнен человеком на устройстве. Наличие автоматических
+тестов, agent review или этот checklist не удовлетворяют этим двум утверждениям.
 
-### Интерфейс приложения
+- [ ] Inclusion request создан только после публичного Release и заполнен без
+  неподтверждённых human-review/manual-test claims.
+- [ ] После фактического включения приложение найдено в IzzyOnDroid, установка и update
+  подписанным APK проверены.
+- [ ] Только после включения добавлен рабочий IzzyOnDroid badge и закрыты внешние
+  publication requirements.
 
-- Онбординг, настройки и управление языками получили единый карточный интерфейс со светлым и тёмным оформлением
-- Экраны настроек переведены с устаревшего `android.preference` на лёгкие нативные View без новых зависимостей
-```
+## Историческая справка v1.1.0
 
-5. Приложить **`tatar-keyboard-1.1.0.apk`** из шага 5
-6. Перед Publish ещё раз проверить title, tag, имя APK и размер
-7. Опубликовать Release
-
-- [ ] Release опубликован, APK скачивается без авторизации и его подпись проверяется
-
-## Шаг 9. Заявка IzzyOnDroid
-
-1. Открыть https://gitlab.com/IzzyOnDroid/repo/-/issues/new
-2. Выбрать шаблон **App inclusion request**
-3. Указать URL `https://github.com/dExNight/tatar-keyboard`
-4. Сослаться на Release `v1.1.0`, лицензию Apache-2.0 и `PRIVACY.md`
-
-- [ ] Заявка создана только после появления публичного Release с подписанным APK
-
-## Шаг 10. После включения в IzzyOnDroid
-
-- [ ] Добавить рабочий бейдж IzzyOnDroid в README отдельным коммитом
-- [ ] Только после фактической публикации закрыть REL-02/REL-03 в
-  `.planning/REQUIREMENTS.md`
+Проверенный v1.1.0 APK имел размер 832 442 байта, валидную v2-подпись и SHA-256
+`071dcbc4ef513f208a4a77b4a600790f90d2f731067c5c4ce11f54d06046ff21`.
+Использовать его только для сравнения signer certificate/upgrade path; его build, UAT
+или waiver не закрывают ни один checkbox v1.2.0.

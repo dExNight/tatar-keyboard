@@ -17,7 +17,9 @@
 
 ## Статус выполнения
 
-Обновлено 24.07.2026. Ветка `codex/d1-sequential` (от `2e72f6c`); `main` не изменялся; `origin` на `80f332c` (D1e ещё не запушен).
+Обновлено 24.07.2026. Работа ведётся в `codex/d1-sequential`; D1e зафиксирована в
+локальной истории до `a277283`, release hardening 1.2.0 выполняется поверх неё. Ветка
+остаётся впереди `origin/codex/d1-sequential`; merge/tag/release ещё не выполнялись.
 
 | Фаза | Статус | Коммит | Примечание |
 |---|---|---|---|
@@ -25,12 +27,18 @@
 | D1b — атомарное сжатое хранилище | ✅ выполнено | `037f3ea` | lease/lifecycle, fail-closed, device-protected storage |
 | D1c — сенсорная Canvas-полоса | ✅ выполнено | `f47000a` | 40dp, insets/touchable-region, a11y virtual nodes |
 | D1d — mmap prefix engine | ✅ выполнено | `80f332c` | latest-only/coalescing, immutable prefix, без гонок |
-| D1e — интеграция, opt-in, privacy, a11y | ✅ выполнено | `7c7777c` + текущий fix | два HIGH runtime interleaving устранены; пять обязательных regression tests и дополнительный no-op guard зелёные; независимый аудит `APPROVED` |
-| D1f — общие gates + device-UAT | ⏳ открыто | — | D1e больше не блокирует фазу; нужны финальная clean matrix и полная device-UAT |
+| D1e — интеграция, opt-in, privacy, a11y | ✅ выполнено | `7c7777c`, `a277283` + hardening | runtime interleavings, warm-engine re-lookup и preparing/unavailable state устранены; пять обязательных и пять дополнительных regression tests зелёные; локальный re-audit одобрен, D1f/device-UAT/native proofread/publish открыты |
+| D1f — общие gates + device-UAT | ⏳ открыто | — | JVM и `lintVitalRelease` hardening-checks зелёные; финальная clean artifact matrix и device-UAT ещё обязательны |
 
-Зафиксированные зелёные automated gates D1e (прогнаны на Mac, Gradle 9.6): после runtime-fix весь JVM-набор — **136 tests, 0 failures/errors** (`SuggestionsControllerTest` — 29), `assembleRelease` — `BUILD SUCCESSFUL`; подписанный APK проверен `apksigner` (v2), no-INTERNET на APK — PASS (только `VIBRATE`), размер **1 445 067 B**, значительно ниже целевого лимита 1.7 МБ. Ранее `lintVitalRelease` проходил на D1e до runtime-fix; его финальный clean-прогон вместе с полной release-матрицей остаётся в D1f. Это не device evidence. Подробности — `docs/DICTIONARY-D1E.md`.
+Текущий release-hardening прогон на Mac, Gradle 9.6: весь JVM-набор — **140 tests,
+0 failures/errors** (`SuggestionsControllerTest` — 33), `lintVitalRelease --rerun-tasks` —
+**BUILD SUCCESSFUL**. Исторический D1e artifact gate также проходил, но был выполнен до
+bump до 1.2.0/vc4 и не заменяет финальную clean build/signing/no-INTERNET/version/size
+matrix. Это не device evidence. Подробности — `docs/DICTIONARY-D1E.md`.
 
-Осталось перед фактическим выпуском: финальная версия 1.2.0/vc4 и changelog, clean release-gates, versioned signed artifact, device-UAT, вычитка новых татарских строк носителем, push/merge/tag и публикация.
+Версия 1.2.0/vc4 и changelog подготовлены. Перед фактическим выпуском остаются clean
+release-gates, versioned signed artifact, device-UAT, отдельно подтверждённая вычитка
+новых татарских строк, push/merge/tag и публикация.
 
 ## Устранённые D1e runtime-блокеры
 
@@ -42,6 +50,14 @@
   exact displayed prefix/session. При переходе text A→text B binding старых A немедленно
   инвалидируется; tap(old A) после B — no-op и не может выполнить
   `commit(B, candidateA)`.
+- ✅ **Hardening — warm-engine lifecycle re-entry.** При `tt→ru→tt` и при открытии
+  нового eligible field уже опубликованный engine немедленно повторно запрашивает
+  текущий известный непустой cached prefix. Cold и in-flight engine не получают
+  дублирующий запрос: их единственный lookup выполняется после публикации engine.
+- ✅ **Hardening — finished/preparing fail-closed state.** `onFinishInput` закрывает
+  eligibility до позднего readiness callback; такой callback не запускает engine. При
+  подготовке словаря или неуспешном engine полоса остаётся `GONE`/0dp и резервируется
+  только после успешной публикации engine.
 
 Реализованные детерминированные regression tests, закрывающие D1e:
 
@@ -51,9 +67,20 @@
 - ✅ late readiness callback after destroy → engine/lookup не запускаются;
 - ✅ `show(A) → text(B) → tap(old A)` → текст не изменяется;
 - ✅ актуальный result B и tap(B) по-прежнему безопасно выполняют commit.
+- ✅ `tt→ru→tt` с warm engine → текущий prefix запрашивается повторно без restart или
+  cold-engine duplicate.
+- ✅ readiness после `onFinishInput` → engine/lookup не запускаются, полоса остаётся
+  скрытой.
+- ✅ уже поставленный в очередь engine publish после `onFinishInput` → handle немедленно
+  получает `finishInput`, lookup/reserve не выполняются.
+- ✅ новый eligible field с retained warm engine → текущий cached prefix
+  запрашивается ровно один раз без restart factory и без дополнительного keystroke.
 
-Все пять обязательных тестов и дополнительный `tapWithNothingDisplayedIsNoOp` проходят;
-D1e закрыто. Неблокирующий warm-engine re-lookup после tt→ru→tt вынесен в D1f hardening.
+Все пять обязательных тестов, `tapWithNothingDisplayedIsNoOp` и
+`subtypeChangeToEligibleWithWarmEngineReRequestsCurrentPrefix`,
+`eligibleStartWithWarmEngineReRequestsCurrentPrefix`, а также fail-closed тест
+readiness после finish проходят; D1e закрыто.
+Полная D1f artifact/device matrix остаётся открытой.
 
 ## Инварианты и бюджеты D1
 
@@ -244,15 +271,18 @@ matrix, а не заменяется накопленными быстрыми �
 - Stale tap или рассинхрон кэша не меняет текст.
 - Полная editor/privacy matrix, word-boundary/casing и TalkBack tests зелёные.
 - Все пять детерминированных regression tests из раздела runtime-блокеров обязательны и
-  зелёные; без них D1e не выполнено, а D1f, merge и release запрещены.
+  зелёные; дополнительные no-op, warm-engine subtype-return и late readiness/publish
+  after finish тесты также зелёные. Без них D1e не выполнено, а D1f, merge и release
+  запрещены.
 - No-go: обход gate, default не OFF или изменение текста без повторной валидации.
 
 ## D1f — общие gates и device-UAT
 
-**Gate:** D1f разблокирована: оба D1e runtime-блокера устранены, все пять обязательных
-детерминированных regression tests зелёные. Для завершения D1 всё ещё обязательны полная
-clean build/lint/no-INTERNET/signing matrix и device-UAT; накопленные отдельные gates их
-не заменяют.
+**Gate:** D1f разблокирована: оба D1e runtime-блокера и warm-engine gap устранены, пять
+обязательных и пять дополнительных детерминированных regression tests зелёные. Текущие
+JVM и `lintVitalRelease` hardening-checks не означают завершение D1f: всё ещё обязательны
+полная clean build/no-INTERNET/signing/version/size matrix и device-UAT; накопленные
+отдельные gates их не заменяют.
 
 - Build/lint/no-INTERNET; signed APK, PSS, cold start, compute и end-to-end latency.
 - Allocation/frame tests полосы; race/lifecycle/failure/editor regression suite.
