@@ -46,6 +46,14 @@ interface EditorSurface {
     fun cachedWordBeforeCursor(): String
     fun commitSuggestion(expectedPrefix: String, suggestion: String): Boolean
     fun hasKnownCursor(): Boolean
+
+    /**
+     * True when the cursor sits inside a word, i.e. the text right after it starts with a letter
+     * (or with a combining mark, which can only continue one). Typing in the middle of a word is
+     * not supported by the frozen contract: the results are cleared instead, because replacing the
+     * trailing word would splice the suggestion into the user's text.
+     */
+    fun hasLetterAfterCursor(): Boolean
 }
 
 /**
@@ -132,7 +140,7 @@ class SuggestionsController private constructor(
     // Monotonic edit-session counter. Bumped on every lifecycle boundary so results computed for an
     // older editor state are dropped even if the engine's own generation check would still pass.
     private var sessionId: Long = 0L
-    private var requestSessionId: Long = -1L
+    private var requestSessionId: Long = NO_SESSION
 
     // The latest prefix a lookup was requested for. Not what is on screen; see [displayedPrefix].
     private var pendingPrefix: String = ""
@@ -142,7 +150,7 @@ class SuggestionsController private constructor(
     // instant those words are cleared or superseded. A tap is bound to THIS value, never to the
     // mutable [pendingPrefix], so a stale candidate can never commit against a newer prefix.
     private var displayedPrefix: String? = null
-    private var displayedSessionId: Long = -1L
+    private var displayedSessionId: Long = NO_SESSION
 
     fun onCreate() {
         strip.setTapListener(SuggestionTapListener { suggestion -> onTap(suggestion) })
@@ -240,6 +248,12 @@ class SuggestionsController private constructor(
                 // Cold, preparing and unavailable engines all stay GONE until publish succeeds.
                 strip.hideSuggestions()
             }
+            // The strip view is created lazily, so a listener registered while it did not exist
+            // yet was silently dropped. Switching INTO the Tatar subtype with the globe key in an
+            // already-open field is a routine path for a bilingual user and may be the first
+            // moment the strip exists, so (re)wire the tap listener exactly like onStartInput()
+            // does; without this a tap would do nothing for the rest of the editor session.
+            strip.setTapListener(SuggestionTapListener { suggestion -> onTap(suggestion) })
             // Switching INTO an eligible subtype in an already-open field must start the engine
             // (if not already running); a freshly started engine looks up the current prefix from
             // publishEngine(). An already-published engine has no publish callback to do that work,
@@ -367,6 +381,10 @@ class SuggestionsController private constructor(
      * prefix changes so stale candidates cannot be tapped in the window before the fresh result
      * arrives. Reused verbatim by [onTextChanged] and by [publishEngine] right after a successful
      * engine publish.
+     *
+     * It is also where the frozen text contract's two "0 results" states are enforced, both
+     * BEFORE the engine is asked anything: a cursor sitting inside a word, and a prefix in mixed
+     * capitalization.
      */
     private fun requestCurrentPrefix() {
         if (!eligible) return
@@ -379,14 +397,26 @@ class SuggestionsController private constructor(
             return
         }
         if (!editor.hasKnownCursor()) {
-            displayedPrefix = null
-            strip.reserve()
+            clearToReservedBand()
             return
         }
         val word = editor.cachedWordBeforeCursor()
         if (word.isEmpty()) {
-            displayedPrefix = null
-            strip.reserve()
+            clearToReservedBand()
+            return
+        }
+        // Cursor inside a word: the contract clears the results instead of offering a replacement
+        // that would be spliced into the middle of the user's text ("ки|тап" + "т" must not become
+        // "китапларtап"). Checked before the lookup so the engine is never even asked.
+        if (editor.hasLetterAfterCursor()) {
+            clearToReservedBand()
+            return
+        }
+        // Mixed capitalization has no defined display form in the frozen contract, which requires
+        // 0 results for it. Classified on the RAW prefix, before NFC/lowercase folding.
+        val casing = TatarWordUtils.classifyCasing(word)
+        if (casing == TatarWordUtils.PrefixCasing.MIXED) {
+            clearToReservedBand()
             return
         }
         // Prefix changed relative to what is on screen: invalidate the displayed candidates NOW so
@@ -400,9 +430,21 @@ class SuggestionsController private constructor(
         val prefixBytes = TatarWordUtils.toLookupBytes(TatarWordUtils.normalizeForLookup(word))
         val token = activeEngine.request(sessionId, SUBTYPE_ID, prefixBytes)
         if (token == null) {
-            displayedPrefix = null
-            strip.reserve()
+            clearToReservedBand()
         }
+    }
+
+    /**
+     * Publishes the empty-but-visible band and unbinds everything the strip was showing.
+     *
+     * The in-flight request generation is invalidated too: these paths deliberately do NOT issue a
+     * new lookup, so the engine would still consider an older token current and a late result
+     * could repaint words for text the user has already left. Clearing means clearing.
+     */
+    private fun clearToReservedBand() {
+        displayedPrefix = null
+        requestSessionId = NO_SESSION
+        strip.reserve()
     }
 
     private fun applyResult(token: Any, suggestions: List<String>) {
@@ -419,10 +461,15 @@ class SuggestionsController private constructor(
         // prefix these candidates were computed for. Bind the displayed candidates to it atomically.
         displayedPrefix = pendingPrefix
         displayedSessionId = sessionId
+        // Ranking runs on the normalized lowercase forms, so the typed capitalization is re-applied
+        // here, after ranking and to the candidates that are actually shown. The casing comes from
+        // the prefix this result was computed for, never from the live editor state, and the strip
+        // hands the very same string back on tap, so the displayed and the inserted form match.
+        val casing = TatarWordUtils.classifyCasing(pendingPrefix)
         strip.showSuggestions(
-            suggestions[0],
-            suggestions.getOrNull(1),
-            suggestions.getOrNull(2),
+            TatarWordUtils.applyCasing(suggestions[0], casing),
+            suggestions.getOrNull(1)?.let { TatarWordUtils.applyCasing(it, casing) },
+            suggestions.getOrNull(2)?.let { TatarWordUtils.applyCasing(it, casing) },
         )
     }
 
@@ -447,5 +494,9 @@ class SuggestionsController private constructor(
     companion object {
         private const val SUBTYPE_ID = "tt_RU"
         private const val DESTROY_TIMEOUT_MS = 60L
+
+        // Sentinel for "no request is outstanding". [sessionId] starts at 0 and only ever grows,
+        // so this can never be mistaken for a live generation.
+        private const val NO_SESSION = -1L
     }
 }

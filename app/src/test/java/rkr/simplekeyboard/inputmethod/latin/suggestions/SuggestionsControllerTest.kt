@@ -63,6 +63,9 @@ class SuggestionsControllerTest {
         var word: String = ""
         var commitResult: Boolean = true
         var knownCursor: Boolean = true
+
+        /** Raw text right after the cursor; classified by the production predicate. */
+        var textAfterCursor: String = ""
         val commits = mutableListOf<Pair<String, String>>()
 
         override fun cachedWordBeforeCursor(): String = word
@@ -73,6 +76,9 @@ class SuggestionsControllerTest {
         }
 
         override fun hasKnownCursor(): Boolean = knownCursor
+
+        override fun hasLetterAfterCursor(): Boolean =
+            TatarWordUtils.startsWithWordCharacter(textAfterCursor)
     }
 
     private class FakeEngine : EngineHandle {
@@ -773,5 +779,187 @@ class SuggestionsControllerTest {
         h.controller.onSubtypeChanged(eligible = false)
 
         assertEquals(hideBefore + 1, h.strip.hideCount)
+    }
+
+    // --- Tap listener across subtype activation -------------------------------------------------
+
+    @Test
+    fun subtypeChangeToEligibleRewiresTapListenerSoTapsStillCommit() {
+        val h = Harness()
+        h.controller.onStartInput(eligible = true)
+
+        // The strip view is created lazily: model the production case where the listener the
+        // controller installed never reached a real view (the band had not been inflated yet).
+        h.strip.listener = null
+
+        h.editor.word = "сүз"
+        h.controller.onSubtypeChanged(eligible = true)
+
+        assertNotNull(h.strip.listener)
+
+        // The re-registered listener must be live: a tap on a displayed candidate commits.
+        h.capturedCallback!!.onResult(FakeEngine.TOKEN, listOf("сүзләр", "сүзлек"))
+        h.strip.listener!!.onTap("сүзләр")
+
+        assertEquals(listOf("сүз" to "сүзләр"), h.editor.commits)
+    }
+
+    // --- Right context: no replacement in the middle of a word ---------------------------------
+
+    @Test
+    fun letterAfterCursorClearsResultsAndNeverRequests() {
+        val h = Harness()
+        h.controller.onStartInput(eligible = true)
+        val reserveBefore = h.strip.reserveCount
+        val hideBefore = h.strip.hideCount
+
+        // "ки|тап" with a freshly typed "т": the trailing word is "кит", but replacing it would
+        // splice the candidate into the middle of the user's text.
+        h.editor.word = "кит"
+        h.editor.textAfterCursor = "ап"
+        h.controller.onTextChanged()
+
+        assertTrue(h.engine.requestedPrefixes.isEmpty())
+        assertEquals(reserveBefore + 1, h.strip.reserveCount)
+        assertEquals(hideBefore, h.strip.hideCount)
+        assertTrue(h.strip.shown.isEmpty())
+    }
+
+    @Test
+    fun tapIsNoOpWhileTheCursorSitsInsideAWord() {
+        val h = Harness()
+        h.controller.onStartInput(eligible = true)
+
+        // Candidates are displayed for a word typed at the end of the text.
+        h.editor.word = "кит"
+        h.controller.onTextChanged()
+        h.capturedCallback!!.onResult(FakeEngine.TOKEN, listOf("китап", "китаплар"))
+        assertEquals(1, h.strip.shown.size)
+
+        // The cursor then ends up inside a word (the user typed into "ки|тап"). The next text
+        // event must unbind the candidates, and a late result for the old request must not
+        // re-display them, so a tap cannot commit.
+        h.editor.textAfterCursor = "ап"
+        h.controller.onTextChanged()
+        h.capturedCallback!!.onResult(FakeEngine.TOKEN, listOf("китап", "китаплар"))
+        h.strip.listener!!.onTap("китаплар")
+
+        assertEquals(1, h.strip.shown.size)
+        assertTrue(h.editor.commits.isEmpty())
+    }
+
+    @Test
+    fun nonLetterAfterCursorKeepsRequestingAsBefore() {
+        val h = Harness()
+        h.controller.onStartInput(eligible = true)
+        h.editor.word = "сүз"
+
+        // A space, punctuation and the end of the text all end the word: business as usual.
+        h.editor.textAfterCursor = " дигән"
+        h.controller.onTextChanged()
+        h.editor.textAfterCursor = ", дигән"
+        h.controller.onTextChanged()
+        h.editor.textAfterCursor = ""
+        h.controller.onTextChanged()
+
+        assertEquals(3, h.engine.requestedPrefixes.size)
+        h.engine.requestedPrefixes.forEach {
+            assertTrue(it.contentEquals("сүз".toByteArray(Charsets.UTF_8)))
+        }
+    }
+
+    // --- Casing contract -----------------------------------------------------------------------
+
+    @Test
+    fun lowerCasePrefixShowsAndCommitsDictionaryFormUnchanged() {
+        val h = Harness()
+        h.controller.onStartInput(eligible = true)
+
+        h.editor.word = "сүз"
+        h.controller.onTextChanged()
+        h.capturedCallback!!.onResult(FakeEngine.TOKEN, listOf("сүзләр", "сүзлек", "сүзсез"))
+
+        assertEquals(Triple("сүзләр", "сүзлек", "сүзсез"), h.strip.shown.single())
+
+        h.strip.listener!!.onTap("сүзләр")
+        assertEquals(listOf("сүз" to "сүзләр"), h.editor.commits)
+    }
+
+    @Test
+    fun initialCapsPrefixShowsAndCommitsInitialCapsForms() {
+        val h = Harness()
+        h.controller.onStartInput(eligible = true)
+
+        h.editor.word = "Сүз"
+        h.controller.onTextChanged()
+        // The lookup key is always the normalized lowercase form.
+        assertTrue(
+            h.engine.requestedPrefixes.single()
+                .contentEquals("сүз".toByteArray(Charsets.UTF_8)),
+        )
+        h.capturedCallback!!.onResult(FakeEngine.TOKEN, listOf("сүзләр", "сүзлек", "сүзсез"))
+
+        assertEquals(Triple("Сүзләр", "Сүзлек", "Сүзсез"), h.strip.shown.single())
+
+        // The inserted form is exactly the displayed one; the guard prefix stays the raw word.
+        h.strip.listener!!.onTap("Сүзләр")
+        assertEquals(listOf("Сүз" to "Сүзләр"), h.editor.commits)
+    }
+
+    @Test
+    fun allCapsPrefixShowsAndCommitsAllCapsForms() {
+        val h = Harness()
+        h.controller.onStartInput(eligible = true)
+
+        h.editor.word = "СҮЗ"
+        h.controller.onTextChanged()
+        h.capturedCallback!!.onResult(FakeEngine.TOKEN, listOf("сүзләр", "сүзлек"))
+
+        assertEquals(Triple("СҮЗЛӘР", "СҮЗЛЕК", null), h.strip.shown.single())
+
+        h.strip.listener!!.onTap("СҮЗЛӘР")
+        assertEquals(listOf("СҮЗ" to "СҮЗЛӘР"), h.editor.commits)
+    }
+
+    @Test
+    fun mixedCasePrefixYieldsNoRequestAndAnEmptyBand() {
+        val h = Harness()
+        h.controller.onStartInput(eligible = true)
+        val reserveBefore = h.strip.reserveCount
+        val hideBefore = h.strip.hideCount
+
+        h.editor.word = "сҮз"
+        h.controller.onTextChanged()
+
+        assertTrue(h.engine.requestedPrefixes.isEmpty())
+        assertEquals(reserveBefore + 1, h.strip.reserveCount)
+        assertEquals(hideBefore, h.strip.hideCount)
+
+        // Nothing is bound, so nothing can be tapped either.
+        h.strip.listener!!.onTap("сүзләр")
+        assertTrue(h.strip.shown.isEmpty())
+        assertTrue(h.editor.commits.isEmpty())
+    }
+
+    // --- Internal cursor gestures --------------------------------------------------------------
+
+    @Test
+    fun internalCursorGestureUnbindsDisplayedCandidates() {
+        val h = Harness()
+        h.controller.onStartInput(eligible = true)
+        h.editor.word = "сүз"
+        h.controller.onTextChanged()
+        h.capturedCallback!!.onResult(FakeEngine.TOKEN, listOf("сүзләр", "сүзлек"))
+        assertEquals(1, h.strip.shown.size)
+        val reserveBefore = h.strip.reserveCount
+
+        // A space slide / delete swipe performed by the keyboard itself notifies the controller
+        // directly, because the connection keeps the expected selection in sync and the framework
+        // callback reports no external move.
+        h.controller.onSelectionChanged()
+
+        assertEquals(reserveBefore + 1, h.strip.reserveCount)
+        h.strip.listener!!.onTap("сүзләр")
+        assertTrue(h.editor.commits.isEmpty())
     }
 }

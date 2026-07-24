@@ -306,6 +306,20 @@ public final class RichInputConnection {
         return mTextBeforeCursor == null ? "" : mTextBeforeCursor;
     }
 
+    /**
+     * Returns the cached text after the cursor without any IPC to the editor.
+     *
+     * <p>Same contract as {@link #getCachedTextBeforeCursor}: reads only the local cache, never
+     * calls {@link android.view.inputmethod.InputConnection}, and must be called on the UI thread.
+     * The returned text is potentially sensitive and must never be logged.
+     *
+     * @return the cached after-cursor text, or the empty string if it is not available.
+     */
+    public CharSequence getCachedTextAfterCursor() {
+        // Never initiates IPC; reads only the local cache. Do not log the returned value.
+        return mTextAfterCursor == null ? "" : mTextAfterCursor;
+    }
+
     public int getCodePointBeforeCursor() {
         final int length = mTextBeforeCursor.length();
         if (length < 1) return Constants.NOT_A_CODE;

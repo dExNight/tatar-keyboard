@@ -363,6 +363,12 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
             public boolean hasKnownCursor() {
                 return mInputLogic.mConnection.hasCursorPosition();
             }
+
+            @Override
+            public boolean hasLetterAfterCursor() {
+                return TatarWordUtils.INSTANCE.startsWithWordCharacter(
+                        mInputLogic.mConnection.getCachedTextAfterCursor());
+            }
         };
 
         final Function1<ResultCallback, EngineHandle> engineFactory =
@@ -834,12 +840,17 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
             mInputLogic.mConnection.setSelection(start, end);
             hapticTickFeedback();
         } else {
+            final boolean moved = steps != 0;
             for (; steps < 0; steps++)
                 mInputLogic.sendDownUpKeyEvent(KeyEvent.KEYCODE_DPAD_LEFT);
             for (; steps > 0; steps--)
                 mInputLogic.sendDownUpKeyEvent(KeyEvent.KEYCODE_DPAD_RIGHT);
             hapticTickFeedback();
+            if (!moved) {
+                return;
+            }
         }
+        onSuggestionsAffectingCursorMove();
     }
 
     @Override
@@ -854,21 +865,46 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
             mInputLogic.mConnection.setSelection(start, end);
             hapticTickFeedback();
         } else {
+            final boolean deleted = steps != 0;
             for (; steps < 0; steps++)
                 mInputLogic.sendDownUpKeyEvent(KeyEvent.KEYCODE_DEL);
             hapticTickFeedback();
+            if (!deleted) {
+                return;
+            }
         }
+        onSuggestionsAffectingCursorMove();
     }
 
     @Override
     public void onUpWithDeletePointerActive() {
-        if (mInputLogic.mConnection.hasSelection())
+        if (mInputLogic.mConnection.hasSelection()) {
             mInputLogic.mConnection.deleteSelectedText();
+            onSuggestionsAffectingCursorMove();
+        }
     }
 
     @Override
     public void onUpWithSpacePointerActive() {
         mInputLogic.reloadTextCache();
+        // Only reached after an actual cursor slide, and the reload lands asynchronously, so the
+        // strip must not keep offering candidates bound to the pre-slide cache.
+        onSuggestionsAffectingCursorMove();
+    }
+
+    /**
+     * Invalidates the suggestion strip after the keyboard itself moved the cursor or the
+     * selection (space slide, delete swipe). Those gestures go through
+     * {@link RichInputConnection}, which updates the expected selection as it goes, so
+     * {@link #onUpdateSelection} sees no external move, and it returns early anyway while a
+     * cursor-move gesture is running. Without this direct notification the strip would keep
+     * showing (and accepting taps on) words computed for the position the cursor has left.
+     * Cheap and idempotent: it only bumps the session and clears the band.
+     */
+    private void onSuggestionsAffectingCursorMove() {
+        if (mSuggestionsController != null) {
+            mSuggestionsController.onSelectionChanged();
+        }
     }
 
     private boolean isShowingOptionDialog() {
