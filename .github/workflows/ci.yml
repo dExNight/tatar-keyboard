@@ -31,6 +31,12 @@ jobs:
             https://raw.githubusercontent.com/gradle/gradle/v9.6.0/gradle/wrapper/gradle-wrapper.jar
           echo "497c8c2a7e5031f6aa847f88104aa80a93532ec32ee17bdb8d1d2f67a194a9c7  gradle/wrapper/gradle-wrapper.jar" | sha256sum -c -
 
+      - name: Run JVM unit tests
+        run: ./gradlew test --console=plain
+
+      - name: Run release vital lint
+        run: ./gradlew lintVitalRelease --console=plain
+
       - name: Build debug APK
         run: ./gradlew assembleDebug
 
