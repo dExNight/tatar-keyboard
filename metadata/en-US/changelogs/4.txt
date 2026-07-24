@@ -1,0 +1,4 @@
+• Optional Tatar word suggestions, off by default and fully offline
+• Up to three frequency-ranked completions for the current Tatar word
+• Automatic privacy gating for passwords, addresses, email, and unsupported fields
+• Safe taps that replace only the current matching prefix and ignore stale suggestions

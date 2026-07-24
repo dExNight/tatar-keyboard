@@ -9,17 +9,18 @@ To enable the keyboard:
 
 * Tatar layout: ЙЦУКЕН + a visible fifth row with ә ө ү җ ң һ
 * Three languages: Tatar, Russian, English — switch with the globe key
+* Optional offline Tatar word suggestions: up to three completions, disabled by default and never shown in password or other private fields
 * Long-press duplicates on the Russian layout: а→ә, о→ө, у→ү, ж→җ, н→ң, х→һ, plus е→ё and ь→ъ
 * Clean, minimalist look with light and dark themes
 * Fast typing: double-space → period, swipe on space to move the cursor, multi-touch
 * Key-press preview, alternatives popup, sound and vibration (all configurable)
 * Accessibility: full TalkBack support with Tatar letter descriptions
 * Works before the first unlock (Direct Boot) — available for PIN entry right after reboot
-* Small size (&lt;1 MB)
+* Lightweight app that stays within the project's strict 3 MiB release limit
 
 <b>Privacy:</b>
 
-* No INTERNET permission at all — the keyboard physically cannot send what you type anywhere (verified by CI on every commit)
+* No INTERNET permission at all — the keyboard physically cannot send what you type anywhere
 * No ads, no analytics, no tracking SDKs
 * The only permission is Vibrate
 
