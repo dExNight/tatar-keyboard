@@ -4,11 +4,12 @@ Branch: `codex/d1-sequential` · Base commit: `80f332c` (D1d) · Status:
 **implemented; the six confirmed audit findings are fixed and independently re-reviewed;
 the D1f artifact gate passed; device UAT on a real Samsung remains open.**
 
-The integration and follow-up runtime fixes are in the local branch through `a277283`,
-with the 1.2.0 hardening and the audit fixes prepared on top. JVM tests, release-vital
-lint and the signed-artifact gate pass on the developer Mac (see "Current automated
-evidence" below). This does not claim any Samsung/One UI device evidence, any confirmed
-runtime budget, or a native-speaker proofread.
+The integration and follow-up runtime fixes are in the local branch through `a277283`, with
+the 1.2.0 hardening and the audit fixes on top, and the auto-space follow-up in `bacf177`
+(code) / `c3ed443` (docs, branch head). JVM tests, release-vital lint and the
+signed-artifact gate pass on the developer Mac (see "Current automated evidence" below).
+This does not claim any Samsung/One UI device evidence, any confirmed runtime budget, or a
+native-speaker proofread.
 
 ## Scope delivered
 
@@ -123,13 +124,16 @@ produces is described under "Behavior after the audit fixes" above.
 Thirty-seven new tests came with the fixes: 24 in `TatarWordUtilsTest` (40 in the class now
 — boundary analysis, casing classification and application, and the after-cursor
 predicate), 9 in `SuggestionsControllerTest` (42), 1 in `SuggestionStripStateTest` (11) and
-3 in `SuggestionStripSourceContractTest` (8). The suite went 140 → 161 → **177** tests.
+3 in `SuggestionStripSourceContractTest` (8). At the end of that round the suite stood at
+**177** tests (140 → 161 → 177); it has since grown again, see the next paragraph.
 
-The auto-space follow-up (device feedback from a real Samsung: an accepted suggestion had
-to be followed by a manual space) added 9 more — 6 in `TatarWordUtilsTest` (46) for the
-`needsAutoSpace` predicate, 2 in `SuggestionStripSourceContractTest` (10) for the
-single-`commitText` and shift-state contracts, and 1 in `SuggestionsControllerTest` (43)
-for the band after a commit that ends the word — bringing the suite to **186** tests.
+The auto-space follow-up (device feedback from a real Samsung: the owner tried the
+suggestions by hand, they worked, but an accepted suggestion had to be followed by a
+manual space) added 9 more — 6 in `TatarWordUtilsTest` (46) for the `needsAutoSpace`
+predicate, 2 in `SuggestionStripSourceContractTest` (10) for the single-`commitText` and
+shift-state contracts, and 1 in `SuggestionsControllerTest` (43) for the band after a
+commit that ends the word. The full progression is 140 → 161 → 177 → **186**, and 186 is
+the current total.
 
 The fixes were re-reviewed independently through three lenses — conformance to the frozen
 contract, regression of the previously closed bugs plus lifecycle, and edge cases /
@@ -139,22 +143,38 @@ review, not device evidence.
 
 ## Current automated evidence — Mac, Android SDK, Gradle 9.6
 
+Every row describes the current tree — branch head `c3ed443`, auto-space included.
+
 | Gate | Command | Result |
 |------|---------|--------|
-| Full JVM unit-test suite | `./gradlew test --rerun-tasks --console=plain` | **BUILD SUCCESSFUL** — 177 tests, 0 failures/errors |
-| Release vital lint | `./gradlew lintVitalRelease --rerun-tasks --console=plain` | **BUILD SUCCESSFUL** (no fatal issues; pre-existing deprecation warnings only) |
-| D1f artifact gate | clean build + `check-no-internet` + `apksigner verify` + badging | **PASS** — `dist/tatar-keyboard-1.2.0.apk`, 1 446 019 bytes, SHA-256 `4960b85072d4db64669d63e7755e89cefaf295a7a12e6fcb0b889775543d3772`, versionName 1.2.0 / versionCode 4, only `android.permission.VIBRATE`, APK Signature Scheme **v2 only** (1 signer, RSA 4096, `CN=Tatar Keyboard`), certificate SHA-256 `cdd8c535…b09e` matching the historical release certificate |
+| Full JVM unit-test suite | `./gradlew test lintVitalRelease --console=plain` | **BUILD SUCCESSFUL** — 186 tests, 0 failures / 0 errors / 0 skipped |
+| Release vital lint | same invocation | **BUILD SUCCESSFUL** (no fatal issues; pre-existing deprecation warnings only) |
+| D1f artifact gate | `./gradlew assembleRelease` + `aapt2 dump badging/permissions` + `apksigner verify --print-certs` | **PASS** — `dist/tatar-keyboard-1.2.0.apk`, 1 446 111 bytes, SHA-256 `26afd03f200f2939e5ce3b5f102bf4dcd93b5fbb8635161cd393b941cff13bcf`, versionName 1.2.0 / versionCode 4, package `org.tatarkeyboard.ime`, minSdk 24, only `android.permission.VIBRATE`, APK Signature Scheme **v2 only** (v1/v3/v3.1/v4 = false; 1 signer, RSA 4096, `CN=Tatar Keyboard`), certificate SHA-256 `cdd8c535…b09e` matching the historical release certificate |
 
-The auto-space follow-up re-ran the first two gates only (`./gradlew test lintVitalRelease
---console=plain`): **BUILD SUCCESSFUL — 186 tests, 0 failures/errors**, lint with no fatal
-issues. The artifact row above still describes the 1.2.0 APK built *before* that change, so
-it has to be regenerated before the next release.
+The artifact was **rebuilt after** the auto-space commit `bacf177`, so the row above and
+the 186-test row describe the same tree. `dist/tatar-keyboard-1.2.0.apk` is byte-identical
+to `app/build/outputs/apk/release/app-release.apk` (`cmp`, both 1 446 111 bytes). The
+earlier APK produced by the audit-fix round — the one the 177-test count belongs to — is
+superseded and no longer exists in `dist/`.
 
 ## Partial device evidence — emulator only, **not** a Samsung
 
 A UAT pass ran on AVD `tatar_keyboard_d1f_api35_arm64` (Pixel 3a, Android 15 / API 35,
-google_apis arm64, headless, `-gpu swiftshader_indirect`) with exactly the artifact above
-installed.
+google_apis arm64, headless, `-gpu swiftshader_indirect`).
+
+**Which build it covers.** The installed APK was the **previous** build of
+`dist/tatar-keyboard-1.2.0.apk` — the one produced by the audit-fix round, *before* the
+auto-space commit `bacf177`. It is **not** the artifact in the gate table above. Auto-space
+therefore has **no device evidence at all**: every result below predates it, and none of
+them exercises the trailing space, the double-space-gesture reset or the post-commit
+shift-state refresh.
+
+`bacf177` edited the tap-commit path itself (`InputLogic.commitChosenSuggestion`,
+`LatinIME.EditorSurface.commitSuggestion`) plus the pure `TatarWordUtils` predicate, and
+nothing else. So the measurements that do not go through a tap — strip visibility and
+height, insets, cold start, PSS, jank, the privacy gating — still describe the current
+build. The tap-related functional results do **not**: the code path they exercised has
+changed since, and re-running them on the current artifact is part of the open device UAT.
 
 - Functionally green, including all four integration fixes: tap-after-`ru→tt` commits, an
   initial capital yields and inserts capitalized candidates, a cursor inside a word leaves
@@ -177,13 +197,28 @@ installed.
 One UI hosts the IME with its own shell, insets, fonts and layout switcher, so none of the
 results above closes the Samsung requirement.
 
+### Manual check on a real Samsung (not a UAT)
+
+The owner installed a build on a real Samsung (serial `R5CY8222TDP`) and tried the
+suggestions by hand: they worked functionally, which is what prompted the auto-space
+request. That is a single ad-hoc functional check — the D1f matrix was not walked, no
+metric was captured, and auto-space itself was not tried, since it did not exist yet. It
+closes **no** checkbox; it is recorded here only because it is real evidence that the
+feature works on One UI at the "it types" level.
+
 ## Outstanding
 
 - **D1f device UAT on a real Samsung**: end-to-end suggestions, all cell taps + edge pixels,
   TalkBack, rotation, moreKeys, insets, the full privacy-field matrix, delete+commit, cold
   start, PSS / FD lifecycle, allocation/jank and end-to-end latency. The emulator pass above
-  is partial evidence only.
-- **PSS budget**: unresolved until re-measured on hardware.
+  is partial evidence only, and the manual check above is not a matrix run.
+- **Auto-space on a device**: never exercised anywhere. The trailing space, the
+  punctuation/whitespace suppression, the double-space-gesture reset and the post-commit
+  shift refresh are covered by JVM tests only.
+- **PSS budget**: unresolved until re-measured on hardware. A measurement was started on the
+  real Samsung but produced no usable numbers (taken with the settings screen open in the
+  same process, and with truncated output), so the budget stays **open and potentially
+  failing**.
 - **Tatar strings**: native-speaker proofread requires separately recorded evidence before
   release; this document does not claim it.
 - **Publication**: push/merge/tag, a public GitHub Release and the IzzyOnDroid inclusion

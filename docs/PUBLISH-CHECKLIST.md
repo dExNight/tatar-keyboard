@@ -4,22 +4,33 @@
 только проверенный результат именно кандидата v1.2.0. Исторические результаты v1.1.0
 не переносятся на новый APK и явно помечены как справочные.
 
-## Текущее состояние на 2026-07-24
+## Текущее состояние на 2026-07-25
 
 - Release candidate объявляет `1.2.0` / `versionCode 4`; CHANGELOG и Fastlane changelog
   подготовлены и сверены между собой.
 - D1a–D1e реализованы, шесть находок независимого аудита закрыты и повторно
-  отревьюированы (три линзы, все APPROVED_WITH_NOTES). JVM-набор — 177 тестов,
-  0 failures/errors; `lintVitalRelease` — BUILD SUCCESSFUL.
-- Финальный подписанный APK v1.2.0 собран и проаудирован: 1 446 019 байт, SHA-256
-  `4960b85072d4db64669d63e7755e89cefaf295a7a12e6fcb0b889775543d3772`, versionCode 4 /
+  отревьюированы (три линзы, все APPROVED_WITH_NOTES); поверх добавлен автопробел после
+  принятой подсказки (`bacf177` + `c3ed443`, HEAD ветки). JVM-набор — **186 тестов,
+  0 failures / 0 errors / 0 skipped** (по раундам: 140 → 161 → 177 → 186);
+  `lintVitalRelease` — BUILD SUCCESSFUL.
+- Финальный подписанный APK v1.2.0 **пересобран после автопробела** и проаудирован:
+  1 446 111 байт, SHA-256
+  `26afd03f200f2939e5ce3b5f102bf4dcd93b5fbb8635161cd393b941cff13bcf`, versionCode 4 /
   versionName 1.2.0, только permission `VIBRATE`, подпись v2 с историческим сертификатом.
   Evidence-поля ниже заполнены по этому артефакту. Release commit ещё не создан, поэтому
   frozen commit SHA остаётся открытым.
 - Device-UAT на реальном Samsung, подтверждённые runtime/performance бюджеты, проверка
   TalkBack на устройстве и вычитка новых татарских строк носителем языка **не выполнены**.
   Есть только эмуляторный прогон (см. раздел 3) — частичное свидетельство, которое эти
-  пункты не закрывает; более того, бюджет PSS на эмуляторе провален.
+  пункты не закрывает; более того, бюджет PSS на эмуляторе провален. Этот прогон шёл на
+  **предыдущей** сборке, до автопробела, поэтому автопробел не проверен на устройстве
+  вообще.
+- Владелец вручную попробовал подсказки на реальном Samsung (серийник `R5CY8222TDP`) —
+  функционально они работали, и именно это привело к запросу автопробела. Матрица не
+  прогонялась, метрики не снимались, автопробела тогда ещё не было: ни одного checkbox
+  раздела 3 этот факт не закрывает. Замер PSS на том же устройстве был начат, но валидных
+  чисел не дал (снимался с открытым экраном настроек в том же процессе и с обрезанным
+  выводом).
 - Анонимные GitHub web/API/raw проверки по-прежнему получают HTTP 404. SSH-аутентификация
   позволяет push, но `gh` отсутствует, а доступный API token недействителен. Поэтому
   Public-доступ, GitHub Actions, tag/Release и анонимное скачивание APK не подтверждены.
@@ -30,7 +41,8 @@
 
 - [ ] Все intended изменения v1.2.0 находятся в одной проверяемой ветке; рабочее дерево
   не содержит случайных файлов, ключей или локальных конфигов. Открыто: правки по аудиту
-  и эта документация ещё не закоммичены.
+  и автопробел закоммичены (`2e0b44a`, `bacf177`, `c3ed443`), но эта синхронизация
+  документации ещё не закоммичена.
 - [x] `app/build.gradle` подтверждает `versionName "1.2.0"` и `versionCode 4`.
 - [x] В `CHANGELOG.md` есть раздел `[1.2.0]`, а `metadata/en-US/changelogs/4.txt`
   соответствует ему (сверено построчно; финальная freeze-проверка повторяется перед
@@ -54,7 +66,8 @@ apksigner verify --verbose --print-certs \
   app/build/outputs/apk/release/app-release.apk
 ```
 
-- [x] Полный JVM unit suite прошёл без failures/errors; записано число тестов — **177**.
+- [x] Полный JVM unit suite прошёл без failures/errors; записано число тестов — **186**
+  (0 failures / 0 errors / 0 skipped). Прогон выполнен на дереве с автопробелом.
 - [x] `lintVitalRelease` завершился `BUILD SUCCESSFUL`.
 - [ ] Debug и signed release APK собраны из того же frozen checkout. Частично: собран и
   проаудирован release APK; debug APK в этом прогоне не собирался
@@ -70,7 +83,7 @@ apksigner verify --verbose --print-certs \
   release`) и manifest-разбор артефакта в отчёте gate подтверждают версию.
 - [x] Единственное запрошенное runtime/platform permission — `VIBRATE`; permission dump
   артефакта просмотрен целиком и содержит ровно одну строку.
-- [x] APK не превышает 3 145 728 байт: **1 446 019** байт. Целевой бюджет D1 ≤ 1.7 MB —
+- [x] APK не превышает 3 145 728 байт: **1 446 111** байт. Целевой бюджет D1 ≤ 1.7 MB —
   **pass** (1,38 MiB).
 
 ### Evidence финального локального артефакта
@@ -79,15 +92,16 @@ apksigner verify --verbose --print-certs \
 
 | Проверка | Результат v1.2.0 |
 |---|---|
-| Frozen commit SHA | `PENDING` — артефакт собран из рабочего дерева поверх `898e208`, release commit ещё не создан |
-| JVM tests | 177 tests, 0 failures/errors |
+| Frozen commit SHA | `PENDING` — артефакт собран из рабочего дерева на `c3ed443` (код — `bacf177`, автопробел включён), release commit ещё не создан |
+| JVM tests | 186 tests, 0 failures / 0 errors / 0 skipped |
+| Состояние сборки | пересобрана после автопробела `bacf177`; mtime `app/build/outputs/apk/release/app-release.apk` и копии в `dist/` — 2026-07-25 02:02:38, позже коммита `c3ed443` (02:02:24) |
 | `lintVitalRelease` | `BUILD SUCCESSFUL` |
 | Manifest version | versionName `1.2.0`, versionCode `4` |
 | Permissions / no-INTERNET | только `android.permission.VIBRATE`; INTERNET нет ни в исходном манифесте, ни в release APK (debug APK не собирался) |
 | APK signing schemes | v2 only (v1=false, v2=true, v3=false, v3.1=false, v4=false), 1 signer, RSA 4096 |
 | Signer certificate SHA-256 | `cdd8c5350ddc86f13cd89b5bfb55ca33c13efba77beb4d4ccb75d5e6b961b09e` (совпадает с историческим релизным; SHA-1 `b0f3fa16a46a5a7c7b7c663165fd2e1c2e56a889`, public key SHA-256 `a9524b37c7ebff271e9ddf670d1c19ceb44bf0981542277deee3cb83bbf6757c`) |
-| APK size, bytes | 1 446 019 |
-| Final APK SHA-256 | `4960b85072d4db64669d63e7755e89cefaf295a7a12e6fcb0b889775543d3772` |
+| APK size, bytes | 1 446 111 |
+| Final APK SHA-256 | `26afd03f200f2939e5ce3b5f102bf4dcd93b5fbb8635161cd393b941cff13bcf` |
 
 ## 3. Device-UAT и runtime budgets
 
@@ -98,6 +112,10 @@ Host/JVM tests не являются device evidence. Записать устр�
   значение по умолчанию OFF.
 - [ ] Подсказки работают end-to-end для татарского subtype: 0–3 результата, все ячейки
   и крайние пиксели нажимаются, tap безопасно выполняет exact delete+commit.
+- [ ] Автопробел проверен на устройстве: принятая подсказка вставляется вместе с пробелом;
+  перед пунктуацией и там, где пробел уже стоит, лишний пробел не появляется; следующее
+  нажатие пробела не превращает вставленный пробел в точку; автозаглавная обновляется
+  сразу. Не проверялось нигде — ни на эмуляторе, ни на реальном устройстве.
 - [ ] Полная privacy matrix скрывает полосу и запрещает lookup/commit в password,
   email, URI, filter, autocomplete, `NO_SUGGESTIONS`, non-text и selection/mid-word.
 - [ ] TalkBack проверен вручную: обход только заполненных virtual nodes, полные labels,
@@ -114,9 +132,17 @@ Host/JVM tests не являются device evidence. Записать устр�
 ### Частичное свидетельство: эмулятор (не закрывает ни один пункт выше)
 
 Прогон на AVD `tatar_keyboard_d1f_api35_arm64` (Pixel 3a, Android 15 / API 35,
-google_apis arm64, headless, cold boot, `-gpu swiftshader_indirect`), установлен именно
-`dist/tatar-keyboard-1.2.0.apk`. Это не Samsung и не One UI: у One UI своя оболочка
-IME-хостинга, свои insets, свой шрифт/плотность и свой переключатель раскладок.
+google_apis arm64, headless, cold boot, `-gpu swiftshader_indirect`). Это не Samsung и не
+One UI: у One UI своя оболочка IME-хостинга, свои insets, свой шрифт/плотность и свой
+переключатель раскладок.
+
+Устанавливалась **предыдущая** сборка `dist/tatar-keyboard-1.2.0.apk` — до автопробела
+(`bacf177`), а не артефакт из evidence-таблицы выше. Поэтому автопробел не покрыт этим
+прогоном вообще. Коммит `bacf177` затронул только путь коммита по тапу
+(`InputLogic.commitChosenSuggestion`, `LatinIME.commitSuggestion`) и чистый предикат
+`TatarWordUtils`: измерения вне тапа (высота полосы, insets, холодный старт, PSS, jank,
+privacy-гейтинг) продолжают описывать текущую сборку, функциональные результаты по тапу —
+уже нет.
 
 - Функционально зелёное: обычный ввод не регрессировал, opt-in по умолчанию OFF, 0–3
   результата, тап коммитит после переключения ru→tt в уже открытом поле, заглавная даёт
@@ -153,6 +179,10 @@ IME-хостинга, свои insets, свой шрифт/плотность и
 локальный аудируемый артефакт для device-UAT, а не готовый к публикации релиз. После
 закрытия шагов 1 и 3 сборка и копия должны быть повторены с frozen commit.
 
+Текущая копия — уже вторая: первая соответствовала раунду закрытия находок аудита, а после
+автопробела (`bacf177`) сборка и копия были повторены. Числа ниже относятся к текущей,
+пересобранной копии; старый артефакт полностью заменён.
+
 ```sh
 release_tmp=$(mktemp dist/.tatar-keyboard-1.2.0.apk.tmp.XXXXXX)
 cp app/build/outputs/apk/release/app-release.apk "$release_tmp"
@@ -164,12 +194,15 @@ apksigner verify --verbose --print-certs dist/tatar-keyboard-1.2.0.apk
 ```
 
 - [x] `dist/tatar-keyboard-1.2.0.apk` совпадает с audited build output — `cmp` с
-  `app/build/outputs/apk/release/app-release.apk` без различий, оба 1 446 019 байт.
+  `app/build/outputs/apk/release/app-release.apk` без различий, оба 1 446 111 байт.
 - [x] SHA-256 и все поля evidence выше обновлены после копирования (кроме frozen commit
   SHA — release commit ещё не создан).
-- [x] Повторная сборка после этого шага не выполнялась: mtime build output 22:06:06
-  раньше mtime копии в `dist/` 22:07:01, содержимое побайтово идентично. Любая новая
-  сборка обязывает повторить artifact audit и публикацию в `dist/`.
+- [x] Повторная сборка после этого шага не выполнялась: mtime build output и mtime копии в
+  `dist/` совпадают — 2026-07-25 02:02:38, то есть обе позже последнего коммита `c3ed443`
+  (02:02:24), содержимое побайтово идентично (`cmp`), SHA-256 обоих файлов —
+  `26afd03f200f2939e5ce3b5f102bf4dcd93b5fbb8635161cd393b941cff13bcf`. Любая новая сборка
+  обязывает повторить artifact audit и публикацию в `dist/` — как это и было сделано после
+  автопробела.
 
 ## 5. Commit, push и CI
 
