@@ -172,9 +172,28 @@ class SuggestionsController private constructor(
             engine?.finishInput()
             return
         }
-        strip.reserve()
+        // Eligibility alone is not enough to expose the band: while the dictionary is preparing
+        // or the engine is unavailable the frozen state table requires GONE/0dp. A successful
+        // publishEngine() transitions a cold session to the reserved state.
+        val engineWasReady = engine != null
+        if (!engineWasReady) {
+            strip.hideSuggestions()
+        } else {
+            strip.reserve()
+        }
         strip.setTapListener(SuggestionTapListener { suggestion -> onTap(suggestion) })
+        // A warm engine has no publication callback in this new editor session. Re-request the
+        // cached prefix now so changing fields never requires an extra keystroke. Capture readiness
+        // before maybeStartEngine() so a cold engine that publishes inline still requests exactly
+        // once from publishEngine().
         maybeStartEngine()
+        if (
+            engineWasReady &&
+            editor.hasKnownCursor() &&
+            editor.cachedWordBeforeCursor().isNotEmpty()
+        ) {
+            requestCurrentPrefix()
+        }
     }
 
     fun onTextChanged() {
@@ -187,17 +206,23 @@ class SuggestionsController private constructor(
         // Any in-flight request is invalidated and whatever was shown is no longer bound to the
         // live editor state, so drop the displayed binding immediately.
         displayedPrefix = null
-        // Keep the reserved band while the field stays eligible so an external selection change
-        // never collapses the keyboard height. When the field is not eligible the strip is already
-        // GONE and must stay that way.
+        // Keep the reserved band only after an engine has actually published. Eligibility while
+        // the dictionary is preparing/unavailable remains fail-closed at GONE/0dp.
         if (eligible) {
-            strip.reserve()
+            if (engine == null) {
+                strip.hideSuggestions()
+            } else {
+                strip.reserve()
+            }
         }
     }
 
     fun onFinishInput() {
         sessionId++
         displayedPrefix = null
+        // Close eligibility before hiding/finishing. A readiness notification queued behind this
+        // lifecycle boundary must not start or publish an engine for the finished editor session.
+        eligible = false
         strip.hideSuggestions()
         engine?.finishInput()
     }
@@ -208,11 +233,27 @@ class SuggestionsController private constructor(
         displayedPrefix = null
         this.eligible = eligible
         if (eligible) {
-            strip.reserve()
+            val engineWasReady = engine != null
+            if (engineWasReady) {
+                strip.reserve()
+            } else {
+                // Cold, preparing and unavailable engines all stay GONE until publish succeeds.
+                strip.hideSuggestions()
+            }
             // Switching INTO an eligible subtype in an already-open field must start the engine
             // (if not already running); a freshly started engine looks up the current prefix from
-            // publishEngine().
+            // publishEngine(). An already-published engine has no publish callback to do that work,
+            // so re-request the cached prefix immediately after tt -> non-tt -> tt. Capture the
+            // state before maybeStartEngine() so even an inline test executor cannot double-request
+            // when a cold engine publishes synchronously.
             maybeStartEngine()
+            if (
+                engineWasReady &&
+                editor.hasKnownCursor() &&
+                editor.cachedWordBeforeCursor().isNotEmpty()
+            ) {
+                requestCurrentPrefix()
+            }
         } else {
             strip.hideSuggestions()
         }
@@ -247,7 +288,7 @@ class SuggestionsController private constructor(
 
     /**
      * Handles the dictionary becoming ready. Always runs on the UI owner. A late notification that
-     * arrives after [onDestroy] (destroyed == true) starts nothing and requests nothing.
+     * arrives after [onDestroy] or [onFinishInput] starts nothing and requests nothing.
      */
     private fun onDictionaryReady() {
         if (destroyed) return
@@ -287,17 +328,24 @@ class SuggestionsController private constructor(
             }
             return
         }
-        if (handle == null) return
+        if (handle == null) {
+            // Engine creation failed: do not reserve an empty band for an unavailable dictionary.
+            displayedPrefix = null
+            if (eligible) {
+                strip.hideSuggestions()
+            }
+            return
+        }
         engine = handle
         if (!eligible) {
             handle.finishInput()
             strip.hideSuggestions()
             return
         }
-        // The engine became available while an eligible field is already open: look up whatever the
-        // user has already typed so the strip fills in without waiting for the next keystroke. Skip
-        // the empty-prefix case so a freshly opened empty field does not redundantly re-reserve the
-        // band that onStartInput()/onSubtypeChanged() already reserved.
+        // Successful publication is the transition from preparing/unavailable (GONE) to the stable
+        // eligible band. Look up whatever the user has already typed without waiting for another
+        // keystroke; an empty/unknown prefix leaves the now-available band reserved with 0 results.
+        strip.reserve()
         if (editor.hasKnownCursor() && editor.cachedWordBeforeCursor().isNotEmpty()) {
             requestCurrentPrefix()
         }
@@ -322,12 +370,19 @@ class SuggestionsController private constructor(
      */
     private fun requestCurrentPrefix() {
         if (!eligible) return
+        val activeEngine = engine
+        if (activeEngine == null) {
+            // Text events can arrive while preparation/start is still in flight. Do not expose the
+            // band until publishEngine() establishes that the dictionary is actually available.
+            displayedPrefix = null
+            strip.hideSuggestions()
+            return
+        }
         if (!editor.hasKnownCursor()) {
             displayedPrefix = null
             strip.reserve()
             return
         }
-        val activeEngine = engine ?: return
         val word = editor.cachedWordBeforeCursor()
         if (word.isEmpty()) {
             displayedPrefix = null

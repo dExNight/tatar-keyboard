@@ -30,20 +30,28 @@ class SuggestionsControllerTest {
 
     private class FakeStrip : StripSurface {
         val shown = mutableListOf<Triple<String, String?, String?>>()
+        val visibilityEvents = mutableListOf<String>()
         var hideCount = 0
         var reserveCount = 0
+        var visible = false
         var listener: SuggestionTapListener? = null
 
         override fun showSuggestions(first: String, second: String?, third: String?) {
             shown.add(Triple(first, second, third))
+            visible = true
+            visibilityEvents.add("show")
         }
 
         override fun reserve() {
             reserveCount++
+            visible = true
+            visibilityEvents.add("reserve")
         }
 
         override fun hideSuggestions() {
             hideCount++
+            visible = false
+            visibilityEvents.add("hide")
         }
 
         override fun setTapListener(listener: SuggestionTapListener) {
@@ -198,13 +206,17 @@ class SuggestionsControllerTest {
     }
 
     @Test
-    fun eligibleStartReservesBandAndNeverHides() {
+    fun eligibleStartShowsBandOnlyAfterColdEnginePublishes() {
         val h = Harness()
 
         h.controller.onStartInput(eligible = true)
 
+        // DirectExecutor publishes inline: the transition must still be GONE first, then reserve
+        // only after the engine handle has published successfully.
+        assertEquals(listOf("hide", "reserve"), h.strip.visibilityEvents)
         assertEquals(1, h.strip.reserveCount)
-        assertEquals(0, h.strip.hideCount)
+        assertEquals(1, h.strip.hideCount)
+        assertTrue(h.strip.visible)
     }
 
     @Test
@@ -396,20 +408,25 @@ class SuggestionsControllerTest {
     // --- D1e regression: readiness / eligibility lifecycle (BUG 1) -----------------------------
 
     @Test
-    fun readinessCallbackAfterEligibleStartStartsEngineAndRequestsCurrentPrefix() {
+    fun eligibleStartWhileDictionaryNotReadyStaysHiddenUntilReadyPublish() {
         val h = Harness(dictionaryReady = false)
         h.editor.word = "сүз"
 
-        // Field opens (eligible) before the dictionary is ready: no engine, no request yet.
+        // Field opens eligible while preparation is in flight: the frozen state table requires
+        // GONE/0dp, with no engine or request.
         h.controller.onStartInput(eligible = true)
         assertEquals(0, h.factoryCalls)
         assertTrue(h.engine.requestedPrefixes.isEmpty())
+        assertEquals(0, h.strip.reserveCount)
+        assertFalse(h.strip.visible)
 
-        // Readiness fires later: the engine must start AND the current cached prefix must be looked
-        // up without waiting for another keystroke.
+        // Readiness fires later: successful publication reserves the band and looks up the current
+        // cached prefix without waiting for another keystroke.
         h.controller.signalDictionaryReadyForTest()
 
         assertEquals(1, h.factoryCalls)
+        assertEquals(1, h.strip.reserveCount)
+        assertTrue(h.strip.visible)
         assertEquals(1, h.engine.requestedPrefixes.size)
         assertTrue(
             h.engine.requestedPrefixes.single()
@@ -438,6 +455,29 @@ class SuggestionsControllerTest {
     }
 
     @Test
+    fun subtypeChangeToEligibleWithWarmEngineReRequestsCurrentPrefix() {
+        val h = Harness()
+        h.editor.word = "сүз"
+
+        // Opening an eligible field cold publishes the engine and requests the cached prefix once.
+        h.controller.onStartInput(eligible = true)
+        assertEquals(1, h.factoryCalls)
+        assertEquals(1, h.engine.requestedPrefixes.size)
+
+        // The same engine remains alive across tt -> non-tt -> tt. Returning to the eligible
+        // subtype must immediately re-request the still-cached prefix without restarting it.
+        h.controller.onSubtypeChanged(eligible = false)
+        h.controller.onSubtypeChanged(eligible = true)
+
+        assertEquals(1, h.factoryCalls)
+        assertEquals(2, h.engine.requestedPrefixes.size)
+        assertTrue(
+            h.engine.requestedPrefixes.last()
+                .contentEquals("сүз".toByteArray(Charsets.UTF_8)),
+        )
+    }
+
+    @Test
     fun lateReadinessCallbackAfterDestroyStartsNothingAndRequestsNothing() {
         val h = Harness(dictionaryReady = false)
         h.editor.word = "сүз"
@@ -450,6 +490,103 @@ class SuggestionsControllerTest {
 
         assertEquals(0, h.factoryCalls)
         assertTrue(h.engine.requestedPrefixes.isEmpty())
+    }
+
+    @Test
+    fun readinessCallbackAfterFinishInputStartsNothingAndKeepsStripHidden() {
+        val h = Harness(dictionaryReady = false)
+        h.editor.word = "сүз"
+
+        h.controller.onStartInput(eligible = true)
+        assertFalse(h.strip.visible)
+        assertEquals(0, h.strip.reserveCount)
+
+        h.controller.onFinishInput()
+        val hidesAfterFinish = h.strip.hideCount
+
+        // Finishing the editor session closes eligibility before this late readiness notification.
+        h.controller.signalDictionaryReadyForTest()
+
+        assertEquals(0, h.factoryCalls)
+        assertTrue(h.engine.requestedPrefixes.isEmpty())
+        assertEquals(0, h.strip.reserveCount)
+        assertEquals(hidesAfterFinish, h.strip.hideCount)
+        assertFalse(h.strip.visible)
+    }
+
+    @Test
+    fun enginePublishAfterFinishInputStaysHiddenAndDoesNotRequest() {
+        val strip = FakeStrip()
+        val editor = FakeEditor().apply { word = "сүз" }
+        val engine = FakeEngine()
+        val executor = QueuingExecutorService()
+        var factoryCalls = 0
+        val controller = SuggestionsController(
+            strip,
+            editor,
+            UiPoster { it.run() },
+            { _ ->
+                factoryCalls++
+                engine
+            },
+            executor,
+        )
+
+        // Engine start is queued, but its handle has not published when the session finishes.
+        controller.onStartInput(eligible = true)
+        controller.onFinishInput()
+        assertEquals(0, strip.reserveCount)
+        assertFalse(strip.visible)
+
+        executor.runNext()
+
+        // The late handle is retained for safe reuse but immediately finished for the closed
+        // session. It cannot expose the band or look up the old editor prefix.
+        assertEquals(1, factoryCalls)
+        assertEquals(1, engine.finishCount)
+        assertTrue(engine.requestedPrefixes.isEmpty())
+        assertEquals(0, strip.reserveCount)
+        assertFalse(strip.visible)
+    }
+
+    @Test
+    fun eligibleStartWithWarmEngineReRequestsCurrentPrefix() {
+        val strip = FakeStrip()
+        val editor = FakeEditor().apply { word = "иске" }
+        val engine = FakeEngine()
+        val executor = QueuingExecutorService()
+        var factoryCalls = 0
+        val controller = SuggestionsController(
+            strip,
+            editor,
+            UiPoster { it.run() },
+            { _ ->
+                factoryCalls++
+                engine
+            },
+            executor,
+        )
+
+        // Publish the first session's handle only after that session has finished. The handle is
+        // retained and warm, but the old editor prefix must never be requested.
+        controller.onStartInput(eligible = true)
+        controller.onFinishInput()
+        executor.runNext()
+        assertEquals(1, factoryCalls)
+        assertTrue(engine.requestedPrefixes.isEmpty())
+
+        // A later eligible field already contains a cached word. Reusing the warm handle must issue
+        // exactly one lookup immediately, without restarting the factory or waiting for a keypress.
+        editor.word = "сүз"
+        controller.onStartInput(eligible = true)
+
+        assertEquals(1, factoryCalls)
+        assertEquals(1, engine.requestedPrefixes.size)
+        assertTrue(
+            engine.requestedPrefixes.single()
+                .contentEquals("сүз".toByteArray(Charsets.UTF_8)),
+        )
+        assertTrue(strip.visible)
     }
 
     // --- D1e regression: atomic candidate binding (BUG 2) --------------------------------------
@@ -507,17 +644,21 @@ class SuggestionsControllerTest {
     }
 
     @Test
-    fun failedEngineStartLeavesControllerIdle() {
+    fun failedEngineStartLeavesControllerIdleAndStripHidden() {
         val h = Harness()
         h.factoryResult = null
 
         h.controller.onStartInput(eligible = true)
+        assertEquals(0, h.strip.reserveCount)
+        assertFalse(h.strip.visible)
 
         // Engine never published; a text change must not crash or request.
         h.editor.word = "сүз"
         h.controller.onTextChanged()
         assertEquals(1, h.factoryCalls)
         assertTrue(h.engine.requestedPrefixes.isEmpty())
+        assertEquals(0, h.strip.reserveCount)
+        assertFalse(h.strip.visible)
         assertFalse(h.executor.isShutdown)
     }
 
