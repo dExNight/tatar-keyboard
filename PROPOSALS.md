@@ -18,8 +18,9 @@
 ## Статус выполнения
 
 Обновлено 24.07.2026. Работа ведётся в `codex/d1-sequential`; D1e зафиксирована в
-локальной истории до `a277283`, release hardening 1.2.0 выполняется поверх неё. Ветка
-остаётся впереди `origin/codex/d1-sequential`; merge/tag/release ещё не выполнялись.
+локальной истории до `a277283`, release hardening 1.2.0 и правки по шести находкам
+независимого аудита выполняются поверх неё. Ветка остаётся впереди
+`origin/codex/d1-sequential`; merge/tag/release ещё не выполнялись.
 
 | Фаза | Статус | Коммит | Примечание |
 |---|---|---|---|
@@ -27,18 +28,37 @@
 | D1b — атомарное сжатое хранилище | ✅ выполнено | `037f3ea` | lease/lifecycle, fail-closed, device-protected storage |
 | D1c — сенсорная Canvas-полоса | ✅ выполнено | `f47000a` | 40dp, insets/touchable-region, a11y virtual nodes |
 | D1d — mmap prefix engine | ✅ выполнено | `80f332c` | latest-only/coalescing, immutable prefix, без гонок |
-| D1e — интеграция, opt-in, privacy, a11y | ✅ выполнено | `7c7777c`, `a277283` + hardening | runtime interleavings, warm-engine re-lookup и preparing/unavailable state устранены; пять обязательных и пять дополнительных regression tests зелёные; локальный re-audit одобрен, D1f/device-UAT/native proofread/publish открыты |
-| D1f — общие gates + device-UAT | ⏳ открыто | — | JVM и `lintVitalRelease` hardening-checks зелёные; финальная clean artifact matrix и device-UAT ещё обязательны |
+| D1e — интеграция, opt-in, privacy, a11y | ✅ выполнено | `7c7777c`, `a277283` + hardening + audit fixes | runtime interleavings, warm-engine re-lookup и preparing/unavailable state устранены; шесть подтверждённых находок независимого аудита закрыты; независимое ревью правок в трёх линзах (контракт / регресс / крайние случаи) — APPROVED_WITH_NOTES без блокеров |
+| D1f — общие gates + device-UAT | 🟡 частично | — | artifact gate пройден; device-UAT есть только на эмуляторе и PSS-бюджет там провален; Samsung/One UI остаётся обязательным |
 
-Текущий release-hardening прогон на Mac, Gradle 9.6: весь JVM-набор — **140 tests,
-0 failures/errors** (`SuggestionsControllerTest` — 33), `lintVitalRelease --rerun-tasks` —
-**BUILD SUCCESSFUL**. Исторический D1e artifact gate также проходил, но был выполнен до
-bump до 1.2.0/vc4 и не заменяет финальную clean build/signing/no-INTERNET/version/size
-matrix. Это не device evidence. Подробности — `docs/DICTIONARY-D1E.md`.
+Текущий прогон на Mac, Gradle 9.6: весь JVM-набор — **177 tests, 0 failures/errors**,
+`lintVitalRelease --rerun-tasks` — **BUILD SUCCESSFUL**.
 
-Версия 1.2.0/vc4 и changelog подготовлены. Перед фактическим выпуском остаются clean
-release-gates, versioned signed artifact, device-UAT, отдельно подтверждённая вычитка
-новых татарских строк, push/merge/tag и публикация.
+Финальный artifact gate v1.2.0 — **PASS**: `dist/tatar-keyboard-1.2.0.apk`,
+**1 446 019 байт**, SHA-256
+`4960b85072d4db64669d63e7755e89cefaf295a7a12e6fcb0b889775543d3772`,
+versionName `1.2.0` / versionCode `4`, единственное запрошенное permission —
+`android.permission.VIBRATE`, подпись APK Signature Scheme **v2 only** (один signer,
+RSA 4096, `CN=Tatar Keyboard`), сертификат SHA-256
+`cdd8c5350ddc86f13cd89b5bfb55ca33c13efba77beb4d4ccb75d5e6b961b09e` совпадает с
+историческим релизным, `apksigner verify` → `Verifies`. Это не device evidence.
+Подробности — `docs/DICTIONARY-D1E.md` и `docs/PUBLISH-CHECKLIST.md`.
+
+Device-UAT выполнен **только на эмуляторе** Android API 35 (AVD
+`tatar_keyboard_d1f_api35_arm64`, Pixel 3a, google_apis arm64, headless,
+software-рендеринг swiftshader). Функционально всё зелёное, включая проверки по свежим
+исправлениям (тап после смены subtype, регистр, курсор в середине слова, гашение полосы
+жестами); полоса измерена как ровно 40dp (`contentTopInsets` 1294 против 1184 при
+density 440); холодный старт 124–147 мс при бюджете 400 мс; крэшей/ANR нет. Но **бюджет
+PSS ≤ 30 МБ там провален**: 33,4–33,6 МБ с включённой D1 против 29,2–29,4 МБ с
+выключенной, то есть фича стоит ≈ +4,2 МБ PSS. Эмулятор не заменяет Samsung/One UI, а
+абсолютные значения памяти и jank на программном рендерере недостоверны — достоверна
+только дельта ВКЛ/ВЫКЛ. Требуется перезамер на реальном устройстве, прежде чем считать
+это релиз-блокером или артефактом эмулятора.
+
+Версия 1.2.0/vc4 и changelog подготовлены. Перед фактическим выпуском остаются device-UAT
+на реальном Samsung (включая перезамер PSS и jank), отдельно подтверждённая вычитка
+новых татарских строк носителем языка, push/merge/tag и публикация.
 
 ## Устранённые D1e runtime-блокеры
 
@@ -82,6 +102,39 @@ release-gates, versioned signed artifact, device-UAT, отдельно подт�
 readiness после finish проходят; D1e закрыто.
 Полная D1f artifact/device matrix остаётся открытой.
 
+## Устранённые находки независимого аудита D1
+
+Аудит подтвердил шесть дефектов; все закрыты и покрыты детерминированными JVM-тестами.
+
+- ✅ **HIGH — tap-listener не переустанавливался при активации полосы через смену
+  subtype.** Вью полосы инфлейтится лениво именно из `setTapListener`, а ветка
+  ineligible-старта его не ставила, поэтому после переключения глобусом на татарский в
+  уже открытом поле тап по кандидату ничего не делал. `onSubtypeChanged(eligible = true)`
+  регистрирует listener заново (`subtypeChangeToEligibleRewiresTapListenerSoTapsStillCommit`).
+- ✅ **HIGH — отсутствовала проверка буквы сразу после курсора.** Подсказка в середине
+  слова портила текст. Добавлен правый контекст: `EditorSurface.hasLetterAfterCursor()`
+  поверх `RichInputConnection.getCachedTextAfterCursor()` и чистого предиката
+  `TatarWordUtils.startsWithWordCharacter` (первый кодпоинт: буква или комбинирующая
+  метка). Контроллер при `true` не идёт в движок и оставляет пустую полосу,
+  `InputLogic.commitChosenSuggestion` дублирует проверку fail-closed перед
+  `deleteTextBeforeCursor`.
+- ✅ **HIGH — контракт регистра не был реализован.** Добавлены
+  `PrefixCasing`/`classifyCasing`/`applyCasing`: MIXED-префикс даёт 0 результатов без
+  запроса к движку, регистр применяется к отранжированным кандидатам от `pendingPrefix`
+  перед `showSuggestions`, а `expectedPrefix` остаётся сырым — показанная и вставленная
+  строка совпадают.
+- ✅ **MEDIUM — внутренние жесты курсора и свайп-удаления не гасили полосу.** Они идут
+  через `RichInputConnection`, который сам держит expected selection, поэтому
+  `onUpdateSelection` не видел внешнего перемещения. `onMoveCursorPointer`,
+  `onMoveDeletePointer`, `onUpWithDeletePointerActive` и `onUpWithSpacePointerActive`
+  теперь уведомляют контроллер напрямую через приватный
+  `onSuggestionsAffectingCursorMove()`.
+- ✅ **MEDIUM — TalkBack объявлял подсказки на каждое нажатие.** Объявление тройки
+  выполняется только на переходе «пустая полоса → есть подсказки» и только при включённом
+  touch exploration; сами слова остаются доступны через virtual nodes в любой момент.
+- ✅ **MEDIUM — комбинирующие метки NFD обрывали границу слова.** Ряд слова продолжается
+  через метки Mn/Mc/Me, орфанные метки без базовой буквы отбрасываются.
+
 ## Инварианты и бюджеты D1
 
 - Функция работает только для татарского subtype, opt-in, default OFF.
@@ -104,6 +157,11 @@ readiness после finish проходят; D1e закрыто.
 Превышение hard limit, privacy breach, изменение текста при stale state или поломка
 обычного ввода — безусловный no-go.
 
+Фактическое состояние бюджетов: APK 1 446 019 байт — в пределах и hard limit, и целевых
+1,7 МБ; холодный старт на эмуляторе 124–147 мс; PSS на эмуляторе выходит за 30 МБ и
+требует перезамера на реальном устройстве; latency, allocation и jank на железе не
+измерялись. Подробности и оговорки — в разделе D1f.
+
 ## Состояния полосы
 
 | Условие | Полоса | Высота | Lookup | Ячейки |
@@ -121,13 +179,24 @@ generation немедленно очищаются.
 
 ## Контракт текста
 
-- Boundary-анализ выполняется на NFC-копии text snapshot, но отдельно сохраняет точный
-  span исходного текста для безопасного удаления, включая канонически разложенный ввод.
+- Boundary-анализ выполняется прямо по сырому тексту snapshot, без промежуточной
+  нормализации: ряд слова продолжается через комбинирующие метки (Mn/Mc/Me), поэтому
+  канонически разложенный (NFD) ввод не обрывает слово, а результат остаётся точным span
+  исходного текста — именно это делает удаление безопасным. Нормализация к NFC
+  выполняется отдельно, уже на этапе lookup.
 - Текущий префикс — максимальная непрерывная последовательность букв татарского
-  кириллического алфавита непосредственно перед collapsed cursor.
+  кириллического алфавита непосредственно перед collapsed cursor. Классификация
+  выполняется по `Character.isLetter`, то есть шире алфавита (латиница и русская
+  кириллица тоже считаются буквами); такие префиксы просто не находятся в словаре и дают
+  0 результатов.
 - Пробел, цифра, пунктуация, дефис, апостроф и любой символ вне алфавита завершают слово.
-- При selection, пустом префиксе или татарской букве сразу после cursor результаты
-  очищаются: ввод в середине слова и замена выделения не поддерживаются.
+  Комбинирующая метка без базовой буквы словом не считается: ведущие орфанные метки
+  отбрасываются, а ряд без единой буквы даёт пустой префикс.
+- При selection, пустом префиксе или букве сразу после cursor результаты очищаются: ввод
+  в середине слова и замена выделения не поддерживаются. Реализация намеренно шире
+  контракта и fail-closed: границей считается любая буква (в том числе латинская и
+  русская) и любая комбинирующая метка сразу после курсора — слишком узкая проверка
+  портит текст, слишком широкая лишь не показывает подсказку.
 - Для lookup префикс приводится к NFC и lowercase. Словарь хранит NFC lowercase.
 - Все lowercase-буквы дают lowercase формы. Одна заглавная буква либо первая заглавная
   и остальные lowercase дают Initial Caps. Две и более заглавные без lowercase дают
@@ -137,12 +206,37 @@ generation немедленно очищаются.
   длинные формы с тем же префиксом остаются кандидатами.
 - Кандидаты ранжируются по frequency descending, затем по Unicode code-point lexical
   ascending. Регистр отображения применяется только после ранжирования.
-- Перед тапом повторно проверяются editor session, collapsed selection, subtype, generation
-  и точный префикс. Удаление выполняется по code points; несовпадение отменяет действие.
+- Перед тапом повторно проверяются editor session, collapsed selection, subtype, generation,
+  отсутствие буквы сразу после курсора и точный префикс. Удаление выполняется по code
+  points; несовпадение отменяет действие.
 
-Эти правила покрываются тестами для татарских букв, NFC/NFD, начала предложения,
-lowercase/Initial Caps/ALL CAPS, exact-word exclusion, frequency/lexical ties, punctuation,
-selection, cursor внутри слова и emoji.
+Фактическое покрытие этих правил тестами:
+
+- границы слова — `TatarWordUtilsTest`: татарские буквы, русская кириллица, смешанные
+  скрипты, пробел/цифра/пунктуация, NFD (метка внутри слова, слово, оканчивающееся
+  меткой, разложенное «ё», орфанная метка) и совпадение возвращённого span с сырым
+  текстом;
+- регистр — `TatarWordUtilsTest` (`classifyCasing`/`applyCasing`, включая caseless-метки и
+  round-trip «классифицировать → применить») плюс сквозные
+  `SuggestionsControllerTest.lowerCasePrefixShowsAndCommitsDictionaryFormUnchanged`,
+  `initialCapsPrefixShowsAndCommitsInitialCapsForms`,
+  `allCapsPrefixShowsAndCommitsAllCapsForms`, `mixedCasePrefixYieldsNoRequestAndAnEmptyBand`;
+- курсор внутри слова — `TatarWordUtilsTest.startsWithWordCharacter*` (пусто, пробел,
+  запятая, перевод строки, цифра, дефис, emoji, буква, ведущая метка) и
+  `SuggestionsControllerTest.letterAfterCursorClearsResultsAndNeverRequests`,
+  `tapIsNoOpWhileTheCursorSitsInsideAWord`, `nonLetterAfterCursorKeepsRequestingAsBefore`;
+  отказ commit-пути зафиксирован source-contract тестом
+  `commitPathRefusesToReplaceAWordTheCursorSitsInside`;
+- exact-word exclusion и frequency/code-point ties — `TdictPrefixIndexTest`;
+- selection и внутренние жесты клавиатуры —
+  `SuggestionsControllerTest.externalSelectionChangeWhileEligibleReservesAndNeverHides`,
+  `staleResultDroppedWhenSelectionChangedBumpsSession`,
+  `internalCursorGestureUnbindsDisplayedCandidates`.
+
+Не покрыто JVM-тестами и заявляется только как проверка чтением исходника или на
+устройстве: guard `hasSelection()` внутри `InputLogic.commitChosenSuggestion` (Android-класс
+без JVM-обвязки) и сценарий автозаглавной в начале предложения — он проверялся лишь в
+эмуляторном UAT.
 
 ## Gate каждой фазы
 
@@ -278,16 +372,39 @@ matrix, а не заменяется накопленными быстрыми �
 
 ## D1f — общие gates и device-UAT
 
-**Gate:** D1f разблокирована: оба D1e runtime-блокера и warm-engine gap устранены, пять
-обязательных и пять дополнительных детерминированных regression tests зелёные. Текущие
-JVM и `lintVitalRelease` hardening-checks не означают завершение D1f: всё ещё обязательны
-полная clean build/no-INTERNET/signing/version/size matrix и device-UAT; накопленные
-отдельные gates их не заменяют.
+**Gate:** D1f разблокирована: оба D1e runtime-блокера, warm-engine gap и шесть находок
+независимого аудита устранены, все детерминированные regression tests зелёные (177 JVM).
 
 - Build/lint/no-INTERNET; signed APK, PSS, cold start, compute и end-to-end latency.
 - Allocation/frame tests полосы; race/lifecycle/failure/editor regression suite.
 - Samsung UAT: 0–3 results, все касания, TalkBack, moreKeys, rotation, subtype, selection,
   быстрый ввод/backspace/cursor, password и first-run/update/corruption/direct boot.
+
+### Что закрыто
+
+- ✅ **Artifact gate — PASS.** 177 JVM-тестов, `lintVitalRelease` BUILD SUCCESSFUL, clean
+  build, no-INTERNET, подпись v2 с историческим сертификатом, versionName/versionCode,
+  размер и SHA-256 подтверждены; числа — в разделе «Статус выполнения» и в
+  `docs/PUBLISH-CHECKLIST.md`.
+
+### Что открыто
+
+- ⏳ **Device-UAT на реальном Samsung/One UI.** Выполнен только эмуляторный прогон
+  (API 35, Pixel 3a, arm64, swiftshader) — это ЧАСТИЧНОЕ свидетельство. Функционально
+  всё зелёное (0–3 результата, тап после смены subtype, заглавные, пустая полоса в
+  середине слова, гашение полосы жестами, `GONE` в поле пароля, крэшей/ANR нет), полоса
+  измерена как ровно 40dp, холодный старт 124–147 мс. У One UI своя оболочка
+  IME-хостинга, свои insets и свой переключатель раскладок, поэтому эмулятор эти
+  проверки не закрывает.
+- ⏳ **Бюджет PSS.** На эмуляторе он **провален**: 33,4–33,6 МБ с включённой D1 против
+  29,2–29,4 МБ с выключенной при бюджете 30 МБ. Абсолютные значения на программном
+  рендерере завышены (native heap раздут буферами Skia), достоверна дельта ≈ +4,2 МБ.
+  Требуется перезамер на реальном железе; до него статус бюджета не определён.
+- ⏳ **Jank и allocation-бюджеты.** На swiftshader janky-кадры 25,93% при Slow UI thread
+  = 0 — профиль софтверного GPU, а не подтверждённые рывки. Статус NOT_COVERED.
+- ⏳ **Не проверено вообще:** TalkBack и реальный обход `ExploreByTouchHelper`, поворот и
+  альбомная ориентация, split-screen, физическая клавиатура, direct boot, несколько
+  пользователей, тёмная тема, другие плотности экрана, смена системной локали.
 
 Фаза проходит только при соблюдении всех общих бюджетов и phase-specific acceptance.
 Любой отказ словаря обязан оставлять полностью рабочий обычный ввод.
