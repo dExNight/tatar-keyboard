@@ -29,6 +29,7 @@ import android.util.TypedValue
 import android.view.MotionEvent
 import android.view.View
 import android.view.accessibility.AccessibilityEvent
+import android.view.accessibility.AccessibilityManager
 import androidx.core.view.ViewCompat
 import androidx.core.view.accessibility.AccessibilityNodeInfoCompat
 import androidx.customview.widget.ExploreByTouchHelper
@@ -66,6 +67,8 @@ class SuggestionStripView @JvmOverloads constructor(
         resources.displayMetrics,
     )
     private val accessibilityHelper = SuggestionAccessibilityHelper()
+    private val accessibilityManager = context
+        .getSystemService(Context.ACCESSIBILITY_SERVICE) as AccessibilityManager
     private var textBaseline = 0f
     private var pressedColor = DEFAULT_PRESSED_COLOR
     private var separatorColor = DEFAULT_SEPARATOR_COLOR
@@ -105,11 +108,22 @@ class SuggestionStripView @JvmOverloads constructor(
     }
 
     fun setSuggestions(first: String?, second: String?, third: String?) {
+        val hadSuggestions = state.hasAnySuggestion()
         if (!state.setSuggestions(first, second, third)) return
         rebuildDisplaySuggestions()
         accessibilityHelper.invalidateRoot()
         invalidate()
-        val available = listOfNotNull(first, second, third)
+        // Announce ONLY the empty band -> words transition, and only while touch exploration is
+        // actually on. The triple changes on every keystroke; announcing each one would bury the
+        // key echo TalkBack users type by, exactly like the shift-mode announcements deliberately
+        // stay silent on the frequent auto-caps transitions (KeyboardAccessibilityDelegate). The
+        // words themselves stay reachable at any time through the virtual cell nodes.
+        if (hadSuggestions || !accessibilityManager.isTouchExplorationEnabled) return
+        val available = listOfNotNull(
+            state.suggestionAt(0),
+            state.suggestionAt(1),
+            state.suggestionAt(2),
+        )
         if (available.isNotEmpty()) {
             announceForAccessibility(
                 context.getString(

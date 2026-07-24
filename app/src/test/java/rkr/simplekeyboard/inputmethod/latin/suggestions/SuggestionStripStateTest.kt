@@ -193,6 +193,25 @@ class SuggestionStripStateTest {
     }
 
     @Test
+    fun hasAnySuggestionTracksTheEmptyBandTransition() {
+        val state = SuggestionStripState()
+        assertFalse(state.hasAnySuggestion())
+
+        state.setSuggestions("бер", null, null)
+        assertTrue(state.hasAnySuggestion())
+
+        // Empty strings are normalized to absent cells, so they keep the band empty.
+        state.setSuggestions("", "", "")
+        assertFalse(state.hasAnySuggestion())
+
+        state.setSuggestions(null, null, "өч")
+        assertTrue(state.hasAnySuggestion())
+
+        state.clear()
+        assertFalse(state.hasAnySuggestion())
+    }
+
+    @Test
     fun stripHeightContractIsExactlyFortyDp() {
         assertEquals(40, SuggestionStripState.STRIP_HEIGHT_DP)
         assertEquals(3, SuggestionStripState.CELL_COUNT)

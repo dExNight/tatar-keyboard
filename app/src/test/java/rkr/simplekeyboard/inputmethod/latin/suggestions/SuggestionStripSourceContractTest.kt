@@ -123,6 +123,72 @@ class SuggestionStripSourceContractTest {
         assertTrue(latinIme.contains("outInsets.touchableRegion.setEmpty()"))
     }
 
+    @Test
+    fun suggestionsAreAnnouncedOnlyOnTheEmptyToPopulatedTransition() {
+        val viewSource = File(
+            sourceRoot(),
+            "java/rkr/simplekeyboard/inputmethod/latin/suggestions/SuggestionStripView.kt",
+        ).readText()
+        val setSuggestionsBody = viewSource.substringAfter("fun setSuggestions(")
+            .substringBefore("fun clearSuggestions()")
+
+        // The triple changes on every keystroke: announcing each one would bury the key echo.
+        assertTrue(setSuggestionsBody.contains("val hadSuggestions = state.hasAnySuggestion()"))
+        assertTrue(
+            setSuggestionsBody.contains(
+                "if (hadSuggestions || !accessibilityManager.isTouchExplorationEnabled) return",
+            ),
+        )
+        assertTrue(setSuggestionsBody.contains("announceForAccessibility"))
+        assertTrue(setSuggestionsBody.contains("R.string.spoken_suggestions_available"))
+    }
+
+    @Test
+    fun internalCursorGesturesNotifyTheControllerDirectly() {
+        val latinIme = File(
+            sourceRoot(),
+            "java/rkr/simplekeyboard/inputmethod/latin/LatinIME.java",
+        ).readText()
+        // onUpdateSelection() cannot cover these: the connection keeps the expected selection in
+        // sync (so the move is not "external") and it returns early while the gesture runs.
+        val gestureBodies = listOf(
+            latinIme.substringAfter("public void onMoveCursorPointer")
+                .substringBefore("public void onMoveDeletePointer"),
+            latinIme.substringAfter("public void onMoveDeletePointer")
+                .substringBefore("public void onUpWithDeletePointerActive"),
+            latinIme.substringAfter("public void onUpWithDeletePointerActive")
+                .substringBefore("public void onUpWithSpacePointerActive"),
+            latinIme.substringAfter("public void onUpWithSpacePointerActive")
+                .substringBefore("/**"),
+        )
+        gestureBodies.forEach {
+            assertTrue(it.contains("onSuggestionsAffectingCursorMove()"))
+        }
+        assertTrue(latinIme.contains("mSuggestionsController.onSelectionChanged()"))
+    }
+
+    @Test
+    fun commitPathRefusesToReplaceAWordTheCursorSitsInside() {
+        val javaRoot = File(sourceRoot(), "java/rkr/simplekeyboard/inputmethod/latin")
+        val inputLogic = File(javaRoot, "inputlogic/InputLogic.java").readText()
+        val connection = File(javaRoot, "RichInputConnection.java").readText()
+        val commitBody = inputLogic.substringAfter("public boolean commitChosenSuggestion")
+            .substringBefore("private boolean layoutUsesAutoCaps")
+
+        // Fail-closed second line of defense, before any edit reaches the editor.
+        assertTrue(
+            commitBody.indexOf("startsWithWordCharacter(mConnection.getCachedTextAfterCursor())")
+                in 0 until commitBody.indexOf("deleteTextBeforeCursor"),
+        )
+        // The right-hand context comes from the local cache, never from IPC, and is never logged.
+        assertTrue(connection.contains("public CharSequence getCachedTextAfterCursor()"))
+        assertTrue(
+            connection.substringAfter("public CharSequence getCachedTextAfterCursor()")
+                .substringBefore("}")
+                .contains("Do not log the returned value"),
+        )
+    }
+
     private fun sourceRoot(): File {
         val candidates = listOf(File("src/main"), File("app/src/main"))
         return candidates.firstOrNull(File::isDirectory)

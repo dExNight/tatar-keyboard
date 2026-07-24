@@ -37,6 +37,16 @@ internal class SuggestionStripState {
 
     fun isCellPopulated(cell: Int): Boolean = suggestionAt(cell) != null
 
+    /** True while at least one cell holds a word, i.e. the strip is not an empty band. */
+    fun hasAnySuggestion(): Boolean {
+        var cell = 0
+        while (cell < CELL_COUNT) {
+            if (suggestions[cell] != null) return true
+            cell++
+        }
+        return false
+    }
+
     fun cellAt(x: Float, y: Float, width: Int, height: Int): Int {
         if (x < 0f || x >= width.toFloat() || y < 0f || y >= height.toFloat()
             || width <= 0 || height <= 0
