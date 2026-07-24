@@ -18,7 +18,7 @@ runtime budget, or a native-speaker proofread.
 - **Prefix** taken from the `RichInputConnection` cache snapshot (`getCachedTextBeforeCursor`, **no synchronous editor IPC**, not logged); current word = maximal trailing run of letters; normalized `NFC + lowercase` to byte-match the D1a asset (`scripts/dictionary_coverage.py::normalize_word`); UTF-8 encoded. `TdictPrefixIndex` does not re-normalize at lookup, so caller-side normalization is authoritative.
 - **Result application** only after `sessionId` match **and** `engine.isCurrent(token)`, marshaled to the UI thread.
 - **Invalidation** on genuine external selection change, `onFinishInput`, and subtype change (bumps `sessionId`, hides strip, `engine.finishInput()`). Self-inflicted commits do **not** invalidate. Returning `tt → non-tt → tt` or opening a later eligible field with an already-published engine immediately re-requests the current known non-empty cached prefix; cold/in-flight publication remains the sole request path for a newly started engine.
-- **Safe delete+commit tap** (`InputLogic.commitChosenSuggestion`) with a stale-tap guard: re-reads the live cache, requires `!hasSelection()`, requires that the cursor is not inside a word, and requires the current trailing word to still equal the expected prefix, then batch `deleteTextBeforeCursor(prefix.length)` + `commitText`. A stale/desynced tap is a **no-op** (no text change). No auto-space appended.
+- **Safe delete+commit tap** (`InputLogic.commitChosenSuggestion`) with a stale-tap guard: re-reads the live cache, requires `!hasSelection()`, requires that the cursor is not inside a word, and requires the current trailing word to still equal the expected prefix, then batch `deleteTextBeforeCursor(prefix.length)` + `commitText`. A stale/desynced tap is a **no-op** (no text change). The accepted word carries a trailing space in that same `commitText` unless the text after the cursor already separates it (see "Auto-space after an accepted suggestion").
 - **TalkBack**: the strip announces the triple (`spoken_suggestions_available`, en/ru/tt) only on the empty-band → populated transition, and only while touch exploration is on.
 - **Fail-closed availability + stable height**: eligibility while the dictionary is preparing or its engine is unavailable stays `GONE` (0dp). Only a successfully published engine reserves the fixed 40dp band; from then on it swaps word/empty content without resizing per keystroke or space. It returns to `GONE` for `onFinishInput`, non-Tatar subtype, opt-in OFF, or a privacy field.
 
@@ -33,6 +33,25 @@ the implementation that now satisfies it.
 The strip offers nothing while the cursor sits **inside** a word. `EditorSurface.hasLetterAfterCursor()` reads the local right-hand context (`RichInputConnection.getCachedTextAfterCursor()`, cache only, no IPC, never logged) and feeds it to the pure predicate `TatarWordUtils.startsWithWordCharacter`, which classifies the **first code point** — so a supplementary character is not mistaken for a lone surrogate. Any letter (Tatar, Russian or Latin) and any combining mark counts as "inside a word": the check is deliberately wider than the contract's "Tatar letter", because being too narrow corrupts text while being too wide only costs a suggestion.
 
 The controller applies it in `requestCurrentPrefix()` **before** the engine is asked anything: the band stays visible but empty, and the in-flight generation is invalidated, so a late result cannot repaint words for a position the cursor has left. `InputLogic.commitChosenSuggestion` repeats the same check as a fail-closed second line of defense, before any edit reaches the editor. A space, punctuation, a digit, a newline, an emoji or the end of the text all read as "end of word" and keep the normal request path.
+
+### Auto-space after an accepted suggestion
+
+Tapping a suggestion inserts the word **and a trailing space**, so the next word can be typed without reaching for the space bar — the default behavior of Gboard and of the system keyboards, and not a separate setting. The space is part of the same `commitText` as the word, inside the same batch edit as the prefix deletion: the user never sees the word land without its space, and the tap still costs exactly one editor round trip. `RichInputConnection` appends the whole string to its before-cursor cache and advances the expected cursor by its full length, so the stale-tap guard and `deleteTextBeforeCursor` stay in sync.
+
+Whether the space is needed at all is decided by the pure predicate `TatarWordUtils.needsAutoSpace`, which classifies the **first code point** of the cached right-hand context (`getCachedTextAfterCursor()`, cache only, no IPC, never logged):
+
+| Text right after the cursor | Space |
+|---|---|
+| nothing (end of the text) | appended |
+| whitespace or any space character, the non-breaking space included | not appended — it is already there |
+| punctuation that hugs the word: `Pc`/`Pd`/`Ps`/`Pe`/`Pi`/`Pf`/`Po` — `,` `.` `!` `?` `:` `;` `)` `]` `-` `_`, and also `«»`, the em dash, the ellipsis and curly quotes | not appended — "сүз," must not become "сүз ," |
+| anything else: a digit, a math symbol (`+`, `=`, written as "2 + 2"), an emoji, a letter | appended |
+
+Classification goes through the Unicode categories rather than a hardcoded character list. `SpacingAndPunctuations` was the alternative: it was rejected because it needs `android.content.res.Resources` (so the predicate could not stay a pure JVM-testable function), its `symbols_word_separators` list is ASCII-only and misses exactly the typography Tatar and Russian text uses (`«»`, `—`, `…`), and it answers a different question — "does this character end a word" — which is true of `(`, `+` and `<` as well.
+
+An inserted space must not arm the double-space-to-period gesture, so the commit resets `mJustDoubleSpaced` and `mLastSpaceDownTime` exactly like a lifecycle boundary does. Without the reset, a user who had pressed space less than `DOUBLE_SPACE_PERIOD_TIMEOUT` (1100 ms) ago and then accepted a suggestion would see the next space press rewrite the auto-space into ". ".
+
+Finally, a tap never builds an `InputTransaction`, so nothing would recompute the shift state the way `updateStateAfterInputTransaction()` does after a typed character. `LatinIME.EditorSurface.commitSuggestion` therefore issues the very same `mKeyboardSwitcher.requestUpdatingShiftState(getCurrentAutoCapsState(), getCurrentRecapitalizeState())` after a successful commit, so auto-caps sees the word (and its trailing space) immediately instead of waiting for the editor's `onUpdateSelection`.
 
 ### Casing
 
@@ -106,6 +125,12 @@ Thirty-seven new tests came with the fixes: 24 in `TatarWordUtilsTest` (40 in th
 predicate), 9 in `SuggestionsControllerTest` (42), 1 in `SuggestionStripStateTest` (11) and
 3 in `SuggestionStripSourceContractTest` (8). The suite went 140 → 161 → **177** tests.
 
+The auto-space follow-up (device feedback from a real Samsung: an accepted suggestion had
+to be followed by a manual space) added 9 more — 6 in `TatarWordUtilsTest` (46) for the
+`needsAutoSpace` predicate, 2 in `SuggestionStripSourceContractTest` (10) for the
+single-`commitText` and shift-state contracts, and 1 in `SuggestionsControllerTest` (43)
+for the band after a commit that ends the word — bringing the suite to **186** tests.
+
 The fixes were re-reviewed independently through three lenses — conformance to the frozen
 contract, regression of the previously closed bugs plus lifecycle, and edge cases /
 robustness. All three verdicts were **APPROVED_WITH_NOTES**: no blockers, no previously
@@ -119,6 +144,11 @@ review, not device evidence.
 | Full JVM unit-test suite | `./gradlew test --rerun-tasks --console=plain` | **BUILD SUCCESSFUL** — 177 tests, 0 failures/errors |
 | Release vital lint | `./gradlew lintVitalRelease --rerun-tasks --console=plain` | **BUILD SUCCESSFUL** (no fatal issues; pre-existing deprecation warnings only) |
 | D1f artifact gate | clean build + `check-no-internet` + `apksigner verify` + badging | **PASS** — `dist/tatar-keyboard-1.2.0.apk`, 1 446 019 bytes, SHA-256 `4960b85072d4db64669d63e7755e89cefaf295a7a12e6fcb0b889775543d3772`, versionName 1.2.0 / versionCode 4, only `android.permission.VIBRATE`, APK Signature Scheme **v2 only** (1 signer, RSA 4096, `CN=Tatar Keyboard`), certificate SHA-256 `cdd8c535…b09e` matching the historical release certificate |
+
+The auto-space follow-up re-ran the first two gates only (`./gradlew test lintVitalRelease
+--console=plain`): **BUILD SUCCESSFUL — 186 tests, 0 failures/errors**, lint with no fatal
+issues. The artifact row above still describes the 1.2.0 APK built *before* that change, so
+it has to be regenerated before the next release.
 
 ## Partial device evidence — emulator only, **not** a Samsung
 

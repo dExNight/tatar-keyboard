@@ -209,6 +209,15 @@ generation немедленно очищаются.
 - Перед тапом повторно проверяются editor session, collapsed selection, subtype, generation,
   отсутствие буквы сразу после курсора и точный префикс. Удаление выполняется по code
   points; несовпадение отменяет действие.
+- Принятая подсказка вставляется вместе с завершающим пробелом — одним `commitText` в том
+  же batch edit, что и удаление префикса, поэтому промежуточное состояние «слово без
+  пробела» пользователю не показывается. Пробел не добавляется, если текст сразу после
+  курсора уже отделяет слово: первый кодпоинт — пробельный символ (включая tab, перевод
+  строки и неразрывный пробел) либо примыкающая к слову пунктуация (категории Unicode
+  Pc/Pd/Ps/Pe/Pi/Pf/Po, то есть в том числе «», тире, многоточие и типографские кавычки),
+  чтобы «сүз,» не превращалось в «сүз ,». Цифра, математический символ (Sm: «2 + 2»),
+  emoji и конец текста пробел получают. Вставленный пробел не взводит жест «двойной пробел
+  → точка»: следующее нажатие пробела ведёт себя как первое.
 
 Фактическое покрытие этих правил тестами:
 
@@ -227,6 +236,13 @@ generation немедленно очищаются.
   `tapIsNoOpWhileTheCursorSitsInsideAWord`, `nonLetterAfterCursorKeepsRequestingAsBefore`;
   отказ commit-пути зафиксирован source-contract тестом
   `commitPathRefusesToReplaceAWordTheCursorSitsInside`;
+- автопробел после принятой подсказки — `TatarWordUtilsTest.needsAutoSpace*` (конец текста,
+  уже стоящий пробел/tab/перевод строки/неразрывный пробел, пунктуация ASCII и
+  типографская, цифра и математический символ, суррогатная пара) плюс source-contract тесты
+  `acceptedSuggestionCarriesItsAutoSpaceInsideTheSameCommit` (один `commitText`, сброс
+  состояния двойного пробела) и `successfulTapRefreshesTheShiftStateLikeTypedInputDoes`;
+  поведение полосы после такого коммита —
+  `SuggestionsControllerTest.bandStaysEmptyAndVisibleAfterTheAutoSpacedCommitEndsTheWord`;
 - exact-word exclusion и frequency/code-point ties — `TdictPrefixIndexTest`;
 - selection и внутренние жесты клавиатуры —
   `SuggestionsControllerTest.externalSelectionChangeWhileEligibleReservesAndNeverHides`,
@@ -235,8 +251,9 @@ generation немедленно очищаются.
 
 Не покрыто JVM-тестами и заявляется только как проверка чтением исходника или на
 устройстве: guard `hasSelection()` внутри `InputLogic.commitChosenSuggestion` (Android-класс
-без JVM-обвязки) и сценарий автозаглавной в начале предложения — он проверялся лишь в
-эмуляторном UAT.
+без JVM-обвязки), фактический пересчёт автозаглавной после тапа (сам вызов зафиксирован
+source-contract тестом, но результат виден только на устройстве) и сценарий автозаглавной
+в начале предложения — он проверялся лишь в эмуляторном UAT.
 
 ## Gate каждой фазы
 
