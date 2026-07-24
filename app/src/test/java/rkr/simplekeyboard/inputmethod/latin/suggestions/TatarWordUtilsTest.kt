@@ -283,6 +283,74 @@ class TatarWordUtilsTest {
     }
 
     @Test
+    fun needsAutoSpaceAtTheEndOfTheText() {
+        assertTrue(TatarWordUtils.needsAutoSpace(null))
+        assertTrue(TatarWordUtils.needsAutoSpace(""))
+    }
+
+    @Test
+    fun needsNoAutoSpaceWhenASpaceIsAlreadyThere() {
+        assertFalse(TatarWordUtils.needsAutoSpace(" дигән"))
+        assertFalse(TatarWordUtils.needsAutoSpace(" "))
+        assertFalse(TatarWordUtils.needsAutoSpace("\tдигән"))
+        assertFalse(TatarWordUtils.needsAutoSpace("\nдигән"))
+        // Non-breaking space: not isWhitespace(), but visually a space all the same.
+        assertFalse(TatarWordUtils.needsAutoSpace(" дигән"))
+    }
+
+    @Test
+    fun needsNoAutoSpaceBeforePunctuationThatHugsTheWord() {
+        // "сүз," must never become "сүз ,".
+        assertFalse(TatarWordUtils.needsAutoSpace(", дигән"))
+        assertFalse(TatarWordUtils.needsAutoSpace("."))
+        assertFalse(TatarWordUtils.needsAutoSpace("!"))
+        assertFalse(TatarWordUtils.needsAutoSpace("?"))
+        assertFalse(TatarWordUtils.needsAutoSpace(":"))
+        assertFalse(TatarWordUtils.needsAutoSpace(";"))
+        assertFalse(TatarWordUtils.needsAutoSpace(")"))
+        assertFalse(TatarWordUtils.needsAutoSpace("]"))
+        assertFalse(TatarWordUtils.needsAutoSpace("-сүз"))
+        assertFalse(TatarWordUtils.needsAutoSpace("_сүз"))
+        assertFalse(TatarWordUtils.needsAutoSpace("\"дигән\""))
+        assertFalse(TatarWordUtils.needsAutoSpace("'дигән'"))
+    }
+
+    @Test
+    fun needsNoAutoSpaceBeforeNonAsciiTypography() {
+        // Exactly what a hardcoded ASCII list would miss: «», the em dash, the ellipsis, curly
+        // quotes. All of them are covered because the classification is by Unicode category.
+        assertFalse(TatarWordUtils.needsAutoSpace("»"))
+        assertFalse(TatarWordUtils.needsAutoSpace("«дигән»"))
+        assertFalse(TatarWordUtils.needsAutoSpace("—"))
+        assertFalse(TatarWordUtils.needsAutoSpace("…"))
+        assertFalse(TatarWordUtils.needsAutoSpace("“дигән”"))
+    }
+
+    @Test
+    fun needsAutoSpaceBeforeDigitsSymbolsAndLetters() {
+        assertTrue(TatarWordUtils.needsAutoSpace("123"))
+        assertTrue(TatarWordUtils.needsAutoSpace("5 сум"))
+        // Math symbols take spaces around them ("2 + 2"), so they are not hugging punctuation.
+        assertTrue(TatarWordUtils.needsAutoSpace("+ 2"))
+        assertTrue(TatarWordUtils.needsAutoSpace("= 4"))
+        assertTrue(TatarWordUtils.needsAutoSpace("😀"))
+        // A letter after the cursor is refused earlier by the commit guard; the predicate itself
+        // still has to answer, and "add the space" is the harmless answer.
+        assertTrue(TatarWordUtils.needsAutoSpace("дигән"))
+    }
+
+    @Test
+    fun needsAutoSpaceClassifiesTheFirstCodePointNotTheLeadingSurrogate() {
+        // U+10101 AEGEAN WORD SEPARATOR DOT is punctuation (Po) but lives outside the BMP: read as
+        // a lone leading surrogate it would be uncategorized and would wrongly get a space.
+        val supplementaryPunctuation = String(Character.toChars(0x10101))
+        assertEquals(2, supplementaryPunctuation.length)
+        assertFalse(TatarWordUtils.needsAutoSpace(supplementaryPunctuation))
+        // The mirror case: a supplementary symbol is not punctuation and does take the space.
+        assertTrue(TatarWordUtils.needsAutoSpace(String(Character.toChars(0x1F600))))
+    }
+
+    @Test
     fun classifyThenApplyPreservesTypedCapitalization() {
         val candidate = "сүзләр"
         assertEquals(

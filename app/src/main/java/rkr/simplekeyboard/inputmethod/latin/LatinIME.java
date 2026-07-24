@@ -356,7 +356,18 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
             @Override
             public boolean commitSuggestion(final String expectedPrefix,
                     final String suggestion) {
-                return mInputLogic.commitChosenSuggestion(expectedPrefix, suggestion);
+                final boolean committed =
+                        mInputLogic.commitChosenSuggestion(expectedPrefix, suggestion);
+                if (committed) {
+                    // A tap does not go through an InputTransaction, so nothing would recompute
+                    // the auto-caps state the way updateStateAfterInputTransaction() does after a
+                    // typed character. The committed word (and its trailing space) can change it —
+                    // ". " right before the cursor means the next letter is a sentence start — so
+                    // refresh it here with the very same call.
+                    mKeyboardSwitcher.requestUpdatingShiftState(getCurrentAutoCapsState(),
+                            getCurrentRecapitalizeState());
+                }
+                return committed;
             }
 
             @Override

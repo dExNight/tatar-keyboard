@@ -189,6 +189,54 @@ class SuggestionStripSourceContractTest {
         )
     }
 
+    @Test
+    fun acceptedSuggestionCarriesItsAutoSpaceInsideTheSameCommit() {
+        val javaRoot = File(sourceRoot(), "java/rkr/simplekeyboard/inputmethod/latin")
+        val inputLogic = File(javaRoot, "inputlogic/InputLogic.java").readText()
+        val commitBody = inputLogic.substringAfter("public boolean commitChosenSuggestion")
+            .substringBefore("private boolean layoutUsesAutoCaps")
+
+        // One commitText for word + space: two would flash the word without its space and would
+        // cost a second IPC round trip.
+        assertEquals(1, "mConnection\\.commitText\\(".toRegex().findAll(commitBody).count())
+        assertTrue(commitBody.contains("suggestion + AUTO_SPACE"))
+        assertTrue(
+            commitBody.contains(
+                "TatarWordUtils.needsAutoSpace(mConnection.getCachedTextAfterCursor())",
+            ),
+        )
+        assertTrue(
+            commitBody.indexOf("beginBatchEdit")
+                in 0 until commitBody.indexOf("mConnection.commitText"),
+        )
+        // The inserted space must not arm the double-space-to-period gesture.
+        assertTrue(
+            commitBody.indexOf("mConnection.endBatchEdit()")
+                in 0 until commitBody.indexOf("mJustDoubleSpaced = false"),
+        )
+        assertTrue(commitBody.contains("mLastSpaceDownTime = 0"))
+    }
+
+    @Test
+    fun successfulTapRefreshesTheShiftStateLikeTypedInputDoes() {
+        val latinIme = File(
+            sourceRoot(),
+            "java/rkr/simplekeyboard/inputmethod/latin/LatinIME.java",
+        ).readText()
+        // A tap never builds an InputTransaction, so updateStateAfterInputTransaction() cannot
+        // recompute auto-caps for it; the surface has to make the same call itself.
+        val commitSurfaceBody = latinIme.substringAfter("public boolean commitSuggestion(")
+            .substringBefore("public boolean hasKnownCursor()")
+
+        assertTrue(commitSurfaceBody.contains("mInputLogic.commitChosenSuggestion"))
+        assertTrue(
+            commitSurfaceBody.contains(
+                "mKeyboardSwitcher.requestUpdatingShiftState(getCurrentAutoCapsState(),",
+            ),
+        )
+        assertTrue(commitSurfaceBody.contains("getCurrentRecapitalizeState())"))
+    }
+
     private fun sourceRoot(): File {
         val candidates = listOf(File("src/main"), File("app/src/main"))
         return candidates.firstOrNull(File::isDirectory)

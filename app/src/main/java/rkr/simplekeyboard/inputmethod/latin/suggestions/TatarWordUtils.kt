@@ -92,6 +92,49 @@ object TatarWordUtils {
         return isWordCharacter(Character.codePointAt(textAfterCursor, 0))
     }
 
+    /**
+     * True when a suggestion committed at the cursor must carry a trailing space, i.e. when the
+     * text right after the cursor does not already provide the separation the next word needs.
+     *
+     * Accepting a suggestion appends the space in the same commit so the user can keep typing the
+     * next word without reaching for the space bar. The space is left out in the two cases where it
+     * would be wrong:
+     * - a space is already there — [Character.isWhitespace] covers tab/newline and
+     *   [Character.isSpaceChar] covers the non-breaking space, and only their union means "the
+     *   separator already exists";
+     * - punctuation follows the cursor and has to hug the word: "сүз," must never become "сүз ,".
+     *   Classification goes through the Unicode punctuation categories (Pc/Pd/Ps/Pe/Pi/Pf/Po)
+     *   rather than a hardcoded ASCII list, so the typography Tatar and Russian actually use — «»,
+     *   the em dash, the ellipsis, curly quotes — is covered too.
+     *
+     * Math symbols (Sm: "+", "=") are deliberately NOT treated as hugging punctuation, because they
+     * are written with spaces around them ("2 + 2"). Anything else — a digit, an emoji, a letter —
+     * also keeps the space: a space too many costs one backspace, a space too few costs the feature
+     * its whole point.
+     *
+     * Reads the FIRST CODE POINT, exactly like [startsWithWordCharacter], so a supplementary
+     * character is classified as itself instead of as a lone (uncategorized) surrogate.
+     */
+    @JvmStatic
+    fun needsAutoSpace(textAfterCursor: CharSequence?): Boolean {
+        if (textAfterCursor == null || textAfterCursor.isEmpty()) return true
+        val codePoint = Character.codePointAt(textAfterCursor, 0)
+        if (Character.isWhitespace(codePoint) || Character.isSpaceChar(codePoint)) return false
+        return !isHuggingPunctuation(codePoint)
+    }
+
+    /** True for the punctuation categories that must stay glued to the word in front of them. */
+    private fun isHuggingPunctuation(codePoint: Int): Boolean {
+        val type = Character.getType(codePoint)
+        return type == Character.CONNECTOR_PUNCTUATION.toInt() ||
+            type == Character.DASH_PUNCTUATION.toInt() ||
+            type == Character.START_PUNCTUATION.toInt() ||
+            type == Character.END_PUNCTUATION.toInt() ||
+            type == Character.INITIAL_QUOTE_PUNCTUATION.toInt() ||
+            type == Character.FINAL_QUOTE_PUNCTUATION.toInt() ||
+            type == Character.OTHER_PUNCTUATION.toInt()
+    }
+
     /** True for letters and for the non-standalone combining marks that attach to them. */
     private fun isWordCharacter(ch: Char): Boolean = isWordCharacter(ch.code)
 

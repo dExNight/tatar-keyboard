@@ -400,6 +400,32 @@ class SuggestionsControllerTest {
     }
 
     @Test
+    fun bandStaysEmptyAndVisibleAfterTheAutoSpacedCommitEndsTheWord() {
+        val h = Harness()
+        h.controller.onStartInput(eligible = true)
+        h.editor.word = "сүз"
+        h.controller.onTextChanged()
+        h.capturedCallback!!.onResult(FakeEngine.TOKEN, listOf("сүзләр", "сүзлек"))
+        val shownBefore = h.strip.shown.size
+        val hideBefore = h.strip.hideCount
+
+        h.editor.commitResult = true
+        h.strip.listener!!.onTap("сүзләр")
+        // The commit appends a space, so the trailing word is empty afterwards. Whatever text
+        // event follows must keep the reserved 40dp band and must not repaint the old words.
+        h.editor.word = ""
+        h.controller.onTextChanged()
+
+        assertEquals(shownBefore, h.strip.shown.size)
+        assertEquals(hideBefore, h.strip.hideCount)
+        assertTrue(h.strip.visible)
+        // A second tap on the words that are no longer bound must not commit again.
+        val commitsAfterTap = h.editor.commits.size
+        h.strip.listener!!.onTap("сүзләр")
+        assertEquals(commitsAfterTap, h.editor.commits.size)
+    }
+
+    @Test
     fun tapWithNothingDisplayedIsNoOp() {
         val h = Harness()
         h.controller.onStartInput(eligible = true)

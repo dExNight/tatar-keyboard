@@ -48,6 +48,9 @@ public final class InputLogic {
     // double tap timeout (~300 ms) is too short for this gesture.
     private static final long DOUBLE_SPACE_PERIOD_TIMEOUT = 1100;
 
+    // Appended to an accepted suggestion so the next word can be typed straight away.
+    private static final String AUTO_SPACE = " ";
+
     // TODO : Remove this member when we can.
     final LatinIME mLatinIME;
 
@@ -487,6 +490,10 @@ public final class InputLogic {
      * word edited), no edit is made and {@code false} is returned. All work happens on the UI
      * thread and reads only the cached text around the cursor (no IPC to recompute the word).
      *
+     * <p>The accepted word is committed with a trailing space so the user can type the next word
+     * right away, unless the text after the cursor already separates it
+     * ({@link TatarWordUtils#needsAutoSpace}).
+     *
      * @param expectedPrefix the trailing word the suggestion was computed for.
      * @param suggestion the replacement text to commit.
      * @return {@code true} if the replacement was committed, {@code false} otherwise (no edit).
@@ -511,10 +518,22 @@ public final class InputLogic {
             // Stale tap: the trailing word no longer matches. Do not edit.
             return false;
         }
+        // The space rides along inside the SAME commitText: a second commit would show the word
+        // without its space for one frame and would cost another IPC round trip for nothing.
+        final String textToCommit =
+                TatarWordUtils.needsAutoSpace(mConnection.getCachedTextAfterCursor())
+                        ? suggestion + AUTO_SPACE : suggestion;
         mConnection.beginBatchEdit();
         mConnection.deleteTextBeforeCursor(expectedPrefix.length());
-        mConnection.commitText(suggestion, 1);
+        mConnection.commitText(textToCommit, 1);
         mConnection.endBatchEdit();
+        // A space this code inserted must not arm the double-space-to-period gesture: the next
+        // real space press has to behave like a first one, exactly as it does after a typed
+        // letter. Leaving mLastSpaceDownTime armed would turn "сүзләр " + space into "сүзләр. "
+        // whenever the user had pressed space less than DOUBLE_SPACE_PERIOD_TIMEOUT ago. This is
+        // also an edit, so a pending revert no longer describes the text before the cursor.
+        mJustDoubleSpaced = false;
+        mLastSpaceDownTime = 0;
         return true;
     }
 
