@@ -1,0 +1,12 @@
+# Очередь вычитки татарских строк носителем языка. Одна строка ресурса — одна строка очереди.
+# Строка добавляется в том же коммите, что и сам ресурс. Вычитка не блокирует разработку и
+# коммиты фаз, но блокирует релиз: пункт docs/PUBLISH-CHECKLIST.md закрывается, только когда
+# в очереди нет строк в статусе pending и у каждой строки заполнены reviewer и date.
+# Машинная или AI-проверка статус approved НЕ ставит: approved ставит только носитель языка.
+# status: pending | approved | changed
+phase	resource_key	file	en_base	tt_string	status	reviewer	date	note
+E1b	tatar_suggestions_offer_title	app/src/main/res/values-tt/strings.xml	Turn on Tatar suggestions?	Татарча тәкъдимнәрне кабызыргамы?	pending			Заголовок одноразового предложения включить подсказки.
+E1b	tatar_suggestions_offer_message	app/src/main/res/values-tt/strings.xml	Suggested Tatar words can appear above the keyboard as you type. The word list stays on your device and no internet connection is used.	Язган вакытта төймәсар өстендә татарча сүз тәкъдимнәре күренә ала. Сүзлек сезнең җиһазыгызда саклана, интернет кулланылмый.	pending			Тело предложения; единственное место в продукте, где обещание приватности встречает пользователя.
+E1b	tatar_suggestions_offer_enable	app/src/main/res/values-tt/strings.xml	Turn on	Кабызу	pending			Подпись подтверждающей кнопки; требуется глагол действия, не «OK».
+E1b	tatar_suggestions_offer_dismiss	app/src/main/res/values-tt/strings.xml	Not now	Хәзер түгел	pending			Подпись отклоняющей кнопки; требуется явный отказ, не «Cancel».
+E1b	tatar_suggestions_unavailable	app/src/main/res/values-tt/strings.xml	Tatar suggestions could not be turned on right now. You can try again later.	Татарча тәкъдимнәрне хәзер кабызып булмады. Соңрак кабат карап карагыз.	pending			Разовое сообщение E1b-8; без имён файлов, кодов ошибок и размеров.

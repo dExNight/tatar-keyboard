@@ -157,6 +157,15 @@ to `app/build/outputs/apk/release/app-release.apk` (`cmp`, both 1 446 111 bytes)
 earlier APK produced by the audit-fix round — the one the 177-test count belongs to — is
 superseded and no longer exists in `dist/`.
 
+**Note, 2026-07-26 — the audited artifact is gone too.** `dist/` is now empty: the copy was
+overwritten by an unpublished build during phase E1 and then deleted so that an unaudited
+APK could not ship under the release name. The size, SHA-256 and `cmp` result above are
+therefore not verifiable right now, and rebuilding does not restore them — the same commit
+produces the same 1 446 111 bytes but a different SHA-256, because the APK signature is not
+byte-reproducible. Nothing was published, so nothing has to be withdrawn; the artifact audit
+is simply redone on a fresh build before release. Details: the «Пробел в свидетельствах»
+section of `docs/PUBLISH-CHECKLIST.md`.
+
 ## Partial device evidence — emulator only, **not** a Samsung
 
 A UAT pass ran on AVD `tatar_keyboard_d1f_api35_arm64` (Pixel 3a, Android 15 / API 35,
@@ -188,6 +197,11 @@ changed since, and re-running them on the current artifact is part of the open d
   a 30 MB budget — the feature costs about +4.2 MB PSS. Absolute numbers on a software
   renderer are inflated; the ON/OFF delta is the trustworthy part. Needs a re-measurement on
   real hardware before it is called a release blocker or an emulator artifact.
+  Footnote — «бюджет 30 МБ отменён, см. PROPOSALS.md, раздел «Бюджет памяти (PSS)»»: the
+  30 MB ceiling was withdrawn after this run and replaced by a per-phase delta rule plus a
+  ceiling recomputed from the first valid measurement on real hardware. The paragraph above
+  is left unedited on purpose — it is historical evidence and describes the budget that was
+  in force at the time.
 - Jank 25.93% with Slow UI thread = 0 is a software-GPU profile, so the "janky ~0%" budget
   is neither confirmed nor refuted: NOT_COVERED.
 - Never exercised: TalkBack and real virtual-node navigation, rotation/landscape,

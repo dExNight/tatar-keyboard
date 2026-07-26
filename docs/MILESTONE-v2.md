@@ -89,6 +89,10 @@ Leipzig top-100k, 97.3318% self-coverage принятых токенов; нез
   v2 only (v1/v3/v3.1/v4 = false), RSA 4096, `CN=Tatar Keyboard`, сертификат SHA-256
   `cdd8c5350ddc86f13cd89b5bfb55ca33c13efba77beb4d4ccb75d5e6b961b09e` совпадает с
   историческим релизным; `apksigner verify` → `Verifies`.
+  **Пометка 2026-07-26:** сам аудированный артефакт локально утрачен — `dist/` пуст, поля
+  выше сейчас не проверяемы, а пересборка их не восстанавливает (тот же коммит даёт тот же
+  размер, но другой SHA-256). Перед выпуском аудит выполняется заново на свежей сборке;
+  подробности — раздел «Пробел в свидетельствах» в `docs/PUBLISH-CHECKLIST.md`.
 - [ ] **D1f device/performance:** Samsung/целевое устройство, все touch/insets/rotation/
   moreKeys cases, TalkBack, privacy matrix, PSS, cold start, latency, allocations/jank и
   lifecycle FD measurements. **Частичное свидетельство — только эмулятор и только на сборке
