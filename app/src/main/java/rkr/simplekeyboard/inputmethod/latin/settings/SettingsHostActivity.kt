@@ -124,6 +124,7 @@ class SettingsHostActivity : Activity() {
         SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
             BackupManager(this).dataChanged()
             if (Settings.PREF_SHOW_NUMBER_ROW == key
+                    || Settings.PREF_SHOW_EMOJI_KEY == key
                     || Settings.PREF_SHOW_SPECIAL_CHARS == key) {
                 KeyboardLayoutSet.onKeyboardThemeChanged()
             }
@@ -329,6 +330,8 @@ class SettingsHostActivity : Activity() {
         addCard(listOf(
             switchRow(Settings.PREF_SHOW_NUMBER_ROW, false,
                     R.string.show_number_row, R.string.show_number_row_summary),
+            switchRow(Settings.PREF_SHOW_EMOJI_KEY, true,
+                    R.string.show_emoji_key, R.string.show_emoji_key_summary),
             valueRow(Settings.PREF_KEYBOARD_HEIGHT,
                     R.string.prefs_keyboard_height_settings,
                     resources.getInteger(R.integer.config_min_keyboar_height),

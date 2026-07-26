@@ -47,6 +47,7 @@ public class SettingsValues {
     public final int mKeyLongpressTimeout;
     public final boolean mShowSpecialChars;
     public final boolean mShowNumberRow;
+    public final boolean mShowEmojiKey;
     public final boolean mSpaceSwipeEnabled;
     public final boolean mDeleteSwipeEnabled;
     public final boolean mTatarSuggestionsEnabled;
@@ -90,6 +91,7 @@ public class SettingsValues {
         mDisplayOrientation = res.getConfiguration().orientation;
         mShowSpecialChars = Settings.readShowSpecialChars(prefs);
         mShowNumberRow = Settings.readShowNumberRow(prefs);
+        mShowEmojiKey = Settings.readShowEmojiKey(prefs);
         mSpaceSwipeEnabled = Settings.readSpaceSwipeEnabled(prefs);
         mDeleteSwipeEnabled = Settings.readDeleteSwipeEnabled(prefs);
         mTatarSuggestionsEnabled = Settings.readTatarSuggestionsEnabled(prefs);

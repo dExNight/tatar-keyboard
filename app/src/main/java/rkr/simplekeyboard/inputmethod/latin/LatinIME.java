@@ -1307,6 +1307,15 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
                 getCurrentRecapitalizeState());
     }
 
+    /**
+     * Shows the emoji panel in place of the keyboard. Called from the emoji key's functional event
+     * (see {@link rkr.simplekeyboard.inputmethod.latin.inputlogic.InputLogic}); it never edits the
+     * editor. The surface swap and insets are handled by the keyboard switcher.
+     */
+    public void showEmojiPanel() {
+        mKeyboardSwitcher.showEmojiPanel();
+    }
+
     private void loadKeyboard() {
         // Since we are switching languages, the most urgent thing is to let the keyboard graphics
         // update. LoadKeyboard does that, but we need to wait for buffer flip for it to be on

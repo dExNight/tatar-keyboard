@@ -44,5 +44,11 @@
             android:fitsSystemWindows="true"
             android:layout_width="match_parent"
             android:layout_height="wrap_content" />
+        <ViewStub
+            android:id="@+id/emoji_panel_stub"
+            android:inflatedId="@+id/emoji_panel_view"
+            android:layout="@layout/emoji_panel"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content" />
     </LinearLayout>
 </rkr.simplekeyboard.inputmethod.latin.InputView>

@@ -50,6 +50,7 @@ public final class KeyboardIconsSet {
     public static final String NAME_PREVIOUS_KEY = "previous_key";
     public static final String NAME_TAB_KEY = "tab_key";
     public static final String NAME_LANGUAGE_SWITCH_KEY = "language_switch_key";
+    public static final String NAME_EMOJI_KEY = "emoji_key";
     public static final String NAME_ZWNJ_KEY = "zwnj_key";
     public static final String NAME_ZWJ_KEY = "zwj_key";
 
@@ -76,6 +77,7 @@ public final class KeyboardIconsSet {
         NAME_SPACE_KEY_FOR_NUMBER_LAYOUT, R.drawable.sym_keyboard_space,
         NAME_SHIFT_KEY_SHIFTED,           R.drawable.sym_keyboard_shift_locked,
         NAME_LANGUAGE_SWITCH_KEY,         R.drawable.sym_keyboard_language_switch,
+        NAME_EMOJI_KEY,                   R.drawable.sym_keyboard_emoji,
         NAME_ZWNJ_KEY,                    R.drawable.sym_keyboard_zwnj,
         NAME_ZWJ_KEY,                     R.drawable.sym_keyboard_zwj,
     };

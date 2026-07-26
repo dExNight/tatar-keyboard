@@ -25,11 +25,13 @@ import android.view.ViewStub;
 import android.widget.FrameLayout;
 
 import rkr.simplekeyboard.inputmethod.R;
+import rkr.simplekeyboard.inputmethod.latin.emoji.EmojiPanelView;
 import rkr.simplekeyboard.inputmethod.latin.suggestions.SuggestionStripView;
 
 public final class InputView extends FrameLayout {
     private final Rect mTemporaryBounds = new Rect();
     private SuggestionStripView mSuggestionStripView;
+    private EmojiPanelView mEmojiPanelView;
     private Runnable mInsetsChangedListener;
 
     public InputView(final Context context, final AttributeSet attrs) {
@@ -58,6 +60,57 @@ public final class InputView extends FrameLayout {
 
     public SuggestionStripView getSuggestionStripView() {
         return mSuggestionStripView;
+    }
+
+    /** Creates the emoji panel on first use. Merely inflating the keyboard never creates it. */
+    public EmojiPanelView getOrCreateEmojiPanelView() {
+        if (mEmojiPanelView != null) {
+            return mEmojiPanelView;
+        }
+        final View stub = findViewById(R.id.emoji_panel_stub);
+        if (!(stub instanceof ViewStub)) {
+            return null;
+        }
+        final View inflated = ((ViewStub) stub).inflate();
+        if (!(inflated instanceof EmojiPanelView)) {
+            return null;
+        }
+        mEmojiPanelView = (EmojiPanelView) inflated;
+        return mEmojiPanelView;
+    }
+
+    public EmojiPanelView getEmojiPanelView() {
+        return mEmojiPanelView;
+    }
+
+    /**
+     * Shows the emoji panel sized to the current keyboard height, so that the content top inset is
+     * identical whether the keyboard or the panel is visible. The caller hides the
+     * {@link rkr.simplekeyboard.inputmethod.keyboard.MainKeyboardView}; the two are never visible
+     * at once.
+     */
+    public EmojiPanelView showEmojiPanel(final int keyboardHeightPx) {
+        final EmojiPanelView panel = getOrCreateEmojiPanelView();
+        if (panel == null) {
+            return null;
+        }
+        panel.setPanelHeightPx(keyboardHeightPx);
+        if (panel.getVisibility() != VISIBLE) {
+            panel.setVisibility(VISIBLE);
+            notifyInsetsChanged();
+        }
+        return panel;
+    }
+
+    /** Hides the emoji panel without creating it. */
+    public void hideEmojiPanel() {
+        if (mEmojiPanelView == null) {
+            return;
+        }
+        if (mEmojiPanelView.getVisibility() != GONE) {
+            mEmojiPanelView.setVisibility(GONE);
+            notifyInsetsChanged();
+        }
     }
 
     /** Shows the fixed-height strip, including the valid visible zero-results state. */
@@ -114,6 +167,9 @@ public final class InputView extends FrameLayout {
         if (mSuggestionStripView != null) {
             mSuggestionStripView.release();
         }
+        if (mEmojiPanelView != null) {
+            mEmojiPanelView.release();
+        }
         mInsetsChangedListener = null;
     }
 
@@ -142,6 +198,17 @@ public final class InputView extends FrameLayout {
                 && strip.getWidth() > 0 && strip.getHeight() > 0) {
             mTemporaryBounds.set(0, 0, strip.getWidth(), strip.getHeight());
             offsetDescendantRectToMyCoords(strip, mTemporaryBounds);
+            outBounds.union(mTemporaryBounds);
+        }
+
+        // The emoji panel is a second surface inside the same stack; when it is shown its bounds
+        // join the touchable/visible region the same way the strip's do, so touches on it never
+        // fall through to the application behind the keyboard.
+        final EmojiPanelView panel = mEmojiPanelView;
+        if (panel != null && panel.isShown() && panel.isLaidOut()
+                && panel.getWidth() > 0 && panel.getHeight() > 0) {
+            mTemporaryBounds.set(0, 0, panel.getWidth(), panel.getHeight());
+            offsetDescendantRectToMyCoords(panel, mTemporaryBounds);
             outBounds.union(mTemporaryBounds);
         }
         return true;

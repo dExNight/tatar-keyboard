@@ -35,6 +35,8 @@ import rkr.simplekeyboard.inputmethod.keyboard.internal.KeyboardTextsSet;
 import rkr.simplekeyboard.inputmethod.latin.InputView;
 import rkr.simplekeyboard.inputmethod.latin.LatinIME;
 import rkr.simplekeyboard.inputmethod.latin.RichInputMethodManager;
+import rkr.simplekeyboard.inputmethod.latin.common.Constants;
+import rkr.simplekeyboard.inputmethod.latin.emoji.EmojiPanelView;
 import rkr.simplekeyboard.inputmethod.latin.settings.Settings;
 import rkr.simplekeyboard.inputmethod.latin.settings.SettingsValues;
 import rkr.simplekeyboard.inputmethod.latin.utils.CapsModeUtils;
@@ -42,10 +44,13 @@ import rkr.simplekeyboard.inputmethod.latin.utils.LanguageOnSpacebarUtils;
 import rkr.simplekeyboard.inputmethod.latin.utils.RecapitalizeStatus;
 import rkr.simplekeyboard.inputmethod.latin.utils.ResourceUtils;
 
-public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
+public final class KeyboardSwitcher implements KeyboardState.SwitchActions,
+        EmojiPanelView.Listener {
     private static final String TAG = KeyboardSwitcher.class.getSimpleName();
 
     private MainKeyboardView mKeyboardView;
+    private InputView mCurrentInputView;
+    private boolean mEmojiPanelShown;
     private LatinIME mLatinIME;
     private RichInputMethodManager mRichImm;
 
@@ -121,6 +126,7 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
         builder.setLanguageSwitchKeyEnabled(mLatinIME.shouldShowLanguageSwitchKey());
         builder.setShowSpecialChars(settingsValues.mShowSpecialChars);
         builder.setShowNumberRow(settingsValues.mShowNumberRow);
+        builder.setShowEmojiKey(settingsValues.mShowEmojiKey);
         mKeyboardLayoutSet = builder.build();
         try {
             mState.onLoadKeyboard(currentAutoCapsState, currentRecapitalizeState);
@@ -252,7 +258,10 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
     private void setMainKeyboardFrame(
             final SettingsValues settingsValues,
             final KeyboardSwitchState toggleState) {
-        final int visibility =  isImeSuppressedByHardwareKeyboard(settingsValues, toggleState)
+        // While the emoji panel is the active surface, MainKeyboardView must stay hidden even if a
+        // loadKeyboard/setKeyboard runs underneath it: the two surfaces are never visible at once.
+        final int visibility = (mEmojiPanelShown
+                || isImeSuppressedByHardwareKeyboard(settingsValues, toggleState))
                 ? View.GONE : View.VISIBLE;
         mKeyboardView.setVisibility(visibility);
     }
@@ -270,6 +279,13 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
     }
 
     public KeyboardSwitchState getKeyboardSwitchState() {
+        if (mEmojiPanelShown) {
+            // The panel is a visible surface, so the IME is not hidden even though
+            // MainKeyboardView is GONE. Returning HIDDEN here would let the framework clear the
+            // touchable region (and would suppress the IME under a physical keyboard), dropping
+            // touches on the panel into the application behind it.
+            return KeyboardSwitchState.OTHER;
+        }
         boolean hidden = mKeyboardLayoutSet == null
                 || mKeyboardView == null
                 || !mKeyboardView.isShown();
@@ -352,7 +368,66 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
     }
 
     public View getVisibleKeyboardView() {
+        if (mEmojiPanelShown && mCurrentInputView != null) {
+            final View panel = mCurrentInputView.getEmojiPanelView();
+            if (panel != null) {
+                return panel;
+            }
+        }
         return mKeyboardView;
+    }
+
+    public boolean isEmojiPanelShown() {
+        return mEmojiPanelShown;
+    }
+
+    /**
+     * Replaces the keyboard surface with the emoji panel. Called from the emoji key's functional
+     * event; it never edits the editor. The panel is sized to the current keyboard height so the
+     * content top inset is unchanged, and MainKeyboardView goes {@code GONE} so the two surfaces
+     * are never visible at once.
+     */
+    public void showEmojiPanel() {
+        if (mKeyboardView == null || mCurrentInputView == null) {
+            return;
+        }
+        final EmojiPanelView panel = mCurrentInputView.showEmojiPanel(mKeyboardView.getHeight());
+        if (panel == null) {
+            return;
+        }
+        panel.setListener(this);
+        mEmojiPanelShown = true;
+        mKeyboardView.setVisibility(View.GONE);
+    }
+
+    /** Hides the emoji panel and restores the keyboard surface through the normal visibility path. */
+    public void hideEmojiPanel() {
+        if (!mEmojiPanelShown) {
+            return;
+        }
+        mEmojiPanelShown = false;
+        if (mCurrentInputView != null) {
+            mCurrentInputView.hideEmojiPanel();
+        }
+        if (mKeyboardView != null) {
+            setMainKeyboardFrame(Settings.getInstance().getCurrent(), KeyboardSwitchState.OTHER);
+        }
+    }
+
+    // Implements {@link EmojiPanelView.Listener}. The "АБВ" key returns to the letters.
+    @Override
+    public void onEmojiPanelBackToKeyboard() {
+        hideEmojiPanel();
+    }
+
+    // Implements {@link EmojiPanelView.Listener}. Delete routes through the ordinary code-input
+    // path, so the emoji-cluster-aware backspace from E2a applies here too.
+    @Override
+    public void onEmojiPanelDelete() {
+        if (mLatinIME != null) {
+            mLatinIME.onCodeInput(Constants.CODE_DELETE, Constants.NOT_A_COORDINATE,
+                    Constants.NOT_A_COORDINATE, false);
+        }
     }
 
     public MainKeyboardView getMainKeyboardView() {
@@ -378,6 +453,10 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
 
         mKeyboardView = currentInputView.findViewById(R.id.keyboard_view);
         mKeyboardView.setKeyboardActionListener(mLatinIME);
+        mCurrentInputView = currentInputView;
+        // The "panel is open" state never survives an input-view recreation (rotation, theme or
+        // height change): the panel closes and the letters come back.
+        mEmojiPanelShown = false;
         return currentInputView;
     }
 }

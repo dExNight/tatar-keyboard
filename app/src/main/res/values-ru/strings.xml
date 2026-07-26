@@ -61,6 +61,8 @@
     <string name="pref_enable_ime_switch">Переключение на другие клавиатуры</string>
     <string name="pref_enable_ime_switch_summary">Кнопка языка переключает и на другие приложения-клавиатуры</string>
     <string name="show_number_row">Показать ряд цифр</string>
+    <string name="show_emoji_key">Показать клавишу эмодзи</string>
+    <string name="show_emoji_key_summary">Клавиша рядом с пробелом, открывающая панель эмодзи</string>
     <string name="space_swipe">Перемещать курсор пробелом</string>
     <string name="space_swipe_summary">Проведите по пробелу, чтобы переместить курсор</string>
     <string name="delete_swipe">Удалить смахиванием</string>

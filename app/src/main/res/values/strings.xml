@@ -129,6 +129,9 @@
     <!-- Description for option to also switch to other input methods with the language key -->
     <string name="pref_enable_ime_switch_summary">The language key also switches to other keyboard apps</string>
     <string name="show_number_row">Show separate number row</string>
+    <string name="show_emoji_key">Show emoji key</string>
+    <!-- Description for option to show the emoji key next to the space bar -->
+    <string name="show_emoji_key_summary">Key next to the space bar that opens the emoji panel</string>
     <string name="space_swipe">Space swipe cursor move</string>
     <!-- Description for option to move the cursor by swiping on the space bar -->
     <string name="space_swipe_summary">Swipe the space bar to move the cursor</string>

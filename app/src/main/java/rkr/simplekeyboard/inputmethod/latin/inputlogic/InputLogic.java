@@ -244,6 +244,11 @@ public final class InputLogic {
             case Constants.CODE_LANGUAGE_SWITCH:
                 handleLanguageSwitchKey();
                 break;
+            case Constants.CODE_EMOJI:
+                // The emoji key never edits the editor: it only asks for the emoji panel to
+                // replace the keyboard surface. The surface swap and insets happen there.
+                mLatinIME.showEmojiPanel();
+                break;
             case Constants.CODE_SHIFT_ENTER:
                 sendDownUpKeyEvent(KeyEvent.KEYCODE_ENTER, KeyEvent.META_SHIFT_ON);
                 // Shift + Enter is not supported in all devices

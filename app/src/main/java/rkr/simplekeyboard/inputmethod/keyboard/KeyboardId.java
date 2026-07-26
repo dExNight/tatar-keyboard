@@ -66,6 +66,7 @@ public final class KeyboardId {
     public final String mCustomActionLabel;
     public final boolean mShowMoreKeys;
     public final boolean mShowNumberRow;
+    public final boolean mShowEmojiKey;
 
     private final int mHashCode;
 
@@ -84,6 +85,11 @@ public final class KeyboardId {
                 ? mEditorInfo.actionLabel.toString() : null;
         mShowMoreKeys = params.mShowMoreKeys;
         mShowNumberRow = params.mShowNumberRow;
+        // Like mShowNumberRow and mShowMoreKeys, mShowEmojiKey is intentionally left out of
+        // equals()/computeHashCode(): the static keyboard cache would otherwise return the
+        // previous layout when only this toggle changed. Live toggling works because
+        // SettingsHostActivity clears that cache from its prefChangeListener.
+        mShowEmojiKey = params.mShowEmojiKey;
 
         mHashCode = computeHashCode(this);
     }

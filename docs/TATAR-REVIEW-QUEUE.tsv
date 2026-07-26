@@ -10,3 +10,6 @@ E1b	tatar_suggestions_offer_message	app/src/main/res/values-tt/strings.xml	Sugge
 E1b	tatar_suggestions_offer_enable	app/src/main/res/values-tt/strings.xml	Turn on	Кабызу	pending			Подпись подтверждающей кнопки; требуется глагол действия, не «OK».
 E1b	tatar_suggestions_offer_dismiss	app/src/main/res/values-tt/strings.xml	Not now	Хәзер түгел	pending			Подпись отклоняющей кнопки; требуется явный отказ, не «Cancel».
 E1b	tatar_suggestions_unavailable	app/src/main/res/values-tt/strings.xml	Tatar suggestions could not be turned on right now. You can try again later.	Татарча тәкъдимнәрне хәзер кабызып булмады. Соңрак кабат карап карагыз.	pending			Разовое сообщение E1b-8; без имён файлов, кодов ошибок и размеров.
+E2b-1	show_emoji_key	app/src/main/res/values-tt/strings.xml	Show emoji key	Эмодзи төймәсен күрсәтү	pending			Название тумблера клавиши эмодзи на экране «Оформление».
+E2b-1	show_emoji_key_summary	app/src/main/res/values-tt/strings.xml	Key next to the space bar that opens the emoji panel	Буш урын янындагы эмодзи панелен ачучы төймә	pending			Пояснение к тумблеру клавиши эмодзи.
+E2b-1	spoken_description_emoji	app/src/main/res/values-tt/strings-a11y.xml	Emoji	Эмодзи	pending			Озвучка TalkBack для клавиши эмодзи в нижнем ряду.

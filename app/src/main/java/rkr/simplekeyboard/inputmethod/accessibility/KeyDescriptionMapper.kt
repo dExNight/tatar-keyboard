@@ -106,6 +106,7 @@ object KeyDescriptionMapper {
                 else -> R.string.spoken_description_to_symbol
             }
             Constants.CODE_LANGUAGE_SWITCH -> R.string.spoken_description_language_switch
+            Constants.CODE_EMOJI -> R.string.spoken_description_emoji
             Constants.CODE_SETTINGS -> R.string.spoken_description_settings
             Constants.CODE_OUTPUT_TEXT -> return key.outputText
                 ?: context.getString(R.string.spoken_description_unknown)

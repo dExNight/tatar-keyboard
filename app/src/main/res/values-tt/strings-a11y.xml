@@ -53,6 +53,7 @@
     <string name="spoken_description_to_symbol">Символлар</string>
     <string name="spoken_description_to_alpha">Хәрефләр</string>
     <string name="spoken_description_language_switch">Тел алыштыру</string>
+    <string name="spoken_description_emoji">Эмодзи</string>
     <string name="spoken_description_settings">Көйләүләр</string>
     <string name="spoken_description_unknown">Билгесез символ</string>
 
