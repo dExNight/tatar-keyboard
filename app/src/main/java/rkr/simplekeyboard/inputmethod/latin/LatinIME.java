@@ -35,6 +35,7 @@ import android.os.Build;
 import android.os.Debug;
 import android.os.IBinder;
 import android.os.Message;
+import android.os.UserManager;
 import android.text.InputType;
 import android.text.TextUtils;
 import android.util.Log;
@@ -46,6 +47,7 @@ import android.view.View;
 import android.view.ViewGroup.LayoutParams;
 import android.view.Window;
 import android.view.WindowInsetsController;
+import android.view.WindowManager;
 import android.view.inputmethod.EditorInfo;
 
 import java.io.FileDescriptor;
@@ -55,6 +57,7 @@ import java.util.concurrent.TimeUnit;
 
 import kotlin.jvm.functions.Function1;
 
+import rkr.simplekeyboard.inputmethod.R;
 import rkr.simplekeyboard.inputmethod.compat.EditorInfoCompatUtils;
 import rkr.simplekeyboard.inputmethod.compat.PreferenceManagerCompat;
 import rkr.simplekeyboard.inputmethod.event.Event;
@@ -67,19 +70,25 @@ import rkr.simplekeyboard.inputmethod.keyboard.MainKeyboardView;
 import rkr.simplekeyboard.inputmethod.latin.common.Constants;
 import rkr.simplekeyboard.inputmethod.latin.define.DebugFlags;
 import rkr.simplekeyboard.inputmethod.latin.inputlogic.InputLogic;
+import rkr.simplekeyboard.inputmethod.latin.dictionary.storage.PublishedDictionaryCatalog;
 import rkr.simplekeyboard.inputmethod.latin.settings.Settings;
 import rkr.simplekeyboard.inputmethod.latin.settings.SettingsActivity;
 import rkr.simplekeyboard.inputmethod.latin.settings.SettingsValues;
 import rkr.simplekeyboard.inputmethod.latin.suggestions.EditorSurface;
 import rkr.simplekeyboard.inputmethod.latin.suggestions.EngineHandle;
 import rkr.simplekeyboard.inputmethod.latin.suggestions.MappedEngineHandle;
+import rkr.simplekeyboard.inputmethod.latin.suggestions.OfferEnvironment;
+import rkr.simplekeyboard.inputmethod.latin.suggestions.OfferFlagStore;
+import rkr.simplekeyboard.inputmethod.latin.suggestions.OfferPresenter;
 import rkr.simplekeyboard.inputmethod.latin.suggestions.ResultCallback;
 import rkr.simplekeyboard.inputmethod.latin.suggestions.StripSurface;
 import rkr.simplekeyboard.inputmethod.latin.suggestions.SuggestionStripView;
 import rkr.simplekeyboard.inputmethod.latin.suggestions.SuggestionTapListener;
 import rkr.simplekeyboard.inputmethod.latin.suggestions.SuggestionsController;
+import rkr.simplekeyboard.inputmethod.latin.suggestions.SuggestionsOfferController;
 import rkr.simplekeyboard.inputmethod.latin.suggestions.TatarWordUtils;
 import rkr.simplekeyboard.inputmethod.latin.utils.ApplicationUtils;
+import rkr.simplekeyboard.inputmethod.latin.utils.DialogUtils;
 import rkr.simplekeyboard.inputmethod.latin.utils.KotlinInteropCheck;
 import rkr.simplekeyboard.inputmethod.latin.utils.LeakGuardHandlerWrapper;
 import rkr.simplekeyboard.inputmethod.latin.utils.ResourceUtils;
@@ -113,6 +122,25 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
 
     // Optional opt-in Tatar suggestions controller. Null until set up in onCreate().
     private SuggestionsController mSuggestionsController;
+
+    // Decides the one-shot offer to turn Tatar suggestions on. Null until set up in onCreate().
+    private SuggestionsOfferController mSuggestionsOffer;
+
+    // Device-protected preferences, the only storage this IME reads: they are readable before the
+    // user unlocks the device, which is what makes the keyboard usable in direct boot at all.
+    private SharedPreferences mDevicePrefs;
+
+    // Last value of PREF_TATAR_SUGGESTIONS this service has seen, so the listener below can tell an
+    // actual transition from the many notifications that carry no change for us.
+    private boolean mLastKnownTatarSuggestionsEnabled;
+
+    /**
+     * Held in a field on purpose, and not registered as an anonymous lambda: SharedPreferencesImpl
+     * keeps its listeners in a WeakHashMap, so a listener without a strong reference is collected
+     * by the GC at an arbitrary later moment and this channel dies without a single symptom.
+     */
+    private final SharedPreferences.OnSharedPreferenceChangeListener mSuggestionsSettingListener =
+            this::onSuggestionsSettingMaybeChanged;
 
     public final UIHandler mHandler = new UIHandler(this);
 
@@ -282,7 +310,13 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         // {@link #resetDictionaryFacilitatorIfNecessary()}.
         loadSettings();
 
+        mDevicePrefs = PreferenceManagerCompat.getDeviceSharedPreferences(this);
         setUpSuggestionsController();
+        setUpSuggestionsOffer();
+        // Registered last: everything the handler touches exists by now, so it can never observe a
+        // half-built service.
+        mLastKnownTatarSuggestionsEnabled = Settings.readTatarSuggestionsEnabled(mDevicePrefs);
+        mDevicePrefs.registerOnSharedPreferenceChangeListener(mSuggestionsSettingListener);
 
         // Register to receive ringer mode change.
         final IntentFilter filter = new IntentFilter();
@@ -382,12 +416,249 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
             }
         };
 
-        final Function1<ResultCallback, EngineHandle> engineFactory =
-                resultCallback -> MappedEngineHandle.create(this, resultCallback);
+        // Runs on the controller's background executor. The catalog is the one the controller
+        // already owns: no second store and no throwaway executor are built per engine start. It is
+        // null until a preparation request has actually created the storage, and a null catalog
+        // simply yields no engine — the strip stays GONE and plain typing is untouched.
+        final Function1<ResultCallback, EngineHandle> engineFactory = resultCallback -> {
+            final SuggestionsController controller = mSuggestionsController;
+            if (controller == null) {
+                return null;
+            }
+            final PublishedDictionaryCatalog catalog = controller.engineCatalog();
+            if (catalog == null) {
+                return null;
+            }
+            return MappedEngineHandle.start(catalog, resultCallback);
+        };
 
         mSuggestionsController = new SuggestionsController(
                 this, stripSurface, editorSurface, mHandler, engineFactory);
         mSuggestionsController.onCreate();
+    }
+
+    /**
+     * Builds the one-shot offer to turn Tatar suggestions on and wires it to the live IME.
+     *
+     * All the decision logic lives in {@link SuggestionsOfferController}; what stays here is the
+     * environment it asks about, the durable one-shot flag and the two dialogs, because those are
+     * exactly the parts that cannot exist without Android.
+     */
+    private void setUpSuggestionsOffer() {
+        final OfferEnvironment environment = new OfferEnvironment() {
+            @Override
+            public boolean isSuggestionsSettingEnabled() {
+                // Read straight from the preferences rather than from SettingsValues: this is also
+                // called from the preference listener, where SettingsValues may not have been
+                // rebuilt yet.
+                return Settings.readTatarSuggestionsEnabled(mDevicePrefs);
+            }
+
+            @Override
+            public boolean isTatarSubtypeActive() {
+                return "tt_RU".equals(mRichImm.getCurrentSubtype().getLocale());
+            }
+
+            @Override
+            public boolean isInputViewShownWithWindowToken() {
+                if (!isInputViewShown()) {
+                    return false;
+                }
+                final MainKeyboardView mainKeyboardView = mKeyboardSwitcher.getMainKeyboardView();
+                return mainKeyboardView != null && mainKeyboardView.getWindowToken() != null;
+            }
+
+            @Override
+            public boolean editorAllowsSuggestions() {
+                final SettingsValues settingsValues = mSettings.getCurrent();
+                return settingsValues != null
+                        && settingsValues.mInputAttributes.mShouldShowSuggestions
+                        // An editor that set IME_FLAG_NO_PERSONALIZED_LEARNING gets no offer at
+                        // all. Incognito fields usually carry an ordinary text inputType, so
+                        // mShouldShowSuggestions is true for them and this is the only condition
+                        // that stops the dialog. Because the controller checks the environment
+                        // before it reads anything, the one-shot flag is not spent and the text of
+                        // such a field is never looked at either.
+                        && !settingsValues.mInputAttributes.mNoPersonalizedLearning;
+            }
+
+            @Override
+            public boolean isUserUnlocked() {
+                final UserManager userManager =
+                        (UserManager) getSystemService(Context.USER_SERVICE);
+                // A service that cannot be reached counts as locked: not showing the offer is the
+                // accepted failure direction, showing it twice is not.
+                return userManager != null && userManager.isUserUnlocked();
+            }
+
+            @Override
+            public boolean isAnotherDialogShowing() {
+                return isShowingOptionDialog();
+            }
+
+            @Override
+            public boolean isImeSuppressedByHardwareKeyboard() {
+                return LatinIME.this.isImeSuppressedByHardwareKeyboard();
+            }
+
+            @Override
+            public boolean isInDraggingFinger() {
+                final MainKeyboardView mainKeyboardView = mKeyboardSwitcher.getMainKeyboardView();
+                return mainKeyboardView != null && mainKeyboardView.isInDraggingFinger();
+            }
+
+            @Override
+            public CharSequence cachedTextBeforeCursor() {
+                // Local cache only, never IPC, and never logged.
+                return mInputLogic.mConnection.getCachedTextBeforeCursor();
+            }
+        };
+
+        final OfferFlagStore flagStore = new OfferFlagStore() {
+            @Override
+            public boolean isOfferSpent() {
+                return Settings.readTatarSuggestionsOfferSpent(mDevicePrefs);
+            }
+
+            @Override
+            public void spendOffer() {
+                Settings.writeTatarSuggestionsOfferSpent(mDevicePrefs);
+            }
+        };
+
+        final OfferPresenter presenter = new OfferPresenter() {
+            @Override
+            public void showEnableOffer() {
+                showSuggestionsOfferDialog();
+            }
+
+            @Override
+            public void showUnavailableMessage() {
+                showSuggestionsUnavailableDialog();
+            }
+        };
+
+        mSuggestionsOffer = new SuggestionsOfferController(environment, flagStore, presenter);
+        if (mSuggestionsController != null) {
+            mSuggestionsController.setDictionaryUnavailableListener(
+                    mSuggestionsOffer::onDictionaryUnavailableAfterExplicitEnable);
+        }
+    }
+
+    /**
+     * Shows the one-shot offer to turn Tatar suggestions on.
+     *
+     * The durable flag has already been spent by {@link SuggestionsOfferController} before this
+     * method was called, so neither answer writes it: cancelling by touching outside the dialog or
+     * with the back button is allowed and means exactly what "Not now" means. Nothing here touches
+     * the user's text, and the suggestion strip is not involved at all — with the setting off it
+     * stays GONE before, during and after the dialog.
+     */
+    private void showSuggestionsOfferDialog() {
+        final MainKeyboardView mainKeyboardView = mKeyboardSwitcher.getMainKeyboardView();
+        if (mainKeyboardView == null) {
+            return;
+        }
+        final IBinder windowToken = mainKeyboardView.getWindowToken();
+        if (windowToken == null) {
+            return;
+        }
+        final AlertDialog dialog = new AlertDialog.Builder(
+                DialogUtils.getPlatformDialogThemeContext(this))
+                .setTitle(R.string.tatar_suggestions_offer_title)
+                .setMessage(R.string.tatar_suggestions_offer_message)
+                .setPositiveButton(R.string.tatar_suggestions_offer_enable,
+                        (di, which) -> Settings.writeTatarSuggestionsEnabled(mDevicePrefs, true))
+                .setNegativeButton(R.string.tatar_suggestions_offer_dismiss, null)
+                .create();
+        dialog.setCancelable(true);
+        dialog.setCanceledOnTouchOutside(true);
+        attachDialogToInputWindow(dialog, windowToken);
+        // Same field the subtype picker uses, so hideWindow() dismisses this dialog and clears the
+        // reference through the one existing path instead of a second mechanism.
+        mOptionsDialog = dialog;
+        dialog.show();
+    }
+
+    /**
+     * Shows the one-shot message saying that Tatar suggestions could not be turned on.
+     *
+     * A modal dialog rather than a Toast: it does not depend on the platform's limits on toasts from
+     * a background process, and it is dismissed by the same {@link #hideWindow()} as every other
+     * dialog here. The single acknowledging button is labelled by the platform, because this phase's
+     * string set is fixed and a plain acknowledgement needs no wording of its own. The body names no
+     * file, no failure code, no size and no cause: none of that is anything the user could act on,
+     * and all of it would be alarming inside someone else's app.
+     */
+    private void showSuggestionsUnavailableDialog() {
+        final MainKeyboardView mainKeyboardView = mKeyboardSwitcher.getMainKeyboardView();
+        if (mainKeyboardView == null) {
+            return;
+        }
+        final IBinder windowToken = mainKeyboardView.getWindowToken();
+        if (windowToken == null) {
+            return;
+        }
+        final AlertDialog dialog = new AlertDialog.Builder(
+                DialogUtils.getPlatformDialogThemeContext(this))
+                .setMessage(R.string.tatar_suggestions_unavailable)
+                .setPositiveButton(android.R.string.ok, null)
+                .create();
+        dialog.setCancelable(true);
+        dialog.setCanceledOnTouchOutside(true);
+        attachDialogToInputWindow(dialog, windowToken);
+        mOptionsDialog = dialog;
+        dialog.show();
+    }
+
+    /**
+     * Attaches a dialog to the IME window exactly the way the subtype picker does. Without the
+     * window token and the attached-dialog type the window manager refuses a dialog owned by an
+     * input method; without FLAG_ALT_FOCUSABLE_IM the keyboard and the dialog fight over input.
+     */
+    private void attachDialogToInputWindow(final AlertDialog dialog, final IBinder windowToken) {
+        final Window window = dialog.getWindow();
+        if (window == null) {
+            return;
+        }
+        final WindowManager.LayoutParams lp = window.getAttributes();
+        lp.token = windowToken;
+        lp.type = WindowManager.LayoutParams.TYPE_APPLICATION_ATTACHED_DIALOG;
+        window.setAttributes(lp);
+        window.addFlags(WindowManager.LayoutParams.FLAG_ALT_FOCUSABLE_IM);
+    }
+
+    /**
+     * Device-protected preferences changed.
+     *
+     * Tolerates a null key, which is how {@link Settings#onReceive} notifies its own listener, and
+     * reacts only to an actual transition of the one value this service watches — writing the
+     * one-shot offer flag, or any unrelated setting, must not be mistaken for the user flipping the
+     * suggestions switch. Nothing expensive happens here: the controller closes or reopens
+     * eligibility immediately and leaves the blocking engine teardown to the next lifecycle
+     * boundary.
+     */
+    private void onSuggestionsSettingMaybeChanged(final SharedPreferences prefs, final String key) {
+        if (key != null && !Settings.PREF_TATAR_SUGGESTIONS.equals(key)) {
+            return;
+        }
+        final boolean enabled = Settings.readTatarSuggestionsEnabled(prefs);
+        if (enabled == mLastKnownTatarSuggestionsEnabled) {
+            return;
+        }
+        mLastKnownTatarSuggestionsEnabled = enabled;
+        if (mSuggestionsController == null) {
+            return;
+        }
+        if (enabled) {
+            mSuggestionsController.onSuggestionsSettingEnabled(
+                    isTatarSuggestionsEligible(true));
+        } else {
+            mSuggestionsController.onSuggestionsSettingDisabled();
+            if (mSuggestionsOffer != null) {
+                mSuggestionsOffer.onSuggestionsSettingDisabled();
+            }
+        }
     }
 
     private InputView getInputViewForSuggestions() {
@@ -398,10 +669,25 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
      * Computes whether opt-in Tatar suggestions may run for the current field and subtype.
      */
     private boolean isTatarSuggestionsEligible() {
+        return isTatarSuggestionsEligible(mSettings.getCurrent().mTatarSuggestionsEnabled);
+    }
+
+    /**
+     * Same computation with the setting value supplied by the caller.
+     *
+     * The preference listener needs this overload: it and {@link Settings} are two listeners on the
+     * same SharedPreferences instance, the platform does not order them, so {@link SettingsValues}
+     * may still carry the previous value at the moment the change reaches this service.
+     */
+    private boolean isTatarSuggestionsEligible(final boolean suggestionsEnabled) {
         final SettingsValues settingsValues = mSettings.getCurrent();
-        return settingsValues.mTatarSuggestionsEnabled
+        return suggestionsEnabled
                 && "tt_RU".equals(mRichImm.getCurrentSubtype().getLocale())
                 && settingsValues.mInputAttributes.mShouldShowSuggestions
+                // IME_FLAG_NO_PERSONALIZED_LEARNING closes eligibility outright: the strip reserves
+                // no band and not a single prefix reaches the engine in such a field, even for a
+                // user who has turned Tatar suggestions on everywhere else.
+                && !settingsValues.mInputAttributes.mNoPersonalizedLearning
                 && mInputLogic.mConnection.hasCursorPosition();
     }
 
@@ -409,6 +695,9 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
     public void onDestroy() {
         if (mSuggestionsController != null) {
             mSuggestionsController.onDestroy();
+        }
+        if (mDevicePrefs != null) {
+            mDevicePrefs.unregisterOnSharedPreferenceChangeListener(mSuggestionsSettingListener);
         }
         mSettings.onDestroy();
         unregisterReceiver(mRingerModeChangeReceiver);
@@ -616,6 +905,12 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
 
         if (mSuggestionsController != null) {
             mSuggestionsController.onStartInput(isTatarSuggestionsEligible());
+        }
+        if (mSuggestionsOffer != null) {
+            // The boundary at which a deferred "could not turn suggestions on" message gets another
+            // chance. It is not a trigger for the offer itself: showing the keyboard proves nothing
+            // about wanting to type Tatar.
+            mSuggestionsOffer.onInputViewStarted();
         }
 
         if (TRACE) Debug.startMethodTracing("/data/trace/latinime");
@@ -954,7 +1249,27 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         final InputTransaction completeInputTransaction =
                 mInputLogic.onCodeInput(mSettings.getCurrent(), event);
         updateStateAfterInputTransaction(completeInputTransaction);
+        maybeOfferTatarSuggestions(event);
         mKeyboardSwitcher.onEvent(event, getCurrentAutoCapsState(), getCurrentRecapitalizeState());
+    }
+
+    /**
+     * Offers Tatar suggestions once, right after the user has finished their first real word.
+     *
+     * The first check is the offer's own in-memory mirror of its one-shot flag, so once the offer has
+     * been made a keypress costs a single field read: no text is read, no preference is touched and
+     * the code point is not even classified. Which key presses count as finishing a word is decided
+     * by {@link SuggestionsOfferController#isWordFinishingKeyPress}: being a word separator is
+     * necessary but not sufficient, because Enter and Tab arrive as ordinary code points ('\n' and
+     * '\t') and both are listed in symbols_word_separators. Delete and the language key are the
+     * events that really do carry {@link Event#NOT_A_CODE_POINT}, which is never a separator.
+     */
+    private void maybeOfferTatarSuggestions(final Event event) {
+        if (mSuggestionsOffer == null || !mSuggestionsOffer.isOfferPending()) {
+            return;
+        }
+        mSuggestionsOffer.onKeyPressCommitted(event.mCodePoint,
+                mSettings.getCurrent().isWordSeparator(event.mCodePoint));
     }
 
     // A helper method to split the code point and the key code. Ultimately, they should not be

@@ -66,6 +66,15 @@ public final class Settings extends BroadcastReceiver implements SharedPreferenc
     public static final String PREF_SPACE_SWIPE = "pref_space_swipe";
     public static final String PREF_DELETE_SWIPE = "pref_delete_swipe";
     public static final String PREF_TATAR_SUGGESTIONS = "pref_tatar_suggestions";
+    /**
+     * One-shot marker: the offer to turn Tatar suggestions on has been made and is never made
+     * again. Deliberately NOT part of {@link SettingsValues} — that object is rebuilt in full on
+     * every change of every setting, and this value is read once per process and written once per
+     * installation. Deliberately not an enterprise restriction either: it is a record of something
+     * that happened, not a policy an administrator sets.
+     */
+    public static final String PREF_TATAR_SUGGESTIONS_OFFER_SPENT =
+            "pref_tatar_suggestions_offer_spent";
 
     private static final float UNDEFINED_PREFERENCE_VALUE_FLOAT = -1.0f;
     private static final int UNDEFINED_PREFERENCE_VALUE_INT = -1;
@@ -255,6 +264,30 @@ public final class Settings extends BroadcastReceiver implements SharedPreferenc
 
     public static boolean readTatarSuggestionsEnabled(final SharedPreferences prefs) {
         return prefs.getBoolean(PREF_TATAR_SUGGESTIONS, false);
+    }
+
+    /**
+     * Turns Tatar suggestions on from outside the settings screen (the offer dialog). The live IME
+     * picks the change up through its own preference listener, so the caller does nothing else.
+     */
+    public static void writeTatarSuggestionsEnabled(final SharedPreferences prefs,
+            final boolean enabled) {
+        prefs.edit().putBoolean(PREF_TATAR_SUGGESTIONS, enabled).apply();
+    }
+
+    public static boolean readTatarSuggestionsOfferSpent(final SharedPreferences prefs) {
+        return prefs.getBoolean(PREF_TATAR_SUGGESTIONS_OFFER_SPENT, false);
+    }
+
+    /**
+     * Spends the one-shot offer. Uses {@code commit()} rather than {@code apply()} on purpose: this
+     * runs immediately before a modal dialog appears, and the whole point of the flag is that a
+     * process death right after the dialog is shown must not bring the offer back. One boolean into
+     * already-loaded device-protected preferences, once per installation, is worth the synchronous
+     * write.
+     */
+    public static void writeTatarSuggestionsOfferSpent(final SharedPreferences prefs) {
+        prefs.edit().putBoolean(PREF_TATAR_SUGGESTIONS_OFFER_SPENT, true).commit();
     }
 
     public static String readPrefSubtypes(final SharedPreferences prefs) {

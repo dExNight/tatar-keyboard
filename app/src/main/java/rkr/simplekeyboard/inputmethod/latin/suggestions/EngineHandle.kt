@@ -16,13 +16,10 @@
 
 package rkr.simplekeyboard.inputmethod.latin.suggestions
 
-import android.content.Context
 import rkr.simplekeyboard.inputmethod.latin.dictionary.engine.LookupToken
 import rkr.simplekeyboard.inputmethod.latin.dictionary.engine.MappedDictionaryEngine
 import rkr.simplekeyboard.inputmethod.latin.dictionary.engine.ResultHandoff
-import rkr.simplekeyboard.inputmethod.latin.dictionary.storage.AndroidDictionaryStorageFactory
 import rkr.simplekeyboard.inputmethod.latin.dictionary.storage.PublishedDictionaryCatalog
-import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 
 /**
@@ -82,9 +79,16 @@ class MappedEngineHandle private constructor(
 
     companion object {
         /**
-         * Acquires a catalog lease and maps the newest dictionary. Performs file I/O; call off the
-         * UI thread. Returns null if no dictionary is safe to activate.
+         * Acquires a catalog lease and maps the newest dictionary. Performs catalog validation and
+         * file mapping I/O, so this MUST be called off the UI thread; the controller invokes it on
+         * its background executor only after the dictionary is ready. Returns null if no dictionary
+         * is safe to activate.
+         *
+         * The [catalog] is the one the controller already owns
+         * ([SuggestionsController.engineCatalog]): the engine neither builds a second store nor
+         * spawns a throwaway executor of its own.
          */
+        @JvmStatic
         fun start(
             catalog: PublishedDictionaryCatalog,
             callback: ResultCallback,
@@ -94,30 +98,6 @@ class MappedEngineHandle private constructor(
             }
             val engine = MappedDictionaryEngine.start(catalog, handoff) ?: return null
             return MappedEngineHandle(engine)
-        }
-
-        /**
-         * Production factory used by LatinIME. Builds a catalog over the already-published asset
-         * (durably written to device-protected storage by SuggestionsController.onCreate's
-         * prepare step) and activates it. Performs catalog validation + file mapping I/O, so this
-         * MUST be called off the UI thread; the controller invokes it on its background executor
-         * only after the dictionary is ready. Returns null when no dictionary is safe to activate.
-         *
-         * The storage factory's executor only backs background preparation, which this path never
-         * triggers, so it is shut down immediately; the returned engine owns its own lookup
-         * executor and the catalog lease.
-         */
-        @JvmStatic
-        fun create(context: Context, callback: ResultCallback): MappedEngineHandle? {
-            val storageExecutor = Executors.newSingleThreadExecutor()
-            return try {
-                val catalog = AndroidDictionaryStorageFactory.create(context, storageExecutor)
-                start(catalog, callback)
-            } catch (_: Throwable) {
-                null
-            } finally {
-                storageExecutor.shutdownNow()
-            }
         }
     }
 }

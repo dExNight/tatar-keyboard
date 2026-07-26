@@ -67,6 +67,11 @@
     <string name="delete_swipe_summary">Проведите по клавише удаления, чтобы стереть больше текста</string>
     <string name="tatar_suggestions">Подсказки татарских слов</string>
     <string name="tatar_suggestions_summary">Показывать подсказки татарских слов над клавиатурой при вводе</string>
+    <string name="tatar_suggestions_offer_title">Включить татарские подсказки?</string>
+    <string name="tatar_suggestions_offer_message">Подсказки татарских слов могут появляться над клавиатурой при вводе. Список слов хранится на вашем устройстве, интернет не используется.</string>
+    <string name="tatar_suggestions_offer_enable">Включить</string>
+    <string name="tatar_suggestions_offer_dismiss">Не сейчас</string>
+    <string name="tatar_suggestions_unavailable">Сейчас не удалось включить татарские подсказки. Можно попробовать позже.</string>
     <string name="keyboard_languages">Языки клавиатуры</string>
     <string name="keyboard_languages_summary">Добавить или убрать язык</string>
     <string name="user_languages">Включённые языки</string>

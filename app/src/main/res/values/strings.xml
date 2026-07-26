@@ -139,6 +139,16 @@
     <string name="tatar_suggestions">Tatar word suggestions</string>
     <!-- Description for the Tatar word suggestions option -->
     <string name="tatar_suggestions_summary">Show suggested Tatar words above the keyboard as you type</string>
+    <!-- Title of the one-time dialog offering to turn Tatar word suggestions on -->
+    <string name="tatar_suggestions_offer_title">Turn on Tatar suggestions?</string>
+    <!-- Body of the one-time dialog offering to turn Tatar word suggestions on -->
+    <string name="tatar_suggestions_offer_message">Suggested Tatar words can appear above the keyboard as you type. The word list stays on your device and no internet connection is used.</string>
+    <!-- Button that turns Tatar word suggestions on -->
+    <string name="tatar_suggestions_offer_enable">Turn on</string>
+    <!-- Button that declines the offer to turn Tatar word suggestions on -->
+    <string name="tatar_suggestions_offer_dismiss">Not now</string>
+    <!-- Message shown once when Tatar word suggestions could not be turned on -->
+    <string name="tatar_suggestions_unavailable">Tatar suggestions could not be turned on right now. You can try again later.</string>
     <!-- Title of the preference item that opens the keyboard languages screen -->
     <string name="keyboard_languages">Keyboard languages</string>
     <!-- Summary of the preference item that opens the keyboard languages screen -->

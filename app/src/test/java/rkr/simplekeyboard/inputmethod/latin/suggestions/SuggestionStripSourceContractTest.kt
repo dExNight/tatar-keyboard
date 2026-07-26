@@ -237,6 +237,74 @@ class SuggestionStripSourceContractTest {
         assertTrue(commitSurfaceBody.contains("getCurrentRecapitalizeState())"))
     }
 
+    @Test
+    fun theOfferTriggerRunsEveryKeyPressThroughTheWordFinishingPredicate() {
+        val latinIme = File(
+            sourceRoot(),
+            "java/rkr/simplekeyboard/inputmethod/latin/LatinIME.java",
+        ).readText()
+        val triggerBody = latinIme.substringAfter("private void maybeOfferTatarSuggestions(")
+            .substringBefore("// A helper method to split the code point")
+
+        // The decision must not be "the editor calls this a word separator" on its own: Enter and
+        // Tab are separators and would spend the one-shot offer on a keystroke that hides the
+        // keyboard. Routing through the controller keeps that rule in one JVM-tested place.
+        assertTrue(triggerBody.contains("mSuggestionsOffer.onKeyPressCommitted("))
+        assertFalse(triggerBody.contains("onWordSeparatorCommitted"))
+        val offerController = File(
+            sourceRoot(),
+            "java/rkr/simplekeyboard/inputmethod/latin/suggestions/SuggestionsOfferController.kt",
+        ).readText()
+        val predicateBody = offerController.substringAfter("fun isWordFinishingKeyPress(")
+            .substringBefore("}")
+        assertTrue(predicateBody.contains("codePoint != Constants.CODE_ENTER"))
+        assertTrue(predicateBody.contains("codePoint != Constants.CODE_TAB"))
+    }
+
+    @Test
+    fun noPersonalizedLearningIsReadFromImeOptionsAndHonouredByBothSuggestionPredicates() {
+        val javaRoot = File(sourceRoot(), "java/rkr/simplekeyboard/inputmethod/latin")
+        val inputAttributes = File(javaRoot, "InputAttributes.java").readText()
+        val latinIme = File(javaRoot, "LatinIME.java").readText()
+
+        // Every other attribute of the class comes from inputType; this one can only come from
+        // imeOptions, because an incognito field's inputType is an ordinary text one.
+        assertTrue(
+            inputAttributes.contains(
+                "0 != (imeOptions & EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING)",
+            ),
+        )
+        // Assigned before the early return of the non-TYPE_CLASS_TEXT branch, so it holds for every
+        // input class rather than for text fields only.
+        assertTrue(
+            inputAttributes.indexOf("mNoPersonalizedLearning = readNoPersonalizedLearning(")
+                in 0 until inputAttributes.indexOf("if (inputClass != InputType.TYPE_CLASS_TEXT)"),
+        )
+        // Settings are reused when isSameInputType() says the field did not change. An app flipping
+        // its own incognito switch calls restartInput() with the same inputType and only imeOptions
+        // changed, so the flag has to take part in that comparison or the permissive attributes of
+        // the previous field survive into the incognito one.
+        assertTrue(
+            inputAttributes.substringAfter("public boolean isSameInputType(")
+                .substringBefore("public String toString()")
+                .contains("readNoPersonalizedLearning(editorInfo) == mNoPersonalizedLearning"),
+        )
+
+        // Both predicates, because they stop different things: the first one the one-shot dialog
+        // (and, before it, any read of the field's text), the second one the reserved strip and
+        // every prefix lookup.
+        val offerBody = latinIme.substringAfter("public boolean editorAllowsSuggestions()")
+            .substringBefore("public boolean isUserUnlocked()")
+        val eligibilityBody = latinIme
+            .substringAfter("private boolean isTatarSuggestionsEligible(final boolean")
+            .substringBefore("public void onDestroy()")
+        listOf(offerBody, eligibilityBody).forEach { body ->
+            assertTrue(
+                body.contains("!settingsValues.mInputAttributes.mNoPersonalizedLearning"),
+            )
+        }
+    }
+
     private fun sourceRoot(): File {
         val candidates = listOf(File("src/main"), File("app/src/main"))
         return candidates.firstOrNull(File::isDirectory)

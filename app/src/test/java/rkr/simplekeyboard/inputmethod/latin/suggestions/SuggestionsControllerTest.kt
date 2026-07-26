@@ -988,4 +988,110 @@ class SuggestionsControllerTest {
         h.strip.listener!!.onTap("сүзләр")
         assertTrue(h.editor.commits.isEmpty())
     }
+
+    // --- Deferred engine release across the setting -------------------------------------------
+
+    /**
+     * Controller wired to a factory that hands out a fresh engine per start, so a test can tell an
+     * engine that was released and replaced from one that was merely kept.
+     */
+    private class ReleaseHarness {
+        val strip = FakeStrip()
+        val editor = FakeEditor()
+        val executor = DirectExecutorService()
+        val engines = mutableListOf<FakeEngine>()
+
+        val controller = SuggestionsController(
+            strip,
+            editor,
+            UiPoster { it.run() },
+            {
+                val engine = FakeEngine()
+                engines.add(engine)
+                engine
+            },
+            executor,
+        )
+
+        fun latestEngine(): FakeEngine = engines.last()
+    }
+
+    @Test
+    fun deferredReleaseIsCancelledWhenTheSettingComesBackOnBeforeTheBoundary() {
+        val h = ReleaseHarness()
+        h.controller.onStartInput(eligible = true)
+        assertEquals(1, h.engines.size)
+        h.editor.word = "сүз"
+
+        h.controller.onSuggestionsSettingDisabled()
+        h.controller.onSuggestionsSettingEnabled(eligible = true)
+        // Re-enabling reuses the warm engine and looks the typed prefix up exactly once, without
+        // waiting for another keystroke.
+        assertEquals(1, h.latestEngine().requestedPrefixes.size)
+
+        // The boundary that would have run the release.
+        h.controller.onStartInput(eligible = true)
+
+        // The engine was never asked to close and was never replaced.
+        assertEquals(0, h.latestEngine().destroyCount)
+        assertEquals(1, h.engines.size)
+    }
+
+    @Test
+    fun reEnablingAfterARefusedReleaseRetriesItInsteadOfKeepingADeadEngine() {
+        val h = ReleaseHarness()
+        h.controller.onStartInput(eligible = true)
+        val dead = h.latestEngine()
+        // The lease misses both deadlines of destroyHandle: the handle is in teardown for good and
+        // rejects every later lookup, which is what request() returning null models here.
+        dead.destroyResult = false
+        dead.nextToken = null
+        h.editor.word = "сүз"
+
+        h.controller.onSuggestionsSettingDisabled()
+        h.controller.onStartInput(eligible = false)
+        // Quick attempt plus the single longer retry, both refused.
+        assertEquals(2, dead.destroyCount)
+
+        // The user turns suggestions back on. The refused release must NOT be cancelled: the band
+        // stays hidden rather than being reserved for an engine that can no longer answer.
+        val hideBefore = h.strip.hideCount
+        val reserveBefore = h.strip.reserveCount
+        h.controller.onSuggestionsSettingEnabled(eligible = true)
+        assertEquals(hideBefore + 1, h.strip.hideCount)
+        assertEquals(reserveBefore, h.strip.reserveCount)
+        assertEquals(1, h.engines.size)
+        // A keystroke in this state must not reserve a band the dead engine can never fill.
+        h.controller.onTextChanged()
+        assertEquals(reserveBefore, h.strip.reserveCount)
+        assertTrue(dead.requestedPrefixes.isEmpty())
+
+        // Next boundary: the lease finally closes, and a fresh engine replaces it in the same call.
+        dead.destroyResult = true
+        h.controller.onStartInput(eligible = true)
+
+        assertEquals(3, dead.destroyCount)
+        assertEquals(2, h.engines.size)
+        assertEquals(0, h.latestEngine().destroyCount)
+        assertTrue(h.strip.visible)
+        // The fresh engine serves the prefix that was already typed, without another keystroke.
+        assertEquals(1, h.latestEngine().requestedPrefixes.size)
+    }
+
+    @Test
+    fun refusedReleaseIsRetriedAtEveryLifecycleBoundary() {
+        val h = ReleaseHarness()
+        h.controller.onStartInput(eligible = true)
+        val dead = h.latestEngine()
+        dead.destroyResult = false
+
+        h.controller.onSuggestionsSettingDisabled()
+        h.controller.onFinishInput()
+        assertEquals(2, dead.destroyCount)
+        h.controller.onStartInput(eligible = false)
+        assertEquals(4, dead.destroyCount)
+
+        // No second engine is ever mapped on top of an unreleased lease.
+        assertEquals(1, h.engines.size)
+    }
 }

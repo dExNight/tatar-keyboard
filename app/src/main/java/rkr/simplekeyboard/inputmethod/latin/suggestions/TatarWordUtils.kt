@@ -31,6 +31,14 @@ import java.text.Normalizer
 object TatarWordUtils {
 
     /**
+     * Hard cap on how much of the cached tail [endsWithWordOfAtLeast] is allowed to look at,
+     * counted in CODE POINTS (so a tail made entirely of supplementary characters touches at most
+     * twice as many `char`s). The cache can hold a whole paragraph, and this check runs on the
+     * keystroke path, so the scan is bounded rather than proportional to the text.
+     */
+    private const val MAX_TAIL_SCAN = 64
+
+    /**
      * Returns the maximal trailing run of word characters in [textBeforeCursor] as an EXACT span of
      * the raw text.
      *
@@ -70,6 +78,50 @@ object TatarWordUtils {
         }
         if (start == length) return ""
         return textBeforeCursor.subSequence(start, length).toString()
+    }
+
+    /**
+     * True when the text before the cursor ends in a word that holds at least [minLetters] letters,
+     * ignoring whatever non-word characters trail it.
+     *
+     * This is the "the user has just finished a real word" test behind the one-shot offer to turn
+     * Tatar suggestions on: the offer fires on a committed word separator, so the tail normally ends
+     * with the separator that was just typed and the word sits in front of it. Several separators in
+     * a row ("сүз!.. ") are skipped the same way, and a tail that ends in a letter (an editor whose
+     * cache has not caught up with the separator yet) is simply measured as it stands — the trailing
+     * run is the only thing this function looks at.
+     *
+     * Counting matches [extractTrailingWord] so the same text never qualifies here and fails there:
+     * combining marks continue the run but are not counted as letters, and letters are
+     * [Character.isLetter] CODE POINTS, so a supplementary letter counts once rather than twice.
+     * Letter class is deliberately not narrowed to the Tatar alphabet — the intent to type Tatar is
+     * proven by the active tt_RU subtype, not by which letters the word happens to contain.
+     *
+     * Allocates nothing and reads at most [MAX_TAIL_SCAN] code points of the tail, counting up to
+     * [minLetters] and no further, because this runs on the keystroke path. A tail longer than that
+     * budget returns false: an offer that never appears is the accepted failure direction.
+     */
+    @JvmStatic
+    fun endsWithWordOfAtLeast(textBeforeCursor: CharSequence?, minLetters: Int): Boolean {
+        if (textBeforeCursor == null) return false
+        var index = textBeforeCursor.length
+        var scanned = 0
+        // Step over the separators that ended the word.
+        while (index > 0 && scanned < MAX_TAIL_SCAN) {
+            val codePoint = Character.codePointBefore(textBeforeCursor, index)
+            if (isWordCharacter(codePoint)) break
+            index -= Character.charCount(codePoint)
+            scanned++
+        }
+        var letters = 0
+        while (index > 0 && scanned < MAX_TAIL_SCAN && letters < minLetters) {
+            val codePoint = Character.codePointBefore(textBeforeCursor, index)
+            if (!isWordCharacter(codePoint)) break
+            if (Character.isLetter(codePoint)) letters++
+            index -= Character.charCount(codePoint)
+            scanned++
+        }
+        return letters >= minLetters
     }
 
     /**

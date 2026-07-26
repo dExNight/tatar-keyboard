@@ -65,6 +65,69 @@ fun interface UiPoster {
 }
 
 /**
+ * Lazily created dictionary storage: background unpacking/validation plus the catalog the engine is
+ * started from.
+ *
+ * Nothing behind this seam exists until preparation is actually requested, so a user who never
+ * turns Tatar suggestions on never pays disk space or background work for them. JVM tests inject a
+ * fake, which is what makes "preparation not requested / requested exactly once" observable without
+ * Android.
+ */
+interface DictionaryPreparation {
+    /**
+     * Requests background preparation of the newest dictionary. There is no de-duplication behind
+     * this seam — `DictionaryStorageController.prepare` is a straight delegate and
+     * `BackgroundDictionaryPreparer` queues a fresh task per call — so the caller's "preparation
+     * requested" flag is the only guard. [onResult] may arrive on any thread.
+     */
+    fun prepare(onResult: (PreparationResult) -> Unit)
+
+    /** Catalog over the published dictionary, read by the engine factory off the UI thread. */
+    fun catalog(): PublishedDictionaryCatalog
+}
+
+/**
+ * Production [DictionaryPreparation] over the device-protected dictionary store.
+ *
+ * Built on the first preparation request only: constructing the store resolves the
+ * device-protected context and the supported-artifact list, which is exactly the work that must not
+ * happen for a user who leaves suggestions off.
+ */
+private class DeviceProtectedDictionaryPreparation(
+    private val storage: DictionaryStorageController,
+) : DictionaryPreparation {
+    override fun prepare(onResult: (PreparationResult) -> Unit) {
+        storage.prepare(onResult)
+    }
+
+    override fun catalog(): PublishedDictionaryCatalog = storage
+
+    companion object {
+        /** Returns null if the store cannot be built at all, leaving the caller fail-closed. */
+        fun create(context: Context, executor: ExecutorService): DictionaryPreparation? = try {
+            DeviceProtectedDictionaryPreparation(
+                AndroidDictionaryStorageFactory.create(context, executor),
+            )
+        } catch (_: Throwable) {
+            null
+        }
+    }
+}
+
+/**
+ * Notified when a dictionary preparation that an *explicit* enable asked for ended
+ * [PreparationResult.Unavailable].
+ *
+ * Only explicit enables are reported. A preparation started by the controller becoming eligible for
+ * the first time was never asked for by the user, so failing it silently is the right answer; a
+ * preparation started by an observed OFF -> ON transition answers a switch the user just flipped,
+ * and leaving that unanswered would look like the setting simply did nothing.
+ */
+fun interface DictionaryUnavailableListener {
+    fun onDictionaryUnavailableAfterExplicitEnable()
+}
+
+/**
  * Drives Tatar prefix suggestions from IME lifecycle callbacks.
  *
  * Threading: every public method must be called on the UI thread. The single-thread background
@@ -74,16 +137,19 @@ fun interface UiPoster {
  * every mutation of controller state happens on the single serialized UI owner.
  *
  * Eligibility (opt-in setting, tt_RU subtype, editor allows suggestions, known cursor) is computed
- * by LatinIME and passed in via [onStartInput]/[onSubtypeChanged]; dictionary readiness is tracked
- * internally.
+ * by LatinIME and passed in via [onStartInput]/[onSubtypeChanged]/[onSuggestionsSettingEnabled];
+ * dictionary readiness is tracked internally.
+ *
+ * Nothing is built eagerly: the background executor, the storage controller and the dictionary
+ * itself only come into existence once suggestions are actually wanted.
  */
-class SuggestionsController private constructor(
-    private val context: Context?,
+class SuggestionsController internal constructor(
     private val strip: StripSurface,
     private val editor: EditorSurface,
     private val uiPoster: UiPoster,
     private val engineFactory: (ResultCallback) -> EngineHandle?,
-    initialExecutor: ExecutorService?,
+    private val executorFactory: () -> ExecutorService?,
+    private val preparationFactory: (ExecutorService) -> DictionaryPreparation?,
     initialDictionaryReady: Boolean,
 ) {
     /** Production entry point (frozen contract). */
@@ -94,12 +160,12 @@ class SuggestionsController private constructor(
         uiHandler: Handler,
         engineFactory: (ResultCallback) -> EngineHandle?,
     ) : this(
-        context,
         strip,
         editor,
         UiPoster { runnable -> uiHandler.post(runnable) },
         engineFactory,
-        null,
+        { Executors.newSingleThreadExecutor() },
+        { executor -> DeviceProtectedDictionaryPreparation.create(context, executor) },
         false,
     )
 
@@ -110,7 +176,7 @@ class SuggestionsController private constructor(
         uiPoster: UiPoster,
         engineFactory: (ResultCallback) -> EngineHandle?,
         backgroundExecutor: ExecutorService,
-    ) : this(null, strip, editor, uiPoster, engineFactory, backgroundExecutor, true)
+    ) : this(strip, editor, uiPoster, engineFactory, backgroundExecutor, true)
 
     /**
      * Test entry point that lets a test drive the not-ready -> ready path: same as the primary test
@@ -124,10 +190,24 @@ class SuggestionsController private constructor(
         engineFactory: (ResultCallback) -> EngineHandle?,
         backgroundExecutor: ExecutorService,
         dictionaryReady: Boolean,
-    ) : this(null, strip, editor, uiPoster, engineFactory, backgroundExecutor, dictionaryReady)
+    ) : this(
+        strip,
+        editor,
+        uiPoster,
+        engineFactory,
+        { backgroundExecutor },
+        { null },
+        dictionaryReady,
+    )
 
-    private var executor: ExecutorService? = initialExecutor
-    private var storage: DictionaryStorageController? = null
+    private var executor: ExecutorService? = null
+
+    /**
+     * Storage seam, created on the first preparation request. Written on the UI thread and read off
+     * it by the production engine factory through [engineCatalog], hence volatile.
+     */
+    @Volatile
+    private var preparation: DictionaryPreparation? = null
 
     @Volatile
     private var dictionaryReady: Boolean = initialDictionaryReady
@@ -136,6 +216,35 @@ class SuggestionsController private constructor(
     private var starting: Boolean = false
     private var eligible: Boolean = false
     private var destroyed: Boolean = false
+
+    // Lifecycle of the "preparation requested" flag, in one place because nothing below it
+    // de-duplicates: it is set the moment preparation is requested, it is NEVER cleared after a
+    // Published result (readiness survives every later transition of the setting and the engine is
+    // restarted from the already published file), and it is cleared ONLY when the last known result
+    // was Unavailable and a fresh OFF -> ON transition of the setting has been observed.
+    private var preparationRequested: Boolean = false
+    private var lastPreparationUnavailable: Boolean = false
+
+    // Provenance of the outstanding request, so an Unavailable result can tell the two callers of
+    // requestPreparationIfNeeded apart. Only a request made because the user turned the setting on
+    // is reported to [dictionaryUnavailableListener].
+    private var preparationRequestedByExplicitEnable: Boolean = false
+
+    /** Set by LatinIME; see [DictionaryUnavailableListener]. */
+    var dictionaryUnavailableListener: DictionaryUnavailableListener? = null
+
+    // Set when the setting goes ON -> OFF. The blocking engine teardown is deferred to the next
+    // lifecycle boundary instead of running inside the settings handler, where it would hold the UI
+    // thread for up to 240 ms on the very keystroke that flipped the setting.
+    private var releasePending: Boolean = false
+
+    // True once a deferred release has been attempted at a boundary and refused. The attempt is not
+    // free of consequences: the engine has already been told to stop and rejects every later lookup,
+    // so it is no longer a correct mapping and the setting coming back on may no longer cancel its
+    // release. Without this the cancellation would strand a permanently dead engine — nothing would
+    // release it and nothing would replace it — and the user would see an empty band for the rest of
+    // the process.
+    private var releaseAttemptFailed: Boolean = false
 
     // Monotonic edit-session counter. Bumped on every lifecycle boundary so results computed for an
     // older editor state are dropped even if the engine's own generation check would still pass.
@@ -152,26 +261,19 @@ class SuggestionsController private constructor(
     private var displayedPrefix: String? = null
     private var displayedSessionId: Long = NO_SESSION
 
+    /**
+     * Registers the tap listener and deliberately nothing else: the background executor, the
+     * storage controller and the dictionary are created on first actual need, so a keyboard start
+     * with the setting off does no dictionary work at all.
+     */
     fun onCreate() {
         strip.setTapListener(SuggestionTapListener { suggestion -> onTap(suggestion) })
-        if (executor != null) return
-        val backgroundExecutor = Executors.newSingleThreadExecutor()
-        executor = backgroundExecutor
-        val ctx = context ?: return
-        val controller = AndroidDictionaryStorageFactory.create(ctx, backgroundExecutor)
-        storage = controller
-        controller.prepare { result ->
-            if (result is PreparationResult.Published) {
-                // The prepare callback runs on the background executor. Marshal onto the serialized
-                // UI owner before touching any controller state, then start the engine (and look up
-                // whatever is already typed) so a field opened before the dictionary finished
-                // preparing still gets suggestions this session.
-                uiPoster.post { onDictionaryReady() }
-            }
-        }
     }
 
     fun onStartInput(eligible: Boolean) {
+        // Lifecycle boundary: one of the only two places allowed to run the blocking engine
+        // teardown that a disabled setting scheduled.
+        runPendingRelease()
         sessionId++
         displayedPrefix = null
         this.eligible = eligible
@@ -183,13 +285,16 @@ class SuggestionsController private constructor(
         // Eligibility alone is not enough to expose the band: while the dictionary is preparing
         // or the engine is unavailable the frozen state table requires GONE/0dp. A successful
         // publishEngine() transitions a cold session to the reserved state.
-        val engineWasReady = engine != null
+        val engineWasReady = usableEngine() != null
         if (!engineWasReady) {
             strip.hideSuggestions()
         } else {
             strip.reserve()
         }
         strip.setTapListener(SuggestionTapListener { suggestion -> onTap(suggestion) })
+        // Becoming eligible is the second of the two events that may request preparation; the flag
+        // keeps every later start from queueing another one.
+        requestPreparationIfNeeded()
         // A warm engine has no publication callback in this new editor session. Re-request the
         // cached prefix now so changing fields never requires an extra keystroke. Capture readiness
         // before maybeStartEngine() so a cold engine that publishes inline still requests exactly
@@ -217,7 +322,7 @@ class SuggestionsController private constructor(
         // Keep the reserved band only after an engine has actually published. Eligibility while
         // the dictionary is preparing/unavailable remains fail-closed at GONE/0dp.
         if (eligible) {
-            if (engine == null) {
+            if (usableEngine() == null) {
                 strip.hideSuggestions()
             } else {
                 strip.reserve()
@@ -233,6 +338,8 @@ class SuggestionsController private constructor(
         eligible = false
         strip.hideSuggestions()
         engine?.finishInput()
+        // The other lifecycle boundary at which a deferred release may run.
+        runPendingRelease()
     }
 
     fun onSubtypeChanged(eligible: Boolean) {
@@ -241,7 +348,7 @@ class SuggestionsController private constructor(
         displayedPrefix = null
         this.eligible = eligible
         if (eligible) {
-            val engineWasReady = engine != null
+            val engineWasReady = usableEngine() != null
             if (engineWasReady) {
                 strip.reserve()
             } else {
@@ -260,6 +367,7 @@ class SuggestionsController private constructor(
             // so re-request the cached prefix immediately after tt -> non-tt -> tt. Capture the
             // state before maybeStartEngine() so even an inline test executor cannot double-request
             // when a cold engine publishes synchronously.
+            requestPreparationIfNeeded()
             maybeStartEngine()
             if (
                 engineWasReady &&
@@ -270,6 +378,87 @@ class SuggestionsController private constructor(
             }
         } else {
             strip.hideSuggestions()
+        }
+    }
+
+    /**
+     * The suggestions setting went ON -> OFF while the IME is live.
+     *
+     * Everything the user can see or reach stops at once, but the engine teardown is only
+     * *scheduled*: [destroyHandle] blocks the UI thread for up to 240 ms, which must never land on
+     * the keystroke that flipped the setting. Deliberately a separate method rather than a reuse of
+     * [onSubtypeChanged]: the two events differ in exactly the part that matters here, whether the
+     * engine has to go away at all.
+     */
+    fun onSuggestionsSettingDisabled() {
+        if (destroyed) return
+        // Bumping the session invalidates any in-flight lookup, so a result computed for the older
+        // generation can no longer repaint the strip.
+        sessionId++
+        eligible = false
+        displayedPrefix = null
+        requestSessionId = NO_SESSION
+        strip.hideSuggestions()
+        engine?.finishInput()
+        // Unconditional: a start that is still in flight publishes a live handle even now (see
+        // publishEngine's ineligible branch), and that handle must be released at the boundary too.
+        releasePending = true
+    }
+
+    /**
+     * The suggestions setting went OFF -> ON while the IME is live: the mirror image of
+     * [onSuggestionsSettingDisabled] and the only thing that sets eligibility on this path. A
+     * SharedPreferences change calls neither [onStartInput] nor [onSubtypeChanged], so without this
+     * method the strip would stay hidden until the user left the field and came back.
+     *
+     * @param eligible freshly recomputed by LatinIME for the current field and subtype.
+     */
+    fun onSuggestionsSettingEnabled(eligible: Boolean) {
+        if (destroyed) return
+        // The setting came back before the deferred release ran: the live engine is still the right
+        // mapping, so the release is cancelled instead of being performed and immediately undone.
+        // Only a release that has not been ATTEMPTED yet may be cancelled: a refused attempt has
+        // already stopped the engine for good (it rejects every later lookup), so that one stays
+        // scheduled and the next boundary retries it, after which a fresh engine is started.
+        if (!releaseAttemptFailed) {
+            releasePending = false
+        }
+        if (lastPreparationUnavailable) {
+            // The single reset point of the requested flag: the last attempt ended Unavailable and
+            // a new OFF -> ON transition has now been observed.
+            preparationRequested = false
+            lastPreparationUnavailable = false
+        }
+        this.eligible = eligible
+        if (!eligible) {
+            // The setting is on, but this field or subtype does not qualify. Nothing may become
+            // visible, yet the observed transition still requests preparation so the dictionary is
+            // there by the time a Tatar field is opened.
+            requestPreparationIfNeeded(explicitEnable = true)
+            return
+        }
+        val engineWasReady = usableEngine() != null
+        if (engineWasReady) {
+            strip.reserve()
+        } else {
+            // Cold, preparing and unavailable dictionaries all stay GONE until publish succeeds.
+            strip.hideSuggestions()
+        }
+        // The strip view is inflated lazily from setTapListener(), and while the setting was off it
+        // may never have existed at all, so an earlier registration was silently dropped. Re-wire
+        // it exactly like onStartInput() does; without this a tap would do nothing for the rest of
+        // the editor session (closed HIGH finding of the D1 audit).
+        strip.setTapListener(SuggestionTapListener { suggestion -> onTap(suggestion) })
+        requestPreparationIfNeeded(explicitEnable = true)
+        // Same shape as onStartInput(): capture readiness first so a cold engine that publishes
+        // inline requests the current prefix exactly once, from publishEngine().
+        maybeStartEngine()
+        if (
+            engineWasReady &&
+            editor.hasKnownCursor() &&
+            editor.cachedWordBeforeCursor().isNotEmpty()
+        ) {
+            requestCurrentPrefix()
         }
     }
 
@@ -288,8 +477,12 @@ class SuggestionsController private constructor(
         executor = null
     }
 
-    /** Catalog for the production engine factory; available only after [onCreate]. */
-    fun engineCatalog(): PublishedDictionaryCatalog? = storage
+    /**
+     * Catalog for the production engine factory. Null until a preparation request has actually
+     * created the storage controller; the factory then produces no engine at all and the strip
+     * stays GONE, which is the intended fail-closed behaviour rather than an error.
+     */
+    fun engineCatalog(): PublishedDictionaryCatalog? = preparation?.catalog()
 
     /**
      * Test seam: drives the exact dictionary-ready path the production prepare callback drives
@@ -310,9 +503,89 @@ class SuggestionsController private constructor(
         maybeStartEngine()
     }
 
+    /**
+     * Requests background preparation at most once per enable cycle, creating the background
+     * executor and the storage controller on the way if they do not exist yet. Called from every
+     * path that can make suggestions wanted; the flag, not the callers, is what keeps the count at
+     * one.
+     */
+    private fun requestPreparationIfNeeded(explicitEnable: Boolean = false) {
+        if (destroyed || preparationRequested) return
+        // A dictionary that is already published is never prepared again: readiness outlives every
+        // later transition of the setting.
+        if (dictionaryReady) return
+        val active = dictionaryPreparation() ?: return
+        preparationRequested = true
+        preparationRequestedByExplicitEnable = explicitEnable
+        active.prepare { result ->
+            // The callback runs on the background executor. Marshal onto the serialized UI owner
+            // before touching any controller state.
+            uiPoster.post { onPreparationResult(result) }
+        }
+    }
+
+    /**
+     * Handles a preparation result on the UI owner.
+     *
+     * [PreparationResult.Unavailable] is terminal for the current enable cycle: the strip stays
+     * GONE, plain typing is untouched and nothing is logged. Only a fresh OFF -> ON transition of
+     * the setting can clear the flag and allow another attempt. The user is shown nothing either,
+     * with one exception — a request the user made themselves gets the one-shot message of
+     * [DictionaryUnavailableListener].
+     */
+    private fun onPreparationResult(result: PreparationResult) {
+        if (destroyed) return
+        when (result) {
+            is PreparationResult.Published -> {
+                lastPreparationUnavailable = false
+                // Start the engine (and look up whatever is already typed) so a field opened before
+                // the dictionary finished preparing still gets suggestions this session.
+                onDictionaryReady()
+            }
+            is PreparationResult.Unavailable -> {
+                lastPreparationUnavailable = true
+                if (preparationRequestedByExplicitEnable) {
+                    dictionaryUnavailableListener?.onDictionaryUnavailableAfterExplicitEnable()
+                }
+            }
+        }
+    }
+
+    /** Lazily built storage seam; null means fail-closed, with no dictionary and no engine. */
+    private fun dictionaryPreparation(): DictionaryPreparation? {
+        preparation?.let { return it }
+        val backgroundExecutor = backgroundExecutor() ?: return null
+        val created = try {
+            preparationFactory(backgroundExecutor)
+        } catch (_: Throwable) {
+            null
+        } ?: return null
+        preparation = created
+        return created
+    }
+
+    /**
+     * The single background executor, created on the first real need (dictionary preparation or
+     * engine start) and never recreated after [onDestroy].
+     */
+    private fun backgroundExecutor(): ExecutorService? {
+        if (destroyed) return null
+        executor?.let { return it }
+        val created = try {
+            executorFactory()
+        } catch (_: Throwable) {
+            null
+        } ?: return null
+        executor = created
+        return created
+    }
+
     private fun maybeStartEngine() {
         if (engine != null || starting || !dictionaryReady || !eligible) return
-        val backgroundExecutor = executor ?: return
+        // A lease that has not been released yet still belongs to this controller: never map a
+        // second dictionary on top of it. The retry happens at the next lifecycle boundary.
+        if (releasePending) return
+        val backgroundExecutor = backgroundExecutor() ?: return
         starting = true
         val callback = ResultCallback { token, suggestions ->
             uiPoster.post { applyResult(token, suggestions) }
@@ -366,6 +639,50 @@ class SuggestionsController private constructor(
     }
 
     /**
+     * Runs the engine release that a disabled setting scheduled, if it has not been cancelled.
+     *
+     * Called only from the two lifecycle boundaries ([onStartInput] and [onFinishInput]), never
+     * from the settings handler. It does not mark the controller destroyed and does not shut the
+     * background executor down: the controller stays fully usable, and re-enabling the setting
+     * starts a fresh engine from the already published file. The engine reference is dropped only
+     * on a successful release; a lease that refused to close keeps the request pending so the next
+     * boundary retries it, and until then no new engine is started on top of it. A refusal is also
+     * remembered in [releaseAttemptFailed], which takes the cancellation in
+     * [onSuggestionsSettingEnabled] off the table for this release: the handle has already been
+     * asked to stop and would be kept alive as a permanently mute engine.
+     */
+    private fun runPendingRelease() {
+        if (!releasePending) return
+        val handle = engine
+        if (handle == null) {
+            // Nothing was ever started, or it is already gone: the request is satisfied.
+            releasePending = false
+            releaseAttemptFailed = false
+            return
+        }
+        if (destroyHandle(handle)) {
+            engine = null
+            releasePending = false
+            releaseAttemptFailed = false
+        } else {
+            // Remember the refusal: from here on the setting coming back on no longer cancels this
+            // release, because the handle it would keep can no longer serve a single lookup.
+            releaseAttemptFailed = true
+        }
+    }
+
+    /**
+     * The engine that may still be used, or null.
+     *
+     * An engine with a pending release is deliberately invisible to every path that exposes the
+     * band or dispatches a lookup. Before the release is attempted this only avoids painting a band
+     * that is about to go away; after a refused attempt it is what keeps the strip honest, because
+     * the handle rejects every request from then on and a reserved band would stay empty forever.
+     * The reference itself is kept so the release can be retried at the next boundary.
+     */
+    private fun usableEngine(): EngineHandle? = if (releasePending) null else engine
+
+    /**
      * Bounded engine teardown: one quick attempt, then a single longer bounded retry so a lease
      * that missed the first deadline still gets a chance to release without risking an ANR.
      * Returns true only if the engine fully released.
@@ -388,7 +705,7 @@ class SuggestionsController private constructor(
      */
     private fun requestCurrentPrefix() {
         if (!eligible) return
-        val activeEngine = engine
+        val activeEngine = usableEngine()
         if (activeEngine == null) {
             // Text events can arrive while preparation/start is still in flight. Do not expose the
             // band until publishEngine() establishes that the dictionary is actually available.
@@ -450,7 +767,7 @@ class SuggestionsController private constructor(
     private fun applyResult(token: Any, suggestions: List<String>) {
         if (!eligible) return
         if (sessionId != requestSessionId) return
-        val activeEngine = engine ?: return
+        val activeEngine = usableEngine() ?: return
         if (!activeEngine.isCurrent(token)) return
         if (suggestions.isEmpty()) {
             displayedPrefix = null

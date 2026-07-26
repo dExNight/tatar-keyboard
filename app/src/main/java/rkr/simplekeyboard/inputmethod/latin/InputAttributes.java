@@ -36,6 +36,21 @@ public final class InputAttributes {
     final public boolean mApplicationSpecifiedCompletionOn;
     final public boolean mShouldInsertSpacesAutomatically;
     /**
+     * Whether the editor asked the IME not to learn from, or personalize for, what is typed in it
+     * ({@link EditorInfo#IME_FLAG_NO_PERSONALIZED_LEARNING}). Incognito browser tabs and the
+     * "incognito keyboard" switch of messengers set it, usually on a field whose inputType is an
+     * ordinary text one, so this is the only signal that distinguishes them.
+     *
+     * <p>Unlike every other attribute here it comes from {@code imeOptions} rather than from
+     * {@code inputType}, and it is computed for every input class rather than for text fields
+     * only.</p>
+     *
+     * <p>The constant was added in API 26 while this app supports API 24 upwards, but it is a
+     * compile-time {@code static final int}, so its value is inlined at build time and nothing is
+     * resolved at runtime; on API 24-25 no platform sets the bit and this is simply false.</p>
+     */
+    final public boolean mNoPersonalizedLearning;
+    /**
      * Whether the floating gesture preview should be disabled. If true, this should override the
      * corresponding keyboard settings preference, always suppressing the floating preview text.
      */
@@ -46,6 +61,9 @@ public final class InputAttributes {
         final int inputType = null != editorInfo ? editorInfo.inputType : 0;
         final int inputClass = inputType & InputType.TYPE_MASK_CLASS;
         mInputType = inputType;
+        // Deliberately computed before the early return of the non-text branch below: a field that
+        // forbids personalized learning has to be recognised whatever its input class is.
+        mNoPersonalizedLearning = readNoPersonalizedLearning(editorInfo);
         mIsPasswordField = InputTypeUtils.isPasswordInputType(inputType)
                 || InputTypeUtils.isVisiblePasswordInputType(inputType);
         if (inputClass != InputType.TYPE_CLASS_TEXT) {
@@ -104,19 +122,31 @@ public final class InputAttributes {
         mApplicationSpecifiedCompletionOn = flagAutoComplete && isFullscreenMode;
     }
 
+    private static boolean readNoPersonalizedLearning(final EditorInfo editorInfo) {
+        final int imeOptions = null != editorInfo ? editorInfo.imeOptions : 0;
+        return 0 != (imeOptions & EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING);
+    }
+
     public boolean isSameInputType(final EditorInfo editorInfo) {
-        return editorInfo.inputType == mInputType;
+        // The personalized-learning flag takes part in the comparison because the caller uses this
+        // to decide whether the settings may be reused as they are. An app that flips its own
+        // "incognito keyboard" switch calls restartInput() on the same view with the same inputType
+        // and only imeOptions changed; comparing inputType alone would keep the previous, permissive
+        // attributes for a field that has just asked not to be personalized for.
+        return editorInfo.inputType == mInputType
+                && readNoPersonalizedLearning(editorInfo) == mNoPersonalizedLearning;
     }
 
     // Pretty print
     @Override
     public String toString() {
         return String.format(
-                "%s: inputType=0x%08x%s%s%s%s%s targetApp=%s\n", getClass().getSimpleName(),
+                "%s: inputType=0x%08x%s%s%s%s%s%s targetApp=%s\n", getClass().getSimpleName(),
                 mInputType,
                 (mInputTypeNoAutoCorrect ? " noAutoCorrect" : ""),
                 (mIsPasswordField ? " password" : ""),
                 (mShouldShowSuggestions ? " shouldShowSuggestions" : ""),
+                (mNoPersonalizedLearning ? " noPersonalizedLearning" : ""),
                 (mApplicationSpecifiedCompletionOn ? " appSpecified" : ""),
                 (mShouldInsertSpacesAutomatically ? " insertSpaces" : ""),
                 mTargetApplicationPackageName);
