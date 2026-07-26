@@ -1,0 +1,7 @@
+# Fixture with a duplicated fully-qualified sequence to exercise the guard.
+# Version: 15.1
+#
+# group: Smileys & Emotion
+# subgroup: face-smiling
+1F600 ; fully-qualified # grinning face
+1F600 ; fully-qualified # grinning face again (duplicate)

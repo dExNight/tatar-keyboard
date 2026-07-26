@@ -1,0 +1,6 @@
+# Fixture with a wrong declared version to exercise the version guard.
+# Version: 14.0
+#
+# group: Smileys & Emotion
+# subgroup: face-smiling
+1F600 ; fully-qualified # grinning face

@@ -1,0 +1,30 @@
+Emoji panel data notice
+
+The emoji panel asset app/src/main/assets/emoji/emoji_set_v1.txt is derived
+from the Unicode emoji keyboard/display test data file emoji-test.txt for
+UTS #51 (Unicode Technical Standard #51, Unicode Emoji), Emoji Version 15.1.
+
+Attribution and terms, quoted verbatim from the header of the source file
+(emoji-test.txt, Date 2023-06-05):
+
+  © 2023 Unicode(R), Inc.
+  Unicode and the Unicode Logo are registered trademarks of Unicode, Inc.
+  in the U.S. and other countries.
+  For terms of use, see https://www.unicode.org/terms_of_use.html
+
+Source data: Unicode Emoji 15.1 emoji-test.txt
+Documentation and usage: https://www.unicode.org/reports/tr51
+Terms of use (Unicode Terms of Use / Unicode License):
+  https://www.unicode.org/terms_of_use.html
+
+Changes by the Tatar Keyboard project: the emoji-test.txt code-point table was
+decoded, its declared version and a pinned SHA-256 were verified, and only
+records with status "fully-qualified" were kept. From those, every sequence
+containing a skin-tone modifier (U+1F3FB..U+1F3FF), a zero-width joiner
+(U+200D), a regional indicator (U+1F1E6..U+1F1FF), or a tag code point
+(U+E0020..U+E007F) was removed by code point. The surviving sequences were
+grouped into category sections in file order and written as a deterministic
+UTF-8 text asset. The original emoji-test.txt is not redistributed in this
+repository; only this derived list of emoji sequences is shipped. The emoji
+data remains subject to the Unicode Terms of Use referenced above; the
+application's Apache-2.0 license does not replace those terms.

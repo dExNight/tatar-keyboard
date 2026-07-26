@@ -33,6 +33,7 @@ import rkr.simplekeyboard.inputmethod.latin.LatinIME;
 import rkr.simplekeyboard.inputmethod.latin.RichInputConnection;
 import rkr.simplekeyboard.inputmethod.latin.common.Constants;
 import rkr.simplekeyboard.inputmethod.latin.common.StringUtils;
+import rkr.simplekeyboard.inputmethod.latin.emoji.EmojiTextUtils;
 import rkr.simplekeyboard.inputmethod.latin.settings.SettingsValues;
 import rkr.simplekeyboard.inputmethod.latin.suggestions.TatarWordUtils;
 import rkr.simplekeyboard.inputmethod.latin.utils.InputTypeUtils;
@@ -406,12 +407,23 @@ public final class InputLogic {
                 return;
             }
             mJustDoubleSpaced = false;
-            final int codePointBeforeCursor = mConnection.getCodePointBeforeCursor();
-            if (codePointBeforeCursor == Constants.NOT_A_CODE) {
-                sendDownUpKeyEvent(KeyEvent.KEYCODE_DEL);
+            // A single backspace must delete a trailing emoji grapheme cluster whole rather than
+            // leaving a fragment behind (a lone variation selector, half of a flag, a base stripped
+            // of its skin-tone modifier). The length is measured purely from the already-cached
+            // before-cursor text, so this adds no new IPC to the editor; the text is read, measured
+            // and dropped, never stored or logged.
+            final int emojiClusterLength = EmojiTextUtils.trailingEmojiClusterLength(
+                    mConnection.getCachedTextBeforeCursor());
+            if (emojiClusterLength > 0) {
+                mConnection.deleteTextBeforeCursor(emojiClusterLength);
             } else {
-                final int numChars = Character.isSupplementaryCodePoint(codePointBeforeCursor) ? 2 : 1;
-                mConnection.deleteTextBeforeCursor(numChars);
+                final int codePointBeforeCursor = mConnection.getCodePointBeforeCursor();
+                if (codePointBeforeCursor == Constants.NOT_A_CODE) {
+                    sendDownUpKeyEvent(KeyEvent.KEYCODE_DEL);
+                } else {
+                    final int numChars = Character.isSupplementaryCodePoint(codePointBeforeCursor) ? 2 : 1;
+                    mConnection.deleteTextBeforeCursor(numChars);
+                }
             }
         }
     }

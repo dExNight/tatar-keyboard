@@ -1,0 +1,6 @@
+# Fixture with an unknown top-level group to exercise the category guard.
+# Version: 15.1
+#
+# group: Bogus Group
+# subgroup: made-up
+1F600 ; fully-qualified # grinning face
