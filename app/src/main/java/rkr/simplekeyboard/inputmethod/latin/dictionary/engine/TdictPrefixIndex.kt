@@ -14,6 +14,14 @@ internal fun interface PrefixComputer {
     fun lookup(normalizedPrefixUtf8: ImmutableUtf8Prefix): List<String>
 }
 
+/**
+ * Receives the current key-neighbor table for a computer that runs a fuzzy pass. Kept separate from
+ * [PrefixComputer] so the frozen `lookup` signature never changes.
+ */
+internal interface KeyNeighborSink {
+    fun updateKeyNeighbors(table: KeyNeighborTable?)
+}
+
 /** Strict scalar UTF-8 validation without a decoder or temporary objects. */
 internal fun isValidUtf8Scalar(bytes: ByteArray): Boolean =
     isValidUtf8Scalar(bytes.size) { bytes[it].toInt() and 0xff }
@@ -75,41 +83,61 @@ internal class TdictPrefixIndex private constructor(
     private val offsetsOffset: Int,
     private val frequenciesOffset: Int,
     private val blobOffset: Int,
-) : PrefixComputer {
+) : PrefixComputer, KeyNeighborSink {
+    // Reusable per-index scratch. The index stops being fully immutable: these buffers are touched
+    // ONLY inside lookup(), whose exclusivity is guaranteed by LatestOnlyPrefixEngine serialization
+    // (at most one active worker). updateKeyNeighbors() only swaps a @Volatile reference.
+    private val exactScratch = ByteArray(MAX_PREFIX_BYTES)
+    private val variantScratch = ByteArray(MAX_PREFIX_BYTES + VARIANT_HEADROOM)
+    private val codePointScratch = IntArray(MAX_PREFIX_BYTES)
+    private val rankedIndices = IntArray(MAX_RESULTS)
+    private val rankedFrequencies = LongArray(MAX_RESULTS)
+    private val fuzzyIndices = IntArray(MAX_RESULTS)
+    private val fuzzyFrequencies = LongArray(MAX_RESULTS)
+
+    @Volatile
+    private var neighborTable: KeyNeighborTable? = null
+
+    // Fuzzy-pass accumulator, private to a single lookup() invocation and reset on each entry.
+    private var fuzzyExactCount = 0
+    private var fuzzyRemaining = 0
+    private var fuzzyCount = 0
+    private var fuzzyVisited = 0
+    private var fuzzyOverBudget = false
+    private var fuzzyPrefixLength = 0
+
+    // Allocated once, so neither a lambda nor any object is created per lookup or per variant.
+    private val fuzzyConsumer =
+        FuzzyPrefixVariants.VariantConsumer { bytes, length -> scanVariantBlock(bytes, length) }
+
+    override fun updateKeyNeighbors(table: KeyNeighborTable?) {
+        neighborTable = table
+    }
+
     override fun lookup(normalizedPrefixUtf8: ImmutableUtf8Prefix): List<String> {
-        if (normalizedPrefixUtf8.byteCount == 0 ||
-            normalizedPrefixUtf8.byteCount > MAX_PREFIX_BYTES ||
+        val prefixLength = normalizedPrefixUtf8.byteCount
+        if (prefixLength == 0 ||
+            prefixLength > MAX_PREFIX_BYTES ||
             !isValidUtf8Scalar(normalizedPrefixUtf8)
         ) {
             return emptyList()
         }
         return try {
-            val start = lowerBound(normalizedPrefixUtf8)
-            val end = upperBound(normalizedPrefixUtf8, start)
-            if (start >= end) return emptyList()
-
-            val rankedIndices = IntArray(MAX_RESULTS)
-            val rankedFrequencies = LongArray(MAX_RESULTS)
-            var resultCount = 0
-            for (index in start until end) {
-                if (wordEquals(index, normalizedPrefixUtf8)) continue
-                val frequency = frequencyAt(index)
-                var insertion = resultCount
-                for (slot in 0 until resultCount) {
-                    if (ranksBefore(index, frequency, rankedIndices[slot], rankedFrequencies[slot])) {
-                        insertion = slot
-                        break
-                    }
+            for (offset in 0 until prefixLength) {
+                exactScratch[offset] = normalizedPrefixUtf8.byteAt(offset).toByte()
+            }
+            var resultCount = collectExact(prefixLength)
+            // The fuzzy level fills only cells left empty by D1, and only when the exact pass
+            // returned fewer than three candidates: one check, no new state. Exact candidates are
+            // never shifted or replaced.
+            if (resultCount < MAX_RESULTS) {
+                val table = neighborTable
+                if (table != null && !table.isEmpty &&
+                    countCodePointsByLeadBytes(exactScratch, prefixLength) >=
+                    MIN_FUZZY_PREFIX_CODE_POINTS
+                ) {
+                    resultCount = collectFuzzy(prefixLength, table, resultCount)
                 }
-                if (insertion >= MAX_RESULTS) continue
-                val newCount = minOf(MAX_RESULTS, resultCount + 1)
-                for (slot in newCount - 1 downTo insertion + 1) {
-                    rankedIndices[slot] = rankedIndices[slot - 1]
-                    rankedFrequencies[slot] = rankedFrequencies[slot - 1]
-                }
-                rankedIndices[insertion] = index
-                rankedFrequencies[insertion] = frequency
-                resultCount = newCount
             }
             if (resultCount == 0) return emptyList()
             ArrayList<String>(resultCount).also { result ->
@@ -122,56 +150,160 @@ internal class TdictPrefixIndex private constructor(
         }
     }
 
-    private fun lowerBound(prefix: ImmutableUtf8Prefix): Int {
-        var low = 0
+    /** The frozen D1 exact pass: fills [rankedIndices] with up to [MAX_RESULTS] and returns count. */
+    private fun collectExact(prefixLength: Int): Int {
+        val start = lowerBound(exactScratch, prefixLength, 0)
+        val end = upperBound(exactScratch, prefixLength, start)
+        if (start >= end) return 0
+        var resultCount = 0
+        for (index in start until end) {
+            if (wordEquals(index, exactScratch, prefixLength)) continue
+            resultCount = insertRanked(
+                rankedIndices, rankedFrequencies, resultCount, MAX_RESULTS,
+                index, frequencyAt(index),
+            )
+        }
+        return resultCount
+    }
+
+    /**
+     * Fills the cells the exact pass left empty with the best fuzzy candidates, ranked among
+     * themselves by the same rule (frequency descending, then code-point lexical ascending). Exact
+     * candidates are never touched. Returns the total candidate count.
+     *
+     * The whole fuzzy level is dropped (returns [exactCount]) if variant generation or the block
+     * scan trips a fixed budget: the level is discarded in full, never in part.
+     */
+    private fun collectFuzzy(prefixLength: Int, table: KeyNeighborTable, exactCount: Int): Int {
+        fuzzyExactCount = exactCount
+        fuzzyRemaining = MAX_RESULTS - exactCount
+        fuzzyCount = 0
+        fuzzyVisited = 0
+        fuzzyOverBudget = false
+        fuzzyPrefixLength = prefixLength
+        val emitted = FuzzyPrefixVariants.generateLongPressVariants(
+            exactScratch, prefixLength, table, codePointScratch, variantScratch,
+            MAX_FUZZY_VARIANTS, fuzzyConsumer,
+        )
+        if (emitted < 0 || fuzzyOverBudget) return exactCount
+        for (slot in 0 until fuzzyCount) {
+            rankedIndices[exactCount + slot] = fuzzyIndices[slot]
+            rankedFrequencies[exactCount + slot] = fuzzyFrequencies[slot]
+        }
+        return exactCount + fuzzyCount
+    }
+
+    /** Scans one variant's dictionary block, ranking its candidates into [fuzzyIndices]. */
+    private fun scanVariantBlock(variantBytes: ByteArray, variantLength: Int) {
+        if (fuzzyOverBudget) return
+        val start = lowerBound(variantBytes, variantLength, 0)
+        val end = upperBound(variantBytes, variantLength, start)
+        var index = start
+        while (index < end) {
+            fuzzyVisited++
+            if (fuzzyVisited > MAX_FUZZY_VISITED) {
+                fuzzyOverBudget = true
+                return
+            }
+            // Exact-word exclusion applies on both levels: never suggest the typed word itself.
+            // A word is de-duplicated by dictionary index so it can never occupy two cells.
+            if (!wordEquals(index, exactScratch, fuzzyPrefixLength) &&
+                !containsIndex(rankedIndices, fuzzyExactCount, index) &&
+                !containsIndex(fuzzyIndices, fuzzyCount, index)
+            ) {
+                fuzzyCount = insertRanked(
+                    fuzzyIndices, fuzzyFrequencies, fuzzyCount, fuzzyRemaining,
+                    index, frequencyAt(index),
+                )
+            }
+            index++
+        }
+    }
+
+    /** Bounded insertion sort shared by both levels; returns the new count. */
+    private fun insertRanked(
+        indices: IntArray,
+        frequencies: LongArray,
+        count: Int,
+        capacity: Int,
+        candidateIndex: Int,
+        candidateFrequency: Long,
+    ): Int {
+        var insertion = count
+        for (slot in 0 until count) {
+            if (ranksBefore(candidateIndex, candidateFrequency, indices[slot], frequencies[slot])) {
+                insertion = slot
+                break
+            }
+        }
+        if (insertion >= capacity) return count
+        val newCount = minOf(capacity, count + 1)
+        for (slot in newCount - 1 downTo insertion + 1) {
+            indices[slot] = indices[slot - 1]
+            frequencies[slot] = frequencies[slot - 1]
+        }
+        indices[insertion] = candidateIndex
+        frequencies[insertion] = candidateFrequency
+        return newCount
+    }
+
+    private fun containsIndex(indices: IntArray, count: Int, value: Int): Boolean {
+        for (slot in 0 until count) {
+            if (indices[slot] == value) return true
+        }
+        return false
+    }
+
+    private fun lowerBound(query: ByteArray, queryLength: Int, from: Int): Int {
+        var low = from
         var high = entryCount
         while (low < high) {
             val middle = (low + high) ushr 1
-            if (compareWholeWordToPrefix(middle, prefix) < 0) low = middle + 1
+            if (compareWholeWordToPrefix(middle, query, queryLength) < 0) low = middle + 1
             else high = middle
         }
         return low
     }
 
-    private fun upperBound(prefix: ImmutableUtf8Prefix, lowHint: Int): Int {
+    private fun upperBound(query: ByteArray, queryLength: Int, lowHint: Int): Int {
         var low = lowHint
         var high = entryCount
         while (low < high) {
             val middle = (low + high) ushr 1
-            if (compareWordToPrefixBlock(middle, prefix) <= 0) low = middle + 1
+            if (compareWordToPrefixBlock(middle, query, queryLength) <= 0) low = middle + 1
             else high = middle
         }
         return low
     }
 
-    private fun compareWholeWordToPrefix(index: Int, prefix: ImmutableUtf8Prefix): Int {
+    private fun compareWholeWordToPrefix(index: Int, query: ByteArray, queryLength: Int): Int {
         val start = wordStart(index)
         val length = wordEnd(index) - start
-        val shared = minOf(length, prefix.byteCount)
+        val shared = minOf(length, queryLength)
         for (offset in 0 until shared) {
-            val difference = unsignedByte(start + offset) - prefix.byteAt(offset)
+            val difference = unsignedByte(start + offset) - (query[offset].toInt() and 0xff)
             if (difference != 0) return difference
         }
-        return length - prefix.byteCount
+        return length - queryLength
     }
 
-    /** Words beginning with prefix compare equal, which gives the exclusive range end. */
-    private fun compareWordToPrefixBlock(index: Int, prefix: ImmutableUtf8Prefix): Int {
+    /** Words beginning with the query compare equal, which gives the exclusive range end. */
+    private fun compareWordToPrefixBlock(index: Int, query: ByteArray, queryLength: Int): Int {
         val start = wordStart(index)
         val length = wordEnd(index) - start
-        val shared = minOf(length, prefix.byteCount)
+        val shared = minOf(length, queryLength)
         for (offset in 0 until shared) {
-            val difference = unsignedByte(start + offset) - prefix.byteAt(offset)
+            val difference = unsignedByte(start + offset) - (query[offset].toInt() and 0xff)
             if (difference != 0) return difference
         }
-        return if (length < prefix.byteCount) -1 else 0
+        return if (length < queryLength) -1 else 0
     }
 
-    private fun wordEquals(index: Int, prefix: ImmutableUtf8Prefix): Boolean {
+    private fun wordEquals(index: Int, query: ByteArray, queryLength: Int): Boolean {
         val start = wordStart(index)
-        if (wordEnd(index) - start != prefix.byteCount) return false
-        for (offset in 0 until prefix.byteCount) {
-            if (unsignedByte(start + offset) != prefix.byteAt(offset)) return false
+        if (wordEnd(index) - start != queryLength) return false
+        for (offset in 0 until queryLength) {
+            if (unsignedByte(start + offset) != (query[offset].toInt() and 0xff)) return false
         }
         return true
     }
@@ -225,6 +357,19 @@ internal class TdictPrefixIndex private constructor(
         private const val MAX_RESULTS = 3
         internal const val MAX_PREFIX_BYTES = 128
         private const val MAX_U32 = 0xffff_ffffL
+
+        // Fuzzy pass (E3a). Extra headroom on the variant buffer covers a re-encode that is a few
+        // bytes longer than the prefix; edit class #1 keeps the length identical in practice.
+        private const val VARIANT_HEADROOM = 8
+
+        // Class #1 needs at least three code points; the count is taken off the UTF-8 lead bytes so
+        // a two-letter Cyrillic prefix (four bytes) is correctly rejected.
+        private const val MIN_FUZZY_PREFIX_CODE_POINTS = 3
+
+        // Fixed budgets. Exceeding either drops the whole fuzzy level, never a part of it. Both sit
+        // far above the class #1 offline reference (p95 3 variants, max 5).
+        private const val MAX_FUZZY_VARIANTS = 24
+        private const val MAX_FUZZY_VISITED = 8192
         private val MAGIC = "TATDICT\u0000".toByteArray(Charsets.US_ASCII)
 
         fun open(

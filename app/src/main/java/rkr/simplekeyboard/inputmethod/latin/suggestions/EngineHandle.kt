@@ -17,6 +17,7 @@
 package rkr.simplekeyboard.inputmethod.latin.suggestions
 
 import rkr.simplekeyboard.inputmethod.latin.dictionary.engine.LookupToken
+import rkr.simplekeyboard.inputmethod.latin.dictionary.engine.KeyNeighborTable
 import rkr.simplekeyboard.inputmethod.latin.dictionary.engine.MappedDictionaryEngine
 import rkr.simplekeyboard.inputmethod.latin.dictionary.engine.ResultHandoff
 import rkr.simplekeyboard.inputmethod.latin.dictionary.storage.PublishedDictionaryCatalog
@@ -51,6 +52,13 @@ interface EngineHandle {
     /** Idles the engine and invalidates any in-flight generation. */
     fun finishInput()
 
+    /**
+     * Pushes the current key-neighbor table used by the fuzzy suggestion pass. Default no-op so
+     * fakes that predate fuzzy suggestions keep compiling; the real handle forwards it to the
+     * engine.
+     */
+    fun updateKeyNeighbors(table: KeyNeighborTable?) {}
+
     /** Bounded teardown; returns true if the engine fully released within [timeoutMs]. */
     fun destroy(timeoutMs: Long): Boolean
 }
@@ -73,6 +81,8 @@ class MappedEngineHandle private constructor(
         token is LookupToken && engine.isCurrent(token)
 
     override fun finishInput() = engine.finishInput()
+
+    override fun updateKeyNeighbors(table: KeyNeighborTable?) = engine.updateKeyNeighbors(table)
 
     override fun destroy(timeoutMs: Long): Boolean =
         engine.destroy(timeoutMs, TimeUnit.MILLISECONDS)

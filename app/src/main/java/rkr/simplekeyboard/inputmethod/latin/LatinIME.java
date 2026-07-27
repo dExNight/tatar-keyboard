@@ -81,6 +81,8 @@ import rkr.simplekeyboard.inputmethod.latin.settings.SettingsActivity;
 import rkr.simplekeyboard.inputmethod.latin.settings.SettingsValues;
 import rkr.simplekeyboard.inputmethod.latin.suggestions.EditorSurface;
 import rkr.simplekeyboard.inputmethod.latin.suggestions.EngineHandle;
+import rkr.simplekeyboard.inputmethod.latin.dictionary.engine.KeyNeighborTable;
+import rkr.simplekeyboard.inputmethod.latin.suggestions.KeyNeighborTableBuilder;
 import rkr.simplekeyboard.inputmethod.latin.suggestions.MappedEngineHandle;
 import rkr.simplekeyboard.inputmethod.latin.suggestions.OfferEnvironment;
 import rkr.simplekeyboard.inputmethod.latin.suggestions.OfferFlagStore;
@@ -713,8 +715,10 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         if (enabled) {
             mSuggestionsController.onSuggestionsSettingEnabled(
                     isTatarSuggestionsEligible(true));
+            updateKeyNeighbors();
         } else {
             mSuggestionsController.onSuggestionsSettingDisabled();
+            mSuggestionsController.updateKeyNeighbors(null);
             if (mSuggestionsOffer != null) {
                 mSuggestionsOffer.onSuggestionsSettingDisabled();
             }
@@ -749,6 +753,36 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
                 // user who has turned Tatar suggestions on everywhere else.
                 && !settingsValues.mInputAttributes.mNoPersonalizedLearning
                 && mInputLogic.mConnection.hasCursorPosition();
+    }
+
+    // The key-neighbor table for the fuzzy suggestion pass is derived from the live keyboard and
+    // cached by KeyboardId: rebuilding it on every onStartInput would repeat the same work for the
+    // same layout. This is the first time layout data crosses into the dictionary engine.
+    private KeyboardId mNeighborTableKeyboardId;
+    private KeyNeighborTable mNeighborTable;
+
+    /**
+     * Rebuilds (or reuses) the key-neighbor table from the current keyboard and hands it to the
+     * suggestion controller. A null table — non-alphabet layout, ineligible field, or no built
+     * keyboard yet — disables the fuzzy pass without touching the exact suggestions. Cheap enough
+     * to call on every lifecycle boundary because it is memoized by KeyboardId.
+     */
+    private void updateKeyNeighbors() {
+        if (mSuggestionsController == null) {
+            return;
+        }
+        final Keyboard keyboard = mKeyboardSwitcher.getKeyboard();
+        KeyNeighborTable table = null;
+        if (keyboard != null && keyboard.mId.isAlphabetKeyboard() && isTatarSuggestionsEligible()) {
+            if (keyboard.mId.equals(mNeighborTableKeyboardId) && mNeighborTable != null) {
+                table = mNeighborTable;
+            } else {
+                table = KeyNeighborTableBuilder.fromKeyboard(keyboard, "tt_RU");
+                mNeighborTableKeyboardId = keyboard.mId;
+                mNeighborTable = table;
+            }
+        }
+        mSuggestionsController.updateKeyNeighbors(table);
     }
 
     @Override
@@ -873,6 +907,7 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         loadKeyboard();
         if (mSuggestionsController != null) {
             mSuggestionsController.onSubtypeChanged(isTatarSuggestionsEligible());
+            updateKeyNeighbors();
         }
     }
 
@@ -973,6 +1008,7 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
 
         if (mSuggestionsController != null) {
             mSuggestionsController.onStartInput(isTatarSuggestionsEligible());
+            updateKeyNeighbors();
         }
         if (mEmojiPanelController != null) {
             // A new editor session: a deferred emoji-panel show armed for the previous one must not

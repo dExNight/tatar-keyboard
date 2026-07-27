@@ -18,6 +18,7 @@ package rkr.simplekeyboard.inputmethod.latin.suggestions
 
 import android.content.Context
 import android.os.Handler
+import rkr.simplekeyboard.inputmethod.latin.dictionary.engine.KeyNeighborTable
 import rkr.simplekeyboard.inputmethod.latin.dictionary.storage.AndroidDictionaryStorageFactory
 import rkr.simplekeyboard.inputmethod.latin.dictionary.storage.DictionaryStorageController
 import rkr.simplekeyboard.inputmethod.latin.dictionary.storage.PreparationResult
@@ -217,6 +218,11 @@ class SuggestionsController internal constructor(
     private var eligible: Boolean = false
     private var destroyed: Boolean = false
 
+    // The key-neighbor table for the fuzzy pass, built by LatinIME from the live layout. Remembered
+    // so an engine started later is handed the current table, and re-pushed on every publish. Null
+    // disables the fuzzy pass; the strip and its exact suggestions are unaffected either way.
+    private var keyNeighbors: KeyNeighborTable? = null
+
     // Lifecycle of the "preparation requested" flag, in one place because nothing below it
     // de-duplicates: it is set the moment preparation is requested, it is NEVER cleared after a
     // Published result (readiness survives every later transition of the setting and the engine is
@@ -268,6 +274,17 @@ class SuggestionsController internal constructor(
      */
     fun onCreate() {
         strip.setTapListener(SuggestionTapListener { suggestion -> onTap(suggestion) })
+    }
+
+    /**
+     * Publishes the key-neighbor table used by the fuzzy suggestion pass. LatinIME rebuilds it from
+     * the live layout whenever the keyboard or subtype changes and hands it here; a null table (a
+     * non-alphabet layout or an ineligible field) disables the fuzzy pass. Stored so an engine
+     * started later still receives it, and forwarded to the running engine at once. UI thread only.
+     */
+    fun updateKeyNeighbors(table: KeyNeighborTable?) {
+        keyNeighbors = table
+        engine?.updateKeyNeighbors(table)
     }
 
     fun onStartInput(eligible: Boolean) {
@@ -624,6 +641,9 @@ class SuggestionsController internal constructor(
             return
         }
         engine = handle
+        // Hand the freshly started engine the current key-neighbor table so its fuzzy pass is armed
+        // without waiting for the next layout change. Null is a valid value (fuzzy pass disabled).
+        handle.updateKeyNeighbors(keyNeighbors)
         if (!eligible) {
             handle.finishInput()
             strip.hideSuggestions()

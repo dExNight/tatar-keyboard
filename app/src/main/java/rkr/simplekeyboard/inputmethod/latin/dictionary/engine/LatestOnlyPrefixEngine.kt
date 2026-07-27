@@ -149,6 +149,17 @@ class LatestOnlyPrefixEngine internal constructor(
         invalidateGenerationLocked()
     }
 
+    /**
+     * Pushes the key-neighbor table into the underlying computer, if it runs a fuzzy pass. Only a
+     * @Volatile reference is swapped; the fuzzy scratch is still touched solely by the serialized
+     * worker inside [PrefixComputer.lookup].
+     */
+    fun updateKeyNeighbors(table: KeyNeighborTable?) {
+        synchronized(lock) {
+            (computer as? KeyNeighborSink)?.updateKeyNeighbors(table)
+        }
+    }
+
     fun destroy(timeout: Long, unit: TimeUnit): Boolean = synchronized(destroyLock) {
         synchronized(lock) {
             if (state == State.DESTROYED) return true

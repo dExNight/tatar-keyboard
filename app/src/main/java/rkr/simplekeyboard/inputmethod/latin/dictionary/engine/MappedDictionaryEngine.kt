@@ -42,6 +42,8 @@ class MappedDictionaryEngine private constructor(
 
     fun finishInput() = engine.finishInput()
 
+    fun updateKeyNeighbors(table: KeyNeighborTable?) = engine.updateKeyNeighbors(table)
+
     fun isCurrent(token: LookupToken): Boolean = engine.isCurrent(token)
 
     fun destroy(timeout: Long, unit: TimeUnit): Boolean = engine.destroy(timeout, unit)

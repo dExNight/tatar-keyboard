@@ -378,6 +378,30 @@ selection, subtype, generation и букв после курсора перед 
   поведение полосы после такого коммита —
   `SuggestionsControllerTest.bandStaysEmptyAndVisibleAfterTheAutoSpacedCommitEndsTheWord`;
 - exact-word exclusion и frequency/code-point ties — `TdictPrefixIndexTest`;
+- ранжирование на два уровня (E3a) — `TdictPrefixIndexFuzzyTest`, четыре поимённых теста
+  редакции пункта ранжирования: `fuzzyCandidateNeverOutranksAnExactCandidateEvenWithHigherFrequency`
+  («неточный кандидат никогда не встаёт выше точного, какова бы ни была его частота»),
+  `withinTheFuzzyLevelOrderIsFrequencyDescendingThenCodePointAscending` («внутри уровня
+  действует прежний порядок частота/лексикографический»),
+  `theTypedWordFormIsExcludedFromBothLevels` («форма, равная набранному слову, исключена на
+  обоих уровнях») и характеризационный
+  `withNoNeighborTableTheResultIsByteForByteTheD1Result` («при пустом множестве неточных
+  порядок совпадает с порядком D1»); плюс отсечения и заполнение —
+  `theFuzzyLevelIsGatedOnAThreeCodePointPrefix`,
+  `theFuzzyLevelIsSkippedWhenTheExactPassAlreadyFillsAllThreeCells`,
+  `theSettingATableDoesNotChangeAnyExactResultAcrossPrefixes` и аллокации на вариант —
+  `perLookupAllocationDoesNotDependOnTheNumberOfVariants`
+  (`com.sun.management.ThreadMXBean.getThreadAllocatedBytes`);
+- генерация неточных вариантов (E3a, класс №1) — `FuzzyPrefixVariantsTest`:
+  `eachTatarFifthRowLetterReEncodesToItsBaseOrBases` (ә ө ү җ ң һ по кодпоинтам с повторным
+  кодированием в UTF-8), `schwaExpandsToBothDeclaredBasesInCodePointOrder`,
+  `replacesEveryPositionThatHasALongPressPartner`, `aPrefixWithoutAnyPartnerProducesNoVariant`,
+  `exceedingTheVariantBudgetFailsClosedWithMinusOne` и подсчёт кодпоинтов по ведущим байтам
+  `countCodePointsByLeadBytesHandlesCyrillicLatinAndMixed` (кириллица, латиница, смешанный ввод);
+- источник соседства (E3a) — `KeyNeighborTableTest`: `onlyTheAlphabetElementIsAValidSource`
+  (правило «только алфавитный элемент»), `longPressPairsAreSymmetrizedAndDeduplicated`,
+  `everyFifthRowLetterBecomesANode`, `codesAreFoldedToNfcLowercaseAndNonLetterKeysDropped`,
+  `tableCarriesItsSubtypeId`;
 - selection и внутренние жесты клавиатуры —
   `SuggestionsControllerTest.externalSelectionChangeWhileEligibleReservesAndNeverHides`,
   `staleResultDroppedWhenSelectionChangedBumpsSession`,
