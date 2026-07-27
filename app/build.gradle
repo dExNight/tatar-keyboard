@@ -14,6 +14,9 @@ android {
         targetSdkVersion 37
         versionCode 4
         versionName "1.2.0"
+        // E3b instrumental harness (androidTest only). The legacy platform runner needs no external
+        // dependency, so it resolves offline; androidTest never contributes to the release APK.
+        testInstrumentationRunner "android.test.InstrumentationTestRunner"
     }
     signingConfigs {
         if (keystorePropsFile.exists()) {
@@ -44,4 +47,17 @@ android {
 dependencies {
     implementation 'androidx.customview:customview:1.1.0'
     testImplementation 'junit:junit:4.13.2'
+
+    // E3b instrumental harness: compile-only against the SDK's legacy instrumentation classes so no
+    // external artifact is downloaded (offline) and nothing is packaged into the release APK. The
+    // classes are provided by the platform's android.test.runner / android.test.base shared
+    // libraries at runtime on the device.
+    def optionalDir = new File(android.sdkDirectory, "platforms").listFiles()
+            ?.findAll { it.name.startsWith("android-${android.compileSdk}") }
+            ?.collect { new File(it, "optional") }
+            ?.find { it.isDirectory() }
+    if (optionalDir != null) {
+        androidTestCompileOnly files(new File(optionalDir, "android.test.runner.jar"),
+                new File(optionalDir, "android.test.base.jar"))
+    }
 }

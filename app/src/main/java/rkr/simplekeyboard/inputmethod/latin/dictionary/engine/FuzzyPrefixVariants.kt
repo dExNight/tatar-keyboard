@@ -67,13 +67,90 @@ internal object FuzzyPrefixVariants {
         variantScratch: ByteArray,
         maxVariants: Int,
         consumer: VariantConsumer,
+    ): Int = generateSubstitutionVariants(
+        prefixUtf8, prefixLength, table, codePointScratch, variantScratch, maxVariants, consumer,
+        geometric = false,
+    )
+
+    /**
+     * Edit class #2: replace one letter with a geometric keyboard neighbour, in every position that
+     * has one. Same contract as [generateLongPressVariants] — one variant per neighbour of every
+     * position, exactly one letter differing per variant, re-encoded to UTF-8, nothing allocated
+     * per variant — but drawing on [KeyNeighborTable.geometricNeighborsOf] instead of the long-press
+     * partners.
+     *
+     * Returns the number of variants emitted, or -1 when the prefix could not be decoded or when
+     * [maxVariants] would be exceeded (fail-closed: the caller drops the whole fuzzy level).
+     */
+    fun generateGeometricVariants(
+        prefixUtf8: ByteArray,
+        prefixLength: Int,
+        table: KeyNeighborTable,
+        codePointScratch: IntArray,
+        variantScratch: ByteArray,
+        maxVariants: Int,
+        consumer: VariantConsumer,
+    ): Int = generateSubstitutionVariants(
+        prefixUtf8, prefixLength, table, codePointScratch, variantScratch, maxVariants, consumer,
+        geometric = true,
+    )
+
+    /**
+     * Edit class #3: swap two adjacent letters, in every adjacent pair of the prefix. Swaps of two
+     * identical code points are skipped (they reproduce the prefix), so exactly one distinct variant
+     * is emitted per distinct adjacent pair. Works on code points and re-encodes to UTF-8; nothing
+     * is allocated per variant.
+     *
+     * Returns the number of variants emitted, or -1 when the prefix could not be decoded or when
+     * [maxVariants] would be exceeded (fail-closed).
+     */
+    fun generateTranspositionVariants(
+        prefixUtf8: ByteArray,
+        prefixLength: Int,
+        codePointScratch: IntArray,
+        variantScratch: ByteArray,
+        maxVariants: Int,
+        consumer: VariantConsumer,
+    ): Int {
+        val codePointCount = decodeCodePoints(prefixUtf8, prefixLength, codePointScratch)
+        if (codePointCount < 0) return -1
+        var emitted = 0
+        for (position in 0 until codePointCount - 1) {
+            val first = codePointScratch[position]
+            val second = codePointScratch[position + 1]
+            if (first == second) continue
+            if (emitted >= maxVariants) return -1
+            codePointScratch[position] = second
+            codePointScratch[position + 1] = first
+            val length = encodeCodePoints(codePointScratch, codePointCount, variantScratch)
+            consumer.onVariant(variantScratch, length)
+            // Restore the pair before moving on, so exactly one adjacent swap differs per variant.
+            codePointScratch[position] = first
+            codePointScratch[position + 1] = second
+            emitted++
+        }
+        return emitted
+    }
+
+    /** Shared body of the two substitution classes; [geometric] picks the neighbour source. */
+    private fun generateSubstitutionVariants(
+        prefixUtf8: ByteArray,
+        prefixLength: Int,
+        table: KeyNeighborTable,
+        codePointScratch: IntArray,
+        variantScratch: ByteArray,
+        maxVariants: Int,
+        consumer: VariantConsumer,
+        geometric: Boolean,
     ): Int {
         val codePointCount = decodeCodePoints(prefixUtf8, prefixLength, codePointScratch)
         if (codePointCount < 0) return -1
         var emitted = 0
         for (position in 0 until codePointCount) {
             val original = codePointScratch[position]
-            val partners = table.longPressPartnersOf(original) ?: continue
+            val partners =
+                if (geometric) table.geometricNeighborsOf(original) else table.longPressPartnersOf(original)
+            if (partners == null) continue
             for (partner in partners) {
                 if (emitted >= maxVariants) {
                     codePointScratch[position] = original

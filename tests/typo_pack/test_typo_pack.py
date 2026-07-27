@@ -346,5 +346,133 @@ class CommittedInputsSmokeTest(unittest.TestCase):
         self.assertEqual(len({frozenset((n, p)) for n, ps in neighbor_map.items() for p in ps}), 10)
 
 
+class GeometricMapTest(unittest.TestCase):
+    """Edit class #2 geometric neighbours reconstructed from rows_tatar.xml (never hard-coded)."""
+
+    def setUp(self) -> None:
+        self.geo = pack.read_layout_geometry(LAYOUT_DIR)
+        self.geometric_map = pack.build_geometric_map(self.geo)
+
+    def test_thirty_seven_letter_keys(self) -> None:
+        self.assertEqual(len(self.geo), 37)
+
+    def test_sixty_five_undirected_pairs_and_symmetry(self) -> None:
+        undirected = set()
+        for node, partners in self.geometric_map.items():
+            for partner in partners:
+                undirected.add(frozenset((node, partner)))
+                self.assertIn(node, self.geometric_map[partner])
+        self.assertEqual(len(undirected), 65)
+
+    def test_average_fanout_is_3_51_and_max_is_5(self) -> None:
+        total = sum(len(v) for v in self.geometric_map.values())
+        self.assertEqual(len(self.geometric_map), 37)
+        self.assertAlmostEqual(total / 37, 3.51, places=2)
+        self.assertEqual(max(len(v) for v in self.geometric_map.values()), 5)
+
+    def test_fifth_row_letters_connect_to_the_alphabet(self) -> None:
+        for letter in "әөүҗңһ":
+            partners = self.geometric_map.get(ord(letter), ())
+            self.assertTrue(partners)
+            self.assertTrue(any(chr(cp) not in "әөүҗңһ" for cp in partners))
+
+    def test_a_specific_neighbour_set(self) -> None:
+        self.assertEqual("".join(chr(cp) for cp in self.geometric_map[ord("к")]), "аеуө")
+
+
+class GeometricTypoSetTest(unittest.TestCase):
+    def setUp(self) -> None:
+        self.geometric_map = pack.read_layout_geometric_map(LAYOUT_DIR)
+
+    def test_exactly_one_geometric_substitution_inside_the_prefix(self) -> None:
+        typo_set = pack.build_geometric_typo_set(FIXTURE_WORDS, self.geometric_map)
+        for original, typo in typo_set.rows:
+            original_prefix = [ord(ch) for ch in original][:3]
+            typo_prefix = [ord(ch) for ch in typo]
+            self.assertEqual(len(typo_prefix), 3)
+            differing = [i for i in range(3) if typo_prefix[i] != original_prefix[i]]
+            self.assertEqual(len(differing), 1, msg=f"{original!r}->{typo!r}")
+            position = differing[0]
+            self.assertIn(typo_prefix[position], self.geometric_map[original_prefix[position]])
+
+    def test_geometric_set_is_byte_identical(self) -> None:
+        first = pack.build_geometric_typo_set(FIXTURE_WORDS, self.geometric_map)
+        second = pack.build_geometric_typo_set(FIXTURE_WORDS, self.geometric_map)
+        self.assertEqual(first.sha256, second.sha256)
+
+
+class TranspositionTypoSetTest(unittest.TestCase):
+    def test_prefix_is_the_original_with_one_adjacent_pair_swapped(self) -> None:
+        typo_set = pack.build_transposition_typo_set(FIXTURE_WORDS)
+        for original, typo in typo_set.rows:
+            original_prefix = [ord(ch) for ch in original][:3]
+            typo_prefix = [ord(ch) for ch in typo]
+            self.assertEqual(len(typo_prefix), 3)
+            # A transposition is a permutation of the prefix and must differ from it.
+            self.assertEqual(sorted(typo_prefix), sorted(original_prefix))
+            self.assertNotEqual(typo_prefix, original_prefix)
+
+    def test_identical_adjacent_letters_are_ineligible(self) -> None:
+        # "ааб": the (а,а) pair reproduces the prefix, so only the (а,б) swap is eligible -> "аба".
+        typo_set = pack.build_transposition_typo_set(["ааб"])
+        self.assertEqual(typo_set.rows, (("ааб", "аба"),))
+
+    def test_transposition_set_is_byte_identical(self) -> None:
+        first = pack.build_transposition_typo_set(FIXTURE_WORDS)
+        second = pack.build_transposition_typo_set(FIXTURE_WORDS)
+        self.assertEqual(first.sha256, second.sha256)
+
+
+class EditClassDispatchTest(unittest.TestCase):
+    def test_generate_dispatches_each_edit_class_to_a_distinct_set(self) -> None:
+        with _asset_file(FIXTURE_ASSET) as asset:
+            shas = {}
+            for edit_class in (1, 2, 3):
+                typo_set, _ = pack.generate(
+                    asset, LAYOUT_DIR,
+                    expected_asset_sha256=sha256_bytes(FIXTURE_ASSET),
+                    expected_raw_sha256=sha256_bytes(FIXTURE_RAW),
+                    expected_entry_count=len(FIXTURE_WORDS),
+                    edit_class=edit_class,
+                )
+                self.assertGreater(typo_set.size, 0)
+                shas[edit_class] = typo_set.sha256
+        # The three edit classes are genuinely different transformations.
+        self.assertEqual(len(set(shas.values())), 3)
+
+    def test_unknown_edit_class_raises(self) -> None:
+        with _asset_file(FIXTURE_ASSET) as asset:
+            with self.assertRaises(pack.TypoPackError):
+                pack.generate(
+                    asset, LAYOUT_DIR,
+                    expected_asset_sha256=sha256_bytes(FIXTURE_ASSET),
+                    expected_raw_sha256=sha256_bytes(FIXTURE_RAW),
+                    expected_entry_count=len(FIXTURE_WORDS),
+                    edit_class=9,
+                )
+
+
+class CommittedExtendedSetsSmokeTest(unittest.TestCase):
+    """When the committed asset is present, classes #2 and #3 reproduce the recorded identities."""
+
+    @unittest.skipUnless(DICTIONARY.is_file(), "committed dictionary asset not available")
+    def test_class1_class2_class3_recorded_identities(self) -> None:
+        one, _ = pack.generate(DICTIONARY, LAYOUT_DIR, edit_class=1)
+        self.assertEqual(one.size, 87375)
+        self.assertEqual(
+            one.sha256, "6a61b48db87ac0bbff78af48ea597b3af19f81dd42ae8deaa2d4c00a6c81dfc3"
+        )
+        two, _ = pack.generate(DICTIONARY, LAYOUT_DIR, edit_class=2)
+        self.assertEqual(two.size, 99659)
+        self.assertEqual(
+            two.sha256, "8cd5b2b89663264d4bde505dfc80b0046951218e502dae997e1545105a8ed1cb"
+        )
+        three, _ = pack.generate(DICTIONARY, LAYOUT_DIR, edit_class=3)
+        self.assertEqual(three.size, 99647)
+        self.assertEqual(
+            three.sha256, "914ae7cf66cc311ca86f49e146d511db4281dd1bf6cd70e23f7d1b69e1902197"
+        )
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -98,6 +98,16 @@ internal class TdictPrefixIndex private constructor(
     @Volatile
     private var neighborTable: KeyNeighborTable? = null
 
+    // Test-only observability of the last lookup's fuzzy work. These are plain ints assigned on the
+    // hot path (no allocation, no logging); they let the JVM harness report measured variants and
+    // visited entries and prove the fail-closed budget never trips on the typo set.
+    internal var lastFuzzyVariantCount = 0
+        private set
+    internal var lastFuzzyVisitedCount = 0
+        private set
+    internal var lastFuzzyOverBudget = false
+        private set
+
     // Fuzzy-pass accumulator, private to a single lookup() invocation and reset on each entry.
     private var fuzzyExactCount = 0
     private var fuzzyRemaining = 0
@@ -123,6 +133,9 @@ internal class TdictPrefixIndex private constructor(
             return emptyList()
         }
         return try {
+            lastFuzzyVariantCount = 0
+            lastFuzzyVisitedCount = 0
+            lastFuzzyOverBudget = false
             for (offset in 0 until prefixLength) {
                 exactScratch[offset] = normalizedPrefixUtf8.byteAt(offset).toByte()
             }
@@ -181,11 +194,39 @@ internal class TdictPrefixIndex private constructor(
         fuzzyVisited = 0
         fuzzyOverBudget = false
         fuzzyPrefixLength = prefixLength
-        val emitted = FuzzyPrefixVariants.generateLongPressVariants(
+        // Classes #1, #2 and #3 share one variant budget: the total number of variants generated
+        // across all three must stay within MAX_FUZZY_VARIANTS, and the class edit type never
+        // affects ranking. Any single class returning -1 (its slice of the budget exceeded) drops
+        // the whole fuzzy level, never a part of it.
+        val classOne = FuzzyPrefixVariants.generateLongPressVariants(
             exactScratch, prefixLength, table, codePointScratch, variantScratch,
             MAX_FUZZY_VARIANTS, fuzzyConsumer,
         )
-        if (emitted < 0 || fuzzyOverBudget) return exactCount
+        if (classOne < 0 || fuzzyOverBudget) {
+            lastFuzzyOverBudget = true
+            lastFuzzyVisitedCount = fuzzyVisited
+            return exactCount
+        }
+        val classTwo = FuzzyPrefixVariants.generateGeometricVariants(
+            exactScratch, prefixLength, table, codePointScratch, variantScratch,
+            MAX_FUZZY_VARIANTS - classOne, fuzzyConsumer,
+        )
+        if (classTwo < 0 || fuzzyOverBudget) {
+            lastFuzzyOverBudget = true
+            lastFuzzyVisitedCount = fuzzyVisited
+            return exactCount
+        }
+        val classThree = FuzzyPrefixVariants.generateTranspositionVariants(
+            exactScratch, prefixLength, codePointScratch, variantScratch,
+            MAX_FUZZY_VARIANTS - classOne - classTwo, fuzzyConsumer,
+        )
+        if (classThree < 0 || fuzzyOverBudget) {
+            lastFuzzyOverBudget = true
+            lastFuzzyVisitedCount = fuzzyVisited
+            return exactCount
+        }
+        lastFuzzyVariantCount = classOne + classTwo + classThree
+        lastFuzzyVisitedCount = fuzzyVisited
         for (slot in 0 until fuzzyCount) {
             rankedIndices[exactCount + slot] = fuzzyIndices[slot]
             rankedFrequencies[exactCount + slot] = fuzzyFrequencies[slot]
@@ -358,17 +399,21 @@ internal class TdictPrefixIndex private constructor(
         internal const val MAX_PREFIX_BYTES = 128
         private const val MAX_U32 = 0xffff_ffffL
 
-        // Fuzzy pass (E3a). Extra headroom on the variant buffer covers a re-encode that is a few
-        // bytes longer than the prefix; edit class #1 keeps the length identical in practice.
+        // Fuzzy pass. Extra headroom on the variant buffer covers a re-encode that is a few bytes
+        // longer than the prefix; edit classes #1/#2 (single-letter substitution) and #3
+        // (transposition) keep the code-point length identical in practice.
         private const val VARIANT_HEADROOM = 8
 
-        // Class #1 needs at least three code points; the count is taken off the UTF-8 lead bytes so
-        // a two-letter Cyrillic prefix (four bytes) is correctly rejected.
+        // The fuzzy pass (all three E3b classes) needs at least three code points; the count is
+        // taken off the UTF-8 lead bytes so a two-letter Cyrillic prefix (four bytes) is rejected.
         private const val MIN_FUZZY_PREFIX_CODE_POINTS = 3
 
-        // Fixed budgets. Exceeding either drops the whole fuzzy level, never a part of it. Both sit
-        // far above the class #1 offline reference (p95 3 variants, max 5).
-        private const val MAX_FUZZY_VARIANTS = 24
+        // Fixed budgets. Exceeding either drops the whole fuzzy level, never a part of it. The
+        // variant budget bounds classes #1+#2+#3 combined; it sits above the E3b offline reference
+        // (p95 33 variants, max 39) with headroom, so a correct implementation never trips it on the
+        // typo set — a fact the recovery test asserts. The visited budget sits far above the E3b
+        // reference (p95 133 entries, max 522).
+        private const val MAX_FUZZY_VARIANTS = 64
         private const val MAX_FUZZY_VISITED = 8192
         private val MAGIC = "TATDICT\u0000".toByteArray(Charsets.US_ASCII)
 

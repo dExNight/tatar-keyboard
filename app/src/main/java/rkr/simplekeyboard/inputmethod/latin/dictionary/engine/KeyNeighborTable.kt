@@ -28,10 +28,11 @@ import java.util.Arrays
  * ([rkr.simplekeyboard.inputmethod.latin.suggestions.KeyNeighborTableBuilder]); not a single letter
  * or key pair is hard-coded here.
  *
- * E3a fills in the edit class #1 source only — long-press partners taken from the layout's
- * `moreKeys`. The raw geometry (`left/top/right/bottom`) of every letter key is accepted by [build]
- * so the geometric-neighbour relation (edit class #2) can be derived from the very same source in
- * E3b without re-reading the layout; E3a neither computes nor uses it.
+ * E3a fills in the edit class #1 source — long-press partners taken from the layout's `moreKeys`.
+ * E3b adds the edit class #2 source — geometric neighbours derived from the raw geometry
+ * (`left/top/right/bottom`) of every letter key, read from the very same source. Not a single
+ * letter, pair or coordinate is hard-coded: the geometry always comes from the live layout
+ * (`Keyboard.getSortedKeys()` on the device) and the relation below is a pure function of it.
  *
  * The table carries the [subtypeId] it was built for so the engine can refuse a fuzzy pass when the
  * table does not match the requesting subtype. It is fully immutable once built.
@@ -43,6 +44,8 @@ class KeyNeighborTable private constructor(
     val subtypeId: String,
     private val partnerKeys: IntArray,
     private val partnerValues: Array<IntArray>,
+    private val geometricKeys: IntArray,
+    private val geometricValues: Array<IntArray>,
     /** Every distinct code point that is a node of the table (keys plus more-key-only letters). */
     val nodes: IntArray,
     /** Geometry-bearing letter keys actually read from the layout (37 on the Tatar layout). */
@@ -60,6 +63,18 @@ class KeyNeighborTable private constructor(
     fun longPressPartnersOf(codePoint: Int): IntArray? {
         val index = Arrays.binarySearch(partnerKeys, codePoint)
         return if (index >= 0) partnerValues[index] else null
+    }
+
+    /**
+     * Geometric neighbours of [codePoint] (edit class #2), or null when the code point has none.
+     *
+     * A geometric neighbour is a key adjacent to [codePoint] under the layout's geometry (see the
+     * neighbour rule in [build]). The returned array is shared and MUST NOT be mutated by the
+     * caller: it is read on the hot lookup path and allocates nothing per variant.
+     */
+    fun geometricNeighborsOf(codePoint: Int): IntArray? {
+        val index = Arrays.binarySearch(geometricKeys, codePoint)
+        return if (index >= 0) geometricValues[index] else null
     }
 
     /**
@@ -99,15 +114,28 @@ class KeyNeighborTable private constructor(
             keys: List<RawKey>,
         ): KeyNeighborTable {
             if (!isAlphabetElement) {
-                return KeyNeighborTable(subtypeId, IntArray(0), emptyArray(), IntArray(0), 0)
+                return KeyNeighborTable(
+                    subtypeId, IntArray(0), emptyArray(), IntArray(0), emptyArray(), IntArray(0), 0,
+                )
             }
             val pairs = HashMap<Int, MutableSet<Int>>()
             val nodeSet = sortedSetOf<Int>()
             var letterKeys = 0
+            // Parallel geometry records for the letter keys, in encounter order. A key contributes a
+            // geometric record only when it folds to a letter (more-key-only letters like ё/ъ have
+            // no geometry of their own and take part in edit class #1 alone).
+            val geomCode = ArrayList<Int>(keys.size)
+            val geomLeft = ArrayList<Int>(keys.size)
+            val geomTop = ArrayList<Int>(keys.size)
+            val geomRight = ArrayList<Int>(keys.size)
             for (key in keys) {
                 val base = normalizeLetterCodePoint(key.codePoint) ?: continue
                 letterKeys++
                 nodeSet.add(base)
+                geomCode.add(base)
+                geomLeft.add(key.left)
+                geomTop.add(key.top)
+                geomRight.add(key.right)
                 for (rawMoreKey in key.moreKeyCodePoints) {
                     val partner = normalizeLetterCodePoint(rawMoreKey) ?: continue
                     if (partner == base) continue
@@ -117,11 +145,73 @@ class KeyNeighborTable private constructor(
                     pairs.getOrPut(partner) { HashSet() }.add(base)
                 }
             }
+            val geoPairs = computeGeometricPairs(geomCode, geomLeft, geomTop, geomRight)
             val partnerKeys = pairs.keys.toIntArray().also { it.sort() }
             val partnerValues = Array(partnerKeys.size) { index ->
                 pairs.getValue(partnerKeys[index]).toIntArray().also { it.sort() }
             }
-            return KeyNeighborTable(subtypeId, partnerKeys, partnerValues, nodeSet.toIntArray(), letterKeys)
+            val geometricKeys = geoPairs.keys.toIntArray().also { it.sort() }
+            val geometricValues = Array(geometricKeys.size) { index ->
+                geoPairs.getValue(geometricKeys[index]).toIntArray().also { it.sort() }
+            }
+            return KeyNeighborTable(
+                subtypeId, partnerKeys, partnerValues, geometricKeys, geometricValues,
+                nodeSet.toIntArray(), letterKeys,
+            )
+        }
+
+        /**
+         * Edit class #2 relation, verbatim from the contract: keys of the same row that touch
+         * horizontally, plus keys of an adjacent row whose horizontal overlap is MORE than 35% of
+         * the width of the narrower of the two.
+         *
+         * "Same row" is same top coordinate; "adjacent row" is a difference of exactly one in the
+         * rank of the distinct top coordinates (so an empty row between two letter rows, or a
+         * dropped digit row, cannot make non-adjacent letter rows neighbours). "Touch horizontally"
+         * is a shared vertical edge (`right == left`), which is why two coincident rectangles — the
+         * degenerate geometry used by the class #1 unit fixtures — produce no geometric neighbour at
+         * all. The 35% comparison is exact integer arithmetic (`100*overlap > 35*minWidth`) so the
+         * relation is identical on every host and reproducible by the offline model.
+         */
+        private fun computeGeometricPairs(
+            code: List<Int>,
+            left: List<Int>,
+            top: List<Int>,
+            right: List<Int>,
+        ): HashMap<Int, MutableSet<Int>> {
+            val geoPairs = HashMap<Int, MutableSet<Int>>()
+            val distinctTops = top.toSortedSet().toIntArray()
+            val size = code.size
+            for (i in 0 until size) {
+                val rankI = Arrays.binarySearch(distinctTops, top[i])
+                for (j in i + 1 until size) {
+                    val ci = code[i]
+                    val cj = code[j]
+                    if (ci == cj) continue
+                    val rankJ = Arrays.binarySearch(distinctTops, top[j])
+                    val connected = when {
+                        rankI == rankJ ->
+                            right[i] == left[j] || right[j] == left[i]
+                        rankI == rankJ + 1 || rankJ == rankI + 1 -> {
+                            val overlap = minOf(right[i], right[j]) - maxOf(left[i], left[j])
+                            if (overlap <= 0) {
+                                false
+                            } else {
+                                val widthI = right[i] - left[i]
+                                val widthJ = right[j] - left[j]
+                                val minWidth = minOf(widthI, widthJ)
+                                100L * overlap > 35L * minWidth
+                            }
+                        }
+                        else -> false
+                    }
+                    if (connected) {
+                        geoPairs.getOrPut(ci) { HashSet() }.add(cj)
+                        geoPairs.getOrPut(cj) { HashSet() }.add(ci)
+                    }
+                }
+            }
+            return geoPairs
         }
 
         /**

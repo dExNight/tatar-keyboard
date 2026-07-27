@@ -265,3 +265,258 @@ python3 -m unittest tests.typo_pack.test_typo_pack
   `docs/DICTIONARY-E3-TYPO-REVIEW.tsv` (all `pending`; machine classification does not
   replace a human reviewer).
 - One summary reference row added to `docs/TATAR-REVIEW-QUEUE.tsv`.
+
+---
+
+# E3b — geometric-neighbour and transposition classes
+
+Evaluation date: 2026-07-27. This section is the deliverable record for sub-phase **E3b**:
+edit **class #2** (substitute a letter with a geometric keyboard neighbour) and edit
+**class #3** (swap two adjacent letters), the instrumental compute harness, and the
+recovery@3 measurement of the full fuzzy engine. Nothing about class #1 (E3a) changed: the
+class #1 set SHA-256 is byte-for-byte the same, so the E3a calibration stays valid. The
+dictionary asset is untouched (SHA-256 `2d98ed35…7485cae`, still the v1.2.0 asset).
+
+## 1. Neighbour rule — taken verbatim from the contract
+
+Edit class #2 uses the geometric-neighbour relation defined in the E3 contract, word for
+word: **keys of the same row that touch horizontally, plus keys of an adjacent row whose
+horizontal overlap is MORE than 35% of the width of the narrower of the two.** The 35%
+threshold is the contract's chosen constant, not a measured value.
+
+It is derived by `KeyNeighborTable.build` from the raw geometry (`left/top/right/bottom`) of
+the letter keys — geometry that comes only from the live layout (`Keyboard.getSortedKeys()`
+on the device via `KeyNeighborTableBuilder`). Implementation detail, so the relation is
+identical on every host and reproducible offline:
+
+- "same row" = equal top rank (rank of distinct top coordinates); "adjacent row" = top rank
+  differing by exactly one — so a dropped digit row or an empty row cannot make two
+  non-adjacent letter rows neighbours;
+- "touch horizontally" = a shared vertical edge (`right == left`) — which is why two
+  coincident rectangles (the degenerate geometry of the class #1 unit fixtures) produce **no**
+  geometric neighbour, leaving the E3a tests unaffected;
+- the 35% comparison is **exact integer arithmetic** (`100·overlap > 35·minWidth`), so no
+  float rounding can diverge between the Kotlin engine and the offline generator.
+
+No letter, pair or coordinate is hard-coded in the engine: `KeyNeighborTableGeometryTest`
+and `E3bEngineSourceContractTest` assert the engine sources carry no Cyrillic literal, and
+`scripts/typo_pack.py` reconstructs the same integer grid from `res/xml/rows_tatar.xml` +
+`rowkeys_tatar*.xml`.
+
+## 2. Measured geometric map
+
+Reconstructed on the fixed integer grid (layout percent width ×1000) from the live layout:
+the fifth row of six 16.667%p keys, two rows of eleven 9.091%p keys, and a bottom row of
+nine 8.711%p letter keys offset by the 10.8%p shift key.
+
+| Quantity | Value |
+|---|---:|
+| letter keys | **37** (= 6 + 11 + 11 + 9, `rowkeys_tatar*.xml`) |
+| nodes (keys + more-key-only ё, ъ) | 39 |
+| undirected geometric pairs | **65** |
+| — same-row touching | 33 |
+| — adjacent-row, added by the 35% rule | 32 |
+| average fan-out (over 37 keys) | **3.51** |
+| maximum fan-out | **5** |
+
+Full sorted pair list (65):
+
+```
+ав ак ап ас бд бь бю ву вч вы гн го гш гҗ дж дл дщ ек ен еп еү жз жэ жю зх зщ зһ им ир ит
+йф йц йә ку кө ло лш ль мп мс нр нҗ нү ор от пр сч ть уц уө фы хэ хһ цы цә чя шщ шң щң ыя
+җң җү ңһ үө әө
+```
+
+The 35% rule is what keeps the wide fifth-row keys (ә ө ү җ ң һ) geometrically connected to
+the narrower alphabet rows instead of being neighbours only of one another (e.g. ә↔й, ә↔ц,
+ә↔ө; ү↔е, ү↔н; җ↔г, җ↔н). These numbers reproduce the geometric figures the E3a contract
+recorded for the layout (37 keys, fan-out 3.51, max 5), which cross-checks the geometry model.
+
+## 3. Reproducible sets — class #2 and class #3 (class #1 unchanged)
+
+`scripts/typo_pack.py build --edit-class {1,2,3}` emits one deterministic
+`original<TAB>typo_prefix` set per class, on the same `(seed=20260727, word)` selection
+primitive as E3a and the same 3-code-point prefix window. The JVM
+`E3bRecoveryCalibrationTest` rebuilds each set from the enumerated committed asset and asserts
+the byte-identical SHA-256 — the cross-implementation proof that the offline model and the
+engine derive the same geometry and selection.
+
+| edit class | set size | SHA-256 |
+|---|---:|---|
+| #1 long-press partner (E3a) | 87 375 | `6a61b48db87ac0bbff78af48ea597b3af19f81dd42ae8deaa2d4c00a6c81dfc3` (**unchanged**) |
+| #2 geometric neighbour | 99 659 | `8cd5b2b89663264d4bde505dfc80b0046951218e502dae997e1545105a8ed1cb` |
+| #3 adjacent transposition | 99 647 | `914ae7cf66cc311ca86f49e146d511db4281dd1bf6cd70e23f7d1b69e1902197` |
+
+The class #1 SHA is bit-for-bit the E3a value, verified both by the generator
+(`--edit-class 1`) and by `E3bRecoveryCalibrationTest.everyExtendedTypoSetIsByteIdenticalToTheGeneratorRun`.
+
+## 4. Measured variants and visited entries
+
+Measured by the engine's per-lookup counters over the combined typo set (rows where the fuzzy
+pass fired):
+
+| Quantity | p50 | p95 | max | offline reference (contract) |
+|---|---:|---:|---:|---|
+| variants per lookup | 14 | **16** | 19 | p95 **33** |
+| visited entries per lookup | 112 | **546** | 1 800 | p95 **133** |
+| over-budget lookups | — | — | **0** | must never trip |
+
+Reported, not tuned. The variant p95 (16) is below the offline reference (33) because the
+recovery set uses 3-code-point prefixes (the shortest that fire the fuzzy pass), where the
+combined class #1+#2+#3 fan-out is ~14; the offline "p95 33" reference was measured over a
+different, longer prefix mix. The visited p95 (546) is above the offline reference (133)
+because class #2's geometric variants scan common short-letter blocks, which are larger; this
+is well inside `MAX_FUZZY_VISITED` (8192) and the budget never trips (`over_budget=0`), as
+required by acceptance. Zero allocations per variant are preserved — the existing
+`TdictPrefixIndexFuzzyTest.perLookupAllocationDoesNotDependOnTheNumberOfVariants` stays green.
+
+## 5. recovery@3 after E3b and verdict
+
+Test: `E3bRecoveryCalibrationTest.recoveryAtThreeAfterE3b`. Methodology as fixed by the
+contract amendment: typo inside the 3-code-point prefix window; denominator = the **whole**
+combined set (class #1 + #2 + #3 rows); the full engine (all three classes) looks up each typo
+prefix and the word is recovered if it lands in the top three.
+
+Raw line (grep target `E3b recovery@3`, from `app/build/test-results/testDebugUnitTest`):
+
+```
+E3b recovery@3 seed=20260727 prefix_cp=3 combined_set=286681 recovered=13861 recovery@3=4.8350% baseline_exact_only=0.0000% class1_set=87375 class1_recovery@3=4.6272% class2_set=99659 class2_recovery@3=4.7663% class3_set=99647 class3_recovery@3=5.0860% class1_reference=7.2835% threshold=2.4x=17.4804% verdict=BELOW variant_p50=14 variant_p95=16 variant_max=19 visited_p50=112 visited_p95=546 visited_max=1800 over_budget=0 offline_ref_variant_p95=33 offline_ref_visited_p95=133
+```
+
+| Metric | Value |
+|---|---:|
+| recovery@3 (whole combined set, 286 681 rows) | **4.8350 %** (13 861 / 286 681) |
+| baseline (exact only) | **0.0000 %** |
+| class #1 recovery under the full engine | 4.6272 % |
+| class #2 recovery under the full engine | 4.7663 % |
+| class #3 recovery under the full engine | 5.0860 % |
+| threshold (2.4 × 7.2835 % class #1 reference) | **17.4804 %** |
+| **verdict** | **BELOW** |
+
+**Verdict: recovery@3 (4.8350 %) is BELOW the 17.4804 % threshold.** It was **not** tuned:
+neither the code, the test, the generator, nor the threshold was adjusted, per the contract
+prohibition. The finding is reported and the decision is left to the orchestrator.
+
+**Diagnosis — not a defect of the engine (21 JVM tests prove class #2/#3 behaviour):**
+
+1. **Displacement by the contract-mandated class-agnostic ranking.** The contract ranks all
+   fuzzy candidates by frequency alone (edit class does not affect ranking) and fills only the
+   ≤ 3 cells the exact pass leaves empty. With ~14 variants per prefix (p50) each scanning a
+   block, the ≤ 3 cells are filled by the highest-frequency words across all of them, so a
+   *specific* target word rarely ranks in the top three. **Direct evidence:** adding classes
+   #2/#3 to the engine *drops* class #1-typo recovery from **7.2835 %** (E3a, class #1-only
+   engine) to **4.6272 %** (full engine) — the extra classes crowd out class #1 recoveries,
+   and their own recoveries (~4.8–5.1 %) do not compensate. This is the very failure mode the
+   contract's ranking note describes; the contract accepted it for *ranking quality* ("чистая
+   частота даёт правильный ответ") but it also caps single-word *recovery*.
+2. **The offline model that produced the 41.2 % figure (and hence the 2.4× threshold) is
+   unreliable.** The E3a calibration already demonstrated this: the offline model predicted
+   14.2 % for class #1 but the faithful engine measured 7.28 %. The offline 41.2 % for the
+   combined classes evidently did not model cross-class displacement in the shared
+   frequency-ranked fuzzy pool, so the threshold derived from it (2.4× = 17.48 %) is not
+   reachable with the contract's ranking design on 3-code-point typo prefixes.
+
+No code, test, generator, threshold or tolerance was changed to move the number.
+
+## 6. Instrumental compute harness (`app/src/androidTest`)
+
+E3b introduces the project's first instrumental test:
+`app/src/androidTest/java/.../engine/E3bComputeInstrumentationTest.kt`. It runs the same 22
+prefixes as `RealDictionaryPrefixIndexTest` through the full fuzzy engine (with a
+layout-derived neighbour table) and logs p50 / p95 / maximum `compute` in milliseconds.
+
+- **Offline & debug-only.** `testInstrumentationRunner = android.test.InstrumentationTestRunner`
+  (the SDK's legacy runner — no external artifact, resolves offline). The runner/base classes
+  are an `androidTestCompileOnly` dependency on the SDK's `android.test.runner.jar` /
+  `android.test.base.jar`, so nothing is added to the compile classpath of `main` and nothing
+  is packaged into the release APK.
+- **Proven to add zero bytes to the release APK.** `dexdump` of the release `classes.dex`
+  finds no `E3bComputeInstrumentationTest`, `InstrumentationTestCase` or
+  `InstrumentationTestRunner` reference; the same class **is** present in the androidTest APK.
+  The release manifest carries no `<instrumentation>`, no `<uses-library>` and the same single
+  `android.permission.VIBRATE` — no new permission.
+- **Compiles and assembles.** `./gradlew :app:assembleDebugAndroidTest` is **SUCCESSFUL**
+  (androidTest APK `app-debug-androidTest.apk`, 45 452 B).
+- **Measurement is NOT_COVERED.** No device is connected in this environment, so the harness
+  is not executed; the device compute p50/p95/max is NOT_COVERED (reason: no device).
+
+## 7. APK delta
+
+Measured with `./gradlew :app:assembleRelease --offline`
+(`app/build/outputs/apk/release/app-release.apk`).
+
+| Artifact | Bytes |
+|---|---:|
+| post-E2 baseline (given) | 1 478 015 |
+| post-E3a release APK | 1 480 299 |
+| post-E3b release APK (measured) | **1 481 235** |
+| E3b delta (over E3a) | **+936** |
+| **E3 phase delta (over post-E2)** | **+3 220** |
+| E3 phase budget | ≤ 15 360 |
+| remaining under the E3 budget | 12 140 |
+| remaining under the hard limit (3 145 728) | 1 664 493 |
+
+The +936 B is entirely the class #2/#3 engine code and the geometric computation; no new
+asset, no new mmap region, no new file in device-protected storage, no new permission. The
+androidTest dependency and sources contribute 0 B to the release APK (proven above).
+
+## 8. PSS
+
+NOT_COVERED. PSS measurement is deferred by the owner's decision (contract amendment
+2026-07-27); no device is connected. No PSS number is invented. The E3 own-phase delta budget
+(≤ 0.5 MB, factor = build ON/ON) and the absolute ceiling remain NOT_COVERED with that reason.
+
+## 9. Device-UAT matrix
+
+No device is connected. Every row is `NOT_COVERED`; **none is PASSED**, and no PSS number is
+invented.
+
+| Item | Status | Device (model, serial) | Build (vName/vCode, APK SHA-256) | Date | Raw numbers / path |
+|---|---|---|---|---|---|
+| Device compute p50/p95/p95-max on the review-prefix sample (E3b harness) | NOT_COVERED — no device connected; harness compiles & assembles but is not run | — | — | — | — |
+| Device compute p95 on a 100%-fuzzy set ≤ 3.5 ms (E3c input-gate precondition) | NOT_COVERED — no device connected | — | — | — | — |
+| recovery@3 on real device typing (≥ 50 hand-typed typos) | NOT_COVERED — no device connected | — | — | — | — |
+| Fuzzy candidates visibly indistinguishable from exact ones (no colour/icon/suffix, no separate a11y node) | NOT_COVERED — no device | — | — | — | — |
+| Fuzzy pass never shifts or replaces an exact candidate, live | NOT_COVERED — no device | — | — | — | — |
+| Geometric neighbour relation correct on the real live keyboard geometry | NOT_COVERED — no device (host uses reconstructed geometry) | — | — | — | — |
+| PSS delta with the fuzzy level on vs off (≤ 0.5 MB) | NOT_COVERED — PSS deferred by owner (amendment 2026-07-27) | — | — | — | — |
+| Absolute PSS within the (uncomputed) ceiling | NOT_COVERED — ceiling not recomputed; PSS deferred | — | — | — | — |
+| No crash/ANR on live layout/table change (rotation, theme, subtype) | NOT_COVERED — no device | — | — | — | — |
+
+An emulator run, had one been performed, would be a separate row marked `NOT_COVERED` with
+"emulator, reference only"; none was performed for E3b.
+
+## 10. Tests on input / output (E3b)
+
+| | JVM (`:app:testDebugUnitTest`) | Python (`tests/typo_pack`) |
+|---|---:|---:|
+| before E3b (E3a close-out) | 417 | 27 |
+| added in E3b | **21** | **13** |
+| after | **438** | **40** |
+| failures / errors | 0 | 0 |
+| skipped | **0** | **0** |
+
+The 21 new JVM tests: `E3bRecoveryCalibrationTest` (3 — set byte-identity, recovery@3, fuzzy
+delta on the 22 prefixes), `KeyNeighborTableGeometryTest` (4), `FuzzyPrefixVariantsE3bTest`
+(6), `TdictPrefixIndexE3bTest` (6), `E3bEngineSourceContractTest` (2). None is `@Ignore`d or
+skipped — verified by summing the `<testsuite>` `tests`/`skipped` attributes across
+`app/build/test-results/testDebugUnitTest/*.xml` (438 / 0). `:app:assembleDebugAndroidTest`
+is SUCCESSFUL. `lintVitalRelease` is BUILD SUCCESSFUL. `scripts/check-no-internet.sh` passes
+on both the debug and release APKs.
+
+## 11. Regeneration
+
+```
+python3 scripts/typo_pack.py build --edit-class 1 \
+  --dictionary app/src/main/assets/dictionaries/tatar_top100k_v1.tdict.zlib \
+  --layout-dir app/src/main/res/xml --output /tmp/e3_class1.txt   # SHA-256 must equal §3
+python3 scripts/typo_pack.py build --edit-class 2 ... --output /tmp/e3_class2.txt
+python3 scripts/typo_pack.py build --edit-class 3 ... --output /tmp/e3_class3.txt
+python3 -m unittest tests.typo_pack.test_typo_pack
+./gradlew :app:testDebugUnitTest :app:assembleDebugAndroidTest :app:lintVitalRelease :app:assembleRelease
+```
+
+The 22-everyday-prefix fuzzy deltas after E3b are in `docs/DICTIONARY-E3-TYPO-REVIEW.tsv` (all
+`pending`; on all 22 correctly-typed prefixes the E3b fuzzy pass adds **zero** inexact
+candidates — no noise on correct input). One summary reference row remains in
+`docs/TATAR-REVIEW-QUEUE.tsv`.

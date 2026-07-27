@@ -223,6 +223,137 @@ def read_layout_neighbor_map(layout_dir: Path) -> dict[int, tuple[int, ...]]:
 
 
 # --------------------------------------------------------------------------------------
+# Geometric adjacency (edit class #2), reconstructed from the layout geometry (never hard-coded).
+# --------------------------------------------------------------------------------------
+# The row structure and key widths come from res/xml/rows_tatar.xml; the per-row key order comes
+# from the included rowkeys_tatar*.xml. Geometry is reconstructed on a fixed integer grid (percent
+# width x1000, rounded once) so the offline model and the JVM test derive the identical relation:
+# the neighbour rule is scale-invariant and uses exact integer arithmetic, so a device build reading
+# real pixel geometry yields the same pairs. Nothing is hard-coded: both the widths and the key
+# order are read from the layout resources.
+_ROWS_TATAR_FILE = "rows_tatar.xml"
+_GEOMETRY_SCALE = 1000
+_GEOMETRIC_OVERLAP_PERCENT = 35
+
+
+@dataclass(frozen=True)
+class _GeoKey:
+    code_point: int
+    row: int
+    left: int
+    right: int
+
+
+def _parse_percent(value: str) -> int:
+    """Parse a `NN.NNN%p` layout width into integer grid units (percent x _GEOMETRY_SCALE)."""
+    stripped = value.replace("%p", "").replace("%", "").strip()
+    return round(float(stripped) * _GEOMETRY_SCALE)
+
+
+def _read_row_key_specs(xml_path: Path) -> list[str]:
+    """Return the single-character keySpecs of one rowkeys XML, in document order."""
+    try:
+        root = ElementTree.parse(xml_path).getroot()
+    except (ElementTree.ParseError, OSError) as error:
+        raise TypoPackError(f"cannot parse layout resource {xml_path}: {error}") from error
+    key_spec_attr = f"{{{_ANDROID_RES_AUTO}}}keySpec"
+    specs: list[str] = []
+    for key in root.iter("Key"):
+        spec = key.get(key_spec_attr)
+        if spec is None or len(spec) != 1:
+            raise TypoPackError(f"{xml_path.name}: a row key has no single-character keySpec")
+        specs.append(spec)
+    return specs
+
+
+def read_layout_geometry(layout_dir: Path) -> list[_GeoKey]:
+    """Reconstruct the integer geometry of every letter key from res/xml/rows_tatar.xml."""
+    rows_path = layout_dir / _ROWS_TATAR_FILE
+    if not rows_path.is_file():
+        raise TypoPackError(f"layout resource is missing: {rows_path}")
+    try:
+        root = ElementTree.parse(rows_path).getroot()
+    except (ElementTree.ParseError, OSError) as error:
+        raise TypoPackError(f"cannot parse layout resource {rows_path}: {error}") from error
+    key_spec_attr = f"{{{_ANDROID_RES_AUTO}}}keySpec"
+    key_width_attr = f"{{{_ANDROID_RES_AUTO}}}keyWidth"
+    layout_attr = f"{{{_ANDROID_RES_AUTO}}}keyboardLayout"
+    geo_keys: list[_GeoKey] = []
+    row_index = 0
+    for row in root.findall("Row"):
+        row_width_attr = row.get(key_width_attr)
+        row_width = _parse_percent(row_width_attr) if row_width_attr else 0
+        x = 0
+        for child in row:
+            if child.tag == "Key":
+                width_attr = child.get(key_width_attr)
+                if width_attr == "fillRight":
+                    # Trailing non-letter key (delete); its width is not needed for letters.
+                    continue
+                width = _parse_percent(width_attr) if width_attr else row_width
+                spec = child.get(key_spec_attr)
+                if spec is not None and len(spec) == 1:
+                    normalized = _normalize_letter(ord(spec))
+                    if normalized is not None:
+                        geo_keys.append(_GeoKey(normalized, row_index, x, x + width))
+                x += width
+            elif child.tag == "include":
+                include_layout = child.get(layout_attr)
+                if include_layout is None:
+                    continue
+                name = include_layout.split("/")[-1] + ".xml"
+                for spec in _read_row_key_specs(layout_dir / name):
+                    normalized = _normalize_letter(ord(spec))
+                    if normalized is not None:
+                        geo_keys.append(_GeoKey(normalized, row_index, x, x + row_width))
+                    x += row_width
+        row_index += 1
+    if not geo_keys:
+        raise TypoPackError("layout resources yielded no letter geometry")
+    return geo_keys
+
+
+def build_geometric_map(geo_keys: Sequence[_GeoKey]) -> dict[int, tuple[int, ...]]:
+    """Edit class #2 relation, verbatim from the contract and identical to KeyNeighborTable.
+
+    Keys of the same row (same top rank) that touch horizontally (shared vertical edge), plus keys
+    of an adjacent row (top rank differing by one) whose horizontal overlap is MORE than 35% of the
+    width of the narrower of the two. The 35% comparison is exact integer arithmetic.
+    """
+    distinct_tops = sorted({key.row for key in geo_keys})
+    rank = {top: index for index, top in enumerate(distinct_tops)}
+    adjacency: dict[int, set[int]] = {}
+    count = len(geo_keys)
+    for i in range(count):
+        first = geo_keys[i]
+        for j in range(i + 1, count):
+            second = geo_keys[j]
+            if first.code_point == second.code_point:
+                continue
+            rank_first = rank[first.row]
+            rank_second = rank[second.row]
+            connected = False
+            if rank_first == rank_second:
+                connected = first.right == second.left or second.right == first.left
+            elif abs(rank_first - rank_second) == 1:
+                overlap = min(first.right, second.right) - max(first.left, second.left)
+                if overlap > 0:
+                    min_width = min(first.right - first.left, second.right - second.left)
+                    connected = 100 * overlap > _GEOMETRIC_OVERLAP_PERCENT * min_width
+            if connected:
+                adjacency.setdefault(first.code_point, set()).add(second.code_point)
+                adjacency.setdefault(second.code_point, set()).add(first.code_point)
+    return {node: tuple(sorted(partners)) for node, partners in adjacency.items()}
+
+
+def read_layout_geometric_map(layout_dir: Path) -> dict[int, tuple[int, ...]]:
+    geometric_map = build_geometric_map(read_layout_geometry(layout_dir))
+    if not geometric_map:
+        raise TypoPackError("layout geometry yielded no geometric neighbour")
+    return geometric_map
+
+
+# --------------------------------------------------------------------------------------
 # Dictionary vocabulary, inflated and parsed from the committed asset.
 # --------------------------------------------------------------------------------------
 def read_dictionary_words(
@@ -417,6 +548,124 @@ def build_typo_set(
     )
 
 
+def build_geometric_typo_set(
+    words: Sequence[str],
+    geometric_map: dict[int, tuple[int, ...]],
+    *,
+    seed: int = TYPO_SEED,
+    prefix_code_points: int = PREFIX_CODE_POINTS,
+    max_rows: int | None = None,
+) -> TypoSet:
+    """Edit class #2: replace one prefix letter with a geometric keyboard neighbour.
+
+    For every word of at least ``prefix_code_points`` code points whose prefix window holds a letter
+    with a geometric neighbour, one ``(position, neighbour)`` choice is picked deterministically —
+    the same ``(seed, word)`` primitive as class #1 — and applied inside the prefix. Enumeration
+    order is position ascending, then neighbour code point ascending, matching the JVM test.
+    """
+    if prefix_code_points <= 0:
+        raise TypoPackError("prefix length must be positive")
+    rows: list[tuple[str, str]] = []
+    variant_counts: list[int] = []
+    scanned = 0
+    for word in words:
+        code_points = [ord(character) for character in word]
+        if len(code_points) < prefix_code_points:
+            continue
+        scanned += 1
+        eligible: list[tuple[int, int]] = []
+        for position in range(prefix_code_points):
+            for neighbour in geometric_map.get(code_points[position], ()):
+                eligible.append((position, neighbour))
+        if not eligible:
+            continue
+        position, neighbour = eligible[selection_index(word, len(eligible), seed=seed)]
+        typo_code_points = code_points[:prefix_code_points]
+        typo_code_points[position] = neighbour
+        typo_prefix = "".join(chr(cp) for cp in typo_code_points)
+        rows.append((word, typo_prefix))
+        variant_counts.append(_variant_count(typo_code_points, geometric_map))
+    return _finish_typo_set(rows, variant_counts, scanned, words, max_rows, "class #2")
+
+
+def build_transposition_typo_set(
+    words: Sequence[str],
+    *,
+    seed: int = TYPO_SEED,
+    prefix_code_points: int = PREFIX_CODE_POINTS,
+    max_rows: int | None = None,
+) -> TypoSet:
+    """Edit class #3: swap two adjacent prefix letters.
+
+    For every word of at least ``prefix_code_points`` code points whose prefix window holds at least
+    one distinct adjacent pair, one pair ``(i, i+1)`` is picked deterministically and swapped. Swaps
+    of two identical code points are ineligible (they reproduce the prefix). Enumeration order is the
+    left index ascending, matching the JVM test.
+    """
+    if prefix_code_points <= 0:
+        raise TypoPackError("prefix length must be positive")
+    rows: list[tuple[str, str]] = []
+    variant_counts: list[int] = []
+    scanned = 0
+    for word in words:
+        code_points = [ord(character) for character in word]
+        if len(code_points) < prefix_code_points:
+            continue
+        scanned += 1
+        eligible = [
+            i
+            for i in range(prefix_code_points - 1)
+            if code_points[i] != code_points[i + 1]
+        ]
+        if not eligible:
+            continue
+        pivot = eligible[selection_index(word, len(eligible), seed=seed)]
+        typo_code_points = code_points[:prefix_code_points]
+        typo_code_points[pivot], typo_code_points[pivot + 1] = (
+            typo_code_points[pivot + 1],
+            typo_code_points[pivot],
+        )
+        typo_prefix = "".join(chr(cp) for cp in typo_code_points)
+        rows.append((word, typo_prefix))
+        # A transposition prefix emits one distinct variant per distinct adjacent pair.
+        variant_counts.append(
+            sum(
+                1
+                for i in range(len(typo_code_points) - 1)
+                if typo_code_points[i] != typo_code_points[i + 1]
+            )
+        )
+    return _finish_typo_set(rows, variant_counts, scanned, words, max_rows, "class #3")
+
+
+def _finish_typo_set(
+    rows: list[tuple[str, str]],
+    variant_counts: list[int],
+    scanned: int,
+    words: Sequence[str],
+    max_rows: int | None,
+    label: str,
+) -> TypoSet:
+    if not rows:
+        raise TypoPackError(f"no dictionary word is eligible for a {label} typo")
+    limit = len(words) if max_rows is None else max_rows
+    if len(rows) > limit:
+        raise TypoGuardrailError(f"typo set has {len(rows)} rows; limit is {limit}")
+    text = "".join(f"{original}\t{typo}\n" for original, typo in rows)
+    data = text.encode("utf-8")
+    sorted_counts = sorted(variant_counts)
+    return TypoSet(
+        rows=tuple(rows),
+        text=text,
+        data=data,
+        eligible_count=len(rows),
+        scanned_count=scanned,
+        variant_p50=_percentile(sorted_counts, 0.50),
+        variant_p95=_percentile(sorted_counts, 0.95),
+        variant_max=sorted_counts[-1] if sorted_counts else 0,
+    )
+
+
 def generate(
     dictionary_path: Path,
     layout_dir: Path,
@@ -426,18 +675,32 @@ def generate(
     expected_entry_count: int = EXPECTED_ENTRY_COUNT,
     seed: int = TYPO_SEED,
     prefix_code_points: int = PREFIX_CODE_POINTS,
+    edit_class: int = 1,
 ) -> tuple[TypoSet, dict[int, tuple[int, ...]]]:
-    neighbor_map = read_layout_neighbor_map(layout_dir)
     words = read_dictionary_words(
         dictionary_path,
         expected_asset_sha256=expected_asset_sha256,
         expected_raw_sha256=expected_raw_sha256,
         expected_entry_count=expected_entry_count,
     )
-    typo_set = build_typo_set(
-        words, neighbor_map, seed=seed, prefix_code_points=prefix_code_points
-    )
-    return typo_set, neighbor_map
+    if edit_class == 1:
+        neighbor_map = read_layout_neighbor_map(layout_dir)
+        typo_set = build_typo_set(
+            words, neighbor_map, seed=seed, prefix_code_points=prefix_code_points
+        )
+        return typo_set, neighbor_map
+    if edit_class == 2:
+        geometric_map = read_layout_geometric_map(layout_dir)
+        typo_set = build_geometric_typo_set(
+            words, geometric_map, seed=seed, prefix_code_points=prefix_code_points
+        )
+        return typo_set, geometric_map
+    if edit_class == 3:
+        typo_set = build_transposition_typo_set(
+            words, seed=seed, prefix_code_points=prefix_code_points
+        )
+        return typo_set, {}
+    raise TypoPackError(f"unknown edit class {edit_class}")
 
 
 # --------------------------------------------------------------------------------------
@@ -476,10 +739,17 @@ def _pairs_json(neighbor_map: dict[int, tuple[int, ...]]) -> list[dict[str, obje
 def create_argument_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest="command", required=True)
-    build = commands.add_parser("build", help="generate the class #1 typo set")
+    build = commands.add_parser("build", help="generate the class #1/#2/#3 typo set")
     build.add_argument("--dictionary", type=Path, required=True)
     build.add_argument("--layout-dir", type=Path, required=True)
     build.add_argument("--output", type=Path, required=True)
+    build.add_argument(
+        "--edit-class",
+        type=int,
+        choices=(1, 2, 3),
+        default=1,
+        help="1 = long-press partner (default), 2 = geometric neighbour, 3 = adjacent transposition",
+    )
     return parser
 
 
@@ -502,11 +772,12 @@ def main(argv: Sequence[str] | None = None) -> int:
                 expected_entry_count=EXPECTED_ENTRY_COUNT,
                 seed=TYPO_SEED,
                 prefix_code_points=PREFIX_CODE_POINTS,
+                edit_class=args.edit_class,
             )
             write_atomic(args.output, typo_set.data)
             _print_json(
                 {
-                    "edit_class": 1,
+                    "edit_class": args.edit_class,
                     "eligible_count": typo_set.eligible_count,
                     "long_press_pairs": _pairs_json(neighbor_map),
                     "prefix_code_points": PREFIX_CODE_POINTS,
