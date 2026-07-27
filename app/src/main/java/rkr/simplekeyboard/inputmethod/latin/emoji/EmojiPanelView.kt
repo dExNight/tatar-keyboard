@@ -21,13 +21,20 @@ import android.content.res.Configuration
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
+import android.graphics.Rect
+import android.os.Bundle
 import android.util.AttributeSet
 import android.util.TypedValue
 import android.view.MotionEvent
 import android.view.VelocityTracker
 import android.view.View
 import android.view.ViewConfiguration
+import android.view.accessibility.AccessibilityEvent
+import android.view.accessibility.AccessibilityManager
 import android.widget.OverScroller
+import androidx.core.view.ViewCompat
+import androidx.core.view.accessibility.AccessibilityNodeInfoCompat
+import androidx.customview.widget.ExploreByTouchHelper
 import kotlin.math.abs
 import rkr.simplekeyboard.inputmethod.R
 
@@ -81,6 +88,13 @@ class EmojiPanelView @JvmOverloads constructor(
 
         // VelocityTracker reports velocity in px per this many milliseconds.
         private const val VELOCITY_UNITS = 1000
+
+        // Accessibility virtual-view id space. Cell ids are the compact cell index (0 until
+        // entryCount, at most ~1389), so the tab and functional-key ids sit far above any cell id
+        // and can never collide with one.
+        private const val TAB_ID_BASE = 1_000_000
+        private const val BACK_ID = 2_000_000
+        private const val DELETE_ID = 2_000_001
     }
 
     private val state = EmojiPanelState()
@@ -129,7 +143,19 @@ class EmojiPanelView @JvmOverloads constructor(
     private var barLabelBaseline = 0f
     private var barTabBaseline = 0f
     private var tabLabels: Array<String> = emptyArray()
+
+    // The category name of each tab, kept alongside [tabLabels] so the accessibility delegate can
+    // read a localized tab description without recomputing any geometry of its own.
+    private var tabNames: Array<String> = emptyArray()
+
+    // True while a fling is animating, so a single "scroll finished" accessibility refresh fires on
+    // the frame the scroller settles rather than on every frame.
+    private var flingActive = false
     private var listener: Listener? = null
+
+    private val accessibilityManager =
+        context.getSystemService(Context.ACCESSIBILITY_SERVICE) as AccessibilityManager
+    private val accessibilityHelper = EmojiPanelAccessibilityHelper()
 
     private val deleteRepeatRunnable = object : Runnable {
         override fun run() {
@@ -159,6 +185,8 @@ class EmojiPanelView @JvmOverloads constructor(
         activeTabPaint.color = withAlpha(labelPaint.color, ACTIVE_TAB_ALPHA)
         state.setColumns(currentColumns())
         state.setCellMetrics(minCellPx, maxCellPx, bottomBarPx)
+        importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_YES
+        ViewCompat.setAccessibilityDelegate(this, accessibilityHelper)
     }
 
     fun setListener(listener: Listener?) {
@@ -171,7 +199,11 @@ class EmojiPanelView @JvmOverloads constructor(
         state.setSnapshot(snapshot)
         val count = snapshot.categoryCount
         tabLabels = Array(count) { snapshot.entryAt(it, 0) }
+        tabNames = Array(count) { snapshot.categoryName(it) }
         invalidate()
+        // A rebind resets the active category to 0 and rebuilds the whole grid, so the virtual-node
+        // tree changed; refresh it, but only while a screen reader is actually exploring.
+        invalidateAccessibilityRootIfExploring()
     }
 
     /** Matches the panel to the current keyboard height so insets stay identical to the keyboard. */
@@ -186,10 +218,34 @@ class EmojiPanelView @JvmOverloads constructor(
     fun release() {
         cancelDeleteRepeat()
         scroller.forceFinished(true)
+        flingActive = false
         recycleVelocityTracker()
         state.cancelGesture()
         listener = null
         visibility = GONE
+        invalidateAccessibilityRootIfExploring()
+    }
+
+    /**
+     * Frees the bound snapshot and per-layout caches under memory pressure
+     * ([rkr.simplekeyboard.inputmethod.latin.LatinIME] `MSG_DEALLOCATE_MEMORY`, 10 s) or when input
+     * finishes. The panel allocates no offscreen buffer, so there is nothing else to free; the
+     * reusable paints and the single [scroller] stay. The controller keeps the one prepared snapshot
+     * for the whole process (it is never re-prepared), so the next show simply re-binds it through
+     * [setSnapshot]. A no-op while the panel is visible, so it never blanks a shown grid.
+     */
+    fun releaseSnapshotCaches() {
+        if (visibility == VISIBLE) {
+            return
+        }
+        cancelDeleteRepeat()
+        scroller.forceFinished(true)
+        flingActive = false
+        state.cancelGesture()
+        state.setSnapshot(EmojiSetSnapshot.EMPTY)
+        tabLabels = emptyArray()
+        tabNames = emptyArray()
+        invalidateAccessibilityRootIfExploring()
     }
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
@@ -212,17 +268,25 @@ class EmojiPanelView @JvmOverloads constructor(
         val barCenter = state.barTop() + bottomBarPx / 2f
         barLabelBaseline = barCenter - (labelFontMetrics.ascent + labelFontMetrics.descent) / 2f
         barTabBaseline = barCenter - (tabFontMetrics.ascent + tabFontMetrics.descent) / 2f
+        invalidateAccessibilityRootIfExploring()
     }
 
     override fun computeScroll() {
         super.computeScroll()
-        if (!scroller.computeScrollOffset()) {
+        if (scroller.computeScrollOffset()) {
+            // Physics live in EmojiFling: clamp the scroller's position into range, then keep
+            // animating until the scroller settles. onDraw still paints only the visible rows.
+            flingActive = true
+            state.setScrollY(EmojiFling.clampScroll(scroller.currY, state.maxScrollY()))
+            postInvalidateOnAnimation()
             return
         }
-        // Physics live in EmojiFling: clamp the scroller's position into range, then keep animating
-        // until the scroller settles. onDraw still paints only the visible rows.
-        state.setScrollY(EmojiFling.clampScroll(scroller.currY, state.maxScrollY()))
-        postInvalidateOnAnimation()
+        if (flingActive) {
+            // The fling just settled: the visible-cell set is final, so refresh the virtual-node
+            // tree exactly once, and only while a screen reader is exploring.
+            flingActive = false
+            invalidateAccessibilityRootIfExploring()
+        }
     }
 
     override fun onDraw(canvas: Canvas) {
@@ -346,6 +410,11 @@ class EmojiPanelView @JvmOverloads constructor(
                     event.getY(pointerIndex),
                 )
                 invalidate()
+                // A drag-scroll that did not turn into a fling has finished here; refresh the a11y
+                // tree once (the fling path refreshes from computeScroll when the scroller settles).
+                if (wasScrolling && scroller.isFinished) {
+                    invalidateAccessibilityRootIfExploring()
+                }
                 dispatchTarget(target)
                 return true
             }
@@ -374,11 +443,17 @@ class EmojiPanelView @JvmOverloads constructor(
         super.onDetachedFromWindow()
     }
 
+    override fun dispatchHoverEvent(event: MotionEvent): Boolean =
+        accessibilityHelper.dispatchHoverEvent(event) || super.dispatchHoverEvent(event)
+
     private fun dispatchTarget(target: Int) {
         when {
             EmojiPanelState.isCell(target) -> listener?.onEmojiPanelPick(state.entryAt(target))
             EmojiPanelState.isBack(target) -> listener?.onEmojiPanelBackToKeyboard()
-            EmojiPanelState.isTab(target) -> if (state.setActiveCategory(EmojiPanelState.tabIndexOf(target))) invalidate()
+            EmojiPanelState.isTab(target) -> if (state.setActiveCategory(EmojiPanelState.tabIndexOf(target))) {
+                invalidate()
+                invalidateAccessibilityRootIfExploring()
+            }
             // Delete already fired on ACTION_DOWN through the auto-repeat; nothing to do on up.
         }
     }
@@ -436,4 +511,246 @@ class EmojiPanelView @JvmOverloads constructor(
 
     private fun withAlpha(color: Int, alpha: Int): Int =
         Color.argb(alpha, Color.red(color), Color.green(color), Color.blue(color))
+
+    // --- Accessibility ------------------------------------------------------------------------
+
+    /**
+     * Refreshes the ExploreByTouchHelper virtual-node tree, but only while touch exploration is on
+     * — the single gate behind every panel invalidateRoot, exactly as the suggestion strip keeps
+     * its rare announcements behind the same check. The panel calls this on a category change and
+     * once a scroll settles; it never fires during an in-progress scroll or when no screen reader
+     * is exploring.
+     */
+    private fun invalidateAccessibilityRootIfExploring() {
+        if (accessibilityManager.isTouchExplorationEnabled) {
+            accessibilityHelper.invalidateRoot()
+        }
+    }
+
+    /**
+     * Runs a virtual node's activation through the SAME listener path a finger tap uses, so a click
+     * from a screen reader never adds a second insertion or deletion route: a cell goes through
+     * [Listener.onEmojiPanelPick] (-> `LatinIME.onTextInput`), delete through
+     * [Listener.onEmojiPanelDelete] (-> `LatinIME.onCodeInput`), back through
+     * [Listener.onEmojiPanelBackToKeyboard], and a tab switches the active category. Returns true
+     * when it did something.
+     */
+    private fun activateForAccessibility(target: Int): Boolean = when {
+        EmojiPanelState.isCell(target) -> {
+            listener?.onEmojiPanelPick(state.entryAt(target))
+            true
+        }
+        EmojiPanelState.isBack(target) -> {
+            listener?.onEmojiPanelBackToKeyboard()
+            true
+        }
+        EmojiPanelState.isDelete(target) -> {
+            listener?.onEmojiPanelDelete()
+            true
+        }
+        EmojiPanelState.isTab(target) -> {
+            if (state.setActiveCategory(EmojiPanelState.tabIndexOf(target))) {
+                invalidate()
+                invalidateAccessibilityRootIfExploring()
+            }
+            true
+        }
+        else -> false
+    }
+
+    /** Scrolls one grid viewport for a root ACTION_SCROLL_FORWARD/BACKWARD; true when it moved. */
+    private fun scrollOneViewport(forward: Boolean): Boolean {
+        val viewport = state.gridViewportHeight()
+        if (viewport <= 0 || state.maxScrollY() <= 0) {
+            return false
+        }
+        val moved = state.scrollBy(if (forward) viewport else -viewport)
+        if (moved) {
+            invalidate()
+            invalidateAccessibilityRootIfExploring()
+        }
+        return moved
+    }
+
+    /** Localized spoken name of a tab category; the raw slug is the fail-safe fallback. */
+    private fun categoryContentDescription(categoryName: String): CharSequence {
+        val resId = when (categoryName) {
+            EmojiDisplaySnapshots.RECENT_CATEGORY_NAME -> R.string.spoken_emoji_category_recent
+            "smileys-emotion" -> R.string.spoken_emoji_category_smileys
+            "people-body" -> R.string.spoken_emoji_category_people
+            "animals-nature" -> R.string.spoken_emoji_category_animals
+            "food-drink" -> R.string.spoken_emoji_category_food
+            "travel-places" -> R.string.spoken_emoji_category_travel
+            "activities" -> R.string.spoken_emoji_category_activities
+            "objects" -> R.string.spoken_emoji_category_objects
+            "symbols" -> R.string.spoken_emoji_category_symbols
+            "flags" -> R.string.spoken_emoji_category_flags
+            else -> return categoryName
+        }
+        return context.getString(resId)
+    }
+
+    /**
+     * The panel's [ExploreByTouchHelper], modelled on `SuggestionStripView`'s delegate. Its virtual
+     * views are ONLY the visible cells, the category tabs and the two functional keys — the exact
+     * set [EmojiPanelState.virtualNodeCount] counts — enumerated from the same hit-tests and
+     * geometry the touch path uses, with no second geometry of its own. A cell's contentDescription
+     * is the emoji sequence itself: the phase deliberately ships no emoji-name database (no Tatar
+     * CLDR names exist and shipping English/Russian names would be the worst option), so how a
+     * screen reader voices the sequence is left to the system. Tabs and functional keys get
+     * localized descriptions. A node click runs the same action as a finger tap through
+     * [activateForAccessibility], and the root node exposes ACTION_SCROLL_FORWARD/BACKWARD.
+     */
+    private inner class EmojiPanelAccessibilityHelper :
+        ExploreByTouchHelper(this@EmojiPanelView) {
+        private val tempBounds = Rect()
+
+        override fun getVirtualViewAt(x: Float, y: Float): Int =
+            targetToVirtualId(state.targetAt(x, y))
+
+        override fun getVisibleVirtualViews(virtualViewIds: MutableList<Int>) {
+            // Visible cells: the same first/last visible row range the grid draws, so the node set
+            // matches what is on screen and never exposes a scrolled-off cell.
+            val columns = state.columnCount()
+            if (columns > 0) {
+                val firstRow = state.firstVisibleRow()
+                val lastRow = state.lastVisibleRow()
+                if (lastRow >= firstRow) {
+                    var index = firstRow * columns
+                    val end = ((lastRow + 1) * columns).coerceAtMost(state.entryCount())
+                    while (index < end) {
+                        virtualViewIds.add(index)
+                        index++
+                    }
+                }
+            }
+            // Category tabs, then the two functional keys.
+            var tab = 0
+            val tabs = state.tabCount()
+            while (tab < tabs) {
+                virtualViewIds.add(TAB_ID_BASE + tab)
+                tab++
+            }
+            virtualViewIds.add(BACK_ID)
+            virtualViewIds.add(DELETE_ID)
+        }
+
+        override fun onPopulateNodeForHost(node: AccessibilityNodeInfoCompat) {
+            node.className = View::class.java.name
+            if (state.maxScrollY() > 0) {
+                node.isScrollable = true
+                node.addAction(AccessibilityNodeInfoCompat.ACTION_SCROLL_FORWARD)
+                node.addAction(AccessibilityNodeInfoCompat.ACTION_SCROLL_BACKWARD)
+            }
+        }
+
+        override fun onPopulateNodeForVirtualView(
+            virtualViewId: Int,
+            node: AccessibilityNodeInfoCompat,
+        ) {
+            node.className = android.widget.Button::class.java.name
+            when {
+                virtualViewId == BACK_ID -> {
+                    node.contentDescription =
+                        context.getString(R.string.spoken_description_to_alpha)
+                    boundsOfSlot(0, tempBounds)
+                }
+                virtualViewId == DELETE_ID -> {
+                    node.contentDescription = context.getString(R.string.spoken_description_delete)
+                    boundsOfSlot(state.slotCount() - 1, tempBounds)
+                }
+                virtualViewId >= TAB_ID_BASE -> {
+                    val tab = virtualViewId - TAB_ID_BASE
+                    node.contentDescription =
+                        categoryContentDescription(tabNames.getOrElse(tab) { "" })
+                    boundsOfSlot(tab + 1, tempBounds)
+                }
+                virtualViewId in 0 until state.entryCount() -> {
+                    // The cell's spoken description is the sequence itself; no name database ships.
+                    node.contentDescription = state.entryAt(virtualViewId)
+                    boundsOfCell(virtualViewId, tempBounds)
+                }
+                else -> {
+                    node.contentDescription = ""
+                    tempBounds.set(0, 0, 1, 1)
+                    node.setBoundsInParent(tempBounds)
+                    return
+                }
+            }
+            node.setBoundsInParent(tempBounds)
+            node.addAction(AccessibilityNodeInfoCompat.ACTION_CLICK)
+            node.isClickable = true
+            node.isEnabled = true
+        }
+
+        override fun onPerformActionForVirtualView(
+            virtualViewId: Int,
+            action: Int,
+            arguments: Bundle?,
+        ): Boolean {
+            if (action != AccessibilityNodeInfoCompat.ACTION_CLICK) {
+                return false
+            }
+            if (!activateForAccessibility(virtualIdToTarget(virtualViewId))) {
+                return false
+            }
+            sendEventForVirtualView(virtualViewId, AccessibilityEvent.TYPE_VIEW_CLICKED)
+            return true
+        }
+
+        private fun targetToVirtualId(target: Int): Int = when {
+            EmojiPanelState.isCell(target) -> target
+            EmojiPanelState.isBack(target) -> BACK_ID
+            EmojiPanelState.isDelete(target) -> DELETE_ID
+            EmojiPanelState.isTab(target) -> TAB_ID_BASE + EmojiPanelState.tabIndexOf(target)
+            else -> INVALID_ID
+        }
+
+        private fun virtualIdToTarget(virtualViewId: Int): Int = when {
+            virtualViewId == BACK_ID -> EmojiPanelState.BACK_TARGET
+            virtualViewId == DELETE_ID -> EmojiPanelState.DELETE_TARGET
+            virtualViewId >= TAB_ID_BASE ->
+                EmojiPanelState.TAB_TARGET_BASE - (virtualViewId - TAB_ID_BASE)
+            virtualViewId in 0 until state.entryCount() -> virtualViewId
+            else -> EmojiPanelState.NO_TARGET
+        }
+
+        private fun boundsOfCell(index: Int, out: Rect) {
+            val columns = state.columnCount().coerceAtLeast(1)
+            val column = index % columns
+            val row = index / columns
+            val cellHeight = state.cellHeight()
+            val top = row * cellHeight - state.scrollY()
+            out.set(
+                state.columnLeft(column),
+                top,
+                state.columnRight(column),
+                top + cellHeight,
+            )
+        }
+
+        private fun boundsOfSlot(slot: Int, out: Rect) {
+            out.set(
+                state.slotLeft(slot),
+                state.barTop(),
+                state.slotRight(slot),
+                this@EmojiPanelView.height,
+            )
+        }
+    }
+
+    /**
+     * Root scroll actions from a screen reader. ExploreByTouchHelper routes host-node actions back
+     * through this view, so handling ACTION_SCROLL_FORWARD/BACKWARD here scrolls the grid by one
+     * viewport through the same [EmojiPanelState] the touch path uses.
+     */
+    override fun performAccessibilityAction(action: Int, arguments: Bundle?): Boolean {
+        when (action) {
+            AccessibilityNodeInfoCompat.ACTION_SCROLL_FORWARD ->
+                if (scrollOneViewport(forward = true)) return true
+            AccessibilityNodeInfoCompat.ACTION_SCROLL_BACKWARD ->
+                if (scrollOneViewport(forward = false)) return true
+        }
+        return super.performAccessibilityAction(action, arguments)
+    }
 }

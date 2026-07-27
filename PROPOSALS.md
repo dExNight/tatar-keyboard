@@ -340,6 +340,17 @@ selection, subtype, generation и букв после курсора перед 
   `SuggestionsControllerTest.externalSelectionChangeWhileEligibleReservesAndNeverHides`,
   `staleResultDroppedWhenSelectionChangedBumpsSession`,
   `internalCursorGestureUnbindsDisplayedCandidates`.
+- строка «панель эмодзи показана» (условная) —
+  `SuggestionsControllerEmojiPanelBandStateTest`:
+  `panelShownWhileEligibleKeepsBandReservedEmptyInertAndDoesNoLookup` (показ панели приходит в
+  контроллер через идемпотентный `onSelectionChanged()`; при eligible-поле полоса остаётся
+  reserved той же высоты, что и до показа, все ячейки пусты и inert, lookup не выполняется —
+  `engine.request` не вызывается, `engine.finishInput()` вызывается, displayed-кандидаты
+  отвязаны, поэтому тап по полосе — no-op) и
+  `panelShownWhileIneligibleDoesNotMakeTheBandVisible` (при настройке OFF, запрещающем
+  privacy-гейте или нетатарском subtype — все три сводятся к `eligible == false` в
+  `SuggestionsController` — показ панели полосу видимой не делает: `reserve` не вызывается,
+  полоса остаётся `GONE`).
 
 Не покрыто JVM-тестами и заявляется только как проверка чтением исходника или на
 устройстве: guard `hasSelection()` внутри `InputLogic.commitChosenSuggestion` (Android-класс

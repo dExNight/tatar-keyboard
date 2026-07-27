@@ -456,6 +456,24 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions,
             mKeyboardView.cancelAllOngoingEvents();
             mKeyboardView.deallocateMemory();
         }
+        releaseEmojiPanelCaches();
+    }
+
+    /**
+     * Frees the emoji panel's bound snapshot and per-layout caches under memory pressure
+     * ({@code MSG_DEALLOCATE_MEMORY}, 10 s) or when input finished. The panel holds no offscreen
+     * {@code Bitmap}, so there is nothing else to free; the controller keeps the single prepared
+     * snapshot for the process, so the next show re-binds it. Skipped while the panel is the shown
+     * surface so it never blanks a live grid.
+     */
+    public void releaseEmojiPanelCaches() {
+        if (mEmojiPanelShown || mCurrentInputView == null) {
+            return;
+        }
+        final EmojiPanelView panel = mCurrentInputView.getEmojiPanelView();
+        if (panel != null) {
+            panel.releaseSnapshotCaches();
+        }
     }
 
     public View onCreateInputView() {

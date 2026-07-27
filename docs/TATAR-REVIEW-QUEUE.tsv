@@ -16,3 +16,13 @@ E2b-1	spoken_description_emoji	app/src/main/res/values-tt/strings-a11y.xml	Emoji
 E2b-3	clear_recent_emoji	app/src/main/res/values-tt/strings.xml	Clear recent emoji	Соңгы эмодзиләрне чистарту	pending			Название пункта настроек и заголовок диалога стирания недавних эмодзи.
 E2b-3	clear_recent_emoji_confirm	app/src/main/res/values-tt/strings.xml	Remove all recently used emoji stored on this device? This cannot be undone.	Бу җиһазда сакланган барлык соңгы эмодзиләрне бетерергәме? Бу гамәлне кире кайтарып булмый.	pending			Тело диалога подтверждения стирания недавних эмодзи.
 E2b-3	clear_recent_emoji_action	app/src/main/res/values-tt/strings.xml	Clear	Чистарту	pending			Подпись подтверждающей кнопки диалога стирания; требуется глагол действия, не «OK».
+E2c	spoken_emoji_category_recent	app/src/main/res/values-tt/strings-a11y.xml	Recently used	Соңгы кулланылганнар	pending			Вкладка «Недавние» на панели эмодзи (TalkBack).
+E2c	spoken_emoji_category_smileys	app/src/main/res/values-tt/strings-a11y.xml	Smileys and emotion	Елмаюлар һәм хисләр	pending			Вкладка категории смайлов на панели эмодзи (TalkBack).
+E2c	spoken_emoji_category_people	app/src/main/res/values-tt/strings-a11y.xml	People and body	Кешеләр һәм тән	pending			Вкладка «Люди и жесты» на панели эмодзи (TalkBack).
+E2c	spoken_emoji_category_animals	app/src/main/res/values-tt/strings-a11y.xml	Animals and nature	Хайваннар һәм табигать	pending			Вкладка «Животные и природа» на панели эмодзи (TalkBack).
+E2c	spoken_emoji_category_food	app/src/main/res/values-tt/strings-a11y.xml	Food and drink	Ашамлык һәм эчемлек	pending			Вкладка «Еда и напитки» на панели эмодзи (TalkBack).
+E2c	spoken_emoji_category_travel	app/src/main/res/values-tt/strings-a11y.xml	Travel and places	Сәяхәт һәм урыннар	pending			Вкладка «Путешествия и места» на панели эмодзи (TalkBack).
+E2c	spoken_emoji_category_activities	app/src/main/res/values-tt/strings-a11y.xml	Activities	Шөгыльләр	pending			Вкладка «Занятия» на панели эмодзи (TalkBack).
+E2c	spoken_emoji_category_objects	app/src/main/res/values-tt/strings-a11y.xml	Objects	Әйберләр	pending			Вкладка «Предметы» на панели эмодзи (TalkBack).
+E2c	spoken_emoji_category_symbols	app/src/main/res/values-tt/strings-a11y.xml	Symbols	Символлар	pending			Вкладка «Символы» на панели эмодзи (TalkBack).
+E2c	spoken_emoji_category_flags	app/src/main/res/values-tt/strings-a11y.xml	Flags	Флаглар	pending			Вкладка «Флаги» на панели эмодзи (TalkBack).

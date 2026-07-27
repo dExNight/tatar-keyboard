@@ -1022,6 +1022,9 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         if (mEmojiPanelController != null) {
             mEmojiPanelController.onFinishInputView();
         }
+        // The panel frees its bound snapshot and layout caches when input finishes, too (it holds
+        // no offscreen Bitmap); the controller keeps the single prepared snapshot for a re-bind.
+        mKeyboardSwitcher.releaseEmojiPanelCaches();
     }
 
     protected void deallocateMemory() {

@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+     E2b-3 — backup closed as a whitelist, legacy format for API 24–30
+     (android:fullBackupContent). Same meaning as res/xml/data_extraction_rules.xml.
+
+     Whitelist, not blacklist: NO allowing (<include>) element. Every data domain of the
+     app — regular AND device-protected: files, SharedPreferences, databases, external
+     storage — is excluded WHOLE, so any file a future phase adds is closed by default,
+     not by a rule someone must remember to write. Individual paths (personal/,
+     dictionaries/, the "recent emoji" medium) are deliberately NOT listed.
+
+     On API 24–30 there is no device-to-device edition to distinguish; this single
+     <full-backup-content> governs Auto Backup, which by default also includes
+     device-protected SharedPreferences — hence the device_* domains are excluded too.
+
+     The exact XML shape is recorded and justified in docs/DICTIONARY-E2.md.
+-->
+<full-backup-content>
+    <exclude domain="file" />
+    <exclude domain="database" />
+    <exclude domain="sharedpref" />
+    <exclude domain="external" />
+    <exclude domain="device_file" />
+    <exclude domain="device_database" />
+    <exclude domain="device_sharedpref" />
+</full-backup-content>

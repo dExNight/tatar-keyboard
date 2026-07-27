@@ -68,4 +68,18 @@
 
     <!-- Тәкъдимнәр барлыкка килгәндә тавышландырыла; %s — тәкъдимнәр исемлеге. -->
     <string name="spoken_suggestions_available">Тәкъдимнәр бар: %s</string>
+
+    <!-- Эмодзи панеле вкладкалары исемнәре (TalkBack). Ячейкалар үзләре эзлеклелек белән
+         тавышландырыла (эмодзи исемнәре базасы юк); вкладкалар һәм ике функциональ төймә генә
+         локальләштерелә («АБВ» — spoken_description_to_alpha, бетерү — spoken_description_delete). -->
+    <string name="spoken_emoji_category_recent">Соңгы кулланылганнар</string>
+    <string name="spoken_emoji_category_smileys">Елмаюлар һәм хисләр</string>
+    <string name="spoken_emoji_category_people">Кешеләр һәм тән</string>
+    <string name="spoken_emoji_category_animals">Хайваннар һәм табигать</string>
+    <string name="spoken_emoji_category_food">Ашамлык һәм эчемлек</string>
+    <string name="spoken_emoji_category_travel">Сәяхәт һәм урыннар</string>
+    <string name="spoken_emoji_category_activities">Шөгыльләр</string>
+    <string name="spoken_emoji_category_objects">Әйберләр</string>
+    <string name="spoken_emoji_category_symbols">Символлар</string>
+    <string name="spoken_emoji_category_flags">Флаглар</string>
 </resources>

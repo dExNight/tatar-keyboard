@@ -71,4 +71,19 @@
 
     <!-- Announced when word suggestions become available; %s is the joined suggestion list. -->
     <string name="spoken_suggestions_available">Suggestions available: %s</string>
+
+    <!-- Emoji-panel category tab names (TalkBack). The emoji cells themselves carry the sequence
+         as their contentDescription (the phase ships no emoji-name database); only the tabs and the
+         two functional keys ("АБВ" reuses spoken_description_to_alpha, delete reuses
+         spoken_description_delete) are named. -->
+    <string name="spoken_emoji_category_recent">Recently used</string>
+    <string name="spoken_emoji_category_smileys">Smileys and emotion</string>
+    <string name="spoken_emoji_category_people">People and body</string>
+    <string name="spoken_emoji_category_animals">Animals and nature</string>
+    <string name="spoken_emoji_category_food">Food and drink</string>
+    <string name="spoken_emoji_category_travel">Travel and places</string>
+    <string name="spoken_emoji_category_activities">Activities</string>
+    <string name="spoken_emoji_category_objects">Objects</string>
+    <string name="spoken_emoji_category_symbols">Symbols</string>
+    <string name="spoken_emoji_category_flags">Flags</string>
 </resources>

@@ -18,7 +18,6 @@ package rkr.simplekeyboard.inputmethod.latin.settings
 
 import android.app.Activity
 import android.app.AlertDialog
-import android.app.backup.BackupManager
 import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.content.SharedPreferences
@@ -66,8 +65,12 @@ import rkr.simplekeyboard.inputmethod.latin.utils.SubtypeLocaleUtils
  * (SubScreenFragment / the settings fragments / InputMethodSettingsImpl /
  * LanguagesSettingsFragment / SingleLanguageSettingsFragment):
  *  - device-protected SharedPreferences via [PreferenceManagerCompat]
- *  - [BackupManager.dataChanged] after every preference change (subtype
- *    changes flow through the same prefs file, so they are covered too)
+ *  - the legacy harness scheduled a backup after every preference change;
+ *    that is deliberately NOT carried over. E2b-3 turns backup off
+ *    (android:allowBackup="false") and excludes every app data domain from
+ *    both backup editions (res/xml/data_extraction_rules.xml for API 31+,
+ *    res/xml/backup_rules.xml for 24–30), so a per-change backup request
+ *    would have nothing to back up and is gone
  *  - enterprise restrictions ([Settings.ACTIVE_RESTRICTIONS]) disable rows
  *  - dependency chains: sound volume ⇢ sound_on, IME switch ⇢ language key
  *  - [KeyboardLayoutSet.onKeyboardThemeChanged] for the number-row and
@@ -116,14 +119,14 @@ class SettingsHostActivity : Activity() {
 
     /**
      * Registered on the device-protected prefs exactly like
-     * SubScreenFragment.onCreate: schedule a backup on every change, and
-     * clear the keyboard layout cache for the two keys whose legacy
-     * fragments did so. Everything else reaches the live keyboard through
-     * the Settings singleton's own listener on the same prefs file.
+     * SubScreenFragment.onCreate, minus its backup request: E2b-3 disables
+     * backup entirely, so the only job left here is to clear the keyboard
+     * layout cache for the keys whose legacy fragments did so. Everything
+     * else reaches the live keyboard through the Settings singleton's own
+     * listener on the same prefs file.
      */
     private val prefChangeListener =
         SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
-            BackupManager(this).dataChanged()
             if (Settings.PREF_SHOW_NUMBER_ROW == key
                     || Settings.PREF_SHOW_EMOJI_KEY == key
                     || Settings.PREF_SHOW_SPECIAL_CHARS == key) {
