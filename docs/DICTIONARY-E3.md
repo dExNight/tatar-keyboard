@@ -372,6 +372,12 @@ required by acceptance. Zero allocations per variant are preserved — the exist
 
 ## 5. recovery@3 after E3b and verdict
 
+> **История — до правки ранжирования (class-agnostic frequency).** Числа этого раздела
+> (combined **4.8350 %**, class #1 под полным движком **4.6272 %**) измерены до поправки к
+> контракту «внутри нечёткого уровня вводится порядок по классу правки» (2026-07-27, вторая к
+> этому пункту). Пере-калибровка после правки — в разделе «# E3b — recovery@3 после правки
+> ранжирования по классу правки» в конце документа. Раздел оставлен как есть для истории.
+
 Test: `E3bRecoveryCalibrationTest.recoveryAtThreeAfterE3b`. Methodology as fixed by the
 contract amendment: typo inside the 3-code-point prefix window; denominator = the **whole**
 combined set (class #1 + #2 + #3 rows); the full engine (all three classes) looks up each typo
@@ -520,3 +526,256 @@ The 22-everyday-prefix fuzzy deltas after E3b are in `docs/DICTIONARY-E3-TYPO-RE
 `pending`; on all 22 correctly-typed prefixes the E3b fuzzy pass adds **zero** inexact
 candidates — no noise on correct input). One summary reference row remains in
 `docs/TATAR-REVIEW-QUEUE.tsv`.
+
+---
+
+# E3b — recovery@3 после правки ранжирования по классу правки
+
+Дата: 2026-07-27. Раздел — пере-калибровка recovery@3 после **поправки к контракту (вторая
+к этому пункту)**: «внутри нечёткого уровня вводится порядок по классу правки: сначала класс
+№1 (long-press партнёр), затем №2 (геометрический сосед), затем №3 (перестановка); внутри
+одного класса — прежний порядок frequency desc, затем Unicode code-point asc. Точный уровень
+остаётся выше любого нечёткого и его правило не меняется.» Числа §5 выше — история (до правки).
+
+## Что изменилось в коде
+
+Единственный правленый production-файл — `TdictPrefixIndex.kt`. Внутри нечёткого уровня перед
+частотой добавлен ключ **класс правки**, несомый примитивом `int` (`EDIT_CLASS_LONG_PRESS=1`,
+`EDIT_CLASS_GEOMETRIC=2`, `EDIT_CLASS_TRANSPOSITION=3`; точные — `EDIT_CLASS_EXACT=0`). Класс
+кладётся в параллельный `IntArray`, аллоцированный один раз в конструкторе; на вариант — ноль
+аллокаций (существующий `perLookupAllocationDoesNotDependOnTheNumberOfVariants` остаётся
+зелёным, `many <= 8` байт/lookup). `ranksBefore` теперь сравнивает класс (asc) → частоту (desc)
+→ кодпоинт (asc). Точный уровень не тронут: точные кандидаты живут в отдельном массиве, все
+несут `EDIT_CLASS_EXACT`, поэтому класс среди них — тождественная ничья, а точные всегда
+сливаются перед нечёткими.
+
+## Наборы, методика, seed, порог — НЕ менялись
+
+Наборы, генератор, seed (20260727), окно 3 кодпоинта, порог 2,4× = **17,4804 %** и допуск
+±1,0 п.п. взяты дословно из существующих тестов. Набор класса №1 остаётся байт-в-байт
+**SHA-256 `6a61b48db87ac0bbff78af48ea597b3af19f81dd42ae8deaa2d4c00a6c81dfc3`** (проверено
+`E3bRecoveryCalibrationTest.everyExtendedTypoSetIsByteIdenticalToTheGeneratorRun` и печатается
+в сырой строке E3a: `set_sha256=6a61b48…`). Ничего не подгонялось.
+
+## Сырые строки замеров (после правки)
+
+`E3bRecoveryCalibrationTest` — recovery@3 по объединённому набору классов №1–№3 (порог
+≥ 17,4804 %):
+
+```
+E3b recovery@3 seed=20260727 prefix_cp=3 combined_set=286681 recovered=13966 recovery@3=4.8716% baseline_exact_only=0.0000% class1_set=87375 class1_recovery@3=7.2835% class2_set=99659 class2_recovery@3=4.8556% class3_set=99647 class3_recovery@3=2.7728% class1_reference=7.2835% threshold=2.4x=17.4804% verdict=BELOW variant_p50=14 variant_p95=16 variant_max=19 visited_p50=112 visited_p95=546 visited_max=1800 over_budget=0 offline_ref_variant_p95=33 offline_ref_visited_p95=133
+```
+
+`E3aRecoveryCalibrationTest` — recovery@3 на опечатках ТОЛЬКО класса №1 (порог не ниже
+7,2835 % в пределах ±1,0 п.п.):
+
+```
+E3a recovery@3 class#1 seed=20260727 prefix_cp=3 set=87375 recovered=6364 recovery@3=7.2835% baseline_exact_only=0.0000% fuzzy_fired=49155 recovery@3_when_fuzzy_fired=12.9468% variant_p50=2 variant_p95=3 variant_max=6 contract=14.2% delta=-6.9165pp within_1.0pp=false set_sha256=6a61b48db87ac0bbff78af48ea597b3af19f81dd42ae8deaa2d4c00a6c81dfc3
+```
+
+## Вердикт по каждому условию отдельно
+
+| Условие | Порог | После правки | Вердикт |
+|---|---|---:|---|
+| (а) recovery@3 по объединённому набору №1–№3 | ≥ 17,4804 % | **4,8716 %** (13 966 / 286 681) | **BELOW** — не выполнено |
+| (б) recovery@3 только на классе №1 | ≥ 7,2835 % (±1,0 п.п.) | **7,2835 %** (6 364 / 87 375), Δ = 0,0 п.п. | **PASS** — выполнено |
+
+**ОБА условия одновременно — НЕ выполнены** (условие (а) провалено). Приёмка этой правки
+строже обычной и требует ОБОИХ; следовательно правило контракта об этом случае вступает в
+силу: «классы №2 и №3 из поставляемого нечёткого прохода исключаются, а вывод „расширение
+классов правок под этим ранжированием пользы не даёт“ записывается письменно». Решение — за
+оркестратором; здесь фиксируются числа и диагноз, ничего не подгоняется.
+
+## Диагноз — почему объединённый набор не дотянул
+
+Динамика по классам (полный движок, до → после правки ранжирования):
+
+| Класс | Набор | recovery@3 до (class-agnostic) | recovery@3 после (class-ordered) | Δ |
+|---|---:|---:|---:|---:|
+| №1 long-press | 87 375 | 4,6272 % | **7,2835 %** | **+2,66 п.п.** |
+| №2 геометрический | 99 659 | 4,7663 % | **4,8556 %** | +0,09 п.п. |
+| №3 перестановка | 99 647 | 5,0860 % | **2,7728 %** | **−2,31 п.п.** |
+| **объединённый** | 286 681 | 4,8350 % | **4,8716 %** | +0,04 п.п. |
+
+Правка сделала ровно то, что обещала для класса №1: восстановление на опечатках класса №1
+вернулось с 4,6272 % (полный движок, class-agnostic) к **7,2835 %** — в точности к значению
+самой E3a, потому что кандидаты класса №1 теперь заполняют пустые ячейки первыми и не
+вытесняются частыми словами из вариантов классов №2/№3. **Побочный эффект и есть причина
+недобора:** порядок по классу фиксирован №1 > №2 > №3 независимо от того, к какому классу
+принадлежит фактическая опечатка. Для опечатки класса №3 (перестановка) правильное слово
+находится вариантом класса №3, но его ранг теперь ниже шумовых кандидатов классов №1 и №2 из
+тех же ≤ 3 ячеек, поэтому его восстановление падает 5,0860 % → 2,7728 %. Выигрыш класса №1
+(+2 320 слов) почти точно гасится потерей класса №3 (−2 305 слов), и объединённое число
+остаётся ~4,87 %, на порядок ниже порога 17,4804 %.
+
+Фундаментальная причина недостижимости порога — не ранжирование, а то, что офлайн-модель,
+предсказавшая 41,2 % (и породившая порог 2,4×), не моделировала конкуренцию ~14 вариантов на
+запрос за ≤ 3 ячейки; та же модель уже ошиблась на классе №1 (предсказывала 14,2 %, измерено
+7,2835 %). Порядок по классу возвращает сигнал «ближайшего варианта» только когда приоритет
+класса совпадает с фактическим классом опечатки — то есть помогает классу №1 и почти не
+трогает №2, но вредит №3. Порог 17,4804 % под любым ранжированием, не имеющим сигнала
+близости к набранному per-query, на 3-кодпоинтных префиксах не достигается.
+
+Замечание для истории: на текущем HEAD *до* этой правки существующий `E3aRecoveryCalibrationTest`
+печатал уже не 7,2835 %, а 6,6175 % — потому что в E3b в движок добавились классы №2/№3, и
+перестановочный шум вытеснял часть восстановлений класса №1 под общей частотой. Правка
+ранжирования вернула этот тест ровно к 7,2835 % (см. §4), что и служит независимым
+подтверждением условия (б).
+
+## APK delta
+
+Измерено `./gradlew :app:assembleRelease --offline`
+(`app/build/outputs/apk/release/app-release.apk`), `stat -f %z`.
+
+| Артефакт | Байт |
+|---|---:|
+| post-E2 baseline (дано) | 1 478 015 |
+| post-E3a | 1 480 299 |
+| post-E3b (до правки ранжирования) | 1 481 235 |
+| **post правки ранжирования (измерено)** | **1 481 399** |
+| дельта над предыдущим E3b | **+164** |
+| **дельта фазы E3 над post-E2** | **+3 384** |
+| бюджет фазы E3 | ≤ 15 360 |
+
++164 Б — это ключ класса правки (два `IntArray` в конструкторе, поле-примитив, сравнение по
+классу). Ни ассета, ни разрешения не добавлено.
+
+## Тесты
+
+| | JVM (`:app:testDebugUnitTest`) |
+|---|---:|
+| до этой правки | 438 |
+| добавлено здесь | **4** |
+| после | **442** |
+| failures / errors | 0 |
+| skipped | **0** |
+
+Четыре теста — `TdictPrefixIndexEditClassRankingTest` (условие (3) процедуры, по одному на пункт
+поправки): `class1CandidateAlwaysOutranksClass2CandidateAtAnyFrequency`,
+`withinOneClassTheOrderIsFrequencyDescendingThenCodePointAscending`,
+`anExactCandidateAlwaysOutranksAnyFuzzyCandidate`,
+`withASingleEditClassTheOrderMatchesE3a`. Ни один не `@Ignore`d и не skipped — сумма
+`<testsuite>` `tests`/`skipped` по `app/build/test-results/testDebugUnitTest/*.xml` = **442 / 0**.
+Существующие тесты не менялись: аллокационный
+`TdictPrefixIndexFuzzyTest.perLookupAllocationDoesNotDependOnTheNumberOfVariants`, четыре
+поимённых E3a-теста ранжирования и все E3b-тесты остались зелёными без правок (в их фикстурах
+конкурирующие нечёткие кандидаты принадлежат одному классу, поэтому новый ключ порядок не
+меняет). `assembleDebug`, `lintVitalRelease`, `assembleRelease` — BUILD SUCCESSFUL, всё offline.
+
+---
+
+# Отключение классов №2 и №3 от поставляемого нечёткого прохода (2026-07-27)
+
+Всё выше — история: калибровки E3a/E3b, правка ранжирования и её замеры остаются как есть.
+Этот раздел фиксирует **поставляемое** решение по итогу вердикта оркестратора (PROPOSALS.md,
+раздел «Контракт текста», строка «Итог, 2026-07-27»): оба условия приёмки E3b не выполнены,
+поэтому **классы №2 (геометрический сосед) и №3 (перестановка) исключаются из поставляемого
+нечёткого прохода; правка ранжирования остаётся**.
+
+## Что именно поставляется
+
+Нечёткий проход **только класса №1** (long-press партнёр). Поведение и число — ровно E3a:
+recovery@3 = **7,2835 %** при базовой линии 0,0000 %. Класс №1 работает как раньше; правило
+регистра, отсечения по три ячейки, порог 3 кодпоинта, exact-word exclusion и весь путь тапа не
+затронуты.
+
+## Одно место переключения
+
+Переключатель — **одна** именованная константа в `TdictPrefixIndex`:
+
+```kotlin
+internal val SHIPPED_FUZZY_EDIT_CLASSES = intArrayOf(EDIT_CLASS_LONG_PRESS)
+```
+
+`collectFuzzy` запускает генератор класса только если его `EDIT_CLASS_*` входит в этот набор;
+класс №1 входит, классы №2 и №3 — нет, поэтому они **недостижимы с живого пути `lookup()`**. Ни
+нового состояния, ни пользовательского тумблера не заведено. Вернуть №2/№3 на живой путь — это
+однострочное изменение этого набора. Source-contract тест
+`TdictPrefixIndexShippedFuzzyClassesTest.theShippedFuzzyPassEnablesOnlyEditClassOne` читает эту
+константу и утверждает, что включён ровно класс №1.
+
+## Что осталось инфраструктурой (код не удалён, продолжает покрываться тестами)
+
+- генераторы вариантов №2/№3 — `FuzzyPrefixVariants.generateGeometricVariants` /
+  `generateTranspositionVariants` (прямые тесты `FuzzyPrefixVariantsE3bTest` — зелёные);
+- геометрическая карта соседства — `KeyNeighborTable.geometricNeighborsOf`,
+  `KeyNeighborTableBuilder`, фикстура `E3bTestFixtures` (тесты `KeyNeighborTableGeometryTest` —
+  зелёные);
+- порядок по классу правки в `ranksBefore` (класс asc → частота desc → кодпоинт asc) — сохранён
+  без изменений; при единственном поставляемом классе это тождественная ничья, из-за чего
+  восстановление класса №1 инвариантно к присутствию №2/№3 (см. ниже);
+- инструментальный харнесс `app/src/androidTest` — `E3bComputeInstrumentationTest` (компилируется
+  и пакуется в `:app:assembleDebugAndroidTest`; на устройстве по-прежнему меряет классы №1+№2+№3
+  с живой геометрией — от вердикта по качеству не зависит);
+- калибровочные наборы №2/№3 строятся напрямую из карты соседства и по-прежнему проверяются
+  байт-в-байт (`E3bRecoveryCalibrationTest.everyExtendedTypoSetIsByteIdenticalToTheGeneratorRun`).
+
+## Итоговые числа (перемерено существующими калибровочными тестами)
+
+**Поставляемое поведение — recovery@3 на опечатках класса №1 (`E3aRecoveryCalibrationTest`):**
+
+```
+E3a recovery@3 class#1 seed=20260727 prefix_cp=3 set=87375 recovered=6364 recovery@3=7.2835% baseline_exact_only=0.0000% fuzzy_fired=49155 recovery@3_when_fuzzy_fired=12.9468% variant_p50=2 variant_p95=3 variant_max=6 contract=14.2% delta=-6.9165pp within_1.0pp=false set_sha256=6a61b48db87ac0bbff78af48ea597b3af19f81dd42ae8deaa2d4c00a6c81dfc3
+```
+
+recovery@3 = **7,2835 %** — ровно значение E3a, отклонение 0,0 п.п. Правка ранжирования
+гарантирует эту инвариантность: кандидаты класса №1 всегда ранжируются выше любого №2/№3, поэтому
+их удаление с живого пути не меняет ни одной ячейки, занятой кандидатом класса №1.
+
+**Диагностическое — recovery@3 по объединённому набору №1–№3 через тот же поставляемый путь
+(`E3bRecoveryCalibrationTest`):**
+
+```
+E3b recovery@3 seed=20260727 prefix_cp=3 combined_set=286681 recovered=6402 recovery@3=2.2331% baseline_exact_only=0.0000% class1_set=87375 class1_recovery@3=7.2835% class2_set=99659 class2_recovery@3=0.0381% class3_set=99647 class3_recovery@3=0.0000% class1_reference=7.2835% threshold=2.4x=17.4804% verdict=BELOW variant_p50=2 variant_p95=3 variant_max=6 visited_p50=0 visited_p95=168 visited_max=609 over_budget=0 offline_ref_variant_p95=33 offline_ref_visited_p95=133
+```
+
+Объединённое recovery@3 = **2,2331 %** (диагностическое, не критерий приёмки). Классы №2/№3 больше
+не генерируются на живом пути, поэтому их наборы почти не восстанавливаются (class2 = 0,0381 %,
+остаточное перекрытие через класс №1; class3 = 0,0000 %), а класс №1 остаётся 7,2835 %. Для
+сравнения — историческое число полного движка до отключения было 4,8716 % (см. раздел «Сырые
+строки замеров (после правки)» выше). `over_budget=0`.
+
+## Тесты (это изменение)
+
+| | JVM (`:app:testDebugUnitTest`) |
+|---|---:|
+| до этого изменения | 442 |
+| добавлено здесь | **4** |
+| после | **446** |
+| failures / errors | 0 |
+| skipped | **0** |
+
+Добавлены (source-contract + функциональные), файл `TdictPrefixIndexShippedFuzzyClassesTest`:
+`theShippedFuzzyPassEnablesOnlyEditClassOne` (в поставляемом наборе — только класс №1, видно в
+одном названном месте), `onAClass2PrefixTheShippedResultEqualsTheClass1OnlyResult`,
+`onAClass3PrefixTheShippedResultEqualsTheClass1OnlyResult` (на префиксе, где №2/№3 дали бы
+совпадающий вариант, живой результат = результат только-№1), `class1StillRecoversWhileItsClass2SiblingIsDropped`.
+
+Тесты, проверявшие живой путь с №2/№3 и приведённые к новому решению:
+`TdictPrefixIndexE3bTest.geometricNeighbourTypoIsRecoveredIntoAnEmptyCell` →
+`geometricNeighbourTypoIsNotRecoveredBecauseClass2IsOffTheShippedPath`;
+`transpositionTypoIsRecoveredIntoAnEmptyCell` →
+`transpositionTypoIsNotRecoveredBecauseClass3IsOffTheShippedPath`; а также реформулированы
+`exactCandidatesAreNeverShiftedByTheGeometricOrTranspositionPasses`,
+`aWordReachableByTwoClassesStillOccupiesOnlyOneCell`, `theResultIsDeterministicAcrossManyRepeats`;
+`TdictPrefixIndexEditClassRankingTest.class1CandidateAlwaysOutranksClass2CandidateAtAnyFrequency` →
+`theClass2CandidateNeverAppearsBecauseClass2IsOffTheShippedPath` (класс №2 больше не появляется на
+живом пути — гарантия сильнее прежней). Прямые тесты генераторов №2/№3 и геометрии не менялись и
+остались зелёными.
+
+## APK delta
+
+Измерено `./gradlew :app:assembleRelease --offline`, `stat -f %z`.
+
+| Артефакт | Байт |
+|---|---:|
+| post-E2 baseline (дано) | 1 478 015 |
+| post правки ранжирования (до отключения) | 1 481 399 |
+| **post отключения классов №2/№3 (измерено)** | **1 481 503** |
+| дельта над предыдущим | **+104** |
+| **дельта над post-E2 baseline** | **+3 488** |
+| бюджет фазы E3 | ≤ 15 360 |
+
++104 Б — набор `SHIPPED_FUZZY_EDIT_CLASSES` и три проверки принадлежности в `collectFuzzy`. Ни
+ассета, ни разрешения не добавлено. `assembleDebug`, `assembleDebugAndroidTest`,
+`lintVitalRelease`, `assembleRelease` — BUILD SUCCESSFUL, всё offline.

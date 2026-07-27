@@ -4,7 +4,17 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** Engine integration of edit classes #2 (geometric neighbour) and #3 (adjacent transposition). */
+/**
+ * Engine (shipped live path) behaviour for edit classes #2 (geometric neighbour) and #3 (adjacent
+ * transposition) after the E3b verdict (PROPOSALS.md, section "Контракт текста", line "Итог,
+ * 2026-07-27"; docs/DICTIONARY-E3.md): both classes are excluded from the shipped fuzzy pass
+ * ([TdictPrefixIndex.SHIPPED_FUZZY_EDIT_CLASSES]) and are therefore unreachable through lookup().
+ * Their generators stay in the tree as infrastructure and are still exercised directly by
+ * [FuzzyPrefixVariantsE3bTest]; only class #1 (long-press partner) runs on the live path.
+ *
+ * The geometric table is used precisely so the disabled classes WOULD have contributed — the tests
+ * assert they do not.
+ */
 class TdictPrefixIndexE3bTest {
     private val table = E3bTestFixtures.tatarNeighborTable()
 
@@ -18,43 +28,46 @@ class TdictPrefixIndexE3bTest {
         index.lookup(ImmutableUtf8Prefix.copyOf(prefix.toByteArray(Charsets.UTF_8)))
 
     @Test
-    fun geometricNeighbourTypoIsRecoveredIntoAnEmptyCell() {
-        // "аит" is "кит" with к mistyped as its geometric neighbour а. The class #2 pass substitutes
-        // а back to к (а's geometric neighbours are в к п с), scans "кит*" and surfaces "китап".
+    fun geometricNeighbourTypoIsNotRecoveredBecauseClass2IsOffTheShippedPath() {
+        // "аит" is "кит" with к mistyped as its geometric neighbour а. Class #2 (geometric) would
+        // substitute а back to к (а's geometric neighbours are в к п с) and surface "китап", but
+        // class #2 is excluded from the shipped fuzzy pass, so the live lookup recovers nothing.
         val index = index(listOf("китап" to 10L))
-        assertEquals(listOf("китап"), lookup(index, "аит"))
+        assertEquals(emptyList<String>(), lookup(index, "аит"))
     }
 
     @Test
-    fun transpositionTypoIsRecoveredIntoAnEmptyCell() {
-        // "икт" is "кит" with к and и swapped. The class #3 pass swaps them back to "кит".
+    fun transpositionTypoIsNotRecoveredBecauseClass3IsOffTheShippedPath() {
+        // "икт" is "кит" with к and и swapped. Class #3 (transposition) would swap them back and
+        // surface "китап", but class #3 is excluded from the shipped fuzzy pass, so the live lookup
+        // recovers nothing.
         val index = index(listOf("китап" to 10L))
-        assertEquals(listOf("китап"), lookup(index, "икт"))
+        assertEquals(emptyList<String>(), lookup(index, "икт"))
     }
 
     @Test
-    fun exactCandidatesAreNeverShiftedByTheGeometricOrTranspositionPasses() {
-        // "кита" has one exact continuation (китап); the fuzzy classes only fill the two cells the
-        // exact pass left empty and never move the exact candidate off the front.
+    fun theExactCandidateIsKeptFirstAndTheDisabledClassesAddNothing() {
+        // "кита" has one exact continuation (китап); the shipped fuzzy pass (class #1 only) finds no
+        // long-press variant of "кита" that matches a word, so the result is the exact candidate
+        // alone, never shifted. Any class #2/#3 continuation is excluded by the gate, not by luck.
         val index = index(
             listOf(
                 // Code-point sorted, as the tdict fixture requires.
                 "кита" to 20L,    // == typed word, excluded
                 "китап" to 10L,   // exact continuation of "кита"
-                "кутап" to 9L,    // a fuzzy-reachable word — must stay after the exact candidate
+                "кутап" to 9L,    // not on the class-#1 path — must not appear
             ),
         )
-        val result = lookup(index, "кита")
-        assertEquals("китап", result[0])
-        assertTrue(result.isNotEmpty())
+        assertEquals(listOf("китап"), lookup(index, "кита"))
     }
 
     @Test
-    fun aWordReachableByTwoClassesStillOccupiesOnlyOneCell() {
-        // "китап" is reachable from "кит"-family variants of several classes; de-duplication by
-        // dictionary index guarantees it never fills two cells.
-        val index = index(listOf("китап" to 10L))
-        val result = lookup(index, "икт")
+    fun aClass1LongPressTypoIsRecoveredAndNeverDuplicated() {
+        // "кум" is "күм" with ү mistyped as its long-press base у. Class #1 (у→ү) recovers "күмеш";
+        // de-duplication by dictionary index guarantees it never fills two cells.
+        val index = index(listOf("күмеш" to 10L))
+        val result = lookup(index, "кум")
+        assertEquals(listOf("күмеш"), result)
         assertEquals(result.distinct(), result)
     }
 
@@ -99,8 +112,8 @@ class TdictPrefixIndexE3bTest {
 
     @Test
     fun theResultIsDeterministicAcrossManyRepeats() {
-        val index = index(listOf("китап" to 10L, "китаплар" to 4L, "кутап" to 9L))
-        val first = lookup(index, "икт")
-        repeat(1000) { assertEquals(first, lookup(index, "икт")) }
+        val index = index(listOf("күмеш" to 10L, "күмешле" to 4L))
+        val first = lookup(index, "кум")
+        repeat(1000) { assertEquals(first, lookup(index, "кум")) }
     }
 }

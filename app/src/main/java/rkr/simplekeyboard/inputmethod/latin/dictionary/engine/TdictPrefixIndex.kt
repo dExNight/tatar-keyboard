@@ -92,8 +92,14 @@ internal class TdictPrefixIndex private constructor(
     private val codePointScratch = IntArray(MAX_PREFIX_BYTES)
     private val rankedIndices = IntArray(MAX_RESULTS)
     private val rankedFrequencies = LongArray(MAX_RESULTS)
+    // Edit class carried alongside every ranked slot as a plain primitive int — no boxing, no
+    // collection. Exact candidates all carry EDIT_CLASS_EXACT, so the class key is a no-op tie on
+    // the exact level and its frozen order is unchanged; fuzzy candidates carry their generating
+    // class (#1/#2/#3) so the fuzzy level orders by class first (see [ranksBefore]).
+    private val rankedClasses = IntArray(MAX_RESULTS)
     private val fuzzyIndices = IntArray(MAX_RESULTS)
     private val fuzzyFrequencies = LongArray(MAX_RESULTS)
+    private val fuzzyClasses = IntArray(MAX_RESULTS)
 
     @Volatile
     private var neighborTable: KeyNeighborTable? = null
@@ -115,6 +121,11 @@ internal class TdictPrefixIndex private constructor(
     private var fuzzyVisited = 0
     private var fuzzyOverBudget = false
     private var fuzzyPrefixLength = 0
+
+    // The edit class of the variant pass currently running (EDIT_CLASS_LONG_PRESS/GEOMETRIC/
+    // TRANSPOSITION). A plain int, set before each class's generator runs and read by
+    // scanVariantBlock so every fuzzy candidate is tagged with the class that produced it.
+    private var fuzzyCurrentClass = EDIT_CLASS_LONG_PRESS
 
     // Allocated once, so neither a lambda nor any object is created per lookup or per variant.
     private val fuzzyConsumer =
@@ -172,17 +183,28 @@ internal class TdictPrefixIndex private constructor(
         for (index in start until end) {
             if (wordEquals(index, exactScratch, prefixLength)) continue
             resultCount = insertRanked(
-                rankedIndices, rankedFrequencies, resultCount, MAX_RESULTS,
-                index, frequencyAt(index),
+                rankedIndices, rankedFrequencies, rankedClasses, resultCount, MAX_RESULTS,
+                index, frequencyAt(index), EDIT_CLASS_EXACT,
             )
         }
         return resultCount
     }
 
     /**
-     * Fills the cells the exact pass left empty with the best fuzzy candidates, ranked among
-     * themselves by the same rule (frequency descending, then code-point lexical ascending). Exact
-     * candidates are never touched. Returns the total candidate count.
+     * Fills the cells the exact pass left empty with the best fuzzy candidates. Within the fuzzy
+     * level the order is edit class first (class #1 long-press partner, then #2 geometric
+     * neighbour, then #3 transposition), and only inside one class the frozen tie-break
+     * (frequency descending, then code-point lexical ascending). Exact candidates are never
+     * touched and always outrank any fuzzy candidate. Returns the total candidate count.
+     *
+     * WHICH edit classes run on the shipped live path is decided in EXACTLY ONE named place —
+     * [SHIPPED_FUZZY_EDIT_CLASSES]. E3b measured both acceptance conditions unmet (PROPOSALS.md,
+     * section "Контракт текста", line "Итог, 2026-07-27"; docs/DICTIONARY-E3.md), so only class #1
+     * (long-press partner) ships. Classes #2 (geometric neighbour) and #3 (transposition) are
+     * excluded from this live path and are therefore unreachable through lookup(); their generators
+     * below stay in the tree as infrastructure and remain covered by direct-generator tests. A
+     * class runs here only if its EDIT_CLASS_* value is in the shipped set — there is no per-request
+     * state and no user-facing toggle.
      *
      * The whole fuzzy level is dropped (returns [exactCount]) if variant generation or the block
      * scan trips a fixed budget: the level is discarded in full, never in part.
@@ -194,42 +216,61 @@ internal class TdictPrefixIndex private constructor(
         fuzzyVisited = 0
         fuzzyOverBudget = false
         fuzzyPrefixLength = prefixLength
-        // Classes #1, #2 and #3 share one variant budget: the total number of variants generated
-        // across all three must stay within MAX_FUZZY_VARIANTS, and the class edit type never
-        // affects ranking. Any single class returning -1 (its slice of the budget exceeded) drops
-        // the whole fuzzy level, never a part of it.
-        val classOne = FuzzyPrefixVariants.generateLongPressVariants(
-            exactScratch, prefixLength, table, codePointScratch, variantScratch,
-            MAX_FUZZY_VARIANTS, fuzzyConsumer,
-        )
-        if (classOne < 0 || fuzzyOverBudget) {
-            lastFuzzyOverBudget = true
-            lastFuzzyVisitedCount = fuzzyVisited
-            return exactCount
+        // The enabled classes share one variant budget: the total number of variants generated
+        // across all of them must stay within MAX_FUZZY_VARIANTS. The edit class DOES affect ranking
+        // (class #1 before #2 before #3, then frequency inside a class); each candidate is tagged
+        // with fuzzyCurrentClass, set below before its class runs. Any single class returning -1
+        // (its slice of the budget exceeded) drops the whole fuzzy level, never a part of it.
+        var variantsUsed = 0
+
+        if (EDIT_CLASS_LONG_PRESS in SHIPPED_FUZZY_EDIT_CLASSES) {
+            fuzzyCurrentClass = EDIT_CLASS_LONG_PRESS
+            val emitted = FuzzyPrefixVariants.generateLongPressVariants(
+                exactScratch, prefixLength, table, codePointScratch, variantScratch,
+                MAX_FUZZY_VARIANTS - variantsUsed, fuzzyConsumer,
+            )
+            if (emitted < 0 || fuzzyOverBudget) {
+                lastFuzzyOverBudget = true
+                lastFuzzyVisitedCount = fuzzyVisited
+                return exactCount
+            }
+            variantsUsed += emitted
         }
-        val classTwo = FuzzyPrefixVariants.generateGeometricVariants(
-            exactScratch, prefixLength, table, codePointScratch, variantScratch,
-            MAX_FUZZY_VARIANTS - classOne, fuzzyConsumer,
-        )
-        if (classTwo < 0 || fuzzyOverBudget) {
-            lastFuzzyOverBudget = true
-            lastFuzzyVisitedCount = fuzzyVisited
-            return exactCount
+
+        if (EDIT_CLASS_GEOMETRIC in SHIPPED_FUZZY_EDIT_CLASSES) {
+            fuzzyCurrentClass = EDIT_CLASS_GEOMETRIC
+            val emitted = FuzzyPrefixVariants.generateGeometricVariants(
+                exactScratch, prefixLength, table, codePointScratch, variantScratch,
+                MAX_FUZZY_VARIANTS - variantsUsed, fuzzyConsumer,
+            )
+            if (emitted < 0 || fuzzyOverBudget) {
+                lastFuzzyOverBudget = true
+                lastFuzzyVisitedCount = fuzzyVisited
+                return exactCount
+            }
+            variantsUsed += emitted
         }
-        val classThree = FuzzyPrefixVariants.generateTranspositionVariants(
-            exactScratch, prefixLength, codePointScratch, variantScratch,
-            MAX_FUZZY_VARIANTS - classOne - classTwo, fuzzyConsumer,
-        )
-        if (classThree < 0 || fuzzyOverBudget) {
-            lastFuzzyOverBudget = true
-            lastFuzzyVisitedCount = fuzzyVisited
-            return exactCount
+
+        if (EDIT_CLASS_TRANSPOSITION in SHIPPED_FUZZY_EDIT_CLASSES) {
+            fuzzyCurrentClass = EDIT_CLASS_TRANSPOSITION
+            val emitted = FuzzyPrefixVariants.generateTranspositionVariants(
+                exactScratch, prefixLength, codePointScratch, variantScratch,
+                MAX_FUZZY_VARIANTS - variantsUsed, fuzzyConsumer,
+            )
+            if (emitted < 0 || fuzzyOverBudget) {
+                lastFuzzyOverBudget = true
+                lastFuzzyVisitedCount = fuzzyVisited
+                return exactCount
+            }
+            variantsUsed += emitted
         }
-        lastFuzzyVariantCount = classOne + classTwo + classThree
+
+        lastFuzzyVariantCount = variantsUsed
         lastFuzzyVisitedCount = fuzzyVisited
         for (slot in 0 until fuzzyCount) {
             rankedIndices[exactCount + slot] = fuzzyIndices[slot]
             rankedFrequencies[exactCount + slot] = fuzzyFrequencies[slot]
+            rankedClasses[exactCount + slot] = fuzzyClasses[slot]
         }
         return exactCount + fuzzyCount
     }
@@ -247,14 +288,16 @@ internal class TdictPrefixIndex private constructor(
                 return
             }
             // Exact-word exclusion applies on both levels: never suggest the typed word itself.
-            // A word is de-duplicated by dictionary index so it can never occupy two cells.
+            // A word is de-duplicated by dictionary index so it can never occupy two cells. Because
+            // classes run in order (#1, then #2, then #3), the first class to reach a word keeps it,
+            // which is also its best (lowest) class — consistent with the class-first ranking.
             if (!wordEquals(index, exactScratch, fuzzyPrefixLength) &&
                 !containsIndex(rankedIndices, fuzzyExactCount, index) &&
                 !containsIndex(fuzzyIndices, fuzzyCount, index)
             ) {
                 fuzzyCount = insertRanked(
-                    fuzzyIndices, fuzzyFrequencies, fuzzyCount, fuzzyRemaining,
-                    index, frequencyAt(index),
+                    fuzzyIndices, fuzzyFrequencies, fuzzyClasses, fuzzyCount, fuzzyRemaining,
+                    index, frequencyAt(index), fuzzyCurrentClass,
                 )
             }
             index++
@@ -265,14 +308,20 @@ internal class TdictPrefixIndex private constructor(
     private fun insertRanked(
         indices: IntArray,
         frequencies: LongArray,
+        classes: IntArray,
         count: Int,
         capacity: Int,
         candidateIndex: Int,
         candidateFrequency: Long,
+        candidateClass: Int,
     ): Int {
         var insertion = count
         for (slot in 0 until count) {
-            if (ranksBefore(candidateIndex, candidateFrequency, indices[slot], frequencies[slot])) {
+            if (ranksBefore(
+                    candidateClass, candidateIndex, candidateFrequency,
+                    classes[slot], indices[slot], frequencies[slot],
+                )
+            ) {
                 insertion = slot
                 break
             }
@@ -282,9 +331,11 @@ internal class TdictPrefixIndex private constructor(
         for (slot in newCount - 1 downTo insertion + 1) {
             indices[slot] = indices[slot - 1]
             frequencies[slot] = frequencies[slot - 1]
+            classes[slot] = classes[slot - 1]
         }
         indices[insertion] = candidateIndex
         frequencies[insertion] = candidateFrequency
+        classes[insertion] = candidateClass
         return newCount
     }
 
@@ -350,11 +401,18 @@ internal class TdictPrefixIndex private constructor(
     }
 
     private fun ranksBefore(
+        candidateClass: Int,
         candidateIndex: Int,
         candidateFrequency: Long,
+        rankedClass: Int,
         rankedIndex: Int,
         rankedFrequency: Long,
     ): Boolean = when {
+        // Edit class first (ascending): #1 long-press < #2 geometric < #3 transposition. Exact
+        // candidates all share EDIT_CLASS_EXACT, so this key is a tie among them and their frozen
+        // order is untouched; only the fuzzy level, whose candidates carry distinct class values,
+        // is reordered by it.
+        candidateClass != rankedClass -> candidateClass < rankedClass
         candidateFrequency != rankedFrequency -> candidateFrequency > rankedFrequency
         else -> compareWords(candidateIndex, rankedIndex) < 0
     }
@@ -398,6 +456,30 @@ internal class TdictPrefixIndex private constructor(
         private const val MAX_RESULTS = 3
         internal const val MAX_PREFIX_BYTES = 128
         private const val MAX_U32 = 0xffff_ffffL
+
+        // Edit-class ranking keys, carried as plain ints. Exact candidates sort as EDIT_CLASS_EXACT
+        // (a tie on the exact level, whose order is unchanged); within the fuzzy level the ascending
+        // order is #1 long-press partner < #2 geometric neighbour < #3 transposition, applied ahead
+        // of frequency by [ranksBefore]. The exact level always outranks the fuzzy level regardless
+        // of these values, because exact and fuzzy candidates live in separate arrays and the exact
+        // ones are merged first.
+        private const val EDIT_CLASS_EXACT = 0
+        internal const val EDIT_CLASS_LONG_PRESS = 1
+        internal const val EDIT_CLASS_GEOMETRIC = 2
+        internal const val EDIT_CLASS_TRANSPOSITION = 3
+
+        // THE single switch that decides which edit classes reach the shipped fuzzy pass. E3b
+        // measured both of its acceptance conditions unmet — the combined recovery@3 of classes
+        // #1–#3 fell far below the 2.4x threshold — so classes #2 (geometric neighbour) and #3
+        // (transposition) are excluded from the shipped live path and only class #1 (long-press
+        // partner) ships. See PROPOSALS.md, section "Контракт текста", line "Итог, 2026-07-27", and
+        // docs/DICTIONARY-E3.md. The #2/#3 generators, geometry map and instrumentation harness stay
+        // in the tree as infrastructure and keep their direct tests; making them reachable again is
+        // a one-line change to this set (add EDIT_CLASS_GEOMETRIC / EDIT_CLASS_TRANSPOSITION) — there
+        // is deliberately no runtime state and no user-facing toggle. The ranking-by-edit-class order
+        // in [ranksBefore] is retained unchanged; with a single shipped class it is a constant tie,
+        // which is exactly why class #1 recovery is invariant to whether #2/#3 are present.
+        internal val SHIPPED_FUZZY_EDIT_CLASSES = intArrayOf(EDIT_CLASS_LONG_PRESS)
 
         // Fuzzy pass. Extra headroom on the variant buffer covers a re-encode that is a few bytes
         // longer than the prefix; edit classes #1/#2 (single-letter substitution) and #3
