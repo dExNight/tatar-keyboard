@@ -26,3 +26,4 @@ E2c	spoken_emoji_category_activities	app/src/main/res/values-tt/strings-a11y.xml
 E2c	spoken_emoji_category_objects	app/src/main/res/values-tt/strings-a11y.xml	Objects	Әйберләр	pending			Вкладка «Предметы» на панели эмодзи (TalkBack).
 E2c	spoken_emoji_category_symbols	app/src/main/res/values-tt/strings-a11y.xml	Symbols	Символлар	pending			Вкладка «Символы» на панели эмодзи (TalkBack).
 E2c	spoken_emoji_category_flags	app/src/main/res/values-tt/strings-a11y.xml	Flags	Флаглар	pending			Вкладка «Флаги» на панели эмодзи (TalkBack).
+E3a	DICTIONARY-E3-TYPO-REVIEW	docs/DICTIONARY-E3-TYPO-REVIEW.tsv	Fuzzy typo-recovery candidates (edit class #1) on 22 everyday prefixes	см. тематический файл	pending			Одна строка-ссылка на тематический TSV (контракт: одна строка-ссылка, без построчного дублирования). На 22 реальных префиксах нечёткий проход кандидатов не добавляет; см. docs/DICTIONARY-E3.md §5.
