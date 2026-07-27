@@ -26,6 +26,7 @@ import android.widget.FrameLayout;
 
 import rkr.simplekeyboard.inputmethod.R;
 import rkr.simplekeyboard.inputmethod.latin.emoji.EmojiPanelView;
+import rkr.simplekeyboard.inputmethod.latin.emoji.EmojiSetSnapshot;
 import rkr.simplekeyboard.inputmethod.latin.suggestions.SuggestionStripView;
 
 public final class InputView extends FrameLayout {
@@ -89,12 +90,14 @@ public final class InputView extends FrameLayout {
      * {@link rkr.simplekeyboard.inputmethod.keyboard.MainKeyboardView}; the two are never visible
      * at once.
      */
-    public EmojiPanelView showEmojiPanel(final int keyboardHeightPx) {
+    public EmojiPanelView showEmojiPanel(final int keyboardHeightPx,
+            final EmojiSetSnapshot snapshot) {
         final EmojiPanelView panel = getOrCreateEmojiPanelView();
         if (panel == null) {
             return null;
         }
         panel.setPanelHeightPx(keyboardHeightPx);
+        panel.setSnapshot(snapshot);
         if (panel.getVisibility() != VISIBLE) {
             panel.setVisibility(VISIBLE);
             notifyInsetsChanged();

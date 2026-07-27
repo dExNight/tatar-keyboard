@@ -71,6 +71,9 @@ import rkr.simplekeyboard.inputmethod.latin.common.Constants;
 import rkr.simplekeyboard.inputmethod.latin.define.DebugFlags;
 import rkr.simplekeyboard.inputmethod.latin.inputlogic.InputLogic;
 import rkr.simplekeyboard.inputmethod.latin.dictionary.storage.PublishedDictionaryCatalog;
+import rkr.simplekeyboard.inputmethod.latin.emoji.EmojiPanelController;
+import rkr.simplekeyboard.inputmethod.latin.emoji.EmojiSetSnapshot;
+import rkr.simplekeyboard.inputmethod.latin.emoji.EmojiSurface;
 import rkr.simplekeyboard.inputmethod.latin.settings.Settings;
 import rkr.simplekeyboard.inputmethod.latin.settings.SettingsActivity;
 import rkr.simplekeyboard.inputmethod.latin.settings.SettingsValues;
@@ -122,6 +125,9 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
 
     // Optional opt-in Tatar suggestions controller. Null until set up in onCreate().
     private SuggestionsController mSuggestionsController;
+
+    // Owns the emoji panel's single-per-process snapshot. Null until set up in onCreate().
+    private EmojiPanelController mEmojiPanelController;
 
     // Decides the one-shot offer to turn Tatar suggestions on. Null until set up in onCreate().
     private SuggestionsOfferController mSuggestionsOffer;
@@ -313,6 +319,7 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         mDevicePrefs = PreferenceManagerCompat.getDeviceSharedPreferences(this);
         setUpSuggestionsController();
         setUpSuggestionsOffer();
+        setUpEmojiPanelController();
         // Registered last: everything the handler touches exists by now, so it can never observe a
         // half-built service.
         mLastKnownTatarSuggestionsEnabled = Settings.readTatarSuggestionsEnabled(mDevicePrefs);
@@ -435,6 +442,29 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         mSuggestionsController = new SuggestionsController(
                 this, stripSurface, editorSurface, mHandler, engineFactory);
         mSuggestionsController.onCreate();
+    }
+
+    /**
+     * Wires the emoji panel controller. It builds nothing eagerly: the asset is not read and no
+     * glyph is probed here — the single per-process snapshot preparation is started only on the
+     * first emoji key press, on a background executor, never in onCreate() and never on the UI
+     * thread.
+     */
+    private void setUpEmojiPanelController() {
+        final EmojiSurface emojiSurface = new EmojiSurface() {
+            @Override
+            public void showPanel(final EmojiSetSnapshot snapshot) {
+                // Empty the suggestion strip through the idempotent path when the panel appears;
+                // its reserved height and visibility are unchanged and the D1 auto-space contract
+                // is untouched (the panel inserts only through onTextInput and the strip is inert
+                // while the panel is shown).
+                if (mSuggestionsController != null) {
+                    mSuggestionsController.onSelectionChanged();
+                }
+                mKeyboardSwitcher.showEmojiPanel(snapshot);
+            }
+        };
+        mEmojiPanelController = new EmojiPanelController(this, emojiSurface, mHandler);
     }
 
     /**
@@ -696,6 +726,9 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         if (mSuggestionsController != null) {
             mSuggestionsController.onDestroy();
         }
+        if (mEmojiPanelController != null) {
+            mEmojiPanelController.onDestroy();
+        }
         if (mDevicePrefs != null) {
             mDevicePrefs.unregisterOnSharedPreferenceChangeListener(mSuggestionsSettingListener);
         }
@@ -738,6 +771,11 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
 
     @Override
     public View onCreateInputView() {
+        // The input view is being (re)created (rotation, theme or height change): a deferred show
+        // for the old view must not fire. The panel's "was open" state never survives recreation.
+        if (mEmojiPanelController != null) {
+            mEmojiPanelController.onInputViewRecreated();
+        }
         return mKeyboardSwitcher.onCreateInputView();
     }
 
@@ -906,6 +944,11 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         if (mSuggestionsController != null) {
             mSuggestionsController.onStartInput(isTatarSuggestionsEligible());
         }
+        if (mEmojiPanelController != null) {
+            // A new editor session: a deferred emoji-panel show armed for the previous one must not
+            // fire now.
+            mEmojiPanelController.onEditorSessionChanged();
+        }
         if (mSuggestionsOffer != null) {
             // The boundary at which a deferred "could not turn suggestions on" message gets another
             // chance. It is not a trigger for the offer itself: showing the keyboard proves nothing
@@ -945,6 +988,9 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         super.onFinishInputView(finishingInput);
         if (mSuggestionsController != null) {
             mSuggestionsController.onFinishInput();
+        }
+        if (mEmojiPanelController != null) {
+            mEmojiPanelController.onFinishInputView();
         }
     }
 
@@ -1308,12 +1354,16 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
     }
 
     /**
-     * Shows the emoji panel in place of the keyboard. Called from the emoji key's functional event
-     * (see {@link rkr.simplekeyboard.inputmethod.latin.inputlogic.InputLogic}); it never edits the
-     * editor. The surface swap and insets are handled by the keyboard switcher.
+     * The emoji key was pressed. The emoji panel controller decides what happens: it starts the
+     * one-shot snapshot preparation on the first press and shows the panel once (or immediately, if
+     * the snapshot is already built). If preparation failed or produced no drawable entries, the
+     * key is a no-op and ordinary typing is unaffected. The surface swap and insets are handled by
+     * the keyboard switcher once the controller asks to show the panel.
      */
     public void showEmojiPanel() {
-        mKeyboardSwitcher.showEmojiPanel();
+        if (mEmojiPanelController != null) {
+            mEmojiPanelController.onEmojiKeyPressed();
+        }
     }
 
     private void loadKeyboard() {

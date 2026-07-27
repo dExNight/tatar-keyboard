@@ -37,6 +37,7 @@ import rkr.simplekeyboard.inputmethod.latin.LatinIME;
 import rkr.simplekeyboard.inputmethod.latin.RichInputMethodManager;
 import rkr.simplekeyboard.inputmethod.latin.common.Constants;
 import rkr.simplekeyboard.inputmethod.latin.emoji.EmojiPanelView;
+import rkr.simplekeyboard.inputmethod.latin.emoji.EmojiSetSnapshot;
 import rkr.simplekeyboard.inputmethod.latin.settings.Settings;
 import rkr.simplekeyboard.inputmethod.latin.settings.SettingsValues;
 import rkr.simplekeyboard.inputmethod.latin.utils.CapsModeUtils;
@@ -387,11 +388,12 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions,
      * content top inset is unchanged, and MainKeyboardView goes {@code GONE} so the two surfaces
      * are never visible at once.
      */
-    public void showEmojiPanel() {
+    public void showEmojiPanel(final EmojiSetSnapshot snapshot) {
         if (mKeyboardView == null || mCurrentInputView == null) {
             return;
         }
-        final EmojiPanelView panel = mCurrentInputView.showEmojiPanel(mKeyboardView.getHeight());
+        final EmojiPanelView panel = mCurrentInputView.showEmojiPanel(
+                mKeyboardView.getHeight(), snapshot);
         if (panel == null) {
             return;
         }
@@ -427,6 +429,15 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions,
         if (mLatinIME != null) {
             mLatinIME.onCodeInput(Constants.CODE_DELETE, Constants.NOT_A_COORDINATE,
                     Constants.NOT_A_COORDINATE, false);
+        }
+    }
+
+    // Implements {@link EmojiPanelView.Listener}. Insertion goes solely through the ordinary
+    // text-input path; the panel never commits text itself.
+    @Override
+    public void onEmojiPanelPick(final String sequence) {
+        if (mLatinIME != null) {
+            mLatinIME.onTextInput(sequence);
         }
     }
 
