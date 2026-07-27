@@ -255,11 +255,25 @@ PSS на реальном Samsung) и **E1d** (условная, включае�
   открытия при готовом снапшоте ≤ 100 мс — требуют покадрового `screenrecord` и `gfxinfo` на
   реальном устройстве; видимость вкладок и обеих функциональных клавиш при масштабе высоты
   50% в альбоме; холодный старт < 400 мс после E2.
-- [ ] **E2b-3:** fling через `OverScroller`, 24 «недавних» в порядке MRU в
+- [x] **E2b-3:** fling через `OverScroller`, 24 «недавних» в порядке MRU в
   credential-protected `noBackupFilesDir` под гейтом `UserManager.isUserUnlocked()` (в direct
   boot вкладки «Недавние» нет) И `IME_FLAG_NO_PERSONALIZED_LEARNING` (поле
   `InputAttributes.mNoPersonalizedLearning` заводится здесь, E4c его переиспользует) плюс
   правила резервного копирования и путь стирания «Очистить недавние эмодзи».
+  Гейт на 2026-07-27: обе сборки и `lintVitalRelease` зелёные, JVM-набор 317 → **371** теста
+  (0 failures / 0 errors / 0 skipped), `check-no-internet.sh` пройден на release-APK,
+  release-APK **1 470 911 Б** — накопленный прирост за E2 **19 468 Б** из бюджета 40 960 Б,
+  запас до hard limit 1 674 817 Б, новых зависимостей и permission нет. Поле
+  `mNoPersonalizedLearning` не заводилось заново — переиспользовано из E1. Носитель —
+  `noBackupFilesDir` базового (credential-protected) контекста; device-protected контекст
+  по-прежнему создаётся ровно в двух местах (`AndroidDictionaryStorageFactory`,
+  `PreferenceManagerCompat`). Три новые татарские строки внесены в
+  `docs/TATAR-REVIEW-QUEUE.tsv` со статусом `pending` (всего в очереди 11).
+  **NOT_COVERED, поимённо:** дельта PSS фазы E2 и абсолютный PSS — замер отложен решением
+  владельца (поправка от 2026-07-27); janky-кадры ≤ 1% при непрерывной прокрутке — требуют
+  реального устройства, программный рендерер эмулятора этот пункт не закрывает; отсутствие
+  `WindowLeaked` при повороте с открытым диалогом подтверждения; исчезновение вкладки
+  «Недавние» после стирания без пересоздания input view — проверено JVM, но не на устройстве.
 - [ ] **E2c:** a11y, устойчивость к пересозданию input view, privacy-тест пакета, правка
   `PRIVACY.md` (версия 1.1) — не позже попадания носителя «недавних» в `main`, полный clean
   build и device-UAT матрица.

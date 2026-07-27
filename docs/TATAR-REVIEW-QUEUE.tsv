@@ -13,3 +13,6 @@ E1b	tatar_suggestions_unavailable	app/src/main/res/values-tt/strings.xml	Tatar s
 E2b-1	show_emoji_key	app/src/main/res/values-tt/strings.xml	Show emoji key	Эмодзи төймәсен күрсәтү	pending			Название тумблера клавиши эмодзи на экране «Оформление».
 E2b-1	show_emoji_key_summary	app/src/main/res/values-tt/strings.xml	Key next to the space bar that opens the emoji panel	Буш урын янындагы эмодзи панелен ачучы төймә	pending			Пояснение к тумблеру клавиши эмодзи.
 E2b-1	spoken_description_emoji	app/src/main/res/values-tt/strings-a11y.xml	Emoji	Эмодзи	pending			Озвучка TalkBack для клавиши эмодзи в нижнем ряду.
+E2b-3	clear_recent_emoji	app/src/main/res/values-tt/strings.xml	Clear recent emoji	Соңгы эмодзиләрне чистарту	pending			Название пункта настроек и заголовок диалога стирания недавних эмодзи.
+E2b-3	clear_recent_emoji_confirm	app/src/main/res/values-tt/strings.xml	Remove all recently used emoji stored on this device? This cannot be undone.	Бу җиһазда сакланган барлык соңгы эмодзиләрне бетерергәме? Бу гамәлне кире кайтарып булмый.	pending			Тело диалога подтверждения стирания недавних эмодзи.
+E2b-3	clear_recent_emoji_action	app/src/main/res/values-tt/strings.xml	Clear	Чистарту	pending			Подпись подтверждающей кнопки диалога стирания; требуется глагол действия, не «OK».

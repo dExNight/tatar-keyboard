@@ -74,6 +74,9 @@
     <string name="tatar_suggestions_offer_enable">Включить</string>
     <string name="tatar_suggestions_offer_dismiss">Не сейчас</string>
     <string name="tatar_suggestions_unavailable">Сейчас не удалось включить татарские подсказки. Можно попробовать позже.</string>
+    <string name="clear_recent_emoji">Очистить недавние эмодзи</string>
+    <string name="clear_recent_emoji_confirm">Удалить все недавно использованные эмодзи, сохранённые на этом устройстве? Это действие нельзя отменить.</string>
+    <string name="clear_recent_emoji_action">Очистить</string>
     <string name="keyboard_languages">Языки клавиатуры</string>
     <string name="keyboard_languages_summary">Добавить или убрать язык</string>
     <string name="user_languages">Включённые языки</string>

@@ -24,8 +24,10 @@ import android.graphics.Paint
 import android.util.AttributeSet
 import android.util.TypedValue
 import android.view.MotionEvent
+import android.view.VelocityTracker
 import android.view.View
 import android.view.ViewConfiguration
+import android.widget.OverScroller
 import kotlin.math.abs
 import rkr.simplekeyboard.inputmethod.R
 
@@ -76,10 +78,19 @@ class EmojiPanelView @JvmOverloads constructor(
 
         // U+232B ERASE TO THE LEFT: a system glyph, so the panel ships no font of its own.
         private const val DELETE_LABEL = "\u232B"
+
+        // VelocityTracker reports velocity in px per this many milliseconds.
+        private const val VELOCITY_UNITS = 1000
     }
 
     private val state = EmojiPanelState()
     private val deleteRepeat = DeleteRepeatState()
+
+    /** The single, reusable fling scroller for the whole View lifetime. */
+    private val scroller = OverScroller(context)
+
+    /** Obtained at most once per gesture on ACTION_DOWN, recycled on ACTION_UP/ACTION_CANCEL. */
+    private var velocityTracker: VelocityTracker? = null
 
     private val backgroundPaint = Paint()
     private val pressedPaint = Paint()
@@ -107,6 +118,8 @@ class EmojiPanelView @JvmOverloads constructor(
     private val maxCellPx = dp(MAX_CELL_DP)
     private val bottomBarPx = dp(BOTTOM_BAR_DP)
     private val touchSlop = ViewConfiguration.get(context).scaledTouchSlop
+    private val minFlingVelocity = ViewConfiguration.get(context).scaledMinimumFlingVelocity
+    private val maxFlingVelocity = ViewConfiguration.get(context).scaledMaximumFlingVelocity
     private val repeatStartTimeoutMs =
         resources.getInteger(R.integer.config_key_repeat_start_timeout).toLong()
     private val repeatIntervalMs =
@@ -172,6 +185,8 @@ class EmojiPanelView @JvmOverloads constructor(
     /** Drops transient state, the delete repeat and the listener before detach or replacement. */
     fun release() {
         cancelDeleteRepeat()
+        scroller.forceFinished(true)
+        recycleVelocityTracker()
         state.cancelGesture()
         listener = null
         visibility = GONE
@@ -197,6 +212,17 @@ class EmojiPanelView @JvmOverloads constructor(
         val barCenter = state.barTop() + bottomBarPx / 2f
         barLabelBaseline = barCenter - (labelFontMetrics.ascent + labelFontMetrics.descent) / 2f
         barTabBaseline = barCenter - (tabFontMetrics.ascent + tabFontMetrics.descent) / 2f
+    }
+
+    override fun computeScroll() {
+        super.computeScroll()
+        if (!scroller.computeScrollOffset()) {
+            return
+        }
+        // Physics live in EmojiFling: clamp the scroller's position into range, then keep animating
+        // until the scroller settles. onDraw still paints only the visible rows.
+        state.setScrollY(EmojiFling.clampScroll(scroller.currY, state.maxScrollY()))
+        postInvalidateOnAnimation()
     }
 
     override fun onDraw(canvas: Canvas) {
@@ -265,6 +291,11 @@ class EmojiPanelView @JvmOverloads constructor(
     override fun onTouchEvent(event: MotionEvent): Boolean {
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
+                if (!scroller.isFinished) {
+                    scroller.forceFinished(true)
+                }
+                obtainVelocityTracker()
+                velocityTracker?.addMovement(event)
                 val pointerIndex = event.actionIndex
                 val target = state.onDown(
                     event.getPointerId(pointerIndex),
@@ -279,6 +310,7 @@ class EmojiPanelView @JvmOverloads constructor(
                 return true
             }
             MotionEvent.ACTION_MOVE -> {
+                velocityTracker?.addMovement(event)
                 val pointerIndex = event.findPointerIndex(state.activePointerId())
                 if (pointerIndex < 0) return true
                 val changed = state.onMove(
@@ -303,7 +335,11 @@ class EmojiPanelView @JvmOverloads constructor(
             }
             MotionEvent.ACTION_UP -> {
                 cancelDeleteRepeat()
+                velocityTracker?.addMovement(event)
                 val pointerIndex = event.actionIndex
+                val wasScrolling = state.isScrolling()
+                maybeFling(wasScrolling)
+                recycleVelocityTracker()
                 val target = state.onUp(
                     event.getPointerId(pointerIndex),
                     event.getX(pointerIndex),
@@ -315,6 +351,8 @@ class EmojiPanelView @JvmOverloads constructor(
             }
             MotionEvent.ACTION_CANCEL -> {
                 cancelDeleteRepeat()
+                scroller.forceFinished(true)
+                recycleVelocityTracker()
                 state.cancelGesture()
                 invalidate()
                 return true
@@ -348,6 +386,38 @@ class EmojiPanelView @JvmOverloads constructor(
     private fun cancelDeleteRepeat() {
         if (deleteRepeat.cancel()) {
             removeCallbacks(deleteRepeatRunnable)
+        }
+    }
+
+    /** Obtains the per-gesture [VelocityTracker] at most once; DOWN calls this, UP/CANCEL recycle. */
+    private fun obtainVelocityTracker() {
+        if (velocityTracker == null) {
+            velocityTracker = VelocityTracker.obtain()
+        }
+    }
+
+    /** Releases the per-gesture [VelocityTracker]; called on ACTION_UP, ACTION_CANCEL and release. */
+    private fun recycleVelocityTracker() {
+        velocityTracker?.recycle()
+        velocityTracker = null
+    }
+
+    /**
+     * On release of a gesture that was scrolling, starts a fling when the release speed clears the
+     * platform minimum. The fling/tap decision and the scroll clamp are the pure [EmojiFling]
+     * physics; the single reusable [scroller] carries the motion and [computeScroll] advances it.
+     */
+    private fun maybeFling(wasScrolling: Boolean) {
+        val tracker = velocityTracker ?: return
+        if (!wasScrolling) {
+            return
+        }
+        tracker.computeCurrentVelocity(VELOCITY_UNITS, maxFlingVelocity.toFloat())
+        val velocityY = tracker.getYVelocity(state.activePointerId())
+        if (EmojiFling.shouldFling(true, velocityY, minFlingVelocity, state.maxScrollY())) {
+            scroller.forceFinished(true)
+            scroller.fling(0, state.scrollY(), 0, -velocityY.toInt(), 0, 0, 0, state.maxScrollY())
+            postInvalidateOnAnimation()
         }
     }
 

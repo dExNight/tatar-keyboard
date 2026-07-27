@@ -74,6 +74,8 @@ import rkr.simplekeyboard.inputmethod.latin.dictionary.storage.PublishedDictiona
 import rkr.simplekeyboard.inputmethod.latin.emoji.EmojiPanelController;
 import rkr.simplekeyboard.inputmethod.latin.emoji.EmojiSetSnapshot;
 import rkr.simplekeyboard.inputmethod.latin.emoji.EmojiSurface;
+import rkr.simplekeyboard.inputmethod.latin.emoji.RecentEmojiGate;
+import rkr.simplekeyboard.inputmethod.latin.emoji.RecentEmojiGateState;
 import rkr.simplekeyboard.inputmethod.latin.settings.Settings;
 import rkr.simplekeyboard.inputmethod.latin.settings.SettingsActivity;
 import rkr.simplekeyboard.inputmethod.latin.settings.SettingsValues;
@@ -463,8 +465,36 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
                 }
                 mKeyboardSwitcher.showEmojiPanel(snapshot);
             }
+
+            @Override
+            public void refreshAfterRecentsCleared(final EmojiSetSnapshot base) {
+                // The recents were cleared while the panel is open: re-bind the base snapshot (which
+                // carries no recents category) through the same show path, so the Recent tab
+                // disappears without recreating the input view. When the panel is not shown, do
+                // nothing — the next open will read the now-empty medium.
+                if (mKeyboardSwitcher.isEmojiPanelShown()) {
+                    mKeyboardSwitcher.showEmojiPanel(base);
+                }
+            }
         };
-        mEmojiPanelController = new EmojiPanelController(this, emojiSurface, mHandler);
+        // The three-factor gate for updating the recent-emoji list, re-read on every store attempt:
+        //   mShouldShowSuggestions (already covers password, visible password, e-mail, URI, filter,
+        //   NO_SUGGESTIONS and autocomplete) AND UserManager.isUserUnlocked() AND
+        //   NOT mNoPersonalizedLearning (the field reused from E1, IME_FLAG_NO_PERSONALIZED_LEARNING).
+        final RecentEmojiGate recentGate = () -> {
+            final SettingsValues settingsValues = mSettings.getCurrent();
+            final boolean shouldShowSuggestions = settingsValues != null
+                    && settingsValues.mInputAttributes.mShouldShowSuggestions;
+            // Fail-closed when settings are missing: treat the field as no-personalized-learning.
+            final boolean noPersonalizedLearning = settingsValues == null
+                    || settingsValues.mInputAttributes.mNoPersonalizedLearning;
+            final UserManager userManager =
+                    (UserManager) getSystemService(Context.USER_SERVICE);
+            final boolean userUnlocked = userManager != null && userManager.isUserUnlocked();
+            return new RecentEmojiGateState(
+                    shouldShowSuggestions, userUnlocked, noPersonalizedLearning);
+        };
+        mEmojiPanelController = new EmojiPanelController(this, emojiSurface, mHandler, recentGate);
     }
 
     /**
@@ -1363,6 +1393,27 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
     public void showEmojiPanel() {
         if (mEmojiPanelController != null) {
             mEmojiPanelController.onEmojiKeyPressed();
+        }
+    }
+
+    /**
+     * An emoji was inserted from the panel (a grid tap, including a tap inside the Recent tab). The
+     * text was already committed through {@link #onTextInput(String)}; this records the use of the
+     * sequence in the recent-emoji list. Recording is gated and serialized inside the controller.
+     */
+    public void onEmojiInserted(final String sequence) {
+        if (mEmojiPanelController != null) {
+            mEmojiPanelController.onEmojiInserted(sequence);
+        }
+    }
+
+    /**
+     * The emoji panel was hidden. The recent-emoji list is persisted at most once per hide, and only
+     * when it changed; the write runs on the controller's background executor, never on the UI thread.
+     */
+    public void onEmojiPanelHidden() {
+        if (mEmojiPanelController != null) {
+            mEmojiPanelController.onPanelHidden();
         }
     }
 

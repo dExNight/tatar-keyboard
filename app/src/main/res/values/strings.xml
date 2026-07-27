@@ -152,6 +152,12 @@
     <string name="tatar_suggestions_offer_dismiss">Not now</string>
     <!-- Message shown once when Tatar word suggestions could not be turned on -->
     <string name="tatar_suggestions_unavailable">Tatar suggestions could not be turned on right now. You can try again later.</string>
+    <!-- Title of the settings item and its confirmation dialog that erases recently used emoji -->
+    <string name="clear_recent_emoji">Clear recent emoji</string>
+    <!-- Body of the confirmation dialog that erases recently used emoji -->
+    <string name="clear_recent_emoji_confirm">Remove all recently used emoji stored on this device? This cannot be undone.</string>
+    <!-- Affirmative button of the clear-recent-emoji dialog. Names the action rather than saying OK: the action is destructive and irreversible. -->
+    <string name="clear_recent_emoji_action">Clear</string>
     <!-- Title of the preference item that opens the keyboard languages screen -->
     <string name="keyboard_languages">Keyboard languages</string>
     <!-- Summary of the preference item that opens the keyboard languages screen -->

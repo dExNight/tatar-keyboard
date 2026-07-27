@@ -414,6 +414,10 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions,
         if (mKeyboardView != null) {
             setMainKeyboardFrame(Settings.getInstance().getCurrent(), KeyboardSwitchState.OTHER);
         }
+        // Persist the recent-emoji list at most once per hide (only if it changed), off the UI thread.
+        if (mLatinIME != null) {
+            mLatinIME.onEmojiPanelHidden();
+        }
     }
 
     // Implements {@link EmojiPanelView.Listener}. The "АБВ" key returns to the letters.
@@ -433,11 +437,13 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions,
     }
 
     // Implements {@link EmojiPanelView.Listener}. Insertion goes solely through the ordinary
-    // text-input path; the panel never commits text itself.
+    // text-input path; the panel never commits text itself. The use is then recorded in the
+    // recent-emoji list through the gated, serialized controller path.
     @Override
     public void onEmojiPanelPick(final String sequence) {
         if (mLatinIME != null) {
             mLatinIME.onTextInput(sequence);
+            mLatinIME.onEmojiInserted(sequence);
         }
     }
 

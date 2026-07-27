@@ -45,6 +45,7 @@ import rkr.simplekeyboard.inputmethod.keyboard.KeyboardLayoutSet
 import rkr.simplekeyboard.inputmethod.latin.AudioAndHapticFeedbackManager
 import rkr.simplekeyboard.inputmethod.latin.RichInputMethodManager
 import rkr.simplekeyboard.inputmethod.latin.common.LocaleUtils
+import rkr.simplekeyboard.inputmethod.latin.emoji.EmojiPanelController
 import rkr.simplekeyboard.inputmethod.latin.utils.LocaleResourceUtils
 import rkr.simplekeyboard.inputmethod.latin.utils.SubtypeLocaleUtils
 
@@ -287,6 +288,12 @@ class SettingsHostActivity : Activity() {
         setRowEnabled(imeRow,
                 prefs.getBoolean(Settings.PREF_SHOW_LANGUAGE_SWITCH_KEY, true)
                         && !isRestricted(Settings.PREF_ENABLE_IME_SWITCH))
+        // A data action, not an appearance toggle: its own card at the end of Preferences, next to
+        // the Tatar-suggestions switch. Erasing recent emoji is a confirmed, one-way action; it does
+        // not belong on the Appearance screen where the emoji-key toggle lives.
+        addCard(listOf(actionRow(R.string.clear_recent_emoji) {
+            showClearRecentEmojiDialog()
+        }))
     }
 
     private fun buildKeyPressScreen() {
@@ -449,6 +456,31 @@ class SettingsHostActivity : Activity() {
         dialog.show()
         // Disable the positive button since nothing is checked by default.
         dialog.getButton(AlertDialog.BUTTON_POSITIVE).isEnabled = false
+        currentDialog = dialog
+    }
+
+    /**
+     * Confirmation dialog for "Clear recent emoji", built like [showLocalePickerDialog]: the
+     * previous dialog is dismissed, the reference is kept in [currentDialog] and torn down in
+     * [onDestroy] so a rotation with the dialog open never leaks the window (WindowLeaked). The
+     * buttons are the platform strings; only the row title and the dialog body are our own.
+     *
+     * The erase goes to [EmojiPanelController.clearRecents], which routes to the live keyboard when
+     * one exists in this process (updating its in-memory list and any open panel) and otherwise
+     * replaces the medium directly. It runs off the UI thread inside the controller. This screen
+     * never reads the recents content — it only asks for the erase.
+     */
+    private fun showClearRecentEmojiDialog() {
+        currentDialog?.dismiss()
+        val dialog = AlertDialog.Builder(this)
+                .setTitle(R.string.clear_recent_emoji)
+                .setMessage(R.string.clear_recent_emoji_confirm)
+                .setPositiveButton(R.string.clear_recent_emoji_action) { _, _ ->
+                    EmojiPanelController.clearRecents(this)
+                }
+                .setNegativeButton(android.R.string.cancel, null)
+                .create()
+        dialog.show()
         currentDialog = dialog
     }
 

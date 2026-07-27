@@ -19,6 +19,8 @@ package rkr.simplekeyboard.inputmethod.latin.emoji
 import android.content.Context
 import android.graphics.Paint
 import android.os.Handler
+import android.os.UserManager
+import java.io.File
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 
@@ -26,6 +28,13 @@ import java.util.concurrent.Executors
 interface EmojiSurface {
     /** Bind [snapshot] to the panel view and make it the active surface. */
     fun showPanel(snapshot: EmojiSetSnapshot)
+
+    /**
+     * The recents were just cleared. If the panel is currently shown, re-bind [base] (which carries
+     * no recents category) so the Recent tab disappears through the same path as a category change;
+     * if the panel is not shown, this is a no-op. Defaulted so existing fakes need not implement it.
+     */
+    fun refreshAfterRecentsCleared(base: EmojiSetSnapshot) {}
 }
 
 /**
@@ -74,16 +83,50 @@ class EmojiPanelController internal constructor(
     private val uiPoster: EmojiUiPoster,
     private val executorFactory: () -> ExecutorService?,
     private val snapshotSourceFactory: () -> EmojiSnapshotSource?,
+    private val recentStoreFactory: () -> RecentEmojiStore? = { null },
 ) {
     /** Production entry point. */
-    constructor(context: Context, surface: EmojiSurface, uiHandler: Handler) : this(
+    constructor(
+        context: Context,
+        surface: EmojiSurface,
+        uiHandler: Handler,
+        gate: RecentEmojiGate,
+    ) : this(
         surface,
         EmojiUiPoster { runnable -> uiHandler.post(runnable) },
         { Executors.newSingleThreadExecutor() },
         { AssetSnapshotSource(context.applicationContext) },
-    )
+        {
+            val appContext = context.applicationContext
+            RecentEmojiStore(
+                // The recents live in a plain file under the base (credential-protected)
+                // noBackupFilesDir — not device-protected, and not a preferences store. The provider is
+                // built lazily on first panel show, so IME start never touches the path and stays
+                // directBootAware. noBackupFilesDir is not a subdirectory of files/, so the medium
+                // is excluded from every backup domain by construction.
+                RecentEmojiFileProvider { File(appContext.noBackupFilesDir, RECENT_EMOJI_FILE_NAME) },
+                AtomicRecentEmojiFileOps,
+                gate,
+            )
+        },
+    ) {
+        setLive(this)
+    }
 
     private var executor: ExecutorService? = null
+
+    // Built lazily on first use so IME start never resolves the recents path (directBoot-safe).
+    private val recentStore: RecentEmojiStore? by lazy(LazyThreadSafetyMode.NONE) {
+        try {
+            recentStoreFactory()
+        } catch (_: Throwable) {
+            null
+        }
+    }
+
+    // The base set's sequences, computed once when the snapshot is prepared and reused so recording
+    // and showing allocate nothing per tap.
+    private var availableSequences: Set<String> = emptySet()
 
     // Written on the UI thread after a successful preparation and read on the UI thread by showNow.
     @Volatile
@@ -135,14 +178,65 @@ class EmojiPanelController internal constructor(
     /** A new editor session began; a deferred show for the previous one must not fire. */
     fun onEditorSessionChanged() = cancelPendingShow()
 
-    fun onFinishInputView() = cancelPendingShow()
+    fun onFinishInputView() {
+        cancelPendingShow()
+        flushRecentsOnHide()
+    }
 
     /** The input view was recreated (rotation, theme or height change). */
-    fun onInputViewRecreated() = cancelPendingShow()
+    fun onInputViewRecreated() {
+        cancelPendingShow()
+        flushRecentsOnHide()
+    }
+
+    /** The panel was hidden (the "АБВ" key, or any lifecycle hide): persist the recents once. */
+    fun onPanelHidden() = flushRecentsOnHide()
+
+    /**
+     * An emoji was inserted from the panel — a grid tap, including a tap inside the Recent tab. The
+     * three-factor gate is re-read on the background executor before the in-memory list is touched,
+     * so a forbidden field, a locked device or a no-personalized-learning field records nothing.
+     */
+    fun onEmojiInserted(sequence: String) {
+        val store = recentStore ?: return
+        val backgroundExecutor = backgroundExecutor() ?: return
+        val available = availableSequences
+        try {
+            backgroundExecutor.execute { store.recordUse(sequence, available) }
+        } catch (_: Throwable) {
+            // Never crash typing; a missed record is acceptable, a crash is not.
+        }
+    }
+
+    private fun flushRecentsOnHide() {
+        val store = recentStore ?: return
+        val backgroundExecutor = backgroundExecutor() ?: return
+        try {
+            backgroundExecutor.execute { store.flushOnHide() }
+        } catch (_: Throwable) {
+        }
+    }
+
+    /** Erases the recents on the executor, then refreshes any shown panel on the UI thread. */
+    private fun requestClearRecents() {
+        val store = recentStore ?: return
+        val backgroundExecutor = backgroundExecutor() ?: return
+        try {
+            backgroundExecutor.execute {
+                store.clear()
+                val base = snapshot
+                if (base != null) {
+                    uiPoster.post { if (!destroyed) surface.refreshAfterRecentsCleared(base) }
+                }
+            }
+        } catch (_: Throwable) {
+        }
+    }
 
     fun onDestroy() {
         destroyed = true
         pendingShow = false
+        if (liveInstance === this) setLive(null)
         executor?.shutdownNow()
         executor = null
     }
@@ -183,10 +277,11 @@ class EmojiPanelController internal constructor(
             return
         }
         snapshot = built
+        availableSequences = EmojiDisplaySnapshots.availableSequences(built)
         preparation = EmojiPanelPreparation.READY
         if (pendingShow) {
             pendingShow = false
-            surface.showPanel(built)
+            publish(built)
         }
     }
 
@@ -197,7 +292,43 @@ class EmojiPanelController internal constructor(
 
     private fun showNow() {
         val ready = snapshot ?: return
-        surface.showPanel(ready)
+        publish(ready)
+    }
+
+    /**
+     * Publishes the panel. With no recents store (JVM tests) the base snapshot shows synchronously,
+     * exactly as before. In production the recents are read on the background executor — which
+     * re-reads the unlock gate, so a process started before unlock reads the file only after it —
+     * and the combined snapshot (recents first, only when non-empty) is shown on the UI thread. The
+     * recents read never runs on the UI thread, and the base snapshot is shown if the recents path
+     * fails for any reason.
+     */
+    private fun publish(base: EmojiSetSnapshot) {
+        val store = recentStore
+        if (store == null) {
+            surface.showPanel(base)
+            return
+        }
+        val backgroundExecutor = backgroundExecutor()
+        if (backgroundExecutor == null) {
+            surface.showPanel(base)
+            return
+        }
+        val available = availableSequences
+        try {
+            backgroundExecutor.execute {
+                val recents = try {
+                    store.currentRecents(available)
+                } catch (_: Throwable) {
+                    emptyList<String>()
+                }
+                uiPoster.post {
+                    if (!destroyed) surface.showPanel(EmojiDisplaySnapshots.withRecents(base, recents))
+                }
+            }
+        } catch (_: Throwable) {
+            surface.showPanel(base)
+        }
     }
 
     private fun backgroundExecutor(): ExecutorService? {
@@ -210,6 +341,62 @@ class EmojiPanelController internal constructor(
         } ?: return null
         executor = created
         return created
+    }
+
+    companion object {
+        private const val RECENT_EMOJI_FILE_NAME = "recent_emoji_v1"
+
+        @Volatile
+        private var liveInstance: EmojiPanelController? = null
+
+        private fun setLive(controller: EmojiPanelController?) {
+            liveInstance = controller
+        }
+
+        /**
+         * Clears the recent-emoji medium. When the IME exists in this process the erase is routed to
+         * the live controller so its in-memory list and any open panel are updated too; otherwise the
+         * medium is replaced directly. Both paths call the single storage method
+         * [RecentEmojiStore.clear]. Never touches the UI thread's editor and never reads the list.
+         */
+        @JvmStatic
+        fun clearRecents(context: Context) {
+            val live = liveInstance
+            if (live != null) {
+                live.requestClearRecents()
+                return
+            }
+            clearStandalone(context.applicationContext)
+        }
+
+        private fun clearStandalone(appContext: Context) {
+            val standaloneExecutor = try {
+                Executors.newSingleThreadExecutor()
+            } catch (_: Throwable) {
+                return
+            }
+            try {
+                standaloneExecutor.execute {
+                    val gate = RecentEmojiGate {
+                        val userManager = appContext.getSystemService(Context.USER_SERVICE) as? UserManager
+                        RecentEmojiGateState(
+                            shouldShowSuggestions = false,
+                            userUnlocked = userManager == null || userManager.isUserUnlocked,
+                            noPersonalizedLearning = false,
+                        )
+                    }
+                    RecentEmojiStore(
+                        RecentEmojiFileProvider { File(appContext.noBackupFilesDir, RECENT_EMOJI_FILE_NAME) },
+                        AtomicRecentEmojiFileOps,
+                        gate,
+                    ).clear()
+                }
+            } catch (_: Throwable) {
+                // Nothing to clean up on the UI side.
+            } finally {
+                standaloneExecutor.shutdown()
+            }
+        }
     }
 }
 
