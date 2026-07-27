@@ -19,6 +19,7 @@ package rkr.simplekeyboard.inputmethod.latin.suggestions
 import android.content.Context
 import android.os.Handler
 import rkr.simplekeyboard.inputmethod.latin.dictionary.engine.KeyNeighborTable
+import rkr.simplekeyboard.inputmethod.latin.dictionary.personal.PersonalSubtypes
 import rkr.simplekeyboard.inputmethod.latin.dictionary.storage.AndroidDictionaryStorageFactory
 import rkr.simplekeyboard.inputmethod.latin.dictionary.storage.DictionaryStorageController
 import rkr.simplekeyboard.inputmethod.latin.dictionary.storage.PreparationResult
@@ -829,7 +830,10 @@ class SuggestionsController internal constructor(
     }
 
     companion object {
-        private const val SUBTYPE_ID = "tt_RU"
+        // The active-subtype identifier the engine is asked to key its lookup by. Reads the single
+        // source of truth (PersonalSubtypes.TATAR_RU) so the request key can never drift from
+        // LatinIME.isTatarSuggestionsEligible(), which reads the same constant.
+        private const val SUBTYPE_ID = PersonalSubtypes.TATAR_RU
         private const val DESTROY_TIMEOUT_MS = 60L
 
         // Sentinel for "no request is outstanding". [sessionId] starts at 0 and only ever grows,

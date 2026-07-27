@@ -217,9 +217,12 @@ object TatarWordUtils {
     /**
      * The casing shape of the prefix the user actually typed, as classified by [classifyCasing].
      *
-     * The dictionary stores NFC lowercase words only, so the shape is what re-applies the user's
-     * capitalization to a candidate ([applyCasing]) — the displayed and the inserted form always
-     * share it.
+     * The dictionary ASSET stores NFC lowercase words only, so for asset (and fuzzy) candidates the
+     * shape is what re-applies the user's capitalization ([applyCasing]) — the displayed and the
+     * inserted form always share it. The PERSONAL dictionary instead stores each word in its
+     * original form and uses the NFC lowercase form only for sorting, dedup, filters and search
+     * (see the "Контракт текста" amendment of 2026-07-27); at a LOWER prefix a personal record is
+     * shown in its stored casing, so [applyCasing] is not applied to it.
      */
     enum class PrefixCasing {
         /** No uppercase letter: candidates are shown exactly as the dictionary stores them. */

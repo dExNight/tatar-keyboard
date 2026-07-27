@@ -71,6 +71,7 @@ import rkr.simplekeyboard.inputmethod.latin.common.Constants;
 import rkr.simplekeyboard.inputmethod.latin.define.DebugFlags;
 import rkr.simplekeyboard.inputmethod.latin.inputlogic.InputLogic;
 import rkr.simplekeyboard.inputmethod.latin.dictionary.storage.PublishedDictionaryCatalog;
+import rkr.simplekeyboard.inputmethod.latin.dictionary.personal.PersonalSubtypes;
 import rkr.simplekeyboard.inputmethod.latin.emoji.EmojiPanelController;
 import rkr.simplekeyboard.inputmethod.latin.emoji.EmojiSetSnapshot;
 import rkr.simplekeyboard.inputmethod.latin.emoji.EmojiSurface;
@@ -518,7 +519,7 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
 
             @Override
             public boolean isTatarSubtypeActive() {
-                return "tt_RU".equals(mRichImm.getCurrentSubtype().getLocale());
+                return PersonalSubtypes.TATAR_RU.equals(mRichImm.getCurrentSubtype().getLocale());
             }
 
             @Override
@@ -746,7 +747,7 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
     private boolean isTatarSuggestionsEligible(final boolean suggestionsEnabled) {
         final SettingsValues settingsValues = mSettings.getCurrent();
         return suggestionsEnabled
-                && "tt_RU".equals(mRichImm.getCurrentSubtype().getLocale())
+                && PersonalSubtypes.TATAR_RU.equals(mRichImm.getCurrentSubtype().getLocale())
                 && settingsValues.mInputAttributes.mShouldShowSuggestions
                 // IME_FLAG_NO_PERSONALIZED_LEARNING closes eligibility outright: the strip reserves
                 // no band and not a single prefix reaches the engine in such a field, even for a
@@ -777,7 +778,7 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
             if (keyboard.mId.equals(mNeighborTableKeyboardId) && mNeighborTable != null) {
                 table = mNeighborTable;
             } else {
-                table = KeyNeighborTableBuilder.fromKeyboard(keyboard, "tt_RU");
+                table = KeyNeighborTableBuilder.fromKeyboard(keyboard, PersonalSubtypes.TATAR_RU);
                 mNeighborTableKeyboardId = keyboard.mId;
                 mNeighborTable = table;
             }

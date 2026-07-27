@@ -548,6 +548,20 @@ selection, subtype, generation и букв после курсора перед 
   privacy-гейте или нетатарском subtype — все три сводятся к `eligible == false` в
   `SuggestionsController` — показ панели полосу видимой не делает: `reserve` не вызывается,
   полоса остаётся `GONE`).
+- регистр личных записей (поправка 2026-07-27, четыре правки E4a-1) —
+  `PersonalDictionaryTextContractTest`, четыре поимённых теста, по одному на пункт поправки:
+  `point1_storesRawFormWhileNormalizedFormDrivesSearch` (личный словарь хранит исходную форму, а
+  нормализованная NFC lowercase форма ведёт сортировку, дедупликацию, фильтры и поиск; дедупликация
+  по нормализованной форме дополнительно пиннится `TpersValidatorTest.rejectsDuplicateNormalizedForms`),
+  `point2_lowerPrefixLeavesTheStoredCasingUntouched` (личная запись при LOWER-префиксе показывается
+  в сохранённом регистре — `TatarWordUtils.applyCasing` её не меняет),
+  `point3_exactWordExclusionComparesTheNormalizedFormNotRawBytes` (для личных записей равенство
+  проверяется по нормализованной форме, а не по байтам) и
+  `point4_initialAndAllCapsReapplyCasingOverwritingTheStoredForm` (при INITIAL_CAPS и ALL_CAPS к
+  личным записям применяется тот же `applyCasing`, что и к словарным, перезаписывая сохранённый
+  регистр; при LOWER — нет); формат `.tpers`, fail-closed валидация каждого вида нарушения, чтение,
+  поиск и гард по несовпадению subtypeId — `TpersValidatorTest`, `PersonalDictionaryReaderTest`,
+  `PersonalSubtypeSeamTest`, `PersonalDictionaryReadPathPrivacyTest`.
 
 Не покрыто JVM-тестами и заявляется только как проверка чтением исходника или на
 устройстве: guard `hasSelection()` внутри `InputLogic.commitChosenSuggestion` (Android-класс
