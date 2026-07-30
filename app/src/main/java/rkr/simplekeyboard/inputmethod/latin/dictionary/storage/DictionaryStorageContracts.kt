@@ -4,6 +4,7 @@ import androidx.annotation.Keep
 import java.io.Closeable
 import java.io.File
 import java.io.FileDescriptor
+import java.io.IOException
 import java.io.InputStream
 import java.util.Locale
 
@@ -81,6 +82,26 @@ interface DurableFileOps {
     fun atomicRename(source: File, destination: File)
     fun syncDirectory(directory: File)
     fun delete(file: File): Boolean
+
+    /**
+     * Atomically replaces [destination] with [source], REPLACING an existing destination.
+     *
+     * This is deliberately distinct from [atomicRename], which throws when the destination already
+     * exists: D1b's staged-publication retention depends on that throwing behaviour, so its
+     * semantics must not change. The personal store's whole-file write (E4a-2) needs the replacing
+     * variant instead, because it rewrites the same file across a session.
+     *
+     * The production override in `AndroidDurableFileOps` uses POSIX `rename(2)`, which is atomic and
+     * replaces in place. This default is only a JVM fallback for test doubles that do not override
+     * it; it is never reached by the dictionary-asset store.
+     */
+    fun atomicReplace(source: File, destination: File) {
+        if (!source.renameTo(destination)) {
+            if (!(destination.delete() && source.renameTo(destination))) {
+                throw IOException("atomic replace failed")
+            }
+        }
+    }
 }
 
 data class PublishedDictionary(

@@ -36,7 +36,13 @@ object AndroidDictionaryStorageFactory {
     }
 }
 
-private object AndroidDurableFileOps : DurableFileOps {
+/**
+ * The one production [DurableFileOps]. `internal` (not `private`) so the personal store's
+ * whole-file write path (E4a-2) can reuse the same fsync/rename/replace logic instead of
+ * duplicating it. The dictionary-asset store keeps using [atomicRename]; the personal store uses
+ * [atomicReplace].
+ */
+internal object AndroidDurableFileOps : DurableFileOps {
     override fun createNewFile(file: File): Boolean = file.createNewFile()
 
     override fun syncFile(fileDescriptor: FileDescriptor) {
@@ -46,6 +52,14 @@ private object AndroidDurableFileOps : DurableFileOps {
     override fun atomicRename(source: File, destination: File) {
         if (destination.exists()) throw IOException("versioned destination already exists")
         translateErrno("rename dictionary") {
+            Os.rename(source.absolutePath, destination.absolutePath)
+        }
+    }
+
+    override fun atomicReplace(source: File, destination: File) {
+        // POSIX rename(2) is atomic and replaces an existing destination in place. No pre-existence
+        // check: unlike atomicRename, replacing the current file is exactly what E4a-2 needs.
+        translateErrno("replace personal file") {
             Os.rename(source.absolutePath, destination.absolutePath)
         }
     }
