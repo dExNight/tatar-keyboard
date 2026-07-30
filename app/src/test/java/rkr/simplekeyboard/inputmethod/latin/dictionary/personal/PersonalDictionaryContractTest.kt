@@ -71,23 +71,33 @@ class PersonalDictionaryContractTest {
     }
 
     @Test
-    fun theOnlyWayToCreateAnEntryTodayIsTheExplicitManualAdd() {
-        val creators = mainFiles().filter { it.readText().contains("addManually(") }
+    fun thereAreExactlyTwoWritePathsAndBothAreNamedInTheContract() {
+        // Path 1 — the explicit "Add word…" of the settings screen.
+        val manual = mainFiles().filter { it.readText().contains("addManually(") }
             .map { it.name }
             .sorted()
         assertEquals(
-            "exactly two files: the store that defines it and the screen controller that calls it",
+            "the store that defines it and the screen controller that calls it, nothing else",
             listOf("PersonalDictionaryScreenController.kt", "PersonalDictionaryStore.kt"),
-            creators,
+            manual,
         )
 
-        // Learning is E4c and must not have leaked in early: nothing may create an entry as a
-        // CONSEQUENCE of typing yet.
-        val store = File(sourceRoot(),
-            "java/rkr/simplekeyboard/inputmethod/latin/dictionary/personalstore/PersonalDictionaryStore.kt")
-            .readText()
-        assertFalse("learning arrives in E4c, not here", store.contains("fun learn("))
-        assertFalse("nor the clean-run counter it needs", store.contains("noteCompletion("))
+        // Path 2 — learning from three clean completions (E4c). It must be reachable only through
+        // the audited seam: the store defines it and PersonalLearning calls it under the predicate.
+        val learning = mainFiles().filter { it.readText().contains("noteCompletion(") }
+            .map { it.name }
+            .sorted()
+        assertEquals(
+            "learning goes through PersonalLearning and nowhere else",
+            listOf("PersonalDictionaryStore.kt", "PersonalLearning.kt"),
+            learning,
+        )
+
+        // And there is no third: the class that sees every keystroke reaches neither of them.
+        val controller = File(sourceRoot(),
+            "java/rkr/simplekeyboard/inputmethod/latin/suggestions/SuggestionsController.kt").readText()
+        assertFalse(controller.contains("noteCompletion("))
+        assertFalse(controller.contains("addManually("))
     }
 
     @Test

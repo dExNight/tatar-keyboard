@@ -25,6 +25,7 @@ import rkr.simplekeyboard.inputmethod.latin.dictionary.storage.SpaceProbe
 import rkr.simplekeyboard.inputmethod.latin.dictionary.storage.StorageClock
 import java.io.File
 import java.io.IOException
+import java.security.SecureRandom
 import java.util.concurrent.Executor
 
 /**
@@ -68,6 +69,12 @@ internal class PersonalDictionaryStore(
     private var loaded = false
     private var pendingCounterFlush = false
 
+    // E4c: progress towards learning, as salted truncated hashes. Held in memory and written on the
+    // same boundary as the usage counters — never once per completed word.
+    private var pending: PendingCounters = PendingCounters.EMPTY
+    private var pendingDirty = false
+    private var salt: ByteArray? = null
+
     /** Count of physical `.tpers` writes performed; a test counter (never grows on in-memory notes). */
     @Volatile
     var writeCount: Int = 0
@@ -82,6 +89,36 @@ internal class PersonalDictionaryStore(
     fun addManually(word: String) = onWorker {
         val normalized = eligibleNormalizedForm(word) ?: return@onWorker
         commitWrite(entries.upsert(word, normalized))
+    }
+
+    /**
+     * Records ONE clean completion of [word] (E4c). Nothing is written to the dictionary until the
+     * word has survived [PendingCounters.LEARN_THRESHOLD] of them; until then only a salted
+     * truncated hash exists, and only in memory between flushes.
+     *
+     * The threshold is 3 for a reason worth keeping written down: 1 would learn any typo, 2 would
+     * learn a typo repeated twice — and the same slip is exactly what a person repeats — while 3
+     * demands that the spelling survive three independent completions without a single correction.
+     */
+    fun noteCompletion(word: String) = onWorker {
+        val normalized = eligibleNormalizedForm(word) ?: return@onWorker
+        if (entries.containsNormalized(normalized)) return@onWorker
+        val key = PendingCounters.keyOf(saltOrCreate() ?: return@onWorker, normalized)
+        val noted = pending.note(key)
+        if (noted.countOf(key) >= PendingCounters.LEARN_THRESHOLD) {
+            // Graduated: it goes into the dictionary itself, and its pending trace goes away.
+            val candidate = entries.upsert(word, normalized)
+            if (writeWhole(candidate)) {
+                entries = candidate
+                snapshot = candidate.toSnapshot(subtypeId)
+                pending = noted.without(key)
+            } else {
+                pending = noted
+            }
+        } else {
+            pending = noted
+        }
+        pendingDirty = true
     }
 
     /** Removes one word and rewrites (or deletes, when it was the last) the file. */
@@ -101,15 +138,25 @@ internal class PersonalDictionaryStore(
         }
     }
 
-    /** Erases this subtype's personal dictionary: empties memory and deletes the file. */
+    /**
+     * Erases this subtype's personal dictionary: empties memory and deletes the file, the pending
+     * counters and the salt. The salt goes too, so the hashes of a future session cannot be compared
+     * with those of the erased one; a new one is created on demand.
+     */
     fun clearAll() = onWorker {
         entries = PersonalEntries.empty(maxEntries)
         pendingCounterFlush = false
+        pending = PendingCounters.EMPTY
+        pendingDirty = false
+        salt = null
         snapshot = PersonalDictionary.EMPTY
         loaded = true
         if (!unlockGate()) return@onWorker
         try {
             deleteFile()
+            val directory = directoryProvider.personalDirectory()
+            deleteFile(directory, File(directory, pendingFileName()))
+            deleteFile(directory, File(directory, SALT_FILE_NAME))
         } catch (_: Exception) {
             // Fail-closed: the feature is already empty in memory.
         }
@@ -130,11 +177,18 @@ internal class PersonalDictionaryStore(
         pendingCounterFlush = true
     }
 
-    /** Flushes in-memory counter/serial changes to disk once, only when something changed. */
+    /**
+     * Flushes in-memory counter/serial changes to disk once, only when something changed — the one
+     * boundary (`SuggestionsController.onFinishInput`) where both the usage counters and the pending
+     * hashes are written, never per keystroke and never per completed word.
+     */
     fun flush() = onWorker {
         if (!open()) return@onWorker
-        if (!pendingCounterFlush) return@onWorker
-        if (writeWhole(entries)) pendingCounterFlush = false
+        if (pendingCounterFlush && writeWhole(entries)) pendingCounterFlush = false
+        if (pendingDirty) {
+            pending = pending.prunedForFlush()
+            if (writePending(pending)) pendingDirty = false
+        }
     }
 
     /**
@@ -179,6 +233,7 @@ internal class PersonalDictionaryStore(
                 return true
             }
             cleanupTemps(directory)
+            readPending(directory)
             val file = File(directory, TpersFormat.personalFileName(subtypeId))
             if (!file.isFile) {
                 snapshot = PersonalDictionary.EMPTY
@@ -197,6 +252,7 @@ internal class PersonalDictionaryStore(
             }
             entries = PersonalEntries.fromValidated(validated, maxEntries)
             snapshot = entries.toSnapshot(subtypeId)
+            readPending(directory)
         } catch (_: Exception) {
             entries = PersonalEntries.empty(maxEntries)
             snapshot = PersonalDictionary.EMPTY
@@ -238,6 +294,76 @@ internal class PersonalDictionaryStore(
             false
         }
     }
+
+    /**
+     * The salt for the pending hashes: 16 random bytes in `salt.bin`, created on first use and
+     * destroyed by [clearAll]. Returns null when it can neither be read nor created — in which case
+     * nothing is counted at all, which is the fail-closed direction (no learning rather than
+     * unsalted keys).
+     */
+    private fun saltOrCreate(): ByteArray? {
+        salt?.let { return it }
+        return try {
+            val directory = directoryProvider.personalDirectory()
+            ensureDirectory(directory)
+            val file = File(directory, SALT_FILE_NAME)
+            val existing = if (file.isFile && file.length() == SALT_SIZE.toLong()) {
+                file.readBytes()
+            } else {
+                val fresh = ByteArray(SALT_SIZE)
+                SecureRandom().nextBytes(fresh)
+                writeBytesDurably(directory, file, fresh)
+                fresh
+            }
+            salt = existing
+            existing
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    /** Reads the pending counters once, alongside the dictionary itself. Fail-closed to empty. */
+    private fun readPending(directory: File) {
+        pending = try {
+            val file = File(directory, pendingFileName())
+            if (file.isFile) PendingCounters.parse(file.readBytes()) else PendingCounters.EMPTY
+        } catch (_: Exception) {
+            PendingCounters.EMPTY
+        }
+    }
+
+    private fun writePending(counters: PendingCounters): Boolean = try {
+        val directory = directoryProvider.personalDirectory()
+        ensureDirectory(directory)
+        writeBytesDurably(directory, File(directory, pendingFileName()), counters.serialize())
+        true
+    } catch (_: Exception) {
+        false
+    }
+
+    /**
+     * Writes one small fixed-size file through the same temp → fsync → atomic replace → directory
+     * fsync sequence the dictionary uses. The pending file and the salt are not user text, but a
+     * half-written one would be read as garbage, and fail-closed parsing would then silently drop a
+     * user's progress.
+     */
+    private fun writeBytesDurably(directory: File, destination: File, bytes: ByteArray) {
+        val temporary = createExclusiveTemp(directory)
+        try {
+            outputOpener.open(temporary).use { output ->
+                output.write(bytes)
+                output.flush()
+                fileOps.syncFile(output.fd)
+            }
+            fileOps.atomicReplace(temporary, destination)
+            fileOps.syncDirectory(directory)
+        } catch (exception: Exception) {
+            if (temporary.exists()) runCatching { fileOps.delete(temporary) }
+            throw exception
+        }
+    }
+
+    private fun pendingFileName(): String = "pending-$subtypeId-s1-f1.bin"
 
     private fun deleteFile(): Boolean {
         val directory = directoryProvider.personalDirectory()
@@ -284,5 +410,7 @@ internal class PersonalDictionaryStore(
         private const val TEMP_SUFFIX = ".tmp"
         private const val MAX_TEMP_ATTEMPTS = 100
         private const val FREE_SPACE_RESERVE_BYTES = 64L * 1024L
+        private const val SALT_FILE_NAME = "salt.bin"
+        private const val SALT_SIZE = 16
     }
 }

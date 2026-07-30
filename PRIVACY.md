@@ -1,6 +1,6 @@
 # Политика конфиденциальности / Privacy Policy
 
-**Версия / Version:** 1.2 — 2026-07-31
+**Версия / Version:** 1.3 — 2026-07-31
 
 ## English
 
@@ -31,6 +31,7 @@ If you turn the **personal dictionary** on (it is **off** unless you turn it on)
 - **It never leaves your device**, and it is excluded from cloud backup and from the transfer to a new device — there is no export, no import and no sync, in this version or any planned one.
 - **Not everywhere.** Nothing is saved in **password fields or other private fields** — e-mail, URL, postal address, and any field that asks the keyboard not to show suggestions or not to personalize (an incognito tab, a banking app).
 - **How to see and erase it.** Keyboard settings → **“Saved words”**: every saved word of every language, with **“Delete”** on each one and **“Erase all saved words.”** Turning the personal dictionary off does **not** erase what was already saved — erase it here. Deleting the app, or clearing its data in the system settings, destroys everything saved, and no backup brings it back.
+- **A limit worth knowing, on Android 7 only.** The standard signal an app uses to say "do not learn from this field" (`IME_FLAG_NO_PERSONALIZED_LEARNING`) exists from Android 8 onwards. On Android 7.0 and 7.1 no app sets it, so on those two versions the keyboard cannot tell such a field apart, and only the other gates above (password and private field types, postal addresses, the off-by-default switch itself) protect it. Every other guarantee on this page holds on all supported versions.
 - **The screen is not behind a separate password.** Anyone holding your unlocked phone can read the list of saved words. `FLAG_SECURE` keeps it out of screenshots and out of the recent-apps thumbnail, but it cannot keep out a person standing next to you. This is a deliberate trade-off, stated rather than left unsaid.
 
 ## По-русски
@@ -62,6 +63,7 @@ Tatar Keyboard хранит то, что вы печатаете, **на ваш�
 - **Это никогда не покидает ваше устройство** и исключено из облачной резервной копии и переноса на новое устройство — ни экспорта, ни импорта, ни синхронизации нет ни в этой версии, ни в планах.
 - **Не везде.** Ничего не сохраняется в **полях пароля и других приватных полях** — e-mail, URL, почтовый адрес и любое поле, которое просит клавиатуру не показывать подсказки или не персонализироваться (вкладка инкогнито, банковское приложение).
 - **Как посмотреть и стереть.** Настройки клавиатуры → **«Сохранённые слова»**: все сохранённые слова всех языков, у каждого — **«Удалить»**, и отдельно **«Стереть все сохранённые слова»**. Выключение личного словаря **не** удаляет накопленное — стирать нужно здесь. Удаление приложения или «стереть данные» в системных настройках уничтожает всё накопленное безвозвратно, и восстановление из резервной копии его не вернёт.
+- **Ограничение, о котором стоит знать, — только для Android 7.** Стандартный сигнал, которым приложение просит клавиатуру не запоминать набранное в поле (`IME_FLAG_NO_PERSONALIZED_LEARNING`), существует начиная с Android 8. На Android 7.0 и 7.1 его не выставляет ни одно приложение, поэтому на этих двух версиях клавиатура не может отличить такое поле, и его защищают только остальные перечисленные выше условия (поля пароля и другие приватные типы полей, почтовые адреса и сам выключенный по умолчанию тумблер). Все прочие гарантии этой страницы действуют на всех поддерживаемых версиях.
 - **Экран не защищён отдельным паролем.** Любой, у кого в руках ваш разблокированный телефон, увидит список сохранённых слов. `FLAG_SECURE` закрывает его от скриншота и от миниатюры «недавних приложений», но не от человека рядом. Это осознанный компромисс, и он назван, а не умолчан.
 
 ## Контакт / Contact

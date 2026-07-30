@@ -22,6 +22,7 @@ import rkr.simplekeyboard.inputmethod.latin.dictionary.engine.KeyNeighborTable
 import rkr.simplekeyboard.inputmethod.latin.dictionary.personal.PersonalSubtypes
 import rkr.simplekeyboard.inputmethod.latin.dictionary.storage.AndroidDictionaryStorageFactory
 import rkr.simplekeyboard.inputmethod.latin.dictionary.storage.DictionaryStorageController
+import rkr.simplekeyboard.inputmethod.latin.dictionary.personal.WordCompletionSink
 import rkr.simplekeyboard.inputmethod.latin.dictionary.storage.PreparationResult
 import rkr.simplekeyboard.inputmethod.latin.dictionary.storage.PublishedDictionaryCatalog
 import java.util.concurrent.ExecutorService
@@ -268,6 +269,23 @@ class SuggestionsController internal constructor(
     private var displayedPrefix: String? = null
     private var displayedSessionId: Long = NO_SESSION
 
+    // --- E4c clean-run state. Nothing here is persisted and nothing leaves this object except one
+    // completed word handed to [completionSink]; with the default sink that is a no-op.
+    /** The trailing word as last seen. Empty between words. */
+    private var runWord: String = ""
+    /** False as soon as anything but plain growth happens; a dirty run reports nothing. */
+    private var runClean: Boolean = true
+    /** Length of the longest proper prefix of the current run that came back with NO candidates. */
+    private var runEmptyResultPrefixLength: Int = NO_EMPTY_RESULT
+
+    /** Where clean completions go (E4c). Default writes nothing at all. */
+    private var completionSink: WordCompletionSink = WordCompletionSink.NONE
+
+    /** Set once by LatinIME. Kept out of the constructor so the frozen test entry points stay put. */
+    fun setCompletionSink(sink: WordCompletionSink) {
+        completionSink = sink
+    }
+
     /**
      * Registers the tap listener and deliberately nothing else: the background executor, the
      * storage controller and the dictionary are created on first actual need, so a keyboard start
@@ -289,6 +307,7 @@ class SuggestionsController internal constructor(
     }
 
     fun onStartInput(eligible: Boolean) {
+        markRunDirty()
         // Lifecycle boundary: one of the only two places allowed to run the blocking engine
         // teardown that a disabled setting scheduled.
         runPendingRelease()
@@ -328,10 +347,14 @@ class SuggestionsController internal constructor(
     }
 
     fun onTextChanged() {
+        trackCleanRun(editor.cachedWordBeforeCursor())
         requestCurrentPrefix()
     }
 
     fun onSelectionChanged() {
+        // A selection change — external, or an internal cursor gesture, which LatinIME routes here —
+        // breaks the run: what looks like growth afterwards may be growth of a different word.
+        markRunDirty()
         sessionId++
         engine?.finishInput()
         // Any in-flight request is invalidated and whatever was shown is no longer bound to the
@@ -349,6 +372,10 @@ class SuggestionsController internal constructor(
     }
 
     fun onFinishInput() {
+        markRunDirty()
+        // The one boundary where the personal store writes what it has accumulated: usage counters
+        // and pending hashes, once, and only if something changed.
+        completionSink.onInputFinished()
         sessionId++
         displayedPrefix = null
         // Close eligibility before hiding/finishing. A readiness notification queued behind this
@@ -361,6 +388,7 @@ class SuggestionsController internal constructor(
     }
 
     fun onSubtypeChanged(eligible: Boolean) {
+        markRunDirty()
         sessionId++
         engine?.finishInput()
         displayedPrefix = null
@@ -808,12 +836,84 @@ class SuggestionsController internal constructor(
         strip.reserve()
     }
 
+    /**
+     * The clean-run machine of E4c, computed from the hooks that already exist — no new IPC, no new
+     * editor call and nothing kept about the text beyond the current word.
+     *
+     * A run is CLEAN while the trailing word grows one piece at a time (`w.startsWith(previous) &&
+     * w.length > previous.length`) and it ENDS when the trailing word becomes empty. A shortening
+     * (backspace), a replacement, a selection change, a cursor gesture, an accepted suggestion, a
+     * field or subtype change all mark it dirty, and a dirty run reports nothing.
+     */
+    private fun trackCleanRun(word: String) {
+        val previous = runWord
+        if (word == previous) return
+        if (word.isEmpty()) {
+            reportCompletionIfClean(previous)
+            runWord = ""
+            runClean = true
+            runEmptyResultPrefixLength = NO_EMPTY_RESULT
+            return
+        }
+        if (previous.isEmpty()) {
+            // A fresh word begins; whether it stays clean is decided by what follows.
+            runWord = word
+            runEmptyResultPrefixLength = NO_EMPTY_RESULT
+            return
+        }
+        if (word.startsWith(previous) && word.length > previous.length) {
+            runWord = word
+            return
+        }
+        // Anything else — backspace, a swipe-delete, a replacement — is not growth.
+        runWord = word
+        runClean = false
+        runEmptyResultPrefixLength = NO_EMPTY_RESULT
+    }
+
+    /**
+     * Reports [word] as cleanly completed, but only when the run also proved the word is NOT in the
+     * shipped dictionary: some PROPER prefix of it, actually requested during this same run, came
+     * back with an empty result. An empty result for p means no dictionary word other than p itself
+     * begins with p, so a longer word starting with p cannot be in the dictionary either.
+     *
+     * If no such observation was made — coalescing collapsed the requests, the engine was not ready,
+     * the band was ineligible — nothing is reported. Fail-closed towards writing LESS.
+     */
+    private fun reportCompletionIfClean(word: String) {
+        if (!runClean || word.isEmpty()) return
+        val observed = runEmptyResultPrefixLength
+        if (observed !in 1 until word.length) return
+        completionSink.onCleanCompletion(word)
+    }
+
+    private fun markRunDirty() {
+        runWord = ""
+        runClean = false
+        runEmptyResultPrefixLength = NO_EMPTY_RESULT
+    }
+
     private fun applyResult(token: Any, suggestions: List<String>) {
         if (!eligible) return
         if (sessionId != requestSessionId) return
         val activeEngine = usableEngine() ?: return
         if (!activeEngine.isCurrent(token)) return
         if (suggestions.isEmpty()) {
+            // The observation the E4c filter is built on: nothing in the dictionary continues this
+            // prefix, so no longer word starting with it can be in the dictionary either.
+            //
+            // The SHORTEST such prefix is remembered, not the longest. The contract asks for a
+            // PROPER prefix of the completed word, and the last empty result of a run is usually the
+            // whole word itself — keeping the longest would let that one overwrite the very evidence
+            // the rule is about, and nothing would ever be learned.
+            if (runClean && pendingPrefix.isNotEmpty()) {
+                val length = pendingPrefix.length
+                if (runEmptyResultPrefixLength == NO_EMPTY_RESULT ||
+                    length < runEmptyResultPrefixLength
+                ) {
+                    runEmptyResultPrefixLength = length
+                }
+            }
             displayedPrefix = null
             strip.reserve()
             return
@@ -835,6 +935,8 @@ class SuggestionsController internal constructor(
     }
 
     private fun onTap(suggestion: String) {
+        // An accepted suggestion is not the user spelling the word out: the run stops counting.
+        markRunDirty()
         val prefix = displayedPrefix
         if (prefix == null || displayedSessionId != sessionId) {
             // Nothing bound to the current session is displayed (e.g. the text changed and the old
@@ -862,5 +964,7 @@ class SuggestionsController internal constructor(
         // Sentinel for "no request is outstanding". [sessionId] starts at 0 and only ever grows,
         // so this can never be mistaken for a live generation.
         private const val NO_SESSION = -1L
+        /** No proper prefix of the current run has come back empty yet. */
+        private const val NO_EMPTY_RESULT = -1
     }
 }

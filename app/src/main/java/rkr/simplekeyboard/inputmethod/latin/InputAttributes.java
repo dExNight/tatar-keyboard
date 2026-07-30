@@ -51,6 +51,13 @@ public final class InputAttributes {
      */
     final public boolean mNoPersonalizedLearning;
     /**
+     * True for {@link InputType#TYPE_TEXT_VARIATION_POSTAL_ADDRESS}. Used ONLY as a factor of the
+     * E4c learning predicate: a street or a village name in Cyrillic passes every content filter
+     * the personal dictionary has, so the field type itself is the only thing that can tell it
+     * apart. Suggestions in such a field are unaffected.
+     */
+    final public boolean mIsPostalAddressField;
+    /**
      * Whether the floating gesture preview should be disabled. If true, this should override the
      * corresponding keyboard settings preference, always suppressing the floating preview text.
      */
@@ -66,6 +73,12 @@ public final class InputAttributes {
         mNoPersonalizedLearning = readNoPersonalizedLearning(editorInfo);
         mIsPasswordField = InputTypeUtils.isPasswordInputType(inputType)
                 || InputTypeUtils.isVisiblePasswordInputType(inputType);
+        // E4c, LOCAL to the personal dictionary: a postal-address field is NOT part of
+        // shouldSuppressSuggestions below, so suggestions stay on there exactly as before — only
+        // LEARNING is blocked. Computed here, before the non-text early return, for the same reason
+        // mNoPersonalizedLearning is: the answer must not depend on the input class.
+        mIsPostalAddressField = InputType.TYPE_TEXT_VARIATION_POSTAL_ADDRESS
+                == (inputType & InputType.TYPE_MASK_VARIATION);
         if (inputClass != InputType.TYPE_CLASS_TEXT) {
             // If we are not looking at a TYPE_CLASS_TEXT field, the following strange
             // cases may arise, so we do a couple sanity checks for them. If it's a

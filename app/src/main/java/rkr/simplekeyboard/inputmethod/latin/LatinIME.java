@@ -74,6 +74,7 @@ import rkr.simplekeyboard.inputmethod.latin.dictionary.storage.PublishedDictiona
 import rkr.simplekeyboard.inputmethod.latin.dictionary.personal.PersonalCandidateSource;
 import rkr.simplekeyboard.inputmethod.latin.dictionary.personal.PersonalSubtypes;
 import rkr.simplekeyboard.inputmethod.latin.dictionary.personalstore.PersonalDictionaries;
+import rkr.simplekeyboard.inputmethod.latin.dictionary.personalstore.PersonalLearning;
 import rkr.simplekeyboard.inputmethod.latin.emoji.EmojiPanelController;
 import rkr.simplekeyboard.inputmethod.latin.emoji.EmojiSetSnapshot;
 import rkr.simplekeyboard.inputmethod.latin.emoji.EmojiSurface;
@@ -455,6 +456,13 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
 
         mSuggestionsController = new SuggestionsController(
                 this, stripSurface, editorSurface, mHandler, engineFactory);
+        // E4c: clean completions become writes ONLY through this sink, and only when all five
+        // factors hold at the moment of the event. isTatarSuggestionsEligible() already carries
+        // three of them — the field allows suggestions, it does not ask us not to personalize, and
+        // an absent editorInfo is not eligible at all — so what is added here is the personal
+        // dictionary setting, the unlock state and the postal-address exclusion.
+        mSuggestionsController.setCompletionSink(PersonalLearning.sinkFor(
+                this, PersonalSubtypes.TATAR_RU, this::mayLearnPersonalWords));
         mSuggestionsController.onCreate();
         // Erasing words on the settings screen must unbind whatever the band is showing right now:
         // the screen and the IME live in the same process, so the store notifies us directly. The
@@ -772,6 +780,33 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
                 // user who has turned Tatar suggestions on everywhere else.
                 && !settingsValues.mInputAttributes.mNoPersonalizedLearning
                 && mInputLogic.mConnection.hasCursorPosition();
+    }
+
+    /**
+     * The E4c learning predicate — one predicate, five factors, shared by every write path
+     * (noteCompletion, the eventual learn, the accepted-suggestion counter and the pending flush).
+     *
+     * <p>Two of them deserve a note. {@code isUserUnlocked()} is not about an extra record: before
+     * the first unlock the snapshot is empty by construction, and writing is whole-file, so the
+     * first write to fire would build a file out of "empty plus one word" and atomically replace the
+     * user's real dictionary with it. The window is real — a directBootAware app has input fields
+     * before the unlock. The postal-address exclusion is local to this predicate on purpose: such a
+     * field is NOT part of shouldSuppressSuggestions, so suggestions there behave exactly as before,
+     * and only learning is blocked. TYPE_TEXT_VARIATION_PERSON_NAME is deliberately NOT excluded —
+     * names are precisely what this feature is for.</p>
+     */
+    private boolean mayLearnPersonalWords() {
+        if (!isTatarSuggestionsEligible()) {
+            return false;
+        }
+        if (!Settings.readPersonalDictionaryEnabled(mDevicePrefs)) {
+            return false;
+        }
+        final UserManager userManager = getSystemService(UserManager.class);
+        if (userManager == null || !userManager.isUserUnlocked()) {
+            return false;
+        }
+        return !mSettings.getCurrent().mInputAttributes.mIsPostalAddressField;
     }
 
     // The key-neighbor table for the fuzzy suggestion pass is derived from the live keyboard and
