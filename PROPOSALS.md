@@ -629,6 +629,34 @@ selection, subtype, generation и букв после курсора перед 
   поиск и гард по несовпадению subtypeId — `TpersValidatorTest`, `PersonalDictionaryReaderTest`,
   `PersonalSubtypeSeamTest`, `PersonalDictionaryReadPathPrivacyTest`.
 
+- единая редакция ранжирования на три класса (поправка 2026-07-30, E4b) —
+  `CompositePrefixComputerTest`, по одному поимённому тесту на пункт:
+  `personalOnlyWordTakesIndexOneWhenExactCandidatesExist`,
+  `personalOnlyWordTakesIndexZeroWhenThereAreNoExactCandidates`,
+  `atMostOnePersonalOnlyWordEverAppears`,
+  `theThirdExactCandidateIsPushedOutOfTheBandEntirely` (прямое следствие трёх ячеек),
+  `fuzzyCandidatesFollowBothExactAndPersonalOnly`,
+  `withThePersonalDictionaryOffTheResultIsByteForByteTheE3Result` (проверяется `assertSame` — не
+  равный список, а тот же самый объект), `duplicateByNormalizedFormOccupiesExactlyOneCell`,
+  `theStoredCasingWinsTheDuplicateWhenItDiffersFromTheNormalizedForm`,
+  `withinThePersonalSourceOrderIsUsageCountThenCodePoint`, плюс `aDuplicateNeverBecomesThePersonalOnlyWord`,
+  `aBrokenPersonalSourceCannotTakeDictionarySuggestionsDown` и `theBandCapMatchesTheStripAndTheIndex`;
+- раздел «Контракт личного словаря» (введён 2026-07-30, E4b) — `PersonalDictionaryContractTest`
+  (что хранится: запись = слово плюс два числа, заголовок арифметически исчерпан своими полями;
+  ключ по subtype; единственный сегодняшний путь создания записи — явное ручное добавление, а
+  обучение E4c отсутствует; гейт разблокировки fail-closed; чтение гейтится настройкой на каждом
+  lookup; ни сети, ни экспорта, ни синхронизации в пакетах личного словаря),
+  `PersonalDictionarySettingsTest` (один тумблер, default OFF, выключение не удаляет,
+  односторонняя enterprise-restriction — по тесту на направление, плюс отдельный тест на то, что
+  ключ НЕ попал в общий двунаправленный boolean-список),
+  `PersonalDictionaryScreenSourceContractTest` (все языки с группировкой, кап 200 строк на все
+  языки вместе, поиск до построения View и по нормализованной форме, «показано N из M» только при
+  усечении, `FLAG_SECURE` ровно один раз на всю Activity и никогда не снимается, три флага на
+  ОБОИХ полях ввода, поисковый запрос не уезжает в saved state, экран работает при выключенной
+  настройке, а следует ей только добавление) и `PersonalDictionaryErasureTest`
+  («стёрто значит стёрто»: отвязка показанных кандидатов тем же механизмом, что смена subtype,
+  устаревший результат не перерисовывает полосу, стирание охватывает все языки);
+
 Не покрыто JVM-тестами и заявляется только как проверка чтением исходника или на
 устройстве: guard `hasSelection()` внутри `InputLogic.commitChosenSuggestion` (Android-класс
 без JVM-обвязки), фактический пересчёт автозаглавной после тапа (сам вызов зафиксирован

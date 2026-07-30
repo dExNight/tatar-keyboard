@@ -29,13 +29,17 @@ import android.util.Log
 import android.view.View
 import android.view.ViewGroup
 import android.view.WindowInsets
+import android.view.WindowManager
+import android.view.inputmethod.EditorInfo
 import android.view.accessibility.AccessibilityNodeInfo
 import android.widget.CompoundButton
+import android.widget.EditText
 import android.widget.ImageButton
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.Switch
 import android.widget.TextView
+import android.widget.Toast
 import java.util.Locale
 import java.util.TreeSet
 import rkr.simplekeyboard.inputmethod.R
@@ -44,6 +48,7 @@ import rkr.simplekeyboard.inputmethod.keyboard.KeyboardLayoutSet
 import rkr.simplekeyboard.inputmethod.latin.AudioAndHapticFeedbackManager
 import rkr.simplekeyboard.inputmethod.latin.RichInputMethodManager
 import rkr.simplekeyboard.inputmethod.latin.common.LocaleUtils
+import rkr.simplekeyboard.inputmethod.latin.dictionary.personal.PersonalSubtypes
 import rkr.simplekeyboard.inputmethod.latin.emoji.EmojiPanelController
 import rkr.simplekeyboard.inputmethod.latin.utils.LocaleResourceUtils
 import rkr.simplekeyboard.inputmethod.latin.utils.SubtypeLocaleUtils
@@ -92,7 +97,8 @@ class SettingsHostActivity : Activity() {
         APPEARANCE(R.string.settings_screen_appearance),
         LANGUAGES(R.string.keyboard_languages),
         // Title is the language display name, set dynamically in showScreen.
-        LANGUAGE_DETAIL(0)
+        LANGUAGE_DETAIL(0),
+        PERSONAL_DICTIONARY(R.string.personal_dictionary)
     }
 
     companion object {
@@ -118,6 +124,13 @@ class SettingsHostActivity : Activity() {
     private var restrictionKeys: Set<String> = emptySet()
 
     /**
+     * The personal-dictionary search text. Deliberately transient: it is NOT written to
+     * [onSaveInstanceState], so it does not survive rotation and no fragment of a personal word
+     * travels through Binder into `system_server`.
+     */
+    private var personalSearchQuery: String = ""
+
+    /**
      * Registered on the device-protected prefs exactly like
      * SubScreenFragment.onCreate, minus its backup request: E2b-3 disables
      * backup entirely, so the only job left here is to clear the keyboard
@@ -136,6 +149,20 @@ class SettingsHostActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // FLAG_SECURE once, for the WHOLE activity, not per "screen": the screens here are not
+        // separate activities but swapped content in one ScrollView, and adding/clearing the flag
+        // during navigation is a known source of flicker, surface recreation and races with the
+        // recent-apps snapshot on OEM builds. Without it the list of what the user typed lands in
+        // the recent-apps thumbnail and can be screenshotted. Nobody suffers from a permanent flag
+        // on a keyboard settings screen.
+        window.setFlags(WindowManager.LayoutParams.FLAG_SECURE,
+                WindowManager.LayoutParams.FLAG_SECURE)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            // Content capture is switched off for the whole window by the API that actually exists
+            // publicly for it (added in R). Without it the platform's content-capture pipeline may
+            // see the saved words rendered on the screen.
+            window.decorView.importantForContentCapture = View.IMPORTANT_FOR_CONTENT_CAPTURE_NO
+        }
         setContentView(R.layout.settings_screen)
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
@@ -235,6 +262,7 @@ class SettingsHostActivity : Activity() {
             Screen.APPEARANCE -> buildAppearanceScreen()
             Screen.LANGUAGES -> buildLanguagesScreen()
             Screen.LANGUAGE_DETAIL -> buildLanguageDetailScreen(detail!!)
+            Screen.PERSONAL_DICTIONARY -> buildPersonalDictionaryScreen()
         }
         scrollView.scrollTo(0, 0)
     }
@@ -305,12 +333,176 @@ class SettingsHostActivity : Activity() {
         setRowEnabled(personalRow,
                 Settings.readTatarSuggestionsEnabled(prefs)
                         && !isRestricted(Settings.PREF_PERSONAL_DICTIONARY))
+        // Reachable whatever the toggles say: erasing what was already saved must always be
+        // possible, so the entry never depends on the switch above it.
+        addCard(listOf(linkRow(R.string.personal_dictionary_screen) {
+            navigateTo(Screen.PERSONAL_DICTIONARY)
+        }))
         // A data action, not an appearance toggle: its own card at the end of Preferences, next to
         // the Tatar-suggestions switch. Erasing recent emoji is a confirmed, one-way action; it does
         // not belong on the Appearance screen where the emoji-key toggle lives.
         addCard(listOf(actionRow(R.string.clear_recent_emoji) {
             showClearRecentEmojiDialog()
         }))
+    }
+
+    /**
+     * The "Personal dictionary" screen (E4b): the words of EVERY language, grouped by language, with
+     * a search field, an "Add word…" row, a "Delete" action on each shown row and "Erase all".
+     *
+     * Fully usable with the setting off — erasing what was already saved must always be possible.
+     * Only ADDING follows the setting, because the acceptance says that with the personal dictionary
+     * off not a single file is created.
+     *
+     * The search text deliberately does NOT survive rotation: `onSaveInstanceState` carries the
+     * screen, the back stack and the detail locale, and a Bundle travels through Binder into
+     * `system_server` — putting a fragment of a personal word there for the convenience of a rotation
+     * is not a trade worth making. Documented in docs/DICTIONARY-E4.md as expected behaviour.
+     */
+    private fun buildPersonalDictionaryScreen() {
+        val controller = PersonalDictionaryScreenController(this)
+        val subtypeIds = personalSubtypeIds()
+        val content = PersonalDictionaryScreenModel.build(
+                controller.sections(subtypeIds), personalSearchQuery)
+
+        addCard(listOf(
+                textInputRow(R.string.personal_dictionary_search_hint, personalSearchQuery) { text ->
+                    // Filtering happens before any row View exists: the whole screen is simply
+                    // rebuilt from the model with the new query.
+                    personalSearchQuery = text
+                    showScreen(Screen.PERSONAL_DICTIONARY)
+                }))
+
+        val addRow = actionRow(R.string.personal_dictionary_add) {
+            showAddPersonalWordDialog(controller, subtypeIds)
+        }
+        addCard(listOf(addRow))
+        setRowEnabled(addRow, Settings.readPersonalDictionaryEnabled(prefs)
+                && !isRestricted(Settings.PREF_PERSONAL_DICTIONARY))
+
+        if (content.totalCount == 0) {
+            addCard(listOf(inflateRow(R.layout.row_link,
+                    getString(if (personalSearchQuery.isEmpty()) {
+                        R.string.personal_dictionary_empty
+                    } else {
+                        R.string.personal_dictionary_no_matches
+                    }), null).also {
+                it.findViewById<View>(R.id.row_chevron).visibility = View.GONE
+            }))
+        }
+
+        for (section in content.sections) {
+            addSectionHeader(
+                    LocaleResourceUtils.getLocaleDisplayNameInSystemLocale(section.subtypeId))
+            addCard(section.rows.map { row ->
+                inflateRow(R.layout.row_link, row.rawForm,
+                        getString(R.string.personal_dictionary_delete)).also { view ->
+                    view.findViewById<View>(R.id.row_chevron).visibility = View.GONE
+                    view.setOnClickListener {
+                        showForgetPersonalWordDialog(controller, row)
+                    }
+                }
+            })
+        }
+
+        if (content.isTruncated) {
+            // Never silently truncated: a capped list that does not say so reads as "this is
+            // everything you saved", which would be a lie the user cannot detect.
+            addCard(listOf(inflateRow(R.layout.row_link,
+                    getString(R.string.personal_dictionary_shown_of_total,
+                            content.shownCount, content.totalCount), null).also {
+                it.findViewById<View>(R.id.row_chevron).visibility = View.GONE
+            }))
+        }
+
+        if (content.totalCount > 0 || personalSearchQuery.isNotEmpty()) {
+            addCard(listOf(actionRow(R.string.personal_dictionary_erase_all) {
+                showErasePersonalDictionaryDialog(controller, subtypeIds)
+            }))
+        }
+    }
+
+    /** Subtypes whose words the screen shows: every enabled one, in the order the system lists them. */
+    private fun personalSubtypeIds(): List<String> =
+            richImm.getEnabledSubtypes(true).map { it.locale }.distinct()
+
+    private fun showAddPersonalWordDialog(
+            controller: PersonalDictionaryScreenController, subtypeIds: List<String>) {
+        val field = layoutInflater.inflate(R.layout.row_text_input, contentView, false) as EditText
+        applyPrivateInputFlags(field)
+        field.setHint(R.string.personal_dictionary_add_hint)
+        currentDialog?.dismiss()
+        currentDialog = AlertDialog.Builder(this)
+                .setTitle(R.string.personal_dictionary_add)
+                .setView(field)
+                .setPositiveButton(R.string.personal_dictionary_add_action) { _, _ ->
+                    val subtypeId = subtypeIds.firstOrNull { PersonalSubtypes.alphabetFor(it) != null }
+                    val added = subtypeId != null
+                            && controller.addWord(subtypeId, field.text.toString())
+                    if (!added) {
+                        Toast.makeText(this, R.string.personal_dictionary_add_rejected,
+                                Toast.LENGTH_SHORT).show()
+                    }
+                    showScreen(Screen.PERSONAL_DICTIONARY)
+                }
+                .setNegativeButton(android.R.string.cancel, null)
+                .show()
+    }
+
+    private fun showForgetPersonalWordDialog(
+            controller: PersonalDictionaryScreenController, row: PersonalWordRow) {
+        currentDialog?.dismiss()
+        currentDialog = AlertDialog.Builder(this)
+                .setTitle(getString(R.string.personal_dictionary_forget_title, row.rawForm))
+                .setPositiveButton(R.string.personal_dictionary_delete) { _, _ ->
+                    controller.removeWord(row.subtypeId, row.normalizedForm)
+                    showScreen(Screen.PERSONAL_DICTIONARY)
+                }
+                .setNegativeButton(android.R.string.cancel, null)
+                .show()
+    }
+
+    private fun showErasePersonalDictionaryDialog(
+            controller: PersonalDictionaryScreenController, subtypeIds: List<String>) {
+        currentDialog?.dismiss()
+        currentDialog = AlertDialog.Builder(this)
+                .setTitle(R.string.personal_dictionary_erase_all)
+                .setMessage(R.string.personal_dictionary_erase_confirm)
+                .setPositiveButton(R.string.personal_dictionary_erase_action) { _, _ ->
+                    controller.eraseAll(subtypeIds)
+                    showScreen(Screen.PERSONAL_DICTIONARY)
+                }
+                .setNegativeButton(android.R.string.cancel, null)
+                .show()
+    }
+
+    /**
+     * The three flags both text fields of this screen carry — the search field and the "Add word…"
+     * field. Without them the name or the village a user puts into OUR private dictionary would be
+     * learned and synced to the cloud by whichever third-party keyboard is typing it (people
+     * normally have two installed), or picked up by an autofill service. The search field takes the
+     * very same personal words as the add field, so there is no exception here.
+     */
+    private fun applyPrivateInputFlags(field: EditText) {
+        field.imeOptions = field.imeOptions or EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING
+        field.inputType = field.inputType or EditorInfo.TYPE_TEXT_FLAG_NO_SUGGESTIONS
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            field.importantForAutofill = View.IMPORTANT_FOR_AUTOFILL_NO
+        }
+    }
+
+    private fun textInputRow(hintRes: Int, initialText: String,
+                             onTextCommitted: (String) -> Unit): View {
+        val field = layoutInflater.inflate(R.layout.row_text_input, contentView, false) as EditText
+        applyPrivateInputFlags(field)
+        field.setHint(hintRes)
+        field.setText(initialText)
+        field.imeOptions = field.imeOptions or EditorInfo.IME_ACTION_SEARCH
+        field.setOnEditorActionListener { view, _, _ ->
+            onTextCommitted(view.text.toString())
+            true
+        }
+        return field
     }
 
     private fun buildKeyPressScreen() {

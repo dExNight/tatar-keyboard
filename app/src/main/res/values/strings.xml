@@ -156,6 +156,34 @@
     <string name="personal_dictionary">Personal dictionary</string>
     <!-- Description for the personal dictionary option. Says plainly that words are saved on the device and that turning the option off keeps what was already saved. -->
     <string name="personal_dictionary_summary">Remember words you type and suggest them later. Saved on this device only. Turning this off keeps what is already saved — erase it on the Personal dictionary screen.</string>
+    <!-- Entry row leading to the screen with the words the keyboard has saved -->
+    <string name="personal_dictionary_screen">Saved words</string>
+    <!-- Hint of the search field on the personal dictionary screen -->
+    <string name="personal_dictionary_search_hint">Search saved words</string>
+    <!-- Row that opens a dialog for adding one word by hand -->
+    <string name="personal_dictionary_add">Add word\u2026</string>
+    <!-- Hint of the text field in the add-word dialog -->
+    <string name="personal_dictionary_add_hint">Word</string>
+    <!-- Affirmative button of the add-word dialog -->
+    <string name="personal_dictionary_add_action">Add</string>
+    <!-- Shown when the typed word cannot go into the personal dictionary -->
+    <string name="personal_dictionary_add_rejected">This word cannot be saved: use 3 to 24 Tatar letters, without digits or punctuation.</string>
+    <!-- Action that removes one saved word -->
+    <string name="personal_dictionary_delete">Delete</string>
+    <!-- Title of the dialog confirming removal of one word. %1$s is the word itself. -->
+    <string name="personal_dictionary_forget_title">Forget \u201c%1$s\u201d?</string>
+    <!-- Row and dialog title for erasing every saved word of every language -->
+    <string name="personal_dictionary_erase_all">Erase all saved words</string>
+    <!-- Body of the erase-everything dialog -->
+    <string name="personal_dictionary_erase_confirm">Remove every word saved on this device, in all languages? This cannot be undone.</string>
+    <!-- Affirmative button of the erase-everything dialog. Names the action rather than saying OK: it is destructive and irreversible. -->
+    <string name="personal_dictionary_erase_action">Erase</string>
+    <!-- Shown when nothing has been saved yet -->
+    <string name="personal_dictionary_empty">No saved words yet. Words you type are saved here once the personal dictionary is on.</string>
+    <!-- Shown when the search matches nothing -->
+    <string name="personal_dictionary_no_matches">No words match your search.</string>
+    <!-- Says how many of the matching words are actually listed. %1$d is shown, %2$d is the total. -->
+    <string name="personal_dictionary_shown_of_total">Showing %1$d of %2$d. Use search to narrow the list.</string>
     <!-- Title of the settings item and its confirmation dialog that erases recently used emoji -->
     <string name="clear_recent_emoji">Clear recent emoji</string>
     <!-- Body of the confirmation dialog that erases recently used emoji -->
