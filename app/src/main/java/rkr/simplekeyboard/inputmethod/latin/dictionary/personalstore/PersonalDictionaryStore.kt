@@ -137,6 +137,13 @@ internal class PersonalDictionaryStore(
         if (writeWhole(entries)) pendingCounterFlush = false
     }
 
+    /**
+     * Opens the store on its worker if it is not open yet, publishing the snapshot the engine will
+     * read. A no-op afterwards. Safe to call from any thread — like every other mutation it is an
+     * event on the executor, so the file read never lands on the caller's thread.
+     */
+    fun prime() = onWorker { open() }
+
     /** Test hook: runs [block] on the store's executor (so tests can drive the serialized owner). */
     fun runOnWorker(block: () -> Unit) = onWorker(block)
 

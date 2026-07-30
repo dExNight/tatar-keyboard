@@ -20,6 +20,7 @@ import rkr.simplekeyboard.inputmethod.latin.dictionary.engine.LookupToken
 import rkr.simplekeyboard.inputmethod.latin.dictionary.engine.KeyNeighborTable
 import rkr.simplekeyboard.inputmethod.latin.dictionary.engine.MappedDictionaryEngine
 import rkr.simplekeyboard.inputmethod.latin.dictionary.engine.ResultHandoff
+import rkr.simplekeyboard.inputmethod.latin.dictionary.personal.PersonalCandidateSource
 import rkr.simplekeyboard.inputmethod.latin.dictionary.storage.PublishedDictionaryCatalog
 import java.util.concurrent.TimeUnit
 
@@ -99,14 +100,18 @@ class MappedEngineHandle private constructor(
          * spawns a throwaway executor of its own.
          */
         @JvmStatic
+        @JvmOverloads
         fun start(
             catalog: PublishedDictionaryCatalog,
             callback: ResultCallback,
+            personalCandidates: PersonalCandidateSource = PersonalCandidateSource.EMPTY,
         ): MappedEngineHandle? {
             val handoff = ResultHandoff { result ->
                 callback.onResult(result.token, result.suggestions)
             }
-            val engine = MappedDictionaryEngine.start(catalog, handoff) ?: return null
+            val engine = MappedDictionaryEngine.start(
+                catalog, handoff, personalCandidates = personalCandidates,
+            ) ?: return null
             return MappedEngineHandle(engine)
         }
     }

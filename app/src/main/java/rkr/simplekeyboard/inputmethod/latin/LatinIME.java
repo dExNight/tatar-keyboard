@@ -71,7 +71,9 @@ import rkr.simplekeyboard.inputmethod.latin.common.Constants;
 import rkr.simplekeyboard.inputmethod.latin.define.DebugFlags;
 import rkr.simplekeyboard.inputmethod.latin.inputlogic.InputLogic;
 import rkr.simplekeyboard.inputmethod.latin.dictionary.storage.PublishedDictionaryCatalog;
+import rkr.simplekeyboard.inputmethod.latin.dictionary.personal.PersonalCandidateSource;
 import rkr.simplekeyboard.inputmethod.latin.dictionary.personal.PersonalSubtypes;
+import rkr.simplekeyboard.inputmethod.latin.dictionary.personalstore.PersonalDictionaries;
 import rkr.simplekeyboard.inputmethod.latin.emoji.EmojiPanelController;
 import rkr.simplekeyboard.inputmethod.latin.emoji.EmojiSetSnapshot;
 import rkr.simplekeyboard.inputmethod.latin.emoji.EmojiSurface;
@@ -441,12 +443,28 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
             if (catalog == null) {
                 return null;
             }
-            return MappedEngineHandle.start(catalog, resultCallback);
+            // The personal side of the merge (E4b). The gate is read on every lookup rather than
+            // baked in here, so turning the setting off stops personal candidates on the next
+            // keystroke without restarting the engine, its lease or its mapping. Reading is bound to
+            // the active subtype: personal words of one language can never surface in another.
+            final PersonalCandidateSource personalCandidates =
+                    PersonalDictionaries.sourceFor(this, PersonalSubtypes.TATAR_RU,
+                            () -> Settings.readPersonalDictionaryEnabled(mDevicePrefs));
+            return MappedEngineHandle.start(catalog, resultCallback, personalCandidates);
         };
 
         mSuggestionsController = new SuggestionsController(
                 this, stripSurface, editorSurface, mHandler, engineFactory);
         mSuggestionsController.onCreate();
+        // Erasing words on the settings screen must unbind whatever the band is showing right now:
+        // the screen and the IME live in the same process, so the store notifies us directly. The
+        // callback arrives on the store's worker, hence the hop to the UI thread.
+        PersonalDictionaries.setErasureListener(() -> mHandler.post(() -> {
+            final SuggestionsController controller = mSuggestionsController;
+            if (controller != null) {
+                controller.onPersonalDictionaryErased();
+            }
+        }));
     }
 
     /**
@@ -788,6 +806,9 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
 
     @Override
     public void onDestroy() {
+        // Dropped first: the listener holds this service, and the store outlives it (it is
+        // process-wide). Leaving it registered would keep a destroyed IME reachable.
+        PersonalDictionaries.setErasureListener(null);
         if (mSuggestionsController != null) {
             mSuggestionsController.onDestroy();
         }

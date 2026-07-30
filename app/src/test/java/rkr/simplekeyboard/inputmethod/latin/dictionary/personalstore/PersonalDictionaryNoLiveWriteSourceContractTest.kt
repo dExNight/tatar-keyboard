@@ -22,11 +22,20 @@ import org.junit.Test
 import java.io.File
 
 /**
- * E4a-2 introduces the write path but wires NOTHING into the live IME: no toggle, no merge, no
- * learning. Writing is exercised only from tests through the explicit store API, so in the running
- * app not a single word is ever written. This test proves it by source: neither `LatinIME` nor
- * `SuggestionsController` reference the store, and every main reference to the store class lives
- * inside its own package.
+ * The TYPING path never writes a personal word.
+ *
+ * E4a-2 stated this as "nothing outside the store's own package references it", which was true while
+ * the feature was dormant. E4b connects it: the screen adds, removes and erases words, and the IME
+ * reads the published snapshot and registers an erasure listener. What must NOT arrive before E4c is
+ * learning — a word saved as a consequence of typing — so the guarantee is now stated where it
+ * actually lives:
+ *
+ *  - `SuggestionsController`, the class that sees every keystroke, does not reference the store
+ *    package at all (unchanged, and the strongest of the three);
+ *  - `LatinIME` may reach the process-wide owner for the READ source and the erasure listener, but
+ *    calls no mutation on it;
+ *  - outside the store package, the only file allowed to call a mutation is the settings screen,
+ *    where the user asks for it explicitly.
  */
 class PersonalDictionaryNoLiveWriteSourceContractTest {
     private val latinIme by lazy {
@@ -36,34 +45,65 @@ class PersonalDictionaryNoLiveWriteSourceContractTest {
         File(sourceRoot(), "java/rkr/simplekeyboard/inputmethod/latin/suggestions/SuggestionsController.kt").readText()
     }
 
+    /** Every mutation the store exposes. Learning would have to call one of these. */
+    private val mutations = listOf(
+        "addManually(", "forget(", "clearAll(", "noteAcceptedSuggestion(", "flush(", "writeWhole(",
+    )
+
     @Test
-    fun neitherTheImeNorTheSuggestionsControllerReferenceThePersonalStore() {
+    fun theSuggestionsControllerNeverReferencesThePersonalStore() {
         for (marker in listOf(
             "PersonalDictionaryStore",
             "AndroidPersonalDictionaryStorage",
+            "PersonalDictionaries",
             "personalstore",
         )) {
-            assertFalse("LatinIME references $marker", latinIme.contains(marker))
-            assertFalse("SuggestionsController references $marker", suggestionsController.contains(marker))
+            assertFalse(
+                "SuggestionsController — the class that sees every keystroke — references $marker",
+                suggestionsController.contains(marker),
+            )
         }
     }
 
     @Test
-    fun everyMainReferenceToThePersonalStoreLivesInItsOwnPackage() {
+    fun theImeReadsAndUnbindsButNeverWrites() {
+        assertTrue("the IME wires the read source",
+            latinIme.contains("PersonalDictionaries.sourceFor("))
+        for (mutation in mutations) {
+            assertFalse(
+                "the typing path must not write: LatinIME calls $mutation — learning is E4c",
+                latinIme.contains(mutation),
+            )
+        }
+        // Fail-capable: the same predicate against a source that does call one.
+        assertTrue((latinIme + "store.addManually(word)").contains("addManually("))
+    }
+
+    @Test
+    fun outsideItsPackageOnlyTheSettingsScreenMutatesThePersonalDictionary() {
         val javaRoot = File(sourceRoot(), "java")
-        val offenders = javaRoot.walkTopDown()
+        val separator = File.separator
+        val packagePath = "dictionary${separator}personalstore$separator"
+        val allowedOutside = "settings${separator}PersonalDictionaryScreen"
+
+        // Only files that know about the personal dictionary at all: `clearAll(`/`flush(` are
+        // ordinary verbs and also belong to unrelated stores (the recent-emoji one, for instance).
+        val mutatingFiles = javaRoot.walkTopDown()
             .filter { it.isFile && (it.extension == "kt" || it.extension == "java") }
-            .filter { it.readText().contains("PersonalDictionaryStore") }
+            .filter { file ->
+                val text = file.readText()
+                val knowsThePersonalStore = text.contains("PersonalDictionaryStore") ||
+                    text.contains("PersonalDictionaries")
+                knowsThePersonalStore && mutations.any { text.contains(it) }
+            }
             .map { it.path }
             .toList()
 
-        assertTrue("something references the store, so the class exists", offenders.isNotEmpty())
-        val separator = File.separator
-        val packagePath = "dictionary${separator}personalstore$separator"
-        for (path in offenders) {
+        assertTrue("something mutates the store, so the API exists", mutatingFiles.isNotEmpty())
+        for (path in mutatingFiles) {
             assertTrue(
-                "the store is referenced outside its own package: $path",
-                path.contains(packagePath),
+                "a mutation lives outside the store package and outside the screen: $path",
+                path.contains(packagePath) || path.contains(allowedOutside),
             )
         }
     }

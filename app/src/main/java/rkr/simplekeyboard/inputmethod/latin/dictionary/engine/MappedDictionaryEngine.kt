@@ -1,5 +1,6 @@
 package rkr.simplekeyboard.inputmethod.latin.dictionary.engine
 
+import rkr.simplekeyboard.inputmethod.latin.dictionary.personal.PersonalCandidateSource
 import rkr.simplekeyboard.inputmethod.latin.dictionary.storage.DictionaryFileLease
 import rkr.simplekeyboard.inputmethod.latin.dictionary.storage.PublishedDictionaryCatalog
 import java.io.File
@@ -96,13 +97,16 @@ class MappedDictionaryEngine private constructor(
             executorFactory: () -> EngineExecutor =
                 ExecutorServiceEngineExecutor::singleThread,
             mapper: DictionaryMapper = FILE_MAPPER,
+            personalCandidates: PersonalCandidateSource = PersonalCandidateSource.EMPTY,
         ): MappedDictionaryEngine? {
             val lease = try {
                 catalog.acquireLatestForActivation()
             } catch (_: Throwable) {
                 null
             } ?: return null
-            return startOwnedLease(lease, catalog, resultHandoff, executorFactory, mapper)
+            return startOwnedLease(
+                lease, catalog, resultHandoff, executorFactory, mapper, personalCandidates,
+            )
         }
 
         private fun startOwnedLease(
@@ -111,6 +115,7 @@ class MappedDictionaryEngine private constructor(
             resultHandoff: ResultHandoff,
             executorFactory: () -> EngineExecutor,
             mapper: DictionaryMapper,
+            personalCandidates: PersonalCandidateSource,
         ): MappedDictionaryEngine? {
             val dictionary = lease.dictionary
             val identity = DictionaryIdentity(
@@ -132,9 +137,14 @@ class MappedDictionaryEngine private constructor(
                 val executor = executorFactory()
                 createdExecutor = executor
                 val resources = Resources(lease, catalog, mapped, index)
+                // The three-class merge of E4b lives in the same computer as the E3 fuzzy pass,
+                // because only there are both the candidate classes and the frequencies known. The
+                // engine's public surface does not widen: what goes out through PrefixComputer.lookup
+                // is still a List<String>, and there is no second request, token or isCurrent.
+                val computer = CompositePrefixComputer(index, personalCandidates)
                 val engine = LatestOnlyPrefixEngine(
                     identity,
-                    index,
+                    computer,
                     executor,
                     resultHandoff,
                     resources::release,

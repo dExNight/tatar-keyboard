@@ -15,6 +15,22 @@ internal fun interface PrefixComputer {
 }
 
 /**
+ * A [PrefixComputer] that also reports how many of the results it just returned were EXACT
+ * dictionary candidates; the rest are fuzzy (E3).
+ *
+ * The three-class merge of E4b has to insert one personal word BETWEEN the exact and the fuzzy
+ * candidates, so it must know where the boundary is — and the frozen `lookup` signature returns a
+ * bare `List<String>` that cannot carry it. The count is exposed as state rather than as a richer
+ * return type on purpose: `lookup` stays frozen, and no object is allocated per lookup to carry two
+ * numbers. Reading it is safe under exactly the guarantee the index's scratch buffers already rely
+ * on — at most one active worker, serialized by `LatestOnlyPrefixEngine`.
+ */
+internal interface ClassifiedPrefixComputer : PrefixComputer {
+    /** Number of LEADING results of the last [lookup] that are exact candidates. */
+    val lastExactCount: Int
+}
+
+/**
  * Receives the current key-neighbor table for a computer that runs a fuzzy pass. Kept separate from
  * [PrefixComputer] so the frozen `lookup` signature never changes.
  */
@@ -83,7 +99,7 @@ internal class TdictPrefixIndex private constructor(
     private val offsetsOffset: Int,
     private val frequenciesOffset: Int,
     private val blobOffset: Int,
-) : PrefixComputer, KeyNeighborSink {
+) : ClassifiedPrefixComputer, KeyNeighborSink {
     // Reusable per-index scratch. The index stops being fully immutable: these buffers are touched
     // ONLY inside lookup(), whose exclusivity is guaranteed by LatestOnlyPrefixEngine serialization
     // (at most one active worker). updateKeyNeighbors() only swaps a @Volatile reference.
@@ -103,6 +119,14 @@ internal class TdictPrefixIndex private constructor(
 
     @Volatile
     private var neighborTable: KeyNeighborTable? = null
+
+    /**
+     * How many leading results of the last [lookup] are exact. Worker-confined exactly like the
+     * scratch buffers above; reset at the top of every lookup so a failed or rejected one cannot
+     * leave a stale boundary behind for the merge to trust.
+     */
+    override var lastExactCount = 0
+        private set
 
     // Test-only observability of the last lookup's fuzzy work. These are plain ints assigned on the
     // hot path (no allocation, no logging); they let the JVM harness report measured variants and
@@ -137,6 +161,7 @@ internal class TdictPrefixIndex private constructor(
 
     override fun lookup(normalizedPrefixUtf8: ImmutableUtf8Prefix): List<String> {
         val prefixLength = normalizedPrefixUtf8.byteCount
+        lastExactCount = 0
         if (prefixLength == 0 ||
             prefixLength > MAX_PREFIX_BYTES ||
             !isValidUtf8Scalar(normalizedPrefixUtf8)
@@ -151,6 +176,9 @@ internal class TdictPrefixIndex private constructor(
                 exactScratch[offset] = normalizedPrefixUtf8.byteAt(offset).toByte()
             }
             var resultCount = collectExact(prefixLength)
+            // Recorded before the fuzzy pass appends to the same ranked arrays: everything after
+            // this many slots is fuzzy, which is exactly what the E4b merge needs to know.
+            lastExactCount = resultCount
             // The fuzzy level fills only cells left empty by D1, and only when the exact pass
             // returned fewer than three candidates: one check, no new state. Exact candidates are
             // never shifted or replaced.
@@ -170,6 +198,7 @@ internal class TdictPrefixIndex private constructor(
                 }
             }
         } catch (_: RuntimeException) {
+            lastExactCount = 0
             emptyList()
         }
     }

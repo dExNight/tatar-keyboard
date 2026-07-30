@@ -58,7 +58,16 @@ class PersonalDictionary private constructor(
      * The final three-class merge with the dictionary asset and the exact-vs-fuzzy ranking are
      * E4b; this is the read-only building block only.
      */
-    fun lookupRawForms(normalizedPrefix: String): List<String> {
+    fun lookupRawForms(normalizedPrefix: String): List<String> =
+        lookupCandidates(normalizedPrefix).map(PersonalCandidate::rawForm)
+
+    /**
+     * The same search as [lookupRawForms], but each match carries BOTH forms: the raw one to show
+     * and the normalized one to compare by. The three-class merge (E4b) needs both — duplicate
+     * detection against dictionary candidates is defined on the normalized form, while the cell
+     * shows the form the user saved.
+     */
+    fun lookupCandidates(normalizedPrefix: String): List<PersonalCandidate> {
         if (isEmpty || normalizedPrefix.isEmpty()) return emptyList()
         val start = lowerBound(normalizedPrefix)
         var index = start
@@ -72,7 +81,7 @@ class PersonalDictionary private constructor(
         matches.sortWith(
             compareByDescending<Int> { usageCounts[it] }.thenBy { it },
         )
-        return matches.map { rawForms[it] }
+        return matches.map { PersonalCandidate(rawForms[it], normalizedForms[it]) }
     }
 
     /** First index whose normalized form is >= [key]; a plain binary lower bound. */

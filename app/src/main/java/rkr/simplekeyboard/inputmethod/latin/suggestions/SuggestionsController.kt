@@ -400,6 +400,29 @@ class SuggestionsController internal constructor(
     }
 
     /**
+     * Personal words were erased ("Erase all" or "Forget", E4b) while the keyboard is up.
+     *
+     * Uses EXACTLY the mechanism of an actual subtype change — bump the session (which invalidates
+     * any in-flight generation), idle the engine, unbind the displayed candidates — because a second
+     * mechanism for the same job is what drifts apart later. The engine itself is untouched: the
+     * personal source it reads has already published an empty snapshot, so the next lookup simply
+     * finds nothing personal.
+     *
+     * Saying only "the NEXT lookup has no personal candidates" would not be enough: the user who
+     * just confirmed the dialog would still see the erased word in the band, and a tap would insert
+     * it through the single commit path like any other candidate. For a feature whose whole value is
+     * "erased means erased", that is a defect in the guarantee itself.
+     */
+    fun onPersonalDictionaryErased() {
+        if (destroyed) return
+        sessionId++
+        engine?.finishInput()
+        displayedPrefix = null
+        displayedSessionId = NO_SESSION
+        if (eligible) strip.reserve() else strip.hideSuggestions()
+    }
+
+    /**
      * The suggestions setting went ON -> OFF while the IME is live.
      *
      * Everything the user can see or reach stops at once, but the engine teardown is only
