@@ -126,6 +126,15 @@ internal class PersonalDictionaryStore(
         if (!open()) return@onWorker
         alphabet ?: return@onWorker
         val normalized = PersonalWordFilter.normalize(word)
+        // The pending hash goes with the word: forgetting it must not leave progress behind that
+        // would re-learn it after three more completions.
+        salt?.let { existing ->
+            val key = PendingCounters.keyOf(existing, normalized)
+            if (pending.countOf(key) > 0) {
+                pending = pending.without(key)
+                pendingDirty = true
+            }
+        }
         val candidate = entries.remove(normalized)
         if (candidate === entries) return@onWorker
         if (candidate.isEmpty) {

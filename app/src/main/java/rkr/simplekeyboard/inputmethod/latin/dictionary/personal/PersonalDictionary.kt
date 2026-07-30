@@ -84,6 +84,16 @@ class PersonalDictionary private constructor(
         return matches.map { PersonalCandidate(rawForms[it], normalizedForms[it]) }
     }
 
+    /**
+     * The index of [normalized] in the parallel array of normalized forms, or -1. A BINARY search,
+     * as the E4d contract requires — the array is sorted by that very form, and a linear scan over
+     * up to 2 000 entries would run on the UI thread's long-press timer.
+     */
+    fun indexOfNormalized(normalized: String): Int {
+        val index = lowerBound(normalized)
+        return if (index < normalizedForms.size && normalizedForms[index] == normalized) index else -1
+    }
+
     /** First index whose normalized form is >= [key]; a plain binary lower bound. */
     private fun lowerBound(key: String): Int {
         var low = 0

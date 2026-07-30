@@ -74,6 +74,7 @@ import rkr.simplekeyboard.inputmethod.latin.dictionary.storage.PublishedDictiona
 import rkr.simplekeyboard.inputmethod.latin.dictionary.personal.PersonalCandidateSource;
 import rkr.simplekeyboard.inputmethod.latin.dictionary.personal.PersonalSubtypes;
 import rkr.simplekeyboard.inputmethod.latin.dictionary.personalstore.PersonalDictionaries;
+import rkr.simplekeyboard.inputmethod.latin.dictionary.personalstore.PersonalForget;
 import rkr.simplekeyboard.inputmethod.latin.dictionary.personalstore.PersonalLearning;
 import rkr.simplekeyboard.inputmethod.latin.emoji.EmojiPanelController;
 import rkr.simplekeyboard.inputmethod.latin.emoji.EmojiSetSnapshot;
@@ -392,6 +393,10 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
                 }
                 strip.setOnSuggestionClickListener(
                         (cellId, suggestion) -> listener.onTap(suggestion));
+                // E4d: the long press is wired next to the tap, on the same strip instance, so a
+                // strip created later (the band appears lazily) gets both or neither.
+                strip.setOnSuggestionLongPressListener(
+                        (cellId, suggestion) -> showForgetPersonalWordDialog(suggestion));
             }
         };
 
@@ -665,6 +670,47 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         attachDialogToInputWindow(dialog, windowToken);
         // Same field the subtype picker uses, so hideWindow() dismisses this dialog and clears the
         // reference through the one existing path instead of a second mechanism.
+        mOptionsDialog = dialog;
+        dialog.show();
+    }
+
+    /**
+     * "Forget «X»?" for a word the personal dictionary holds (E4d).
+     *
+     * <p>Long-pressing a cell that shows an ordinary dictionary word does nothing at all: the lookup
+     * below simply finds no personal entry. The word is looked up by its NORMALIZED form against the
+     * published snapshot, never by the string on screen — the shown string has already been through
+     * applyCasing for an INITIAL_CAPS or ALL_CAPS prefix, and a search by it would silently miss the
+     * saved spelling exactly when the user typed in capitals.</p>
+     */
+    private void showForgetPersonalWordDialog(final String shownWord) {
+        if (!Settings.readPersonalDictionaryEnabled(mDevicePrefs)) {
+            return;
+        }
+        final String savedForm =
+                PersonalForget.savedFormOf(this, PersonalSubtypes.TATAR_RU, shownWord);
+        if (savedForm == null) {
+            // An ordinary dictionary word: a long press on it is a no-op by contract.
+            return;
+        }
+        final MainKeyboardView mainKeyboardView = mKeyboardSwitcher.getMainKeyboardView();
+        if (mainKeyboardView == null) {
+            return;
+        }
+        final IBinder windowToken = mainKeyboardView.getWindowToken();
+        if (windowToken == null) {
+            return;
+        }
+        final AlertDialog dialog = new AlertDialog.Builder(
+                DialogUtils.getPlatformDialogThemeContext(this))
+                .setTitle(getString(R.string.personal_dictionary_forget_title, savedForm))
+                .setPositiveButton(R.string.personal_dictionary_delete, (di, which) ->
+                        PersonalForget.confirmForget(this, PersonalSubtypes.TATAR_RU, shownWord))
+                .setNegativeButton(android.R.string.cancel, null)
+                .create();
+        dialog.setCancelable(true);
+        dialog.setCanceledOnTouchOutside(true);
+        attachDialogToInputWindow(dialog, windowToken);
         mOptionsDialog = dialog;
         dialog.show();
     }

@@ -28,6 +28,7 @@ import android.util.AttributeSet
 import android.util.TypedValue
 import android.view.MotionEvent
 import android.view.View
+import android.view.ViewConfiguration
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityManager
 import androidx.core.view.ViewCompat
@@ -42,6 +43,15 @@ class SuggestionStripView @JvmOverloads constructor(
 ) : View(context, attrs, R.attr.mainKeyboardViewStyle) {
     fun interface OnSuggestionClickListener {
         fun onSuggestionClick(cellId: Int, suggestion: String)
+    }
+
+    /**
+     * A long press on a filled cell (E4d). The word shown there is passed as it is displayed;
+     * whether it belongs to the personal dictionary — and therefore whether anything happens at all
+     * — is decided on the other side, never here.
+     */
+    fun interface OnSuggestionLongPressListener {
+        fun onSuggestionLongPress(cellId: Int, suggestion: String)
     }
 
     private val state = SuggestionStripState()
@@ -73,7 +83,12 @@ class SuggestionStripView @JvmOverloads constructor(
     private var pressedColor = DEFAULT_PRESSED_COLOR
     private var separatorColor = DEFAULT_SEPARATOR_COLOR
     private var listener: OnSuggestionClickListener? = null
+    private var longPressListener: OnSuggestionLongPressListener? = null
     private var touchSequenceAccepted = false
+    /** True once the timer has fired for this touch sequence: the tap on release is cancelled. */
+    private var longPressFired = false
+    /** Allocated once, so neither onTouchEvent nor onDraw ever creates an object. */
+    private val longPressRunnable = Runnable { fireLongPress() }
 
     init {
         val stripAttributes = context.obtainStyledAttributes(
@@ -105,6 +120,32 @@ class SuggestionStripView @JvmOverloads constructor(
 
     fun setOnSuggestionClickListener(listener: OnSuggestionClickListener?) {
         this.listener = listener
+    }
+
+    fun setOnSuggestionLongPressListener(listener: OnSuggestionLongPressListener?) {
+        this.longPressListener = listener
+    }
+
+    /**
+     * The timer body: the cell is read here, off the touch path, and the tap of this sequence is
+     * cancelled — a long press NEVER commits text.
+     */
+    private fun fireLongPress() {
+        val cell = state.pressedCell()
+        if (cell == SuggestionStripState.NO_CELL) return
+        val suggestion = state.suggestionAt(cell) ?: return
+        longPressFired = true
+        longPressListener?.onSuggestionLongPress(cell, suggestion)
+    }
+
+    private fun scheduleLongPress() {
+        removeCallbacks(longPressRunnable)
+        postDelayed(longPressRunnable, ViewConfiguration.getLongPressTimeout().toLong())
+    }
+
+    private fun cancelLongPress(resetFired: Boolean = true) {
+        removeCallbacks(longPressRunnable)
+        if (resetFired) longPressFired = false
     }
 
     fun setSuggestions(first: String?, second: String?, third: String?) {
@@ -216,7 +257,11 @@ class SuggestionStripView @JvmOverloads constructor(
                     height,
                 )
                 touchSequenceAccepted = handled
-                if (handled) invalidate()
+                longPressFired = false
+                if (handled) {
+                    invalidate()
+                    scheduleLongPress()
+                }
                 return handled
             }
             MotionEvent.ACTION_MOVE -> {
@@ -234,7 +279,11 @@ class SuggestionStripView @JvmOverloads constructor(
                         height,
                     )
                 }
-                if (oldPressed != state.pressedCell()) invalidate()
+                if (oldPressed != state.pressedCell()) {
+                    invalidate()
+                    // The finger left the cell it started on: that is no longer a long press.
+                    cancelLongPress()
+                }
                 return true
             }
             MotionEvent.ACTION_POINTER_DOWN -> return touchSequenceAccepted
@@ -258,13 +307,16 @@ class SuggestionStripView @JvmOverloads constructor(
                 state.cancelGesture()
                 touchSequenceAccepted = false
                 invalidate()
-                if (cell != SuggestionStripState.NO_CELL) activateCell(cell)
+                val wasLongPress = longPressFired
+                cancelLongPress()
+                if (!wasLongPress && cell != SuggestionStripState.NO_CELL) activateCell(cell)
                 return true
             }
             MotionEvent.ACTION_CANCEL -> {
                 val handled = touchSequenceAccepted || state.hasActiveGesture()
                 val changed = state.cancelGesture()
                 touchSequenceAccepted = false
+                cancelLongPress()
                 if (changed) invalidate()
                 return handled
             }
@@ -356,7 +408,16 @@ class SuggestionStripView @JvmOverloads constructor(
             )
             node.setBoundsInParent(tempBounds)
             val actionable = isVirtualCellActionable(virtualViewId)
-            if (actionable) node.addAction(AccessibilityNodeInfoCompat.ACTION_CLICK)
+            if (actionable) {
+                node.addAction(AccessibilityNodeInfoCompat.ACTION_CLICK)
+                // Exposed on EVERY filled cell, not only on personal words. An action present only
+                // on personal ones would make the contents of a private list observable to any
+                // enabled accessibility service and to automated tree dumps — one could see which
+                // of the three words came from it. For a dictionary word the action is a no-op,
+                // which is what the contract requires of a long press there anyway.
+                node.addAction(AccessibilityNodeInfoCompat.ACTION_LONG_CLICK)
+                node.isLongClickable = true
+            }
             node.isClickable = actionable
             node.isEnabled = actionable
         }
@@ -366,11 +427,13 @@ class SuggestionStripView @JvmOverloads constructor(
             action: Int,
             arguments: Bundle?,
         ): Boolean {
-            if (action != AccessibilityNodeInfoCompat.ACTION_CLICK
-                || !isVirtualCellActionable(virtualViewId)
-            ) {
-                return false
+            if (!isVirtualCellActionable(virtualViewId)) return false
+            if (action == AccessibilityNodeInfoCompat.ACTION_LONG_CLICK) {
+                val suggestion = state.suggestionAt(virtualViewId) ?: return false
+                longPressListener?.onSuggestionLongPress(virtualViewId, suggestion)
+                return true
             }
+            if (action != AccessibilityNodeInfoCompat.ACTION_CLICK) return false
             if (!activateCell(virtualViewId)) return false
             sendEventForVirtualView(virtualViewId, AccessibilityEvent.TYPE_VIEW_CLICKED)
             return true
