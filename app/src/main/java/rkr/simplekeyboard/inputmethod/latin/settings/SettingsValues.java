@@ -52,6 +52,8 @@ public class SettingsValues {
     public final boolean mDeleteSwipeEnabled;
     public final boolean mTatarSuggestionsEnabled;
     public final boolean mPersonalDictionaryEnabled;
+    /** Already includes the subordination to {@link #mTatarSuggestionsEnabled} (D3). */
+    public final boolean mTatarAutocorrectEnabled;
 
     // From the input box
     public final InputAttributes mInputAttributes;
@@ -97,6 +99,7 @@ public class SettingsValues {
         mDeleteSwipeEnabled = Settings.readDeleteSwipeEnabled(prefs);
         mTatarSuggestionsEnabled = Settings.readTatarSuggestionsEnabled(prefs);
         mPersonalDictionaryEnabled = Settings.readPersonalDictionaryEnabled(prefs);
+        mTatarAutocorrectEnabled = Settings.readTatarAutocorrectEnabled(prefs);
     }
 
     public boolean isWordSeparator(final int code) {

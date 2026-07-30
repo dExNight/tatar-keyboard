@@ -313,10 +313,14 @@ class SettingsHostActivity : Activity() {
         rows.add(switchRow(Settings.PREF_DELETE_SWIPE, false,
                 R.string.delete_swipe, R.string.delete_swipe_summary))
         var personalDictionaryRow: View? = null
+        var autocorrectRow: View? = null
         rows.add(switchRow(Settings.PREF_TATAR_SUGGESTIONS, false,
                 R.string.tatar_suggestions, R.string.tatar_suggestions_summary) { checked ->
             personalDictionaryRow?.let {
                 setRowEnabled(it, checked && !isRestricted(Settings.PREF_PERSONAL_DICTIONARY))
+            }
+            autocorrectRow?.let {
+                setRowEnabled(it, checked && !isRestricted(Settings.PREF_TATAR_AUTOCORRECT))
             }
         })
         // The personal dictionary rides on the suggestion band: without suggestions there is
@@ -325,6 +329,14 @@ class SettingsHostActivity : Activity() {
                 R.string.personal_dictionary, R.string.personal_dictionary_summary)
         personalDictionaryRow = personalRow
         rows.add(personalRow)
+        // Autocorrection (D3) is subordinate to suggestions for a different reason than the personal
+        // dictionary: it draws its candidate from the very same lookup that feeds the band, so with
+        // suggestions off there is nothing to correct from. Its own switch stays separate because a
+        // suggestion offers while a correction changes what is already typed.
+        val autocorrectSwitch = switchRow(Settings.PREF_TATAR_AUTOCORRECT, false,
+                R.string.tatar_autocorrect, R.string.tatar_autocorrect_summary)
+        autocorrectRow = autocorrectSwitch
+        rows.add(autocorrectSwitch)
         addCard(rows)
         // android:dependency="pref_show_language_switch_key" from the legacy screen.
         setRowEnabled(imeRow,
@@ -333,6 +345,9 @@ class SettingsHostActivity : Activity() {
         setRowEnabled(personalRow,
                 Settings.readTatarSuggestionsEnabled(prefs)
                         && !isRestricted(Settings.PREF_PERSONAL_DICTIONARY))
+        setRowEnabled(autocorrectSwitch,
+                Settings.readTatarSuggestionsEnabled(prefs)
+                        && !isRestricted(Settings.PREF_TATAR_AUTOCORRECT))
         // Reachable whatever the toggles say: erasing what was already saved must always be
         // possible, so the entry never depends on the switch above it.
         addCard(listOf(linkRow(R.string.personal_dictionary_screen) {

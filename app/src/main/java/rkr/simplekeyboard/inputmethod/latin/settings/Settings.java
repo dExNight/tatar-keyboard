@@ -78,6 +78,15 @@ public final class Settings extends BroadcastReceiver implements SharedPreferenc
      */
     public static final String PREF_PERSONAL_DICTIONARY = "pref_personal_dictionary";
     /**
+     * Autocorrection on a word separator (D3): its own toggle, default OFF, subordinate to
+     * {@link #PREF_TATAR_SUGGESTIONS}.
+     *
+     * <p>Deliberately NOT merged into the suggestions switch: a suggestion offers, an autocorrection
+     * changes what the user has already typed. The price of a mistake differs, and someone who
+     * accepts the first is not obliged to accept the second.
+     */
+    public static final String PREF_TATAR_AUTOCORRECT = "pref_tatar_autocorrect";
+    /**
      * One-shot marker: the offer to turn Tatar suggestions on has been made and is never made
      * again. Deliberately NOT part of {@link SettingsValues} — that object is rebuilt in full on
      * every change of every setting, and this value is read once per process and written once per
@@ -307,6 +316,16 @@ public final class Settings extends BroadcastReceiver implements SharedPreferenc
      */
     public static boolean readPersonalDictionaryEnabled(final SharedPreferences prefs) {
         return prefs.getBoolean(PREF_PERSONAL_DICTIONARY, false);
+    }
+
+    /**
+     * Autocorrection is opt-in AND subordinate: it answers true only when Tatar suggestions are on
+     * as well. Reading both here rather than at the call sites is what makes the subordination a
+     * property of the setting instead of a rule every caller has to remember.
+     */
+    public static boolean readTatarAutocorrectEnabled(final SharedPreferences prefs) {
+        return prefs.getBoolean(PREF_TATAR_AUTOCORRECT, false)
+                && readTatarSuggestionsEnabled(prefs);
     }
 
     /**

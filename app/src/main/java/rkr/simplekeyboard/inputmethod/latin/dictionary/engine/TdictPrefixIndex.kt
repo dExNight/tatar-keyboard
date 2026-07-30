@@ -28,6 +28,14 @@ internal fun interface PrefixComputer {
 internal interface ClassifiedPrefixComputer : PrefixComputer {
     /** Number of LEADING results of the last [lookup] that are exact candidates. */
     val lastExactCount: Int
+
+    /**
+     * The D3 autocorrect verdict of the last [lookup], or null when the typed word must not be
+     * replaced. Read from the UI thread, hence the implementations publish it through a `@Volatile`
+     * reference; a computer that does not run the class #1 pass simply never advises anything.
+     */
+    val lastAutocorrectAdvice: AutocorrectAdvice?
+        get() = null
 }
 
 /**
@@ -116,6 +124,12 @@ internal class TdictPrefixIndex private constructor(
     private val fuzzyIndices = IntArray(MAX_RESULTS)
     private val fuzzyFrequencies = LongArray(MAX_RESULTS)
     private val fuzzyClasses = IntArray(MAX_RESULTS)
+    // Scratch of the D3 pass. Separate buffers rather than a reuse of the two above, because the
+    // autocorrect pass must stay independent of whether the display fuzzy level ran at all: it is
+    // decided by rules of its own (word length, word absent from the dictionary), never by how many
+    // cells the exact pass happened to leave empty.
+    private val autocorrectCodePointScratch = IntArray(MAX_PREFIX_BYTES)
+    private val autocorrectVariantScratch = ByteArray(MAX_PREFIX_BYTES + VARIANT_HEADROOM)
 
     @Volatile
     private var neighborTable: KeyNeighborTable? = null
@@ -127,6 +141,23 @@ internal class TdictPrefixIndex private constructor(
      */
     override var lastExactCount = 0
         private set
+
+    /**
+     * The D3 verdict of the last [lookup]. Written by the serialized worker, read on the UI thread
+     * when a word separator is pressed, hence `@Volatile`: the object itself is immutable, so
+     * publishing the reference publishes everything the reader needs.
+     *
+     * Reset at the top of every lookup, exactly like [lastExactCount], so a rejected or failed
+     * lookup can never leave an older word's verdict behind for the next separator to act on.
+     */
+    @Volatile
+    override var lastAutocorrectAdvice: AutocorrectAdvice? = null
+        private set
+
+    /** Drops the current verdict; called when the engine idles or is torn down. */
+    fun clearAutocorrectAdvice() {
+        lastAutocorrectAdvice = null
+    }
 
     // Test-only observability of the last lookup's fuzzy work. These are plain ints assigned on the
     // hot path (no allocation, no logging); they let the JVM harness report measured variants and
@@ -151,9 +182,18 @@ internal class TdictPrefixIndex private constructor(
     // scanVariantBlock so every fuzzy candidate is tagged with the class that produced it.
     private var fuzzyCurrentClass = EDIT_CLASS_LONG_PRESS
 
+    // D3 accumulator, private to a single computeAutocorrectAdvice() invocation. The pass counts
+    // WHOLE-WORD matches: how many class #1 variants of the typed word are themselves dictionary
+    // entries, and which one. Anything but exactly one means no replacement.
+    private var autocorrectMatchCount = 0
+    private var autocorrectMatchIndex = NO_ENTRY
+
     // Allocated once, so neither a lambda nor any object is created per lookup or per variant.
     private val fuzzyConsumer =
         FuzzyPrefixVariants.VariantConsumer { bytes, length -> scanVariantBlock(bytes, length) }
+
+    private val autocorrectConsumer =
+        FuzzyPrefixVariants.VariantConsumer { bytes, length -> matchWholeWord(bytes, length) }
 
     override fun updateKeyNeighbors(table: KeyNeighborTable?) {
         neighborTable = table
@@ -162,6 +202,7 @@ internal class TdictPrefixIndex private constructor(
     override fun lookup(normalizedPrefixUtf8: ImmutableUtf8Prefix): List<String> {
         val prefixLength = normalizedPrefixUtf8.byteCount
         lastExactCount = 0
+        lastAutocorrectAdvice = null
         if (prefixLength == 0 ||
             prefixLength > MAX_PREFIX_BYTES ||
             !isValidUtf8Scalar(normalizedPrefixUtf8)
@@ -191,6 +232,9 @@ internal class TdictPrefixIndex private constructor(
                     resultCount = collectFuzzy(prefixLength, table, resultCount)
                 }
             }
+            // Deliberately outside the `resultCount < MAX_RESULTS` guard above: the D3 verdict is
+            // about the typed word itself and must not depend on how full the band happens to be.
+            computeAutocorrectAdvice(normalizedPrefixUtf8, prefixLength)
             if (resultCount == 0) return emptyList()
             ArrayList<String>(resultCount).also { result ->
                 for (slot in 0 until resultCount) {
@@ -199,8 +243,78 @@ internal class TdictPrefixIndex private constructor(
             }
         } catch (_: RuntimeException) {
             lastExactCount = 0
+            lastAutocorrectAdvice = null
             emptyList()
         }
+    }
+
+    /**
+     * The D3 pass: decides whether the word that was just looked up may be autocorrected, and to
+     * what. Runs on the same worker, right after the display passes, and touches the same mmap'd
+     * buffer they do — so no new thread, no new request and no new token exist anywhere.
+     *
+     * Every condition of the contract is checked here, in the contract's own order:
+     *  - the word is at least [AutocorrectPolicy.MIN_WORD_CODE_POINTS] code points long;
+     *  - the word is ABSENT from the dictionary (a word people write is never "corrected");
+     *  - EXACTLY ONE class #1 (long-press partner) variant of it is itself a dictionary word —
+     *    counted before any frequency filter, so an ambiguous typo is left alone rather than
+     *    resolved by frequency;
+     *  - that one candidate's frequency is at least [AutocorrectPolicy.MIN_CANDIDATE_FREQUENCY].
+     *
+     * Two properties are worth naming. The match is WHOLE-WORD, not prefix-block: the contract
+     * replaces a word by a word one edit away from it, and a prefix scan would offer continuations
+     * instead. And the class is pinned to #1 directly rather than through
+     * [SHIPPED_FUZZY_EDIT_CLASSES]: D3 excludes classes #2/#3 by its own contract, so re-enabling
+     * them for the band must not make autocorrect follow.
+     *
+     * The pass costs one binary search per variant and scans no block at all; it runs only for words
+     * long enough to qualify, so short prefixes — the bulk of the keystrokes — pay nothing.
+     */
+    private fun computeAutocorrectAdvice(
+        normalizedPrefixUtf8: ImmutableUtf8Prefix,
+        prefixLength: Int,
+    ) {
+        val table = neighborTable ?: return
+        if (table.isEmpty) return
+        if (countCodePointsByLeadBytes(exactScratch, prefixLength) <
+            AutocorrectPolicy.MIN_WORD_CODE_POINTS
+        ) {
+            return
+        }
+        val typedEntry = lowerBound(exactScratch, prefixLength, 0)
+        if (typedEntry < entryCount && wordEquals(typedEntry, exactScratch, prefixLength)) return
+        autocorrectMatchCount = 0
+        autocorrectMatchIndex = NO_ENTRY
+        val emitted = FuzzyPrefixVariants.generateLongPressVariants(
+            exactScratch, prefixLength, table, autocorrectCodePointScratch,
+            autocorrectVariantScratch, MAX_FUZZY_VARIANTS, autocorrectConsumer,
+        )
+        // Fail closed on a budget overrun or malformed input, exactly like the display level: a
+        // partially generated variant set could hide the second candidate that makes a typo
+        // ambiguous, and acting on it would replace text on incomplete evidence.
+        if (emitted < 0) return
+        if (autocorrectMatchCount != 1) return
+        val candidate = autocorrectMatchIndex
+        val frequency = frequencyAt(candidate)
+        if (frequency < AutocorrectPolicy.MIN_CANDIDATE_FREQUENCY) return
+        lastAutocorrectAdvice = AutocorrectAdvice(
+            normalizedPrefixUtf8.decodeUtf8(),
+            decodeWord(candidate),
+            frequency,
+        )
+    }
+
+    /** Counts one class #1 variant that is itself a dictionary entry; stops caring past two. */
+    private fun matchWholeWord(variantBytes: ByteArray, variantLength: Int) {
+        if (autocorrectMatchCount > 1) return
+        val entry = lowerBound(variantBytes, variantLength, 0)
+        if (entry >= entryCount) return
+        if (!wordEquals(entry, variantBytes, variantLength)) return
+        // Distinct variants are distinct byte strings, so this can only fire on a defensive re-entry;
+        // counting the same entry twice would turn one candidate into a false ambiguity.
+        if (entry == autocorrectMatchIndex) return
+        autocorrectMatchCount++
+        autocorrectMatchIndex = entry
     }
 
     /** The frozen D1 exact pass: fills [rankedIndices] with up to [MAX_RESULTS] and returns count. */
@@ -485,6 +599,9 @@ internal class TdictPrefixIndex private constructor(
         private const val MAX_RESULTS = 3
         internal const val MAX_PREFIX_BYTES = 128
         private const val MAX_U32 = 0xffff_ffffL
+
+        /** "No dictionary entry"; entry indices are non-negative. */
+        private const val NO_ENTRY = -1
 
         // Edit-class ranking keys, carried as plain ints. Exact candidates sort as EDIT_CLASS_EXACT
         // (a tie on the exact level, whose order is unchanged); within the fuzzy level the ascending

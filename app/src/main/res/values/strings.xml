@@ -152,6 +152,10 @@
     <string name="tatar_suggestions_offer_dismiss">Not now</string>
     <!-- Message shown once when Tatar word suggestions could not be turned on -->
     <string name="tatar_suggestions_unavailable">Tatar suggestions could not be turned on right now. You can try again later.</string>
+    <!-- Option to replace a misspelled Tatar word with a dictionary word when a separator is typed -->
+    <string name="tatar_autocorrect">Autocorrect Tatar words</string>
+    <!-- Description for the Tatar autocorrection option. Says plainly that text already typed is changed and how to undo it. -->
+    <string name="tatar_autocorrect_summary">Fix a misspelled Tatar word when you type a space or punctuation. Press backspace right after to get back what you typed.</string>
     <!-- Option to remember words the user types and suggest them later -->
     <string name="personal_dictionary">Personal dictionary</string>
     <!-- Description for the personal dictionary option. Says plainly that words are saved on the device and that turning the option off keeps what was already saved. -->

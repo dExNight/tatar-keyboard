@@ -18,6 +18,7 @@ package rkr.simplekeyboard.inputmethod.latin.suggestions
 
 import android.content.Context
 import android.os.Handler
+import rkr.simplekeyboard.inputmethod.latin.dictionary.engine.AutocorrectPolicy
 import rkr.simplekeyboard.inputmethod.latin.dictionary.engine.KeyNeighborTable
 import rkr.simplekeyboard.inputmethod.latin.dictionary.personal.PersonalSubtypes
 import rkr.simplekeyboard.inputmethod.latin.dictionary.storage.AndroidDictionaryStorageFactory
@@ -57,6 +58,38 @@ interface EditorSurface {
      * trailing word would splice the suggestion into the user's text.
      */
     fun hasLetterAfterCursor(): Boolean
+
+    /**
+     * The SECOND insertion path of the frozen text contract (D3): replaces the trailing word
+     * [expectedPrefix] with [replacement] through the very same explicit delete-by-code-points plus
+     * `commitText` in ONE batch edit that an accepted suggestion goes through, and with the same
+     * re-checks. It differs from [commitSuggestion] in one thing only — no trailing auto-space,
+     * because the separator the user just pressed is committed right after it by the ordinary input
+     * path.
+     *
+     * Returns false without editing anything if any check fails. Defaults to false so an editor
+     * surface written before D3 keeps compiling and simply never autocorrects.
+     */
+    fun replaceTypedWord(expectedPrefix: String, replacement: String): Boolean = false
+
+    /**
+     * Undoes the last autocorrection: where [insertedForm] + [separator] stands immediately before
+     * the cursor, puts [typedForm] + [separator] back, in one batch edit.
+     *
+     * The suffix match IS the position check the contract asks for, and a stricter one than an
+     * offset: an offset can coincide again after unrelated edits, the exact text cannot. Returns
+     * false without editing anything when the text before the cursor is no longer what the
+     * replacement left there. Defaults to false, like [replaceTypedWord].
+     */
+    fun revertTypedWord(insertedForm: String, separator: String, typedForm: String): Boolean = false
+}
+
+/**
+ * Reads the live value of `PREF_TATAR_AUTOCORRECT`. A seam, so the controller needs no preferences
+ * and JVM tests can flip the setting between two keystrokes exactly as a user can.
+ */
+fun interface AutocorrectGate {
+    fun isOn(): Boolean
 }
 
 /**
@@ -281,9 +314,43 @@ class SuggestionsController internal constructor(
     /** Where clean completions go (E4c). Default writes nothing at all. */
     private var completionSink: WordCompletionSink = WordCompletionSink.NONE
 
+    // --- D3 autocorrect state. Nothing here is persisted and nothing leaves this object except the
+    // two editor calls that perform the replacement and its single undo.
+    /** The autocorrect setting, read live. OFF until LatinIME wires the real one. */
+    private var autocorrectGate: AutocorrectGate = AutocorrectGate { false }
+
+    /**
+     * One replacement, as far as the undo is concerned. There is no history: at most one of these
+     * exists at a time and it is dropped, never stacked.
+     */
+    private class Replacement(
+        val typedForm: String,
+        val insertedForm: String,
+        val separator: String,
+        val sessionId: Long,
+    ) {
+        /** Deliberately mute: this object carries the user's text. */
+        override fun toString(): String = "Replacement"
+    }
+
+    /**
+     * A replacement that has been made but whose separator has not been committed yet. It survives
+     * EXACTLY ONE [onTextChanged] — the one carrying that separator, which is part of the same user
+     * action — and becomes [revertable] there. Every later event finds [revertable] and drops it.
+     */
+    private var armedReplacement: Replacement? = null
+
+    /** The one replacement a backspace may still undo. Null means the window has closed. */
+    private var revertable: Replacement? = null
+
     /** Set once by LatinIME. Kept out of the constructor so the frozen test entry points stay put. */
     fun setCompletionSink(sink: WordCompletionSink) {
         completionSink = sink
+    }
+
+    /** Set once by LatinIME, for the same reason as [setCompletionSink]. */
+    fun setAutocorrectGate(gate: AutocorrectGate) {
+        autocorrectGate = gate
     }
 
     /**
@@ -308,6 +375,8 @@ class SuggestionsController internal constructor(
 
     fun onStartInput(eligible: Boolean) {
         markRunDirty()
+        // A new field is one of the six events that make an undo impossible.
+        clearRevertState()
         // Lifecycle boundary: one of the only two places allowed to run the blocking engine
         // teardown that a disabled setting scheduled.
         runPendingRelease()
@@ -347,14 +416,18 @@ class SuggestionsController internal constructor(
     }
 
     fun onTextChanged() {
+        advanceRevertWindow()
         trackCleanRun(editor.cachedWordBeforeCursor())
         requestCurrentPrefix()
     }
 
     fun onSelectionChanged() {
         // A selection change — external, or an internal cursor gesture, which LatinIME routes here —
-        // breaks the run: what looks like growth afterwards may be growth of a different word.
+        // breaks the run: what looks like growth afterwards may be growth of a different word. It is
+        // also two of the six events that close the undo window, and for the same reason: the text
+        // the replacement described is no longer the text at the cursor.
         markRunDirty()
+        clearRevertState()
         sessionId++
         engine?.finishInput()
         // Any in-flight request is invalidated and whatever was shown is no longer bound to the
@@ -373,6 +446,9 @@ class SuggestionsController internal constructor(
 
     fun onFinishInput() {
         markRunDirty()
+        // The contract names this boundary explicitly: the replacement state is erased on
+        // onFinishInput and never outlives the editor session.
+        clearRevertState()
         // The one boundary where the personal store writes what it has accumulated: usage counters
         // and pending hashes, once, and only if something changed.
         completionSink.onInputFinished()
@@ -389,6 +465,8 @@ class SuggestionsController internal constructor(
 
     fun onSubtypeChanged(eligible: Boolean) {
         markRunDirty()
+        // A subtype change is one of the six events that make an undo impossible.
+        clearRevertState()
         sessionId++
         engine?.finishInput()
         displayedPrefix = null
@@ -443,6 +521,7 @@ class SuggestionsController internal constructor(
      */
     fun onPersonalDictionaryErased() {
         if (destroyed) return
+        clearRevertState()
         sessionId++
         engine?.finishInput()
         displayedPrefix = null
@@ -461,6 +540,8 @@ class SuggestionsController internal constructor(
      */
     fun onSuggestionsSettingDisabled() {
         if (destroyed) return
+        // Autocorrect is subordinate to suggestions, so the undo window closes with them.
+        clearRevertState()
         // Bumping the session invalidates any in-flight lookup, so a result computed for the older
         // generation can no longer repaint the strip.
         sessionId++
@@ -484,6 +565,7 @@ class SuggestionsController internal constructor(
      */
     fun onSuggestionsSettingEnabled(eligible: Boolean) {
         if (destroyed) return
+        clearRevertState()
         // The setting came back before the deferred release ran: the live engine is still the right
         // mapping, so the release is cancelled instead of being performed and immediately undone.
         // Only a release that has not been ATTEMPTED yet may be cancelled: a refused attempt has
@@ -535,6 +617,7 @@ class SuggestionsController internal constructor(
         // Set the guard first so an engine start that publishes after this point (posted onto the
         // UI thread from the background executor) is torn down instead of orphaned.
         destroyed = true
+        clearRevertState()
         displayedPrefix = null
         val handle = engine
         if (handle != null && destroyHandle(handle)) {
@@ -934,9 +1017,122 @@ class SuggestionsController internal constructor(
         )
     }
 
+    /**
+     * A word separator has been pressed and is ABOUT to be committed: the last chance to correct the
+     * word it finishes (D3). Returns true when the trailing word was actually replaced.
+     *
+     * Called before the separator reaches the input logic on purpose. At this instant the editor is
+     * in exactly the state an accepted suggestion needs — a trailing word, a collapsed cursor right
+     * after it — so the replacement is the same single delete + commit, with the same re-checks, and
+     * the separator afterwards travels the ordinary path untouched (auto-space, the double-space
+     * gesture and the shift update all behave as they always did).
+     *
+     * Every condition is checked here, and every one of them fails towards NOT editing text:
+     *  - the feature is on (and subordinate to suggestions: [eligible] already carries that);
+     *  - an engine is usable and the cursor is known;
+     *  - the cursor is not inside a word, and the word is not in mixed case (which the frozen
+     *    contract gives 0 results for, so it has no defined replacement form either);
+     *  - the word is long enough ([AutocorrectPolicy.MIN_WORD_CODE_POINTS], on the normalized form);
+     *  - a verdict exists AND was computed for THIS word — a coalesced or never-answered lookup
+     *    leaves an older verdict behind, and applying it to a different word is exactly the failure
+     *    this comparison exists to prevent;
+     *  - the candidate is frequent enough ([AutocorrectPolicy.MIN_CANDIDATE_FREQUENCY]).
+     *
+     * The last two are re-checked here although the engine already applied them, for the same reason
+     * the tap path re-checks the prefix inside the editor: one side of a two-sided decision must not
+     * be the only place a rule lives.
+     */
+    fun maybeAutocorrectBeforeSeparator(separatorCodePoint: Int): Boolean {
+        if (destroyed || !eligible) return false
+        if (!autocorrectGate.isOn()) return false
+        val activeEngine = usableEngine() ?: return false
+        if (!editor.hasKnownCursor()) return false
+        if (editor.hasLetterAfterCursor()) return false
+        val word = editor.cachedWordBeforeCursor()
+        if (word.isEmpty()) return false
+        val casing = TatarWordUtils.classifyCasing(word)
+        if (casing == TatarWordUtils.PrefixCasing.MIXED) return false
+        val normalized = TatarWordUtils.normalizeForLookup(word)
+        if (normalized.codePointCount(0, normalized.length) <
+            AutocorrectPolicy.MIN_WORD_CODE_POINTS
+        ) {
+            return false
+        }
+        val advice = activeEngine.autocorrectAdvice() ?: return false
+        if (advice.typedWord != normalized) return false
+        if (advice.frequency < AutocorrectPolicy.MIN_CANDIDATE_FREQUENCY) return false
+        // The user's capitalization is re-applied exactly as it is to a shown candidate, so the
+        // replacement is the word they would have got by tapping it.
+        val replacement = TatarWordUtils.applyCasing(advice.replacement, casing)
+        if (replacement == word) return false
+        if (!editor.replaceTypedWord(word, replacement)) return false
+        // A correction is not the user spelling the word out: the run stops counting, exactly as it
+        // does for an accepted suggestion, so the replaced word reaches neither the pending set nor
+        // the personal dictionary.
+        markRunDirty()
+        // Whatever the band was showing described the word that no longer stands there.
+        displayedPrefix = null
+        armedReplacement = Replacement(
+            word, replacement, separatorString(separatorCodePoint), sessionId,
+        )
+        revertable = null
+        return true
+    }
+
+    /**
+     * A backspace has been pressed. Returns true when it was consumed by undoing the replacement
+     * made immediately before it, in which case no character is deleted; false leaves the key to the
+     * ordinary backspace path.
+     *
+     * There is exactly ONE undo. The state is dropped BEFORE the editor is asked to do anything, so
+     * a refused undo cannot be retried and the second backspace deletes a character like any other.
+     */
+    fun maybeRevertAutocorrect(): Boolean {
+        val replacement = revertable ?: return false
+        revertable = null
+        armedReplacement = null
+        if (destroyed || !eligible) return false
+        if (replacement.sessionId != sessionId) return false
+        if (!autocorrectGate.isOn()) return false
+        if (!editor.hasKnownCursor()) return false
+        markRunDirty()
+        return editor.revertTypedWord(
+            replacement.insertedForm, replacement.separator, replacement.typedForm,
+        )
+    }
+
+    /**
+     * Moves the undo window forward by one text change.
+     *
+     * A replacement is armed while its own separator is still on its way to the editor; that one
+     * change completes it. Any other text change — a typed character, an accepted suggestion, a
+     * deletion — closes the window instead, which is what makes «любое другое событие делает revert
+     * невозможным» true for the two of the six events that arrive as text.
+     */
+    private fun advanceRevertWindow() {
+        val armed = armedReplacement
+        if (armed != null) {
+            armedReplacement = null
+            revertable = if (armed.sessionId == sessionId) armed else null
+            return
+        }
+        revertable = null
+    }
+
+    /** Drops the undo window outright: a field, subtype, selection or setting boundary. */
+    private fun clearRevertState() {
+        armedReplacement = null
+        revertable = null
+    }
+
+    private fun separatorString(codePoint: Int): String =
+        if (Character.isValidCodePoint(codePoint)) String(Character.toChars(codePoint)) else ""
+
     private fun onTap(suggestion: String) {
         // An accepted suggestion is not the user spelling the word out: the run stops counting.
         markRunDirty()
+        // A tap is one of the six events that close the undo window.
+        clearRevertState()
         val prefix = displayedPrefix
         if (prefix == null || displayedSessionId != sessionId) {
             // Nothing bound to the current session is displayed (e.g. the text changed and the old

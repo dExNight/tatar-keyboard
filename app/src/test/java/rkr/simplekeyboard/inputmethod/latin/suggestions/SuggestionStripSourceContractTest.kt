@@ -193,13 +193,17 @@ class SuggestionStripSourceContractTest {
     fun acceptedSuggestionCarriesItsAutoSpaceInsideTheSameCommit() {
         val javaRoot = File(sourceRoot(), "java/rkr/simplekeyboard/inputmethod/latin")
         val inputLogic = File(javaRoot, "inputlogic/InputLogic.java").readText()
-        val commitBody = inputLogic.substringAfter("public boolean commitChosenSuggestion")
-            .substringBefore("private boolean layoutUsesAutoCaps")
+        // D3 made the word replacement a method shared by BOTH insertion paths of the frozen text
+        // contract, so the slice moved from `commitChosenSuggestion` (which now only says "with
+        // auto-space" and delegates) to that shared method. Everything asserted below is unchanged
+        // and still describes the accepted suggestion: it is the same code, in its new single home.
+        val commitBody = inputLogic.substringAfter("private boolean replaceTrailingWord")
+            .substringBefore("public boolean revertTatarAutocorrection")
 
         // One commitText for word + space: two would flash the word without its space and would
         // cost a second IPC round trip.
         assertEquals(1, "mConnection\\.commitText\\(".toRegex().findAll(commitBody).count())
-        assertTrue(commitBody.contains("suggestion + AUTO_SPACE"))
+        assertTrue(commitBody.contains("replacement + AUTO_SPACE"))
         assertTrue(
             commitBody.contains(
                 "TatarWordUtils.needsAutoSpace(mConnection.getCachedTextAfterCursor())",

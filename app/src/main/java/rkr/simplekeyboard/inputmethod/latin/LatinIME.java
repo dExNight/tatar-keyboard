@@ -434,6 +434,28 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
                 return TatarWordUtils.INSTANCE.startsWithWordCharacter(
                         mInputLogic.mConnection.getCachedTextAfterCursor());
             }
+
+            @Override
+            public boolean replaceTypedWord(final String expectedPrefix,
+                    final String replacement) {
+                final boolean replaced =
+                        mInputLogic.commitTatarAutocorrection(expectedPrefix, replacement);
+                if (replaced) {
+                    // Same reason as the accepted suggestion above: the replacement happens outside
+                    // an InputTransaction, so the auto-caps state is refreshed with the very same
+                    // call. The separator that follows requests its own update a moment later;
+                    // doing it here too keeps the two insertion paths identical.
+                    mKeyboardSwitcher.requestUpdatingShiftState(getCurrentAutoCapsState(),
+                            getCurrentRecapitalizeState());
+                }
+                return replaced;
+            }
+
+            @Override
+            public boolean revertTypedWord(final String insertedForm, final String separator,
+                    final String typedForm) {
+                return mInputLogic.revertTatarAutocorrection(insertedForm, separator, typedForm);
+            }
         };
 
         // Runs on the controller's background executor. The catalog is the one the controller
@@ -468,6 +490,11 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         // dictionary setting, the unlock state and the postal-address exclusion.
         mSuggestionsController.setCompletionSink(PersonalLearning.sinkFor(
                 this, PersonalSubtypes.TATAR_RU, this::mayLearnPersonalWords));
+        // D3: read live off the already-rebuilt SettingsValues, which carries the subordination to
+        // the suggestions switch, so flipping either setting takes effect on the next separator
+        // without restarting the engine or touching its lease.
+        mSuggestionsController.setAutocorrectGate(
+                () -> mSettings.getCurrent().mTatarAutocorrectEnabled);
         mSuggestionsController.onCreate();
         // Erasing words on the settings screen must unbind whatever the band is showing right now:
         // the screen and the IME live in the same process, so the store notifies us directly. The
@@ -1464,11 +1491,68 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
     // This method is public for testability of LatinIME, but also in the future it should
     // completely replace #onCodeInput.
     public void onEvent(final Event event) {
+        if (maybeRevertTatarAutocorrection(event)) {
+            return;
+        }
+        maybeAutocorrectTatarWord(event);
         final InputTransaction completeInputTransaction =
                 mInputLogic.onCodeInput(mSettings.getCurrent(), event);
         updateStateAfterInputTransaction(completeInputTransaction);
         maybeOfferTatarSuggestions(event);
         mKeyboardSwitcher.onEvent(event, getCurrentAutoCapsState(), getCurrentRecapitalizeState());
+    }
+
+    /**
+     * Corrects the word a separator is about to finish (D3), BEFORE that separator reaches the input
+     * logic.
+     *
+     * <p>Before, not after, on purpose: at this instant the editor is in exactly the state an
+     * accepted suggestion needs — a trailing word with a collapsed cursor right behind it — so the
+     * correction is the same single delete + commit, and the separator then travels the ordinary
+     * path with the auto-space rule, the double-space gesture and the shift update all untouched.
+     *
+     * <p>The two conditions are a conjunction: the code point must be a word separator of the live
+     * layout AND one of the separators D3 fires on at all
+     * ({@link TatarWordUtils#isAutocorrectSeparator}, i.e. «пробел или пунктуация»). Everything else
+     * — including Enter and Tab, which are word separators too — is left alone. The controller
+     * decides whether anything is actually replaced; this method only recognizes the moment.
+     */
+    private void maybeAutocorrectTatarWord(final Event event) {
+        if (mSuggestionsController == null) {
+            return;
+        }
+        final int codePoint = event.mCodePoint;
+        if (codePoint == Event.NOT_A_CODE_POINT
+                || !TatarWordUtils.isAutocorrectSeparator(codePoint)
+                || !mSettings.getCurrent().isWordSeparator(codePoint)) {
+            return;
+        }
+        mSuggestionsController.maybeAutocorrectBeforeSeparator(codePoint);
+    }
+
+    /**
+     * A backspace pressed immediately after an autocorrection restores what the user typed instead
+     * of deleting a character (D3). Returns true when it did, in which case the key press is fully
+     * handled and the ordinary backspace path never runs.
+     *
+     * <p>What follows a successful revert is exactly what a backspace does apart from the deletion:
+     * the shift state is recomputed (the restored word can change auto-caps), the band is re-derived
+     * from the new text, and the keyboard's own state machine still sees the key press.
+     * {@link #maybeOfferTatarSuggestions} is deliberately skipped — a delete carries
+     * {@link Event#NOT_A_CODE_POINT}, which is never a word separator, so the call would be a no-op.
+     */
+    private boolean maybeRevertTatarAutocorrection(final Event event) {
+        if (mSuggestionsController == null || event.mKeyCode != Constants.CODE_DELETE) {
+            return false;
+        }
+        if (!mSuggestionsController.maybeRevertAutocorrect()) {
+            return false;
+        }
+        mKeyboardSwitcher.requestUpdatingShiftState(getCurrentAutoCapsState(),
+                getCurrentRecapitalizeState());
+        mSuggestionsController.onTextChanged();
+        mKeyboardSwitcher.onEvent(event, getCurrentAutoCapsState(), getCurrentRecapitalizeState());
+        return true;
     }
 
     /**

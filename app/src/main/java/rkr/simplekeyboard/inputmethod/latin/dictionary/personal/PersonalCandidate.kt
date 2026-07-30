@@ -50,6 +50,15 @@ fun interface PersonalCandidateSource {
      */
     fun isEmpty(): Boolean = false
 
+    /**
+     * True when [normalizedWord] is ITSELF a personal record — the membership test D3 needs to leave
+     * the user's own words alone. Distinct from [candidatesFor], which deliberately EXCLUDES the
+     * record equal to the prefix because it must never suggest what is already typed.
+     *
+     * Defaults to false so a source written before D3 keeps compiling and simply vetoes nothing.
+     */
+    fun containsNormalized(normalizedWord: String): Boolean = false
+
     companion object {
         /** The source used whenever the personal dictionary is off or unavailable. */
         @JvmField
@@ -74,4 +83,7 @@ class SnapshotPersonalCandidateSource(
         snapshot().lookupCandidates(normalizedPrefix)
 
     override fun isEmpty(): Boolean = snapshot().isEmpty
+
+    override fun containsNormalized(normalizedWord: String): Boolean =
+        snapshot().indexOfNormalized(normalizedWord) >= 0
 }

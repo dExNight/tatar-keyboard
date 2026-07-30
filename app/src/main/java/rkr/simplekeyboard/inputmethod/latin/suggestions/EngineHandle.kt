@@ -16,6 +16,7 @@
 
 package rkr.simplekeyboard.inputmethod.latin.suggestions
 
+import rkr.simplekeyboard.inputmethod.latin.dictionary.engine.AutocorrectAdvice
 import rkr.simplekeyboard.inputmethod.latin.dictionary.engine.LookupToken
 import rkr.simplekeyboard.inputmethod.latin.dictionary.engine.KeyNeighborTable
 import rkr.simplekeyboard.inputmethod.latin.dictionary.engine.MappedDictionaryEngine
@@ -60,6 +61,15 @@ interface EngineHandle {
      */
     fun updateKeyNeighbors(table: KeyNeighborTable?) {}
 
+    /**
+     * The D3 autocorrect verdict of the newest completed lookup, or null when nothing may be
+     * replaced. Read on the UI thread at the moment a word separator is pressed; there is no request
+     * and no token, because the verdict was produced by the lookup the band already paid for.
+     *
+     * Default null so a handle that predates D3 keeps compiling and simply never autocorrects.
+     */
+    fun autocorrectAdvice(): AutocorrectAdvice? = null
+
     /** Bounded teardown; returns true if the engine fully released within [timeoutMs]. */
     fun destroy(timeoutMs: Long): Boolean
 }
@@ -84,6 +94,8 @@ class MappedEngineHandle private constructor(
     override fun finishInput() = engine.finishInput()
 
     override fun updateKeyNeighbors(table: KeyNeighborTable?) = engine.updateKeyNeighbors(table)
+
+    override fun autocorrectAdvice(): AutocorrectAdvice? = engine.autocorrectAdvice
 
     override fun destroy(timeoutMs: Long): Boolean =
         engine.destroy(timeoutMs, TimeUnit.MILLISECONDS)

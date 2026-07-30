@@ -51,12 +51,27 @@ internal class CompositePrefixComputer(
     private val personal: PersonalCandidateSource,
 ) : PrefixComputer, KeyNeighborSink {
 
+    /**
+     * The D3 verdict as it leaves the engine: the primary's, minus every word the user has saved
+     * themselves. Written by the worker at the end of each lookup, read on the UI thread, hence
+     * `@Volatile`.
+     */
+    @Volatile
+    var lastAutocorrectAdvice: AutocorrectAdvice? = null
+        private set
+
+    /** Drops the current verdict; called when the engine idles or is torn down. */
+    fun clearAutocorrectAdvice() {
+        lastAutocorrectAdvice = null
+    }
+
     override fun updateKeyNeighbors(table: KeyNeighborTable?) {
         (primary as? KeyNeighborSink)?.updateKeyNeighbors(table)
     }
 
     override fun lookup(normalizedPrefixUtf8: ImmutableUtf8Prefix): List<String> {
         val dictionary = primary.lookup(normalizedPrefixUtf8)
+        lastAutocorrectAdvice = withoutPersonalWords(primary.lastAutocorrectAdvice)
         if (personal.isEmpty()) return dictionary
         val matches = try {
             personal.candidatesFor(normalizedPrefixUtf8.decodeUtf8())
@@ -68,6 +83,31 @@ internal class CompositePrefixComputer(
         if (matches.isEmpty()) return dictionary
         val exactCount = primary.lastExactCount.coerceIn(0, dictionary.size)
         return merge(dictionary, exactCount, matches)
+    }
+
+    /**
+     * A word of the personal dictionary is never autocorrected — whatever the shipped asset thinks
+     * of it. The user has already said this is their word, and replacing it would overrule their own
+     * decision. Membership is decided on the NORMALIZED form by the same binary search E4d uses
+     * (`PersonalDictionary.indexOfNormalized`), never on the displayed spelling.
+     *
+     * The check follows the same live gate as the band itself: with the personal dictionary switched
+     * off the source publishes an empty snapshot, so nothing is looked up and no file is touched.
+     * That boundary is deliberate — making autocorrect the one feature that still reads the personal
+     * file while the setting is off would break the E4 rule that a disabled personal dictionary costs
+     * the lookup path nothing.
+     *
+     * A source that throws vetoes nothing but also advises nothing: fail-closed towards NOT editing
+     * the user's text.
+     */
+    private fun withoutPersonalWords(advice: AutocorrectAdvice?): AutocorrectAdvice? {
+        if (advice == null) return null
+        if (personal.isEmpty()) return advice
+        return try {
+            if (personal.containsNormalized(advice.typedWord)) null else advice
+        } catch (_: RuntimeException) {
+            null
+        }
     }
 
     private fun merge(

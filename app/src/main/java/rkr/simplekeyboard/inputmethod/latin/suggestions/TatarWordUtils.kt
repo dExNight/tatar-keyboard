@@ -175,6 +175,29 @@ object TatarWordUtils {
         return !isHuggingPunctuation(codePoint)
     }
 
+    /**
+     * True for the separators an autocorrection (D3) may fire on: the contract says «пробел или
+     * пунктуация», and this is that sentence and nothing more.
+     *
+     * [Character.isSpaceChar] covers the plain space and the non-breaking space; the punctuation
+     * categories are the very ones [needsAutoSpace] already uses, so «сүз,» and «сүз —» end a word
+     * here for exactly the reason they hug it there.
+     *
+     * Enter and Tab are deliberately NOT separators for this purpose, even though they arrive as
+     * ordinary code points ('\n', '\t') and both are listed in `symbols_word_separators`.
+     * [Character.isWhitespace] would have swept them in; [Character.isSpaceChar] does not. The
+     * reason is not taste: Enter may perform an editor action instead of committing anything, so a
+     * replacement made just before it would edit a field that is being submitted — with nothing
+     * committed after the word, and usually no field left to revert in.
+     *
+     * The caller ALSO requires the code point to be a word separator of the live layout
+     * (`SettingsValues.isWordSeparator`); the two conditions are a conjunction, never an
+     * alternative.
+     */
+    @JvmStatic
+    fun isAutocorrectSeparator(codePoint: Int): Boolean =
+        Character.isSpaceChar(codePoint) || isHuggingPunctuation(codePoint)
+
     /** True for the punctuation categories that must stay glued to the word in front of them. */
     private fun isHuggingPunctuation(codePoint: Int): Boolean {
         val type = Character.getType(codePoint)

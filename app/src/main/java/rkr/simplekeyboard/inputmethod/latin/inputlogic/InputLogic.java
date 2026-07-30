@@ -516,7 +516,42 @@ public final class InputLogic {
      * @return {@code true} if the replacement was committed, {@code false} otherwise (no edit).
      */
     public boolean commitChosenSuggestion(final String expectedPrefix, final String suggestion) {
-        if (TextUtils.isEmpty(expectedPrefix) || TextUtils.isEmpty(suggestion)) {
+        return replaceTrailingWord(expectedPrefix, suggestion, true /* withAutoSpace */);
+    }
+
+    /**
+     * Commits an autocorrection (D3): the SECOND insertion path of the frozen text contract, and
+     * the same mechanism as the first one — this method exists only to say "no auto-space" and
+     * delegates the edit itself to {@link #replaceTrailingWord}.
+     *
+     * <p>The separator that triggered the correction has not been committed yet; it follows through
+     * the ordinary input path a moment later and supplies the separation an accepted suggestion has
+     * to bring with it. Adding a space here would produce "сүз  ,".
+     *
+     * @param expectedPrefix the trailing word the verdict was computed for.
+     * @param replacement the dictionary word to put in its place.
+     * @return {@code true} if the replacement was committed, {@code false} otherwise (no edit).
+     */
+    public boolean commitTatarAutocorrection(final String expectedPrefix,
+            final String replacement) {
+        return replaceTrailingWord(expectedPrefix, replacement, false /* withAutoSpace */);
+    }
+
+    /**
+     * THE single place where a Tatar word is replaced in the editor: both insertion paths of the
+     * frozen text contract — the accepted suggestion and the autocorrection — go through this one
+     * explicit delete-by-code-points plus {@code commitText} inside ONE batch edit. No composing
+     * text is ever set, on either path.
+     *
+     * <p>The re-checks below belong to both paths verbatim, which is the point of sharing them:
+     * a collapsed selection, a cursor that is not inside a word, and a live trailing word that still
+     * equals {@code expectedPrefix}. The deletion length is taken from that verified word, so it can
+     * only ever cover whole code points; a mismatch cancels the action entirely rather than editing
+     * part of it.
+     */
+    private boolean replaceTrailingWord(final String expectedPrefix, final String replacement,
+            final boolean withAutoSpace) {
+        if (TextUtils.isEmpty(expectedPrefix) || TextUtils.isEmpty(replacement)) {
             return false;
         }
         if (mConnection.hasSelection()) {
@@ -538,8 +573,9 @@ public final class InputLogic {
         // The space rides along inside the SAME commitText: a second commit would show the word
         // without its space for one frame and would cost another IPC round trip for nothing.
         final String textToCommit =
-                TatarWordUtils.needsAutoSpace(mConnection.getCachedTextAfterCursor())
-                        ? suggestion + AUTO_SPACE : suggestion;
+                withAutoSpace
+                        && TatarWordUtils.needsAutoSpace(mConnection.getCachedTextAfterCursor())
+                        ? replacement + AUTO_SPACE : replacement;
         mConnection.beginBatchEdit();
         mConnection.deleteTextBeforeCursor(expectedPrefix.length());
         mConnection.commitText(textToCommit, 1);
@@ -548,9 +584,70 @@ public final class InputLogic {
         // real space press has to behave like a first one, exactly as it does after a typed
         // letter. Leaving mLastSpaceDownTime armed would turn "сүзләр " + space into "сүзләр. "
         // whenever the user had pressed space less than DOUBLE_SPACE_PERIOD_TIMEOUT ago. This is
-        // also an edit, so a pending revert no longer describes the text before the cursor.
+        // also an edit, so a pending revert no longer describes the text before the cursor. It
+        // holds for the autocorrection path too, which commits no space of its own: the space the
+        // user is about to press must still behave like a first one.
         mJustDoubleSpaced = false;
         mLastSpaceDownTime = 0;
+        return true;
+    }
+
+    /**
+     * Undoes the autocorrection that was made immediately before this backspace (D3), through the
+     * same explicit delete + {@code commitText} in one batch edit, and without composing text.
+     *
+     * <p>What must stand right before the cursor is {@code insertedForm + separator} — the exact
+     * text the replacement and the separator behind it left there. That suffix match IS the position
+     * check the contract asks for and a stronger one than an offset: an offset can coincide again
+     * after unrelated edits, this text cannot. If anything else changed the text, nothing is edited
+     * and {@code false} is returned; the caller has already dropped the undo state by then, so the
+     * backspace simply deletes a character like any other.
+     *
+     * @param insertedForm the word this keyboard put there.
+     * @param separator the separator committed right after it.
+     * @param typedForm what the user had actually typed.
+     * @return {@code true} if the original input was restored, {@code false} otherwise (no edit).
+     */
+    public boolean revertTatarAutocorrection(final String insertedForm, final String separator,
+            final String typedForm) {
+        if (TextUtils.isEmpty(insertedForm) || TextUtils.isEmpty(typedForm)) {
+            return false;
+        }
+        if (mConnection.hasSelection()) {
+            return false;
+        }
+        if (TatarWordUtils.startsWithWordCharacter(mConnection.getCachedTextAfterCursor())) {
+            // Same list as the replacement path: the contract adds checks to it, it removes none.
+            return false;
+        }
+        final String inserted = insertedForm + separator;
+        if (!endsWith(mConnection.getCachedTextBeforeCursor(), inserted)) {
+            return false;
+        }
+        mConnection.beginBatchEdit();
+        mConnection.deleteTextBeforeCursor(inserted.length());
+        mConnection.commitText(typedForm + separator, 1);
+        mConnection.endBatchEdit();
+        mJustDoubleSpaced = false;
+        mLastSpaceDownTime = 0;
+        return true;
+    }
+
+    /** Allocation-free suffix test over the cached text; never logs or copies what it reads. */
+    private static boolean endsWith(final CharSequence text, final String suffix) {
+        if (text == null) {
+            return false;
+        }
+        final int suffixLength = suffix.length();
+        final int offset = text.length() - suffixLength;
+        if (suffixLength == 0 || offset < 0) {
+            return false;
+        }
+        for (int index = 0; index < suffixLength; index++) {
+            if (text.charAt(offset + index) != suffix.charAt(index)) {
+                return false;
+            }
+        }
         return true;
     }
 

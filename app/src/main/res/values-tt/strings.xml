@@ -74,6 +74,8 @@
     <string name="tatar_suggestions_offer_enable">Кабызу</string>
     <string name="tatar_suggestions_offer_dismiss">Хәзер түгел</string>
     <string name="tatar_suggestions_unavailable">Татарча тәкъдимнәрне хәзер кабызып булмады. Соңрак кабат карап карагыз.</string>
+    <string name="tatar_autocorrect">Татарча сүзләрне төзәтү</string>
+    <string name="tatar_autocorrect_summary">Буш урын яки тыныш билгесе язгач, хаталы татарча сүзне төзәтә. Язганыгызны кире кайтару өчен шундук бетерү төймәсенә басыгыз.</string>
     <string name="personal_dictionary">Шәхси сүзлек</string>
     <string name="personal_dictionary_summary">Сез язган сүзләрне исендә калдырып, соңыннан тәкъдим итә. Алар бары тик шушы җиһазда саклана. Сүндерү тупланганны бетерми — аларны «Шәхси сүзлек» экранында бетерергә мөмкин.</string>
     <string name="personal_dictionary_screen">Сакланган сүзләр</string>

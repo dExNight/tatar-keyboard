@@ -34,6 +34,7 @@ class ExecutorServiceEngineExecutor private constructor(
 class MappedDictionaryEngine private constructor(
     val identity: DictionaryIdentity,
     private val engine: LatestOnlyPrefixEngine,
+    private val computer: CompositePrefixComputer,
 ) {
     fun request(
         editorSessionId: Long,
@@ -41,13 +42,31 @@ class MappedDictionaryEngine private constructor(
         normalizedPrefixUtf8: ByteArray,
     ): LookupToken? = engine.request(editorSessionId, subtypeId, normalizedPrefixUtf8)
 
-    fun finishInput() = engine.finishInput()
+    /**
+     * The D3 verdict of the newest completed lookup, or null when nothing may be replaced.
+     *
+     * A plain read of an immutable object behind a `@Volatile` reference: the UI thread never
+     * touches the mapped buffer, the index scratch, or the engine lock through this. The reader must
+     * still check [AutocorrectAdvice.typedWord] against the live word — that, not this getter, is
+     * what makes a verdict left over from an older lookup harmless.
+     */
+    val autocorrectAdvice: AutocorrectAdvice?
+        get() = computer.lastAutocorrectAdvice
+
+    fun finishInput() {
+        // Idling the engine invalidates the generation, so the verdict computed for it goes too.
+        computer.clearAutocorrectAdvice()
+        engine.finishInput()
+    }
 
     fun updateKeyNeighbors(table: KeyNeighborTable?) = engine.updateKeyNeighbors(table)
 
     fun isCurrent(token: LookupToken): Boolean = engine.isCurrent(token)
 
-    fun destroy(timeout: Long, unit: TimeUnit): Boolean = engine.destroy(timeout, unit)
+    fun destroy(timeout: Long, unit: TimeUnit): Boolean {
+        computer.clearAutocorrectAdvice()
+        return engine.destroy(timeout, unit)
+    }
 
     val suppressedStaleResultCount: Long
         get() = engine.suppressedStaleResultCount
@@ -149,7 +168,7 @@ class MappedDictionaryEngine private constructor(
                     resultHandoff,
                     resources::release,
                 )
-                return MappedDictionaryEngine(identity, engine)
+                return MappedDictionaryEngine(identity, engine, computer)
             } catch (_: Throwable) {
                 mapped = null
                 try {
