@@ -51,6 +51,7 @@ public class SettingsValues {
     public final boolean mSpaceSwipeEnabled;
     public final boolean mDeleteSwipeEnabled;
     public final boolean mTatarSuggestionsEnabled;
+    public final boolean mPersonalDictionaryEnabled;
 
     // From the input box
     public final InputAttributes mInputAttributes;
@@ -95,6 +96,7 @@ public class SettingsValues {
         mSpaceSwipeEnabled = Settings.readSpaceSwipeEnabled(prefs);
         mDeleteSwipeEnabled = Settings.readDeleteSwipeEnabled(prefs);
         mTatarSuggestionsEnabled = Settings.readTatarSuggestionsEnabled(prefs);
+        mPersonalDictionaryEnabled = Settings.readPersonalDictionaryEnabled(prefs);
     }
 
     public boolean isWordSeparator(final int code) {

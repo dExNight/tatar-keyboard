@@ -152,6 +152,10 @@
     <string name="tatar_suggestions_offer_dismiss">Not now</string>
     <!-- Message shown once when Tatar word suggestions could not be turned on -->
     <string name="tatar_suggestions_unavailable">Tatar suggestions could not be turned on right now. You can try again later.</string>
+    <!-- Option to remember words the user types and suggest them later -->
+    <string name="personal_dictionary">Personal dictionary</string>
+    <!-- Description for the personal dictionary option. Says plainly that words are saved on the device and that turning the option off keeps what was already saved. -->
+    <string name="personal_dictionary_summary">Remember words you type and suggest them later. Saved on this device only. Turning this off keeps what is already saved — erase it on the Personal dictionary screen.</string>
     <!-- Title of the settings item and its confirmation dialog that erases recently used emoji -->
     <string name="clear_recent_emoji">Clear recent emoji</string>
     <!-- Body of the confirmation dialog that erases recently used emoji -->

@@ -284,13 +284,27 @@ class SettingsHostActivity : Activity() {
                 R.string.space_swipe, R.string.space_swipe_summary))
         rows.add(switchRow(Settings.PREF_DELETE_SWIPE, false,
                 R.string.delete_swipe, R.string.delete_swipe_summary))
+        var personalDictionaryRow: View? = null
         rows.add(switchRow(Settings.PREF_TATAR_SUGGESTIONS, false,
-                R.string.tatar_suggestions, R.string.tatar_suggestions_summary))
+                R.string.tatar_suggestions, R.string.tatar_suggestions_summary) { checked ->
+            personalDictionaryRow?.let {
+                setRowEnabled(it, checked && !isRestricted(Settings.PREF_PERSONAL_DICTIONARY))
+            }
+        })
+        // The personal dictionary rides on the suggestion band: without suggestions there is
+        // nowhere for a remembered word to appear, so the row follows the switch above it.
+        val personalRow = switchRow(Settings.PREF_PERSONAL_DICTIONARY, false,
+                R.string.personal_dictionary, R.string.personal_dictionary_summary)
+        personalDictionaryRow = personalRow
+        rows.add(personalRow)
         addCard(rows)
         // android:dependency="pref_show_language_switch_key" from the legacy screen.
         setRowEnabled(imeRow,
                 prefs.getBoolean(Settings.PREF_SHOW_LANGUAGE_SWITCH_KEY, true)
                         && !isRestricted(Settings.PREF_ENABLE_IME_SWITCH))
+        setRowEnabled(personalRow,
+                Settings.readTatarSuggestionsEnabled(prefs)
+                        && !isRestricted(Settings.PREF_PERSONAL_DICTIONARY))
         // A data action, not an appearance toggle: its own card at the end of Preferences, next to
         // the Tatar-suggestions switch. Erasing recent emoji is a confirmed, one-way action; it does
         // not belong on the Appearance screen where the emoji-key toggle lives.

@@ -50,6 +50,15 @@
         android:title="@string/delete_swipe"
         android:restrictionType="bool"
         android:defaultValue="false" />
+    <!-- One-directional by design: only the value false is applied (it turns the personal
+         dictionary off and locks the row); true is ignored, so a policy can never force the
+         saving of typed words on. See PersonalDictionaryRestriction. -->
+    <restriction
+        android:key="pref_personal_dictionary"
+        android:title="@string/personal_dictionary"
+        android:restrictionType="bool"
+        android:description="@string/personal_dictionary_summary"
+        android:defaultValue="false" />
     <!-- settings_screen_key_press -->
     <restriction
         android:key="vibrate_on"

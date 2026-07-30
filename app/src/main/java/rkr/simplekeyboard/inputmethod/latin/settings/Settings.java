@@ -68,6 +68,16 @@ public final class Settings extends BroadcastReceiver implements SharedPreferenc
     public static final String PREF_DELETE_SWIPE = "pref_delete_swipe";
     public static final String PREF_TATAR_SUGGESTIONS = "pref_tatar_suggestions";
     /**
+     * The personal dictionary: one toggle for both reading and writing, default OFF (E4b). A
+     * separate "remember typed words" switch is deliberately not introduced: two toggles give four
+     * states, only three of which mean anything, and would force the user to be told the difference
+     * between "do not remember" and "do not show".
+     *
+     * <p>Turning it off does NOT erase what was already saved — that is what the "Personal
+     * dictionary" screen is for, and the settings text says so.
+     */
+    public static final String PREF_PERSONAL_DICTIONARY = "pref_personal_dictionary";
+    /**
      * One-shot marker: the offer to turn Tatar suggestions on has been made and is never made
      * again. Deliberately NOT part of {@link SettingsValues} — that object is rebuilt in full on
      * every change of every setting, and this value is read once per process and written once per
@@ -193,13 +203,33 @@ public final class Settings extends BroadcastReceiver implements SharedPreferenc
                         }
                         prefsEditor.remove(key);
                         break;
+                    case PREF_PERSONAL_DICTIONARY:
+                        // ONE-DIRECTIONAL on purpose — see PersonalDictionaryRestriction. The
+                        // generic boolean branch above would let a policy force the saving of typed
+                        // words ON and lock the user out of turning it off.
+                        final boolean personalPolicy = appRestrictions.getBoolean(key);
+                        if (PersonalDictionaryRestriction.writesPreference(personalPolicy)) {
+                            Log.i(TAG, "Loading restriction: " + key + "=" + personalPolicy);
+                            prefsEditor.putBoolean(key,
+                                    PersonalDictionaryRestriction.valueToWrite());
+                        } else {
+                            Log.i(TAG, "Ignoring permissive restriction: " + key);
+                        }
+                        break;
                     default:
                         Log.e(TAG, "Unhandled restriction: " + key);
                 }
             }
 
-            prefsEditor.putStringSet(ACTIVE_RESTRICTIONS, restrictionKeys);
+            // A permissive personal-dictionary policy is dropped from the stored set, so the
+            // settings row it would otherwise grey out stays live for the user.
+            final Set<String> activeKeys = PersonalDictionaryRestriction.effectiveRestrictionKeys(
+                    restrictionKeys,
+                    restrictionKeys.contains(PREF_PERSONAL_DICTIONARY)
+                            ? appRestrictions.getBoolean(PREF_PERSONAL_DICTIONARY) : null);
+            prefsEditor.putStringSet(ACTIVE_RESTRICTIONS, activeKeys);
             prefsEditor.apply();
+            return activeKeys;
         }
         return restrictionKeys;
     }
@@ -269,6 +299,14 @@ public final class Settings extends BroadcastReceiver implements SharedPreferenc
 
     public static boolean readTatarSuggestionsEnabled(final SharedPreferences prefs) {
         return prefs.getBoolean(PREF_TATAR_SUGGESTIONS, false);
+    }
+
+    /**
+     * The personal dictionary is opt-in: default OFF, exactly like Tatar suggestions. This one
+     * reader governs both showing personal words and saving them.
+     */
+    public static boolean readPersonalDictionaryEnabled(final SharedPreferences prefs) {
+        return prefs.getBoolean(PREF_PERSONAL_DICTIONARY, false);
     }
 
     /**
