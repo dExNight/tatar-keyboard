@@ -1,6 +1,6 @@
 # Политика конфиденциальности / Privacy Policy
 
-**Версия / Version:** 1.1 — 2026-07-27
+**Версия / Version:** 1.2 — 2026-07-31
 
 ## English
 
@@ -22,6 +22,17 @@ So the emoji panel can show them first, it remembers **up to 24 recently used em
 - **Not everywhere.** Nothing is remembered in **password fields or other private fields** — e‑mail, URL, and any field that asks the keyboard not to show suggestions or not to personalize (for example an incognito browser tab or a banking app).
 - **How to erase it.** Open the keyboard settings and tap **“Clear recent emoji.”** To remove it together with everything else, delete the app's data in the system settings — that also removes the **2,542,036‑byte** unpacked dictionary, which the app rebuilds on next use.
 
+### Personal dictionary
+
+If you turn the **personal dictionary** on (it is **off** unless you turn it on), the keyboard saves words you type so it can suggest them later.
+
+- **What is saved.** The word itself, spelled the way you typed it, plus two numbers: how often it has been used and when it was last used, as a counter — not a clock time. **Nothing else**: not the sentence around it, not the app you typed it in, not the field, not the date.
+- **Where.** In an internal app folder that is **decrypted only after you enter your device's lock code** (PIN, pattern or password), separately for each keyboard language. **Before the first unlock** after a restart, nothing there is read or written.
+- **It never leaves your device**, and it is excluded from cloud backup and from the transfer to a new device — there is no export, no import and no sync, in this version or any planned one.
+- **Not everywhere.** Nothing is saved in **password fields or other private fields** — e-mail, URL, postal address, and any field that asks the keyboard not to show suggestions or not to personalize (an incognito tab, a banking app).
+- **How to see and erase it.** Keyboard settings → **“Saved words”**: every saved word of every language, with **“Delete”** on each one and **“Erase all saved words.”** Turning the personal dictionary off does **not** erase what was already saved — erase it here. Deleting the app, or clearing its data in the system settings, destroys everything saved, and no backup brings it back.
+- **The screen is not behind a separate password.** Anyone holding your unlocked phone can read the list of saved words. `FLAG_SECURE` keeps it out of screenshots and out of the recent-apps thumbnail, but it cannot keep out a person standing next to you. This is a deliberate trade-off, stated rather than left unsaid.
+
 ## По-русски
 
 Tatar Keyboard хранит то, что вы печатаете, **на вашем устройстве**.
@@ -41,6 +52,17 @@ Tatar Keyboard хранит то, что вы печатаете, **на ваш�
 - **Исключено из бэкапа.** Этот список лежит во внутренней «no‑backup» папке, которую Android **не** включает ни в облачную резервную копию, ни в перенос на новое устройство.
 - **Не везде.** Ничего не запоминается в **полях пароля и других приватных полях** — e‑mail, URL и любое поле, которое просит клавиатуру не показывать подсказки или не персонализироваться (например, вкладка браузера в режиме инкогнито или банковское приложение).
 - **Как стереть.** Откройте настройки клавиатуры и нажмите **«Очистить недавние эмодзи»**. Чтобы удалить вместе со всем остальным — удалите данные приложения в системных настройках; это заодно удалит распакованный словарь на **2 542 036 байт**, который приложение соберёт заново при следующем использовании.
+
+### Личный словарь
+
+Если вы включите **личный словарь** (по умолчанию он **выключен**), клавиатура сохраняет набранные вами слова, чтобы предлагать их позже.
+
+- **Что сохраняется.** Само слово в том написании, в котором вы его набрали, и два числа: сколько раз оно использовалось и когда использовалось в последний раз — счётчиком, а не временем по часам. **Больше ничего**: ни окружающего предложения, ни приложения, в котором вы печатали, ни поля, ни даты.
+- **Где.** Во внутренней папке приложения, которая **расшифровывается только после ввода кода блокировки устройства** (PIN, графический ключ или пароль), отдельно для каждого языка клавиатуры. **До первой разблокировки** после перезагрузки там ничего не читается и не пишется.
+- **Это никогда не покидает ваше устройство** и исключено из облачной резервной копии и переноса на новое устройство — ни экспорта, ни импорта, ни синхронизации нет ни в этой версии, ни в планах.
+- **Не везде.** Ничего не сохраняется в **полях пароля и других приватных полях** — e-mail, URL, почтовый адрес и любое поле, которое просит клавиатуру не показывать подсказки или не персонализироваться (вкладка инкогнито, банковское приложение).
+- **Как посмотреть и стереть.** Настройки клавиатуры → **«Сохранённые слова»**: все сохранённые слова всех языков, у каждого — **«Удалить»**, и отдельно **«Стереть все сохранённые слова»**. Выключение личного словаря **не** удаляет накопленное — стирать нужно здесь. Удаление приложения или «стереть данные» в системных настройках уничтожает всё накопленное безвозвратно, и восстановление из резервной копии его не вернёт.
+- **Экран не защищён отдельным паролем.** Любой, у кого в руках ваш разблокированный телефон, увидит список сохранённых слов. `FLAG_SECURE` закрывает его от скриншота и от миниатюры «недавних приложений», но не от человека рядом. Это осознанный компромисс, и он назван, а не умолчан.
 
 ## Контакт / Contact
 
