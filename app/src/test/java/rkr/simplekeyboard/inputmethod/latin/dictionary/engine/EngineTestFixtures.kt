@@ -1,5 +1,6 @@
 package rkr.simplekeyboard.inputmethod.latin.dictionary.engine
 
+import rkr.simplekeyboard.inputmethod.latin.dictionary.storage.BigramTestFixtures
 import rkr.simplekeyboard.inputmethod.latin.dictionary.storage.DictionaryTestFixtures
 import java.nio.ByteBuffer
 import java.util.ArrayDeque
@@ -8,6 +9,7 @@ import java.util.concurrent.TimeUnit
 
 internal object EngineTestFixtures {
     val identity = DictionaryIdentity(1, 1, 1, "a".repeat(64))
+    val bigramIdentity = BigramTableIdentity(1, "tt", 2, 1, "b".repeat(64))
 
     fun index(entries: List<Pair<String, Long>>): TdictPrefixIndex {
         val raw = DictionaryTestFixtures.raw(entries)
@@ -16,6 +18,18 @@ internal object EngineTestFixtures {
                 ByteBuffer.wrap(raw),
                 identity,
                 entries.size.toLong(),
+                raw.size.toLong(),
+            ),
+        )
+    }
+
+    fun bigramIndex(headsToSuccesses: List<Pair<String, List<String>>>): TatBigrPrefixIndex {
+        val raw = BigramTestFixtures.raw(headsToSuccesses)
+        return requireNotNull(
+            TatBigrPrefixIndex.open(
+                ByteBuffer.wrap(raw),
+                bigramIdentity,
+                headsToSuccesses.size.toLong(),
                 raw.size.toLong(),
             ),
         )

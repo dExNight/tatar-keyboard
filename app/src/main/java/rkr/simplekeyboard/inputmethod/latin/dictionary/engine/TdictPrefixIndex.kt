@@ -50,7 +50,7 @@ internal interface KeyNeighborSink {
 internal fun isValidUtf8Scalar(bytes: ByteArray): Boolean =
     isValidUtf8Scalar(bytes.size) { bytes[it].toInt() and 0xff }
 
-private fun isValidUtf8Scalar(bytes: ImmutableUtf8Prefix): Boolean =
+internal fun isValidUtf8Scalar(bytes: ImmutableUtf8Prefix): Boolean =
     isValidUtf8Scalar(bytes.byteCount) { bytes.byteAt(it) }
 
 private inline fun isValidUtf8Scalar(size: Int, byteAt: (Int) -> Int): Boolean {
