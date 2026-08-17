@@ -134,16 +134,20 @@ class EmojiRecentAndFlingSourceContractTest {
     }
 
     @Test
-    fun deviceProtectedStorageContextIsCreatedInExactlyTwoSeamsAndNoneInTheEmojiPackage() {
+    fun deviceProtectedStorageContextIsCreatedInExactlyThreeSeamsAndNoneInTheEmojiPackage() {
         val javaRoot = File(sourceRoot(), "java")
         val seams = javaRoot.walkTopDown()
             .filter { it.isFile && (it.extension == "kt" || it.extension == "java") }
             .filter { it.readText().contains("createDeviceProtectedStorageContext(") }
             .map { it.name }
             .toList()
-        assertEquals("device-protected context must live in exactly two seams: $seams", 2, seams.size)
+        // E5c added a third seam alongside the frozen two: AndroidBigramStorageFactory.kt is the
+        // exact same production-wiring pattern as AndroidDictionaryStorageFactory.kt, pointed at
+        // its own device-protected subdirectory (docs/DICTIONARY-E5B.md, "Хранение").
+        assertEquals("device-protected context must live in exactly three seams: $seams", 3, seams.size)
         assertTrue(seams.contains("PreferenceManagerCompat.java"))
         assertTrue(seams.contains("AndroidDictionaryStorageFactory.kt"))
+        assertTrue(seams.contains("AndroidBigramStorageFactory.kt"))
 
         val emojiDir = File(javaRoot, "rkr/simplekeyboard/inputmethod/latin/emoji")
         emojiDir.listFiles { file -> file.name.endsWith(".kt") }?.forEach { file ->

@@ -124,6 +124,46 @@ class BigramTableLease internal constructor(
     }
 }
 
+/**
+ * One lifecycle surface for background bigram-table preparation and safe activation — the exact
+ * pair [DictionaryStorageController]/[BackgroundDictionaryPreparer] form for the main dictionary,
+ * mirrored here rather than generalized: the two artifact kinds already deliberately don't share
+ * a spec, validator, or store type (`docs/DICTIONARY-E5B.md`), and this is the last layer of that
+ * same shape.
+ */
+@Keep
+class BigramStorageController internal constructor(
+    private val preparer: BackgroundBigramPreparer,
+    private val catalog: PublishedBigramTableCatalog,
+) : PublishedBigramTableCatalog {
+    fun prepare(callback: (BigramPreparationResult) -> Unit) = preparer.prepare(callback)
+
+    override fun acquireLatestForActivation(): BigramTableLease? =
+        catalog.acquireLatestForActivation()
+
+    override fun cleanupReleasedVersions() = catalog.cleanupReleasedVersions()
+}
+
+@Keep
+class BackgroundBigramPreparer(
+    private val executor: java.util.concurrent.Executor,
+    private val store: AtomicBigramStore,
+    private val artifact: BigramArtifactSpec,
+) {
+    fun prepare(callback: (BigramPreparationResult) -> Unit) {
+        val taskStarted = java.util.concurrent.atomic.AtomicBoolean(false)
+        try {
+            executor.execute {
+                taskStarted.set(true)
+                callback(store.ensurePublished(artifact))
+            }
+        } catch (error: RuntimeException) {
+            if (taskStarted.get()) throw error
+            callback(BigramPreparationResult.Unavailable(StorageFailure.EXECUTOR_REJECTED))
+        }
+    }
+}
+
 internal object TatBigrFormat {
     const val MAGIC = "TATBIGR\u0000"
     const val SCHEMA_ID = 2
