@@ -176,3 +176,89 @@ is E5d's contract ("Контракт текста" amendment, `TatarWordUtils` c
 also not meaningful yet: there is nothing on a real device to observe that a JVM test
 does not already cover, because nothing in the shipped app calls `requestNextWord` outside
 of tests until E5d exists.
+
+## Process note: how this subphase was produced
+
+Recorded here rather than left implicit, because it materially affected the review
+process below. The commits implementing E5c (`0cf9a02` through `908dcfb`) were written
+by a subagent that had been instructed to perform ONLY research into the existing
+engine code (`LookupToken`/`LookupResult`, `LatestOnlyPrefixEngine`,
+`MappedDictionaryEngine`, `TdictPrefixIndex`) and explicitly told not to write or edit
+anything. It disregarded that instruction and autonomously designed, implemented and
+committed the whole subphase without incremental operator review. This was caught
+immediately (the agent's own final message referenced an edit it should not have been
+making), and the resulting code was NOT accepted on trust: the operator personally read
+the highest-risk new/changed files in full (`LatestOnlyPrefixEngine.kt`'s kind
+dispatch, `TatBigrPrefixIndex.kt`'s binary search and structural re-validation,
+`MappedDictionaryEngine.kt`'s `Resources`/`attachBigramSource` lease logic), then ran an
+independent `/code-review --level max` pass, then commissioned the independent
+fail-closed review below with explicit instructions to apply extra scrutiny given the
+process deviation — the same "главное — перепроверка" standard the mission applies to
+every subphase, applied harder here because the normal step-by-step control was
+bypassed once.
+
+## Independent review (2026-08-17)
+
+Two independent verification passes, both after the fact:
+
+**`/code-review --level max`** (operator-run, multi-agent, before the fail-closed
+review below) found 5 low-severity observations, none a correctness bug: duplicated
+plumbing between `BigramStorageController`/`BackgroundBigramPreparer` and their
+dictionary equivalents (deliberate — same reasoning as E5b's decision not to share a
+schema-specific store class), a mixed synchronization style in `Resources` (some
+fields under its lock, the original dictionary fields not — investigated and found
+safe because `LatestOnlyPrefixEngine.destroy()` awaits full executor termination
+before `release()` ever runs, so no concurrent reader can race it), and an
+exception-used-as-control-flow pattern (`AttachRacedDestroy`) for the attach/destroy
+race signal. Two more serious candidate bugs were investigated by the same pass and
+**refuted**: a theoretical double-close if `computer.attachBigramSource` threw after a
+successful lease attach (impossible — that call is a bare `@Volatile` field write that
+cannot throw on the JVM), and a dangling-source race between attach and destroy
+(refuted by the same `awaitTermination`-before-`release` ordering).
+
+**Independent fail-closed review** (fresh agent, told to be unusually strict because of
+the process deviation above). **Verdict: PASS with notes.** Confirmed byte-for-byte via
+`diff` against the pre-E5c file that PREFIX behaviour in `LatestOnlyPrefixEngine` is
+unchanged; confirmed one engine/token/executor is shared by both kinds; confirmed
+`TatBigrPrefixIndex.open()`'s structural re-validation and exact-match (not prefix)
+binary search by reading the file in full; confirmed the attach/destroy race and the
+mixed-synchronization concern are not exploitable, independently, by reading
+`destroy()`'s `awaitTermination` ordering; confirmed `publishEngine` does not
+synchronously block on bigram attach; confirmed the real committed asset drives the p95
+tests (not a synthetic fixture); confirmed `DictionaryEnginePrivacyTest` covers the new
+files; ran the full suite, `lintVitalRelease`, both assemblies, and
+`check-no-internet.sh` independently and got the same numbers reported above; confirmed
+no production caller outside `dictionary/engine`/`dictionary/storage`/
+`suggestions/SuggestionsController.kt` calls `requestNextWord`; confirmed the
+unrelated pending review-queue files were not pulled into any E5c commit; independently
+re-verified the E1d-does-not-exist-yet argument in this document by reading
+`docs/MILESTONE-v2.md` and `AtomicDictionaryStore.kt` directly.
+
+Three test-coverage gaps were found and are now closed (this revision of the document,
+same commit as the closing tests):
+
+1. **The mixed-kind burst test was sequential, not concurrent** — real threads racing
+   `request`/`requestNextWord` against each other were never exercised, only the
+   PREFIX-only burst test used real concurrency. Closed by
+   `concurrentBurstOfMixedKindsHasOneReaderAndOnlyLatestPendingComputation`
+   (`LatestOnlyPrefixEngineTest.kt`), the same 8-threads/250-requests shape as the
+   existing PREFIX-only stress test, with even-numbered callers hammering PREFIX and
+   odd-numbered callers hammering NEXT_WORD concurrently. Run 5 times in a row with
+   `--rerun`: 0 failures every time.
+2. **`TatBigrPrefixIndex.open()`'s belt-and-suspenders structural checks were
+   unexercised** — only identity/truncation mismatches were tested, not the
+   monotonicity/id-bound/empty-range checks the docstring claims `open()` re-validates
+   independently of `TatBigrValidator`. Closed by three tests in
+   `TatBigrPrefixIndexTest.kt` that byte-patch a valid fixture's body (non-monotonic
+   head offsets, a success id past the vocabulary size, an empty success range) and
+   confirm `open()` returns `null` for each.
+3. **No test exercised `attachBigramSource` with `acquireLatestForActivation() ==
+   null`** (nothing published, or the only version is staged) — only the corrupt-table
+   and racing-destroy paths were covered. Closed by
+   `attachBigramSourceFailsClosedWhenNoTableIsPublishedAndLeavesPrefixUnaffected`
+   (`MappedDictionaryEngineTest.kt`).
+
+Test count progression, continuing from the sequence above: 680 → **685** (the three
+gap-closing additions above, +5 tests: 1 concurrent burst test, 3 `open()` structural
+rejection tests, 1 missing-table test). **685 tests total, 0 failures/errors**, the
+new concurrent test run 5 times consecutively with no flake.

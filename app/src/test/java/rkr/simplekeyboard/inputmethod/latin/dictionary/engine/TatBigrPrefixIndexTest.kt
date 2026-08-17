@@ -80,6 +80,55 @@ class TatBigrPrefixIndexTest {
     }
 
     @Test
+    fun openRejectsNonMonotonicHeadOffsets() {
+        // open() re-validates the invariants its own reads depend on rather than trusting that
+        // TatBigrValidator was the only thing ever standing between this buffer and disk — this
+        // corrupts the body (not the header) so only that specific check can catch it.
+        val raw = BigramTestFixtures.raw(listOf("аб" to listOf("аба"), "юл" to listOf("өй")))
+        val section1 = readU32(raw, 28)
+        writeU32(raw, section1 + 4, 0) // second head-offset entry must be > 0 (the first)
+
+        val index = TatBigrPrefixIndex.open(
+            ByteBuffer.wrap(raw), EngineTestFixtures.bigramIdentity, 2, raw.size.toLong(),
+        )
+
+        assertNull(index)
+    }
+
+    @Test
+    fun openRejectsSuccessIdAtOrBeyondVocabularySize() {
+        val raw = BigramTestFixtures.raw(listOf("аб" to listOf("аба")))
+        val section4 = readU32(raw, 40)
+        writeU32(raw, section4, Int.MAX_VALUE) // vocabulary size is 1; this id is far beyond it
+
+        val index = TatBigrPrefixIndex.open(
+            ByteBuffer.wrap(raw), EngineTestFixtures.bigramIdentity, 1, raw.size.toLong(),
+        )
+
+        assertNull(index)
+    }
+
+    @Test
+    fun openRejectsEmptySuccessRange() {
+        // The exact shape scripts/bigram_asset_pack.py refuses to ever produce (a head with zero
+        // successes is dropped, not stored with an empty range) — the reader must refuse it too.
+        val raw = BigramTestFixtures.raw(listOf("аб" to listOf("аба"), "юл" to emptyList()))
+
+        val index = TatBigrPrefixIndex.open(
+            ByteBuffer.wrap(raw), EngineTestFixtures.bigramIdentity, 2, raw.size.toLong(),
+        )
+
+        assertNull(index)
+    }
+
+    private fun readU32(raw: ByteArray, offset: Int): Int =
+        ByteBuffer.wrap(raw, offset, 4).order(java.nio.ByteOrder.LITTLE_ENDIAN).int
+
+    private fun writeU32(raw: ByteArray, offset: Int, value: Int) {
+        ByteBuffer.wrap(raw, offset, 4).order(java.nio.ByteOrder.LITTLE_ENDIAN).putInt(value)
+    }
+
+    @Test
     fun acceptsCommittedTatarBigramAssetAndFindsARealHead() {
         val spec = rkr.simplekeyboard.inputmethod.latin.dictionary.storage.BigramArtifactSpec
             .TATAR_BIGRAMS_V1

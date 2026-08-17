@@ -643,6 +643,85 @@ class LatestOnlyPrefixEngineTest {
         assertEquals(1L, engine.suppressedStaleResultCount)
     }
 
+    @Test
+    fun concurrentBurstOfMixedKindsHasOneReaderAndOnlyLatestPendingComputation() {
+        // The sequential test above shows the coalescing invariant does not depend on kind; this
+        // is the same proof concurrentBurstHasOneReaderAndOnlyLatestPendingComputation gives for
+        // PREFIX alone, but with real threads racing both request() and requestNextWord() against
+        // each other — the interleaving a burst test is meant to catch cannot be forced by a
+        // single caller issuing calls one at a time.
+        val executor = ExecutorServiceEngineExecutor.singleThread()
+        val firstEntered = CountDownLatch(1)
+        val releaseFirst = CountDownLatch(1)
+        val latestPublished = CountDownLatch(1)
+        val activeComputers = AtomicInteger()
+        val maximumActiveComputers = AtomicInteger()
+        val computed = Collections.synchronizedList(mutableListOf<Pair<LookupKind, String>>())
+        val published = Collections.synchronizedList(mutableListOf<LookupResult>())
+        val computer = object : PrefixComputer, NextWordComputer {
+            private fun compute(kind: LookupKind, value: String): List<String> {
+                val active = activeComputers.incrementAndGet()
+                maximumActiveComputers.accumulateAndGet(active, ::maxOf)
+                try {
+                    computed += kind to value
+                    if (value == "first") {
+                        firstEntered.countDown()
+                        assertTrue(releaseFirst.await(2, TimeUnit.SECONDS))
+                    }
+                    return listOf("result:$value")
+                } finally {
+                    activeComputers.decrementAndGet()
+                }
+            }
+
+            override fun lookup(normalizedPrefixUtf8: ImmutableUtf8Prefix): List<String> =
+                compute(LookupKind.PREFIX, normalizedPrefixUtf8.decodeUtf8())
+
+            override fun predict(normalizedContextWordUtf8: ImmutableUtf8Prefix): List<String> =
+                compute(LookupKind.NEXT_WORD, normalizedContextWordUtf8.decodeUtf8())
+        }
+        val engine = LatestOnlyPrefixEngine(
+            EngineTestFixtures.identity,
+            computer,
+            executor,
+            ResultHandoff {
+                published += it
+                if (it.suggestions == listOf("result:latest")) latestPublished.countDown()
+            },
+        )
+        engine.request(1, "tt", utf8("first"))
+        assertTrue(firstEntered.await(1, TimeUnit.SECONDS))
+
+        val callers = (0 until 8).map { caller ->
+            Thread({
+                repeat(250) { request ->
+                    // Even-numbered callers hammer PREFIX, odd-numbered hammer NEXT_WORD — both
+                    // kinds racing the same currentToken/pendingRequest slot concurrently.
+                    if (caller % 2 == 0) {
+                        engine.request(caller.toLong(), "tt-$caller", utf8("$caller-$request"))
+                    } else {
+                        engine.requestNextWord(caller.toLong(), "tt-$caller", utf8("$caller-$request"))
+                    }
+                }
+            }, "e5c-mixed-burst-$caller").apply(Thread::start)
+        }
+        callers.forEach { it.join(2_000) }
+        assertTrue(callers.none(Thread::isAlive))
+        val latest = requireNotNull(engine.requestNextWord(99, "tt", utf8("latest")))
+        assertEquals(1, engine.readerCountForTest())
+        assertTrue(engine.hasPendingForTest())
+
+        releaseFirst.countDown()
+        assertTrue(latestPublished.await(2, TimeUnit.SECONDS))
+
+        assertEquals(listOf(LookupKind.PREFIX to "first", LookupKind.NEXT_WORD to "latest"), computed)
+        assertEquals(listOf(latest), published.map { it.token })
+        assertEquals(LookupKind.NEXT_WORD, published.single().kind)
+        assertEquals(1, maximumActiveComputers.get())
+        assertEquals(1L, engine.suppressedStaleResultCount)
+        assertTrue(engine.destroy(2, TimeUnit.SECONDS))
+    }
+
     private fun engine(
         executor: ManualEngineExecutor,
         computed: MutableList<String>,

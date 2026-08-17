@@ -403,6 +403,34 @@ class MappedDictionaryEngineTest {
     }
 
     @Test
+    fun attachBigramSourceFailsClosedWhenNoTableIsPublishedAndLeavesPrefixUnaffected() {
+        // The "missing file" branch of attachBigramSource — acquireLatestForActivation() returns
+        // null (nothing published, or the only version is staged behind a live lease) rather than
+        // throwing or handing back a corrupt table. This is the ?: return false path, distinct
+        // from the corrupt-table and racing-destroy paths already covered above.
+        val executor = ManualEngineExecutor()
+        val published = mutableListOf<LookupResult>()
+        val engine = requireNotNull(startWithDictionaryOnly(executor, published))
+        val catalog = object : PublishedBigramTableCatalog {
+            override fun acquireLatestForActivation(): BigramTableLease? = null
+            override fun cleanupReleasedVersions() = Unit
+        }
+
+        val attached = engine.attachBigramSource(
+            catalog,
+            mapper = DictionaryMapper { file, _ -> ByteBuffer.wrap(file.readBytes()) },
+        )
+
+        assertFalse(attached)
+
+        // PREFIX lookups are completely unaffected by a missing bigram table.
+        engine.request(1, "tt", utf8("а"))
+        executor.runAll()
+        assertEquals(1, published.size)
+        engine.destroy(1, TimeUnit.SECONDS)
+    }
+
+    @Test
     fun destroyClosesBothDictionaryAndBigramLeasesExactlyOnce() {
         val executor = ManualEngineExecutor()
         var dictionaryClosed = false
