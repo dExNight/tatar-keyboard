@@ -21,10 +21,14 @@ import android.os.Handler
 import rkr.simplekeyboard.inputmethod.latin.dictionary.engine.AutocorrectPolicy
 import rkr.simplekeyboard.inputmethod.latin.dictionary.engine.KeyNeighborTable
 import rkr.simplekeyboard.inputmethod.latin.dictionary.personal.PersonalSubtypes
+import rkr.simplekeyboard.inputmethod.latin.dictionary.storage.AndroidBigramStorageFactory
 import rkr.simplekeyboard.inputmethod.latin.dictionary.storage.AndroidDictionaryStorageFactory
+import rkr.simplekeyboard.inputmethod.latin.dictionary.storage.BigramPreparationResult
+import rkr.simplekeyboard.inputmethod.latin.dictionary.storage.BigramStorageController
 import rkr.simplekeyboard.inputmethod.latin.dictionary.storage.DictionaryStorageController
 import rkr.simplekeyboard.inputmethod.latin.dictionary.personal.WordCompletionSink
 import rkr.simplekeyboard.inputmethod.latin.dictionary.storage.PreparationResult
+import rkr.simplekeyboard.inputmethod.latin.dictionary.storage.PublishedBigramTableCatalog
 import rkr.simplekeyboard.inputmethod.latin.dictionary.storage.PublishedDictionaryCatalog
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
@@ -151,6 +155,36 @@ private class DeviceProtectedDictionaryPreparation(
 }
 
 /**
+ * E5c two-stage readiness: lazily created bigram-table storage, the exact same shape as
+ * [DictionaryPreparation] for the exact same reason (a user who never turns suggestions on never
+ * pays disk space or background work for the bigram table either) — kept a SEPARATE interface
+ * rather than folding into [DictionaryPreparation] because the two artifacts already don't share
+ * a spec, validator or store (`docs/DICTIONARY-E5B.md`), and merging their controller seams here
+ * would just recreate that coupling one layer up.
+ */
+interface BigramPreparation {
+    fun prepare(onResult: (BigramPreparationResult) -> Unit)
+    fun catalog(): PublishedBigramTableCatalog
+}
+
+/** Production [BigramPreparation] over the device-protected bigram-table store. */
+private class DeviceProtectedBigramPreparation(
+    private val storage: BigramStorageController,
+) : BigramPreparation {
+    override fun prepare(onResult: (BigramPreparationResult) -> Unit) = storage.prepare(onResult)
+
+    override fun catalog(): PublishedBigramTableCatalog = storage
+
+    companion object {
+        fun create(context: Context, executor: ExecutorService): BigramPreparation? = try {
+            DeviceProtectedBigramPreparation(AndroidBigramStorageFactory.create(context, executor))
+        } catch (_: Throwable) {
+            null
+        }
+    }
+}
+
+/**
  * Notified when a dictionary preparation that an *explicit* enable asked for ended
  * [PreparationResult.Unavailable].
  *
@@ -187,6 +221,10 @@ class SuggestionsController internal constructor(
     private val executorFactory: () -> ExecutorService?,
     private val preparationFactory: (ExecutorService) -> DictionaryPreparation?,
     initialDictionaryReady: Boolean,
+    // E5c: trailing default so every existing internal test constructor below (there is no
+    // bigram table in any of their fakes) needs no change at all — only the production
+    // constructor passes real wiring.
+    private val bigramPreparationFactory: (ExecutorService) -> BigramPreparation? = { null },
 ) {
     /** Production entry point (frozen contract). */
     constructor(
@@ -203,6 +241,7 @@ class SuggestionsController internal constructor(
         { Executors.newSingleThreadExecutor() },
         { executor -> DeviceProtectedDictionaryPreparation.create(context, executor) },
         false,
+        { executor -> DeviceProtectedBigramPreparation.create(context, executor) },
     )
 
     /** Test entry point: injects a synchronous poster + executor and pre-marks the dictionary. */
@@ -244,6 +283,10 @@ class SuggestionsController internal constructor(
      */
     @Volatile
     private var preparation: DictionaryPreparation? = null
+
+    /** E5c two-stage readiness: same lazy-seam shape as [preparation], for the bigram table. */
+    @Volatile
+    private var bigramPreparation: BigramPreparation? = null
 
     @Volatile
     private var dictionaryReady: Boolean = initialDictionaryReady
@@ -716,6 +759,47 @@ class SuggestionsController internal constructor(
         return created
     }
 
+    /** E5c two-stage readiness: [dictionaryPreparation]'s exact shape, for the bigram table. */
+    private fun bigramPreparationSeam(): BigramPreparation? {
+        bigramPreparation?.let { return it }
+        val backgroundExecutor = backgroundExecutor() ?: return null
+        val created = try {
+            bigramPreparationFactory(backgroundExecutor)
+        } catch (_: Throwable) {
+            null
+        } ?: return null
+        bigramPreparation = created
+        return created
+    }
+
+    /**
+     * PROPOSALS.md, "E5c. Готовность вычислителя двухступенчатая": called from [publishEngine]
+     * strictly AFTER the dictionary engine has already been assigned, reserved and (if a prefix
+     * was already typed) looked up — never on the path that gets there. Preparing and attaching
+     * the bigram table both happen on the background executor and touch no UI-visible state of
+     * their own: unlike [onDictionaryReady], there is nothing here for the strip to reflect —
+     * [CompositePrefixComputer.predict] simply starts answering once attached, and a NEXT_WORD
+     * lookup is only ever triggered by E5d's own context-driven request, not by this completing.
+     * A missing, corrupted, or not-yet-published table leaves [handle] answering NEXT_WORD with
+     * an empty list, exactly like before this ran — no failure path reaches the UI thread.
+     */
+    private fun maybeAttachBigramSource(handle: EngineHandle) {
+        val preparation = bigramPreparationSeam() ?: return
+        try {
+            preparation.prepare { result ->
+                // Runs on the background executor, exactly like requestPreparationIfNeeded's own
+                // callback — attachBigramSource performs the same class of blocking I/O and must
+                // stay off the UI thread, so this is NOT re-marshaled through uiPoster.
+                if (result is BigramPreparationResult.Published) {
+                    handle.attachBigramSource(preparation.catalog())
+                }
+            }
+        } catch (_: Throwable) {
+            // Best-effort: NEXT_WORD simply keeps answering empty, exactly like a corrupted or
+            // missing table would.
+        }
+    }
+
     /**
      * The single background executor, created on the first real need (dictionary preparation or
      * engine start) and never recreated after [onDestroy].
@@ -779,6 +863,11 @@ class SuggestionsController internal constructor(
         // Hand the freshly started engine the current key-neighbor table so its fuzzy pass is armed
         // without waiting for the next layout change. Null is a valid value (fuzzy pass disabled).
         handle.updateKeyNeighbors(keyNeighbors)
+        // E5c two-stage readiness: started AFTER the engine is already assigned, never before —
+        // this is what makes it true that the bigram table cannot delay publication. Kicked off
+        // regardless of `eligible` below: the engine stays warm across an ineligible editor, and
+        // attaching costs nothing the UI can observe either way.
+        maybeAttachBigramSource(handle)
         if (!eligible) {
             handle.finishInput()
             strip.hideSuggestions()
