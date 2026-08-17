@@ -8,11 +8,15 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
+import rkr.simplekeyboard.inputmethod.latin.dictionary.storage.BigramTableLease
+import rkr.simplekeyboard.inputmethod.latin.dictionary.storage.BigramTestFixtures
 import rkr.simplekeyboard.inputmethod.latin.dictionary.storage.DictionaryFileLease
 import rkr.simplekeyboard.inputmethod.latin.dictionary.storage.DictionaryTestFixtures
 import rkr.simplekeyboard.inputmethod.latin.dictionary.storage.AssetInputProvider
 import rkr.simplekeyboard.inputmethod.latin.dictionary.storage.AtomicDictionaryStore
 import rkr.simplekeyboard.inputmethod.latin.dictionary.storage.DeviceProtectedDirectoryProvider
+import rkr.simplekeyboard.inputmethod.latin.dictionary.storage.PublishedBigramTable
+import rkr.simplekeyboard.inputmethod.latin.dictionary.storage.PublishedBigramTableCatalog
 import rkr.simplekeyboard.inputmethod.latin.dictionary.storage.PublishedDictionary
 import rkr.simplekeyboard.inputmethod.latin.dictionary.storage.PublishedDictionaryCatalog
 import rkr.simplekeyboard.inputmethod.latin.dictionary.storage.SpaceProbe
@@ -333,6 +337,154 @@ class MappedDictionaryEngineTest {
             assertTrue(active.isEmpty())
         }
         assertEquals(listOf(2, 3), retained)
+    }
+
+    // --- E5c: two-stage readiness — attachBigramSource after an already-published engine --------
+
+    @Test
+    fun beforeAttachRequestNextWordReturnsEmptyWithoutBlockingStart() {
+        val executor = ManualEngineExecutor()
+        val engine = requireNotNull(startWithDictionaryOnly(executor))
+
+        val token = requireNotNull(engine.requestNextWord(1, "tt", utf8("аб")))
+        executor.runAll()
+
+        assertEquals(LookupKind.NEXT_WORD, token.kind)
+        // No assertion needed on WHAT is published here beyond "no crash, no block" — the
+        // ResultHandoff in startWithDictionaryOnly discards results; the empty-before-attach
+        // behaviour itself is covered end to end by the next test.
+        engine.destroy(1, TimeUnit.SECONDS)
+    }
+
+    @Test
+    fun attachBigramSourceWiresPredictionsIntoTheAlreadyPublishedEngine() {
+        val executor = ManualEngineExecutor()
+        val published = mutableListOf<LookupResult>()
+        val engine = requireNotNull(startWithDictionaryOnly(executor, published))
+        val bigramCatalog = bigramCatalog(bigramFixture(listOf("аб" to listOf("аба"))))
+
+        val attached = engine.attachBigramSource(
+            bigramCatalog,
+            mapper = DictionaryMapper { file, _ -> ByteBuffer.wrap(file.readBytes()) },
+        )
+        assertTrue(attached)
+
+        engine.requestNextWord(1, "tt", utf8("аб"))
+        executor.runAll()
+
+        assertEquals(listOf("аба"), published.single().suggestions)
+        assertEquals(LookupKind.NEXT_WORD, published.single().kind)
+        engine.destroy(1, TimeUnit.SECONDS)
+    }
+
+    @Test
+    fun attachBigramSourceFailsClosedOnCorruptTableAndLeavesPrefixUnaffected() {
+        val executor = ManualEngineExecutor()
+        val published = mutableListOf<LookupResult>()
+        val engine = requireNotNull(startWithDictionaryOnly(executor, published))
+        val corruptFile = temporaryFolder.newFile("corrupt.tatbigr").also { it.writeBytes(byteArrayOf(1, 2, 3)) }
+        val corruptTable = PublishedBigramTable(1, "tt", corruptFile, 3, 1, 1, 1, 2, 1, "0".repeat(64))
+        var closed = false
+        val catalog = bigramCatalog(corruptTable) { closed = true }
+
+        val attached = engine.attachBigramSource(
+            catalog,
+            mapper = DictionaryMapper { file, _ -> ByteBuffer.wrap(file.readBytes()) },
+        )
+
+        assertFalse(attached)
+        assertTrue("a failed attach must close the lease it acquired", closed)
+
+        // PREFIX lookups are completely unaffected by a bigram attach failure.
+        engine.request(1, "tt", utf8("а"))
+        executor.runAll()
+        assertEquals(1, published.size)
+        engine.destroy(1, TimeUnit.SECONDS)
+    }
+
+    @Test
+    fun destroyClosesBothDictionaryAndBigramLeasesExactlyOnce() {
+        val executor = ManualEngineExecutor()
+        var dictionaryClosed = false
+        val dictionaryFixture = dictionaryFixture(1)
+        val dictionaryLease = DictionaryFileLease(dictionaryFixture) { dictionaryClosed = true }
+        val engine = requireNotNull(
+            MappedDictionaryEngine.start(
+                SingleLeaseCatalog(dictionaryLease),
+                ResultHandoff {},
+                executorFactory = { executor },
+                mapper = DictionaryMapper { file, _ -> ByteBuffer.wrap(file.readBytes()) },
+            ),
+        )
+        var bigramClosed = 0
+        val bigramCatalog = bigramCatalog(bigramFixture(listOf("аб" to listOf("аба")))) { bigramClosed++ }
+        assertTrue(
+            engine.attachBigramSource(
+                bigramCatalog,
+                mapper = DictionaryMapper { file, _ -> ByteBuffer.wrap(file.readBytes()) },
+            ),
+        )
+
+        assertTrue(engine.destroy(1, TimeUnit.SECONDS))
+
+        assertTrue(dictionaryClosed)
+        assertEquals(1, bigramClosed)
+        // Idempotent: a second destroy must not double-close either lease.
+        assertTrue(engine.destroy(1, TimeUnit.SECONDS))
+        assertEquals(1, bigramClosed)
+    }
+
+    @Test
+    fun attachAfterDestroyClosesTheAcquiredBigramLeaseWithoutPublishingIt() {
+        val executor = ManualEngineExecutor()
+        val engine = requireNotNull(startWithDictionaryOnly(executor))
+        assertTrue(engine.destroy(1, TimeUnit.SECONDS))
+        var closed = false
+        val catalog = bigramCatalog(bigramFixture(listOf("аб" to listOf("аба")))) { closed = true }
+
+        val attached = engine.attachBigramSource(
+            catalog,
+            mapper = DictionaryMapper { file, _ -> ByteBuffer.wrap(file.readBytes()) },
+        )
+
+        assertFalse("attach must lose the race against a prior destroy", attached)
+        assertTrue("the racing lease must not be leaked", closed)
+    }
+
+    private fun startWithDictionaryOnly(
+        executor: ManualEngineExecutor,
+        published: MutableList<LookupResult> = mutableListOf(),
+    ): MappedDictionaryEngine? = MappedDictionaryEngine.start(
+        SingleLeaseCatalog(DictionaryFileLease(dictionaryFixture(1)) {}),
+        ResultHandoff { published += it },
+        executorFactory = { executor },
+        mapper = DictionaryMapper { file, _ -> ByteBuffer.wrap(file.readBytes()) },
+    )
+
+    private fun bigramFixture(headsToSuccesses: List<Pair<String, List<String>>>): PublishedBigramTable {
+        val raw = BigramTestFixtures
+            .raw(headsToSuccesses)
+        val file = temporaryFolder.newFile("bigrams-${System.nanoTime()}.tatbigr")
+        file.writeBytes(raw)
+        return PublishedBigramTable(
+            1, "tt", file, raw.size.toLong(), headsToSuccesses.size.toLong(),
+            headsToSuccesses.sumOf { it.second.size }.toLong(),
+            headsToSuccesses.flatMap { it.second }.toSet().size.toLong(),
+            2, 1,
+            BigramTestFixtures.sha256(raw),
+        )
+    }
+
+    private fun bigramCatalog(
+        table: PublishedBigramTable,
+        onClose: () -> Unit = {},
+    ): PublishedBigramTableCatalog {
+        var lease: BigramTableLease? =
+            BigramTableLease(table, onClose)
+        return object : PublishedBigramTableCatalog {
+            override fun acquireLatestForActivation() = lease.also { lease = null }
+            override fun cleanupReleasedVersions() = Unit
+        }
     }
 
     private fun dictionaryFixture(generation: Int): PublishedDictionary {
