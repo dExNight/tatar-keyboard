@@ -324,3 +324,28 @@ Level 2 OK: backup closed as a whitelist (allowBackup=false, both editions, no <
   `lintVitalRelease` green; `assembleDebug`/`assembleRelease` both succeed.
 - [x] Android code outside `dictionary/storage/` is untouched — this phase adds three
   new files to that one package plus their tests, and touches no existing file.
+
+## Independent review (2026-08-17)
+
+Fresh agent, no context from the work above. **Verdict: PASS with one noted design
+asymmetry, not a finding.** Re-ran the real packing on the pinned corpora — every
+number (`raw_bytes`, `compressed_bytes`, both SHA-256, `actual_head_count`,
+`pair_count`, `success_vocabulary_count`, all four dropped heads) matched byte-for-byte.
+Read `validate_raw` (Python) and `validateRaw` (Kotlin) line by line and confirmed both
+reject the same corruption classes. Ran both test suites (26 Python + 655 JVM, 0
+failures), rebuilt the release APK independently and re-ran `check-no-internet.sh`
+(both levels OK, same size). Confirmed `git log` on this branch carries only the two
+E5b-scoped commits and that the unrelated pending review-queue files were never pulled
+in.
+
+**Noted asymmetry (not a finding):** `bigram_asset_pack.validate_raw` is a pure format
+validator and accepts a syntactically well-formed `headCount = 0` file (an empty
+table) as structurally valid; `TatBigrValidator.validateRaw` always rejects
+`headCount = 0` — not via a dedicated structural check, but because it is spec-bound
+and `BigramArtifactSpec.expectedHeadCount` is constructor-required to be `> 0`. This is
+not a contract violation (PROPOSALS.md does not name a zero head count among the
+corruption classes E5b's validator must reject, and this document only ever claimed
+symmetry for empty-*word* rejection, not for empty-*table* rejection) and not a real
+gap (the runtime validator is always spec-bound to the one pinned artifact, so a
+zero-head file could never reach it as anything but a SHA-256/size mismatch either
+way). Recorded here for completeness rather than silently left out of the record.
