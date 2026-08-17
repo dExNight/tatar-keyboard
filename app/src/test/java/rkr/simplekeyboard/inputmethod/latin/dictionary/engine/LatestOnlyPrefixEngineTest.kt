@@ -128,7 +128,7 @@ class LatestOnlyPrefixEngineTest {
         val second = requireNotNull(engine.request(5, "tt", utf8("ә")))
 
         assertNotEquals(first.requestSerial, second.requestSerial)
-        assertEquals(first.exactPrefix, second.exactPrefix)
+        assertEquals(first.normalizedQuery, second.normalizedQuery)
         executor.runAll()
     }
 
@@ -153,7 +153,7 @@ class LatestOnlyPrefixEngineTest {
         executor.runAll()
 
         assertEquals(listOf("аб"), computed)
-        assertEquals(ImmutableUtf8Prefix.copyOf(utf8("аб")), token.exactPrefix)
+        assertEquals(ImmutableUtf8Prefix.copyOf(utf8("аб")), token.normalizedQuery)
         assertEquals("аб", retained.single().decodeUtf8())
         assertTrue(
             ImmutableUtf8Prefix::class.java.methods.none { it.returnType == ByteArray::class.java },
@@ -516,6 +516,131 @@ class LatestOnlyPrefixEngineTest {
         assertTrue(oldPublished.isEmpty())
         assertEquals(newIdentity, newToken.dictionary)
         assertEquals(listOf("new"), newPublished.single().suggestions)
+    }
+
+    // --- E5c: NEXT_WORD requests share the same engine, token and executor as PREFIX ------------
+
+    @Test
+    fun requestNextWordInvokesNextWordComputerNotPrefixComputerLookup() {
+        val executor = ManualEngineExecutor()
+        val published = mutableListOf<LookupResult>()
+        var prefixLookups = 0
+        var nextWordPredicts = 0
+        val computer = object : PrefixComputer, NextWordComputer {
+            override fun lookup(normalizedPrefixUtf8: ImmutableUtf8Prefix): List<String> {
+                prefixLookups++
+                return listOf("prefix:${normalizedPrefixUtf8.decodeUtf8()}")
+            }
+
+            override fun predict(normalizedContextWordUtf8: ImmutableUtf8Prefix): List<String> {
+                nextWordPredicts++
+                return listOf("next:${normalizedContextWordUtf8.decodeUtf8()}")
+            }
+        }
+        val engine = LatestOnlyPrefixEngine(
+            EngineTestFixtures.identity, computer, executor, ResultHandoff { published += it },
+        )
+
+        val token = requireNotNull(engine.requestNextWord(1, "tt", utf8("өй")))
+        executor.runAll()
+
+        assertEquals(LookupKind.NEXT_WORD, token.kind)
+        assertEquals(0, prefixLookups)
+        assertEquals(1, nextWordPredicts)
+        assertEquals(listOf("next:өй"), published.single().suggestions)
+        assertEquals(LookupKind.NEXT_WORD, published.single().kind)
+        assertEquals(LookupKind.NEXT_WORD, published.single().token.kind)
+    }
+
+    @Test
+    fun requestNextWordAgainstAPureComputerWithoutNextWordComputerYieldsEmpty() {
+        val executor = ManualEngineExecutor()
+        val published = mutableListOf<LookupResult>()
+        val engine = LatestOnlyPrefixEngine(
+            EngineTestFixtures.identity,
+            PrefixComputer { listOf("should-not-be-used") },
+            executor,
+            ResultHandoff { published += it },
+        )
+
+        engine.requestNextWord(1, "tt", utf8("өй"))
+        executor.runAll()
+
+        // PROPOSALS.md, "E5c. Повреждённый, отсутствующий или неактивируемый файл биграмм даёт 0
+        // предсказаний" — a computer with no bigram source attached is exactly that state.
+        assertTrue(published.single().suggestions.isEmpty())
+    }
+
+    @Test
+    fun requestNextWordRejectsEmptyOversizedAndInvalidUtf8ContextWords() {
+        val executor = ManualEngineExecutor()
+        var predicts = 0
+        val engine = LatestOnlyPrefixEngine(
+            EngineTestFixtures.identity,
+            object : PrefixComputer, NextWordComputer {
+                override fun lookup(normalizedPrefixUtf8: ImmutableUtf8Prefix) = emptyList<String>()
+                override fun predict(normalizedContextWordUtf8: ImmutableUtf8Prefix): List<String> {
+                    predicts++
+                    return emptyList()
+                }
+            },
+            executor,
+            ResultHandoff {},
+        )
+
+        engine.requestNextWord(1, "tt", utf8("old"))
+        assertNull(engine.requestNextWord(1, "tt", ByteArray(0)))
+        assertNull(engine.requestNextWord(1, "tt", ByteArray(TatBigrPrefixIndex.MAX_WORD_BYTES + 1)))
+        assertNull(engine.requestNextWord(1, "tt", byteArrayOf(0xd0.toByte())))
+        executor.runAll()
+
+        assertEquals(1, predicts)
+        assertEquals(1L, engine.suppressedStaleResultCount)
+    }
+
+    @Test
+    fun burstOfMixedPrefixAndNextWordKeepsSingleFlightAndOnePendingSlot() {
+        val executor = ManualEngineExecutor()
+        val computed = mutableListOf<Pair<LookupKind, String>>()
+        val published = mutableListOf<LookupResult>()
+        val computer = object : PrefixComputer, NextWordComputer {
+            override fun lookup(normalizedPrefixUtf8: ImmutableUtf8Prefix): List<String> {
+                computed += LookupKind.PREFIX to normalizedPrefixUtf8.decodeUtf8()
+                return listOf("prefix:${normalizedPrefixUtf8.decodeUtf8()}")
+            }
+
+            override fun predict(normalizedContextWordUtf8: ImmutableUtf8Prefix): List<String> {
+                computed += LookupKind.NEXT_WORD to normalizedContextWordUtf8.decodeUtf8()
+                return listOf("next:${normalizedContextWordUtf8.decodeUtf8()}")
+            }
+        }
+        val engine = LatestOnlyPrefixEngine(
+            EngineTestFixtures.identity, computer, executor, ResultHandoff { published += it },
+        )
+
+        engine.request(1, "tt", utf8("а"))
+        engine.requestNextWord(1, "tt", utf8("өй"))
+        engine.request(1, "tt", utf8("аб"))
+        val latest = requireNotNull(engine.requestNextWord(1, "tt", utf8("юл")))
+
+        // Any interleaving of PREFIX and NEXT_WORD still yields at most one running and one
+        // pending request — the single-flight/coalescing invariant does not depend on kind.
+        assertEquals(1, executor.queueDepth)
+        assertEquals(1, executor.maxQueueDepth)
+        assertEquals(1, engine.readerCountForTest())
+        assertTrue(engine.hasPendingForTest())
+
+        executor.runAll()
+
+        assertEquals(listOf(LookupKind.PREFIX to "а", LookupKind.NEXT_WORD to "юл"), computed)
+        assertEquals(1, published.size)
+        assertEquals(latest, published.single().token)
+        assertEquals(listOf("next:юл"), published.single().suggestions)
+        // Only "а" and "юл" ever reach a worker at all — "өй" and "аб" are overwritten in the
+        // pending slot before being drained, exactly like the PREFIX-only burst test above. Of the
+        // two drained requests, only "а" is stale by the time it finishes (the current token has
+        // already moved on to "юл"), so suppressedStaleResultCount is 1, not the request count.
+        assertEquals(1L, engine.suppressedStaleResultCount)
     }
 
     private fun engine(
