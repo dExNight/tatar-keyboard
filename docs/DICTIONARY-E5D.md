@@ -167,11 +167,14 @@ comment explaining why) rather than the gate narrowed back, because narrowing it
 have silently reintroduced the very gap ("field switch needs an extra keystroke for a
 prediction") the widening exists to close.
 
-Test count progression from the E5c close: 685 → 707 (the fifteen tests named in the
-contract amendment itself) → 710 (two more found while checking this document against
-the fail-closed acceptance list line by line: the missing-toggle source-contract test,
-and the explicit both-directions "Сосуществование" test). **710 tests total, 0
-failures/errors.**
+Test count progression from the E5c close: 685 → 709 (24 new tests: the tests named in
+the contract amendment itself, plus the ones found while checking this document
+against the fail-closed acceptance list line by line, including the missing-toggle
+source-contract test and the explicit both-directions "Сосуществование" test).
+**709 tests total, 0 failures/errors** — count re-measured via `./gradlew
+testDebugUnitTest --rerun-tasks` and the aggregated `test-results` XML, not carried
+forward from an earlier estimate (an independent review caught an off-by-one in an
+earlier draft of this line).
 
 ## APK and privacy gates
 
