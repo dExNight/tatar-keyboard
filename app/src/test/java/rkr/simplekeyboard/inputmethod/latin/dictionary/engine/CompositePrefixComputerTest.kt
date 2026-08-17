@@ -238,4 +238,27 @@ class CompositePrefixComputerTest {
         assertEquals(0, primaryCalls)
         assertEquals(0, personalCalls)
     }
+
+    @Test
+    fun predictionsIgnorePersonalDictionaryEntirely() {
+        // E5d, "Контракт текста" amendment, пункт 3: "Личных биграмм в E5 нет ... таблица биграмм
+        // не знает о личном словаре". The call-count proof above (E5c) shows predict() never even
+        // reaches the personal source; this is the same property demonstrated by RESULT instead —
+        // a personal candidate that would plausibly interfere (the same word the bigram source
+        // returns, or a word for the same head) never appears in or reorders the prediction list.
+        val personalWithAMatchingWord = object : PersonalCandidateSource {
+            override fun candidatesFor(normalizedPrefix: String): List<PersonalCandidate> =
+                listOf(PersonalCandidate("йорт", "йорт"))
+
+            override fun isEmpty(): Boolean = false
+        }
+        val computer = CompositePrefixComputer(FakePrimary(emptyList(), 0), personalWithAMatchingWord)
+        computer.attachBigramSource(NextWordComputer { listOf("бакча", "капка") })
+
+        val result = computer.predict(prefix("өй"))
+
+        // Exactly the bigram source's own list, in its own order — the personal word never joins,
+        // precedes, or reorders it.
+        assertEquals(listOf("бакча", "капка"), result)
+    }
 }

@@ -456,6 +456,27 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
                     final String typedForm) {
                 return mInputLogic.revertTatarAutocorrection(insertedForm, separator, typedForm);
             }
+
+            @Override
+            public String cachedNextWordContext() {
+                return TatarWordUtils.INSTANCE.extractNextWordContext(
+                        mInputLogic.mConnection.getCachedTextBeforeCursor());
+            }
+
+            @Override
+            public boolean commitPredictedWord(final String expectedContextWord,
+                    final String suggestion) {
+                final boolean committed =
+                        mInputLogic.commitPredictedWord(expectedContextWord, suggestion);
+                if (committed) {
+                    // Same reason as the other two insertion paths above: commitPredictedWord runs
+                    // outside an InputTransaction, so the auto-caps state is refreshed with the very
+                    // same call used everywhere else.
+                    mKeyboardSwitcher.requestUpdatingShiftState(getCurrentAutoCapsState(),
+                            getCurrentRecapitalizeState());
+                }
+                return committed;
+            }
         };
 
         // Runs on the controller's background executor. The catalog is the one the controller

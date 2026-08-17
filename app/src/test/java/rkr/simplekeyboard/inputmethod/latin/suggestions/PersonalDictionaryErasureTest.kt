@@ -23,6 +23,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import rkr.simplekeyboard.inputmethod.latin.dictionary.engine.KeyNeighborTable
+import rkr.simplekeyboard.inputmethod.latin.dictionary.engine.LookupKind
 
 /**
  * «Стёрто значит стёрто» (E4b, раздел «Контракт личного словаря»).
@@ -123,7 +124,7 @@ class PersonalDictionaryErasureTest {
         editor.word = "гүз"
         controller.onTextChanged()
         val token = engine.requested.size.toLong()
-        callback!!.onResult(token, listOf("Гүзәл", "гүзәллек"))
+        callback!!.onResult(token, listOf("Гүзәл", "гүзәллек"), LookupKind.PREFIX)
         assertTrue("the personal word is on the strip before erasure",
             strip.events.any { it == "show:Гүзәл" })
 
@@ -160,7 +161,7 @@ class PersonalDictionaryErasureTest {
 
         controller.onPersonalDictionaryErased()
         val eventsAfterErasure = strip.events.size
-        callback!!.onResult(staleToken, listOf("Гүзәл"))
+        callback!!.onResult(staleToken, listOf("Гүзәл"), LookupKind.PREFIX)
 
         assertEquals("a result computed before the erasure must not repaint the strip",
             eventsAfterErasure, strip.events.size)

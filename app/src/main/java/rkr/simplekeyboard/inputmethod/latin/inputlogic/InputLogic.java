@@ -633,6 +633,64 @@ public final class InputLogic {
         return true;
     }
 
+    /**
+     * Commits a predicted next word (E5d): the THIRD insertion path of the frozen text contract, and
+     * a SEPARATE method rather than a branch inside {@link #replaceTrailingWord} — NEXT_WORD deletes
+     * NOTHING (PROPOSALS.md, "Контракт текста" amendment, 2026-08-17, "Отдельный путь коммита"),
+     * while every path through {@link #replaceTrailingWord} always deletes {@code expectedPrefix}
+     * first; a shared method conditioned on "delete or not" would be one method doing two different
+     * jobs behind one signature, exactly the shape the frozen contract's "one commit path per kind of
+     * result" rule exists to prevent.
+     *
+     * <p>Re-checks, all against the LIVE cache: collapsed selection, no letter right after the cursor
+     * (the same two checks {@link #replaceTrailingWord} makes), an EMPTY trailing word (NEXT_WORD is
+     * only ever requested when the prefix is empty, so a non-empty one here means the user typed
+     * something after the request was built, and the tap is stale), and the live context word —
+     * re-extracted by the exact algorithm that built the request — matching {@code
+     * expectedContextWord}. Deletes zero characters; inserts {@code suggestion} with the same
+     * auto-space rule an accepted suggestion uses.
+     *
+     * @param expectedContextWord the context word the prediction was computed for.
+     * @param suggestion the predicted word to insert.
+     * @return {@code true} if the word was committed, {@code false} otherwise (no edit).
+     */
+    public boolean commitPredictedWord(final String expectedContextWord, final String suggestion) {
+        if (TextUtils.isEmpty(expectedContextWord) || TextUtils.isEmpty(suggestion)) {
+            return false;
+        }
+        if (mConnection.hasSelection()) {
+            return false;
+        }
+        if (TatarWordUtils.startsWithWordCharacter(mConnection.getCachedTextAfterCursor())) {
+            // Same list as replaceTrailingWord: the contract adds checks to it, it removes none.
+            return false;
+        }
+        if (!TatarWordUtils.extractTrailingWord(mConnection.getCachedTextBeforeCursor()).isEmpty()) {
+            // The prefix is no longer empty: the user typed something after the request was built,
+            // and NEXT_WORD only ever applies to an empty prefix. Stale tap; do not edit.
+            return false;
+        }
+        final String liveContext =
+                TatarWordUtils.extractNextWordContext(mConnection.getCachedTextBeforeCursor());
+        if (!expectedContextWord.equals(liveContext)) {
+            // Stale tap: the context word no longer matches. Do not edit.
+            return false;
+        }
+        // The space rides along inside the SAME commitText, exactly like the other two paths.
+        final String textToCommit =
+                TatarWordUtils.needsAutoSpace(mConnection.getCachedTextAfterCursor())
+                        ? suggestion + AUTO_SPACE : suggestion;
+        mConnection.beginBatchEdit();
+        mConnection.commitText(textToCommit, 1);
+        mConnection.endBatchEdit();
+        // Same reasoning as replaceTrailingWord: a space this code inserted must not arm the
+        // double-space-to-period gesture, and a pending revert no longer describes the text before
+        // the cursor after this edit.
+        mJustDoubleSpaced = false;
+        mLastSpaceDownTime = 0;
+        return true;
+    }
+
     /** Allocation-free suffix test over the cached text; never logs or copies what it reads. */
     private static boolean endsWith(final CharSequence text, final String suffix) {
         if (text == null) {

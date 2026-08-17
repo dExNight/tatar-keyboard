@@ -118,6 +118,65 @@ class TatarWordUtilsTest {
         assertEquals("ёлка", TatarWordUtils.extractTrailingWord("бу ёлка"))
     }
 
+    // --- extractNextWordContext (E5d, "Контракт текста" amendment, 2026-08-17) ------------------
+
+    @Test
+    fun extractNextWordContextReturnsTheWordBeforeATrailingSpaceRun() {
+        assertEquals("сүз", TatarWordUtils.extractNextWordContext("яз сүз "))
+    }
+
+    @Test
+    fun extractNextWordContextAcceptsMoreThanOneTrailingSpace() {
+        assertEquals("сүз", TatarWordUtils.extractNextWordContext("яз сүз   "))
+    }
+
+    @Test
+    fun extractNextWordContextEmptyWithoutATrailingSpaceAtAll() {
+        assertEquals("", TatarWordUtils.extractNextWordContext("яз сүз"))
+    }
+
+    @Test
+    fun sentenceStartAndPositionsAfterPunctuationNeverBuildAContext() {
+        // "Начало предложения и позиция после пунктуации предсказаний не получают" — a mechanical
+        // consequence of the separator rule being EXACTLY U+0020, not any non-word character.
+        assertEquals("", TatarWordUtils.extractNextWordContext("")) // sentence / field start
+        assertEquals("", TatarWordUtils.extractNextWordContext("сүз.")) // right after a period
+        assertEquals("", TatarWordUtils.extractNextWordContext("сүз,")) // right after a comma
+        assertEquals("", TatarWordUtils.extractNextWordContext("сүз\n")) // right after a newline
+        assertEquals("", TatarWordUtils.extractNextWordContext("сүз\t")) // right after a tab
+        assertEquals("", TatarWordUtils.extractNextWordContext("сүз ")) // right after an NBSP
+    }
+
+    @Test
+    fun extractNextWordContextEmptyWhenTheSeparatorItselfReachesTheCacheBoundary() {
+        // "если разделитель ... упирается в нулевой индекс кэша" — an all-spaces cache with no
+        // letter in front of it at all: the true separator run might extend further back than what
+        // this snippet shows, so it cannot be trusted to be exactly "one or more U+0020".
+        assertEquals("", TatarWordUtils.extractNextWordContext("   "))
+    }
+
+    @Test
+    fun extractNextWordContextEmptyWhenTheWordItselfReachesTheCacheBoundary() {
+        // "или слово ... упирается в нулевой индекс кэша" — the word touches index 0 of the given
+        // text, so it may have been cut off by the real cache limit
+        // (Constants.EDITOR_CONTENTS_CACHE_SIZE, 1024 characters) rather than genuinely starting
+        // there.
+        assertEquals("", TatarWordUtils.extractNextWordContext("сүз "))
+    }
+
+    @Test
+    fun extractNextWordContextUsesTheSameWordBoundaryAlgorithmAsThePrefix() {
+        // Combining marks continue the word exactly like extractTrailingWord: "яз " + decomposed
+        // "сәй" + a trailing space run must still find the whole decomposed word, not just its tail.
+        assertEquals(nfd("сәй"), TatarWordUtils.extractNextWordContext(nfd("бу яз сәй ")))
+    }
+
+    @Test
+    fun extractNextWordContextEmptyForNullAndEmpty() {
+        assertEquals("", TatarWordUtils.extractNextWordContext(null))
+        assertEquals("", TatarWordUtils.extractNextWordContext(""))
+    }
+
     @Test
     fun extractTrailingWordEmptyForLoneCombiningMark() {
         // A mark with no base letter in the run is an orphan, not a word.

@@ -21,6 +21,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import rkr.simplekeyboard.inputmethod.latin.dictionary.engine.KeyNeighborTable
+import rkr.simplekeyboard.inputmethod.latin.dictionary.engine.LookupKind
 import rkr.simplekeyboard.inputmethod.latin.dictionary.personal.WordCompletionSink
 
 /**
@@ -103,7 +104,7 @@ class PersonalLearningRunTest {
         fun type(word: String, result: List<String> = emptyList()) {
             editor.word = word
             controller.onTextChanged()
-            callback?.onResult(engine.requested.size.toLong(), result)
+            callback?.onResult(engine.requested.size.toLong(), result, LookupKind.PREFIX)
         }
 
         /** The word ends: the trailing word becomes empty (a space, or any separator). */

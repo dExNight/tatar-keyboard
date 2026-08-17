@@ -20,6 +20,7 @@ import android.content.Context
 import android.os.Handler
 import rkr.simplekeyboard.inputmethod.latin.dictionary.engine.AutocorrectPolicy
 import rkr.simplekeyboard.inputmethod.latin.dictionary.engine.KeyNeighborTable
+import rkr.simplekeyboard.inputmethod.latin.dictionary.engine.LookupKind
 import rkr.simplekeyboard.inputmethod.latin.dictionary.personal.PersonalSubtypes
 import rkr.simplekeyboard.inputmethod.latin.dictionary.storage.AndroidBigramStorageFactory
 import rkr.simplekeyboard.inputmethod.latin.dictionary.storage.AndroidDictionaryStorageFactory
@@ -86,6 +87,28 @@ interface EditorSurface {
      * replacement left there. Defaults to false, like [replaceTypedWord].
      */
     fun revertTypedWord(insertedForm: String, separator: String, typedForm: String): Boolean = false
+
+    /**
+     * E5d NEXT_WORD context extraction from the live cache (PROPOSALS.md, "Контракт текста"
+     * amendment, 2026-08-17): the word immediately before a trailing run of one-or-more U+0020 right
+     * at the cursor, or "" if there is none. Defaults to "" so an editor surface written before E5d
+     * keeps compiling and NEXT_WORD simply never fires.
+     */
+    fun cachedNextWordContext(): String = ""
+
+    /**
+     * The THIRD insertion path of the frozen text contract (E5d): commits a predicted next word.
+     * Unlike [commitSuggestion] and [replaceTypedWord], this one deletes NOTHING — NEXT_WORD only
+     * ever fires on an empty prefix, so there is nothing trailing to remove; it only inserts, with
+     * the same auto-space rule an accepted suggestion uses.
+     *
+     * Re-checked against the live cache: collapsed selection, no letter right after the cursor (the
+     * same two checks the other two paths make), an EMPTY trailing word (a non-empty one means the
+     * user typed something after the request was built — the tap is stale), and the live context
+     * word re-extracted by [cachedNextWordContext]'s own algorithm matching [expectedContextWord]
+     * exactly. Defaults to false, like [replaceTypedWord] and [revertTypedWord].
+     */
+    fun commitPredictedWord(expectedContextWord: String, suggestion: String): Boolean = false
 }
 
 /**
@@ -345,6 +368,13 @@ class SuggestionsController internal constructor(
     private var displayedPrefix: String? = null
     private var displayedSessionId: Long = NO_SESSION
 
+    // --- E5d NEXT_WORD state, the exact same shape as pendingPrefix/displayedPrefix above, for the
+    // other kind of query. At most one of displayedPrefix/displayedContextWord is ever non-null at a
+    // time (PROPOSALS.md, "Контракт текста" amendment, "Сосуществование") — enforced by clearing the
+    // other one every time either request path runs, not assumed.
+    private var pendingContextWord: String = ""
+    private var displayedContextWord: String? = null
+
     // --- E4c clean-run state. Nothing here is persisted and nothing leaves this object except one
     // completed word handed to [completionSink]; with the default sink that is a no-op.
     /** The trailing word as last seen. Empty between words. */
@@ -425,6 +455,7 @@ class SuggestionsController internal constructor(
         runPendingRelease()
         sessionId++
         displayedPrefix = null
+        displayedContextWord = null
         this.eligible = eligible
         if (!eligible) {
             strip.hideSuggestions()
@@ -449,11 +480,11 @@ class SuggestionsController internal constructor(
         // before maybeStartEngine() so a cold engine that publishes inline still requests exactly
         // once from publishEngine().
         maybeStartEngine()
-        if (
-            engineWasReady &&
-            editor.hasKnownCursor() &&
-            editor.cachedWordBeforeCursor().isNotEmpty()
-        ) {
+        // E5d: no longer gated on a non-empty prefix — requestCurrentPrefix() falls through to
+        // NEXT_WORD on an empty one, and re-requesting on this boundary is what lets switching
+        // fields show a prediction without an extra keystroke, the same reason this call exists
+        // for PREFIX at all.
+        if (engineWasReady && editor.hasKnownCursor()) {
             requestCurrentPrefix()
         }
     }
@@ -476,6 +507,7 @@ class SuggestionsController internal constructor(
         // Any in-flight request is invalidated and whatever was shown is no longer bound to the
         // live editor state, so drop the displayed binding immediately.
         displayedPrefix = null
+        displayedContextWord = null
         // Keep the reserved band only after an engine has actually published. Eligibility while
         // the dictionary is preparing/unavailable remains fail-closed at GONE/0dp.
         if (eligible) {
@@ -497,6 +529,7 @@ class SuggestionsController internal constructor(
         completionSink.onInputFinished()
         sessionId++
         displayedPrefix = null
+        displayedContextWord = null
         // Close eligibility before hiding/finishing. A readiness notification queued behind this
         // lifecycle boundary must not start or publish an engine for the finished editor session.
         eligible = false
@@ -513,6 +546,7 @@ class SuggestionsController internal constructor(
         sessionId++
         engine?.finishInput()
         displayedPrefix = null
+        displayedContextWord = null
         this.eligible = eligible
         if (eligible) {
             val engineWasReady = usableEngine() != null
@@ -536,11 +570,8 @@ class SuggestionsController internal constructor(
             // when a cold engine publishes synchronously.
             requestPreparationIfNeeded()
             maybeStartEngine()
-            if (
-                engineWasReady &&
-                editor.hasKnownCursor() &&
-                editor.cachedWordBeforeCursor().isNotEmpty()
-            ) {
+            // E5d: see the comment on the identical gate in onStartInput().
+            if (engineWasReady && editor.hasKnownCursor()) {
                 requestCurrentPrefix()
             }
         } else {
@@ -568,6 +599,7 @@ class SuggestionsController internal constructor(
         sessionId++
         engine?.finishInput()
         displayedPrefix = null
+        displayedContextWord = null
         displayedSessionId = NO_SESSION
         if (eligible) strip.reserve() else strip.hideSuggestions()
     }
@@ -590,6 +622,7 @@ class SuggestionsController internal constructor(
         sessionId++
         eligible = false
         displayedPrefix = null
+        displayedContextWord = null
         requestSessionId = NO_SESSION
         strip.hideSuggestions()
         engine?.finishInput()
@@ -647,11 +680,11 @@ class SuggestionsController internal constructor(
         // Same shape as onStartInput(): capture readiness first so a cold engine that publishes
         // inline requests the current prefix exactly once, from publishEngine().
         maybeStartEngine()
-        if (
-            engineWasReady &&
-            editor.hasKnownCursor() &&
-            editor.cachedWordBeforeCursor().isNotEmpty()
-        ) {
+        // E5d: no longer gated on a non-empty prefix — requestCurrentPrefix() falls through to
+        // NEXT_WORD on an empty one, and re-requesting on this boundary is what lets switching
+        // fields show a prediction without an extra keystroke, the same reason this call exists
+        // for PREFIX at all.
+        if (engineWasReady && editor.hasKnownCursor()) {
             requestCurrentPrefix()
         }
     }
@@ -662,6 +695,7 @@ class SuggestionsController internal constructor(
         destroyed = true
         clearRevertState()
         displayedPrefix = null
+        displayedContextWord = null
         val handle = engine
         if (handle != null && destroyHandle(handle)) {
             // Only drop the reference once the lease is actually released; a still-leaked lease
@@ -823,8 +857,8 @@ class SuggestionsController internal constructor(
         if (releasePending) return
         val backgroundExecutor = backgroundExecutor() ?: return
         starting = true
-        val callback = ResultCallback { token, suggestions ->
-            uiPoster.post { applyResult(token, suggestions) }
+        val callback = ResultCallback { token, suggestions, kind ->
+            uiPoster.post { applyResult(token, suggestions, kind) }
         }
         val factory = engineFactory
         try {
@@ -854,6 +888,7 @@ class SuggestionsController internal constructor(
         if (handle == null) {
             // Engine creation failed: do not reserve an empty band for an unavailable dictionary.
             displayedPrefix = null
+            displayedContextWord = null
             if (eligible) {
                 strip.hideSuggestions()
             }
@@ -877,7 +912,8 @@ class SuggestionsController internal constructor(
         // eligible band. Look up whatever the user has already typed without waiting for another
         // keystroke; an empty/unknown prefix leaves the now-available band reserved with 0 results.
         strip.reserve()
-        if (editor.hasKnownCursor() && editor.cachedWordBeforeCursor().isNotEmpty()) {
+        // E5d: see the comment on the identical gate in onStartInput().
+        if (editor.hasKnownCursor()) {
             requestCurrentPrefix()
         }
     }
@@ -943,9 +979,15 @@ class SuggestionsController internal constructor(
      * arrives. Reused verbatim by [onTextChanged] and by [publishEngine] right after a successful
      * engine publish.
      *
-     * It is also where the frozen text contract's two "0 results" states are enforced, both
-     * BEFORE the engine is asked anything: a cursor sitting inside a word, and a prefix in mixed
-     * capitalization.
+     * It is also where the frozen text contract's "0 results" states are enforced, all BEFORE the
+     * engine is asked anything: a cursor sitting inside a word (shared by both PREFIX and NEXT_WORD),
+     * and a prefix in mixed capitalization (PREFIX only — NEXT_WORD does not check the context word's
+     * casing at all, PROPOSALS.md, "Контракт текста" amendment, "Регистр предсказаний").
+     *
+     * E5d: an EMPTY prefix no longer unconditionally clears the band. It falls through to
+     * [requestNextWordContext], which is where NEXT_WORD's own "0 results" state (no context word
+     * available) is enforced — "Сосуществование" in the same amendment: a non-empty prefix always
+     * means PREFIX-only, an empty one means NEXT_WORD-only or nothing, never both in the same band.
      */
     private fun requestCurrentPrefix() {
         if (!eligible) return
@@ -954,6 +996,7 @@ class SuggestionsController internal constructor(
             // Text events can arrive while preparation/start is still in flight. Do not expose the
             // band until publishEngine() establishes that the dictionary is actually available.
             displayedPrefix = null
+            displayedContextWord = null
             strip.hideSuggestions()
             return
         }
@@ -961,16 +1004,21 @@ class SuggestionsController internal constructor(
             clearToReservedBand()
             return
         }
-        val word = editor.cachedWordBeforeCursor()
-        if (word.isEmpty()) {
+        // Cursor inside a word: the contract clears the results instead of offering a replacement
+        // that would be spliced into the middle of the user's text ("ки|тап" + "т" must not become
+        // "китапларtап"). Checked before either path below so the engine is never even asked, and
+        // checked ONCE — moved ahead of the prefix/context branch below (it used to run only on the
+        // PREFIX path) because "Контракт текста" amendment пункт 2 requires it to gate NEXT_WORD too:
+        // "При selection или букве... сразу после курсора правило действует без изменений — NEXT_WORD
+        // запрос не строится вообще". Neither check depended on the other's outcome, so this reorders
+        // without changing PREFIX behaviour at all.
+        if (editor.hasLetterAfterCursor()) {
             clearToReservedBand()
             return
         }
-        // Cursor inside a word: the contract clears the results instead of offering a replacement
-        // that would be spliced into the middle of the user's text ("ки|тап" + "т" must not become
-        // "китапларtап"). Checked before the lookup so the engine is never even asked.
-        if (editor.hasLetterAfterCursor()) {
-            clearToReservedBand()
+        val word = editor.cachedWordBeforeCursor()
+        if (word.isEmpty()) {
+            requestNextWordContext(activeEngine)
             return
         }
         // Mixed capitalization has no defined display form in the frozen contract, which requires
@@ -986,10 +1034,42 @@ class SuggestionsController internal constructor(
         if (word != displayedPrefix) {
             displayedPrefix = null
         }
+        // A non-empty prefix is unconditionally PREFIX mode: drop whatever NEXT_WORD state might
+        // still be bound from a moment ago, so the two kinds never coexist in the band.
+        displayedContextWord = null
         pendingPrefix = word
         requestSessionId = sessionId
         val prefixBytes = TatarWordUtils.toLookupBytes(TatarWordUtils.normalizeForLookup(word))
         val token = activeEngine.request(sessionId, SUBTYPE_ID, prefixBytes)
+        if (token == null) {
+            clearToReservedBand()
+        }
+    }
+
+    /**
+     * E5d NEXT_WORD request path, the sibling [requestCurrentPrefix] falls through to on an empty
+     * prefix. Mirrors its PREFIX counterpart's shape exactly (change detection, session stamping,
+     * clear-on-null-token) but has no casing gate — "Контракт текста" amendment, "Регистр
+     * предсказаний": a mixed-case context word does not suppress a prediction, because nothing about
+     * its casing is ever carried into the shown/inserted form.
+     */
+    private fun requestNextWordContext(activeEngine: EngineHandle) {
+        val context = editor.cachedNextWordContext()
+        if (context.isEmpty()) {
+            clearToReservedBand()
+            return
+        }
+        if (context != displayedContextWord) {
+            displayedContextWord = null
+        }
+        // A NEXT_WORD request is unconditionally not PREFIX mode: drop whatever prefix candidates
+        // might still be bound (there should not be any, since this path only runs on an empty
+        // prefix, but the invariant is enforced here rather than assumed).
+        displayedPrefix = null
+        pendingContextWord = context
+        requestSessionId = sessionId
+        val contextBytes = TatarWordUtils.toLookupBytes(TatarWordUtils.normalizeForLookup(context))
+        val token = activeEngine.requestNextWord(sessionId, SUBTYPE_ID, contextBytes)
         if (token == null) {
             clearToReservedBand()
         }
@@ -1004,6 +1084,7 @@ class SuggestionsController internal constructor(
      */
     private fun clearToReservedBand() {
         displayedPrefix = null
+        displayedContextWord = null
         requestSessionId = NO_SESSION
         strip.reserve()
     }
@@ -1065,11 +1146,18 @@ class SuggestionsController internal constructor(
         runEmptyResultPrefixLength = NO_EMPTY_RESULT
     }
 
-    private fun applyResult(token: Any, suggestions: List<String>) {
+    private fun applyResult(token: Any, suggestions: List<String>, kind: LookupKind) {
         if (!eligible) return
         if (sessionId != requestSessionId) return
         val activeEngine = usableEngine() ?: return
         if (!activeEngine.isCurrent(token)) return
+        when (kind) {
+            LookupKind.PREFIX -> applyPrefixResult(suggestions)
+            LookupKind.NEXT_WORD -> applyNextWordResult(suggestions)
+        }
+    }
+
+    private fun applyPrefixResult(suggestions: List<String>) {
         if (suggestions.isEmpty()) {
             // The observation the E4c filter is built on: nothing in the dictionary continues this
             // prefix, so no longer word starting with it can be in the dictionary either.
@@ -1103,6 +1191,27 @@ class SuggestionsController internal constructor(
             TatarWordUtils.applyCasing(suggestions[0], casing),
             suggestions.getOrNull(1)?.let { TatarWordUtils.applyCasing(it, casing) },
             suggestions.getOrNull(2)?.let { TatarWordUtils.applyCasing(it, casing) },
+        )
+    }
+
+    /**
+     * E5d NEXT_WORD counterpart of [applyPrefixResult]. No E4c learning (that filter is about
+     * PROPER prefixes of a growing word; NEXT_WORD only ever fires on an empty prefix, so there is no
+     * prefix growth to observe) and no casing re-application — "Контракт текста" amendment, "Регистр
+     * предсказаний": predictions are shown and inserted exactly as the bigram table stores them.
+     */
+    private fun applyNextWordResult(suggestions: List<String>) {
+        if (suggestions.isEmpty()) {
+            displayedContextWord = null
+            strip.reserve()
+            return
+        }
+        displayedContextWord = pendingContextWord
+        displayedSessionId = sessionId
+        strip.showSuggestions(
+            suggestions[0],
+            suggestions.getOrNull(1),
+            suggestions.getOrNull(2),
         )
     }
 
@@ -1161,6 +1270,7 @@ class SuggestionsController internal constructor(
         markRunDirty()
         // Whatever the band was showing described the word that no longer stands there.
         displayedPrefix = null
+        displayedContextWord = null
         armedReplacement = Replacement(
             word, replacement, separatorString(separatorCodePoint), sessionId,
         )
@@ -1222,20 +1332,36 @@ class SuggestionsController internal constructor(
         markRunDirty()
         // A tap is one of the six events that close the undo window.
         clearRevertState()
-        val prefix = displayedPrefix
-        if (prefix == null || displayedSessionId != sessionId) {
+        if (displayedSessionId != sessionId) {
             // Nothing bound to the current session is displayed (e.g. the text changed and the old
             // candidates were invalidated): a tap must be a no-op and must never commit.
             return
         }
-        // Commit against the DISPLAYED prefix, not the mutable pendingPrefix. The editor's own
-        // stale-tap guard (re-reads live cache, requires collapsed selection and live trailing word
-        // == expectedPrefix, deletes by code points) is the second line of defense.
-        if (editor.commitSuggestion(prefix, suggestion)) {
-            // The field is still eligible after a commit; clear the words but keep the reserved
-            // band so accepting a suggestion does not resize the keyboard.
-            displayedPrefix = null
-            strip.reserve()
+        // Exactly one of these is ever non-null (PROPOSALS.md, "Контракт текста" amendment,
+        // "Сосуществование") — the owner of state reads the kind off what is actually bound, not off
+        // the tapped string's content, which is the same rule E5c's engine-level guarantee exists
+        // for, one layer up.
+        val prefix = displayedPrefix
+        if (prefix != null) {
+            // Commit against the DISPLAYED prefix, not the mutable pendingPrefix. The editor's own
+            // stale-tap guard (re-reads live cache, requires collapsed selection and live trailing
+            // word == expectedPrefix, deletes by code points) is the second line of defense.
+            if (editor.commitSuggestion(prefix, suggestion)) {
+                // The field is still eligible after a commit; clear the words but keep the reserved
+                // band so accepting a suggestion does not resize the keyboard.
+                displayedPrefix = null
+                strip.reserve()
+            }
+            return
+        }
+        val context = displayedContextWord
+        if (context != null) {
+            // Same second line of defense as the PREFIX path, through the E5d commit path instead:
+            // the editor re-derives the live context word and refuses a stale tap itself.
+            if (editor.commitPredictedWord(context, suggestion)) {
+                displayedContextWord = null
+                strip.reserve()
+            }
         }
     }
 

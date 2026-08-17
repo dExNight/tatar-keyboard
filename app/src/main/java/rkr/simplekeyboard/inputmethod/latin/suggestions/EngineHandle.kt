@@ -17,6 +17,7 @@
 package rkr.simplekeyboard.inputmethod.latin.suggestions
 
 import rkr.simplekeyboard.inputmethod.latin.dictionary.engine.AutocorrectAdvice
+import rkr.simplekeyboard.inputmethod.latin.dictionary.engine.LookupKind
 import rkr.simplekeyboard.inputmethod.latin.dictionary.engine.LookupToken
 import rkr.simplekeyboard.inputmethod.latin.dictionary.engine.KeyNeighborTable
 import rkr.simplekeyboard.inputmethod.latin.dictionary.engine.MappedDictionaryEngine
@@ -33,9 +34,13 @@ import java.util.concurrent.TimeUnit
  * marshaling to the UI thread and for re-checking [EngineHandle.isCurrent] before applying, exactly
  * as the underlying engine's [ResultHandoff] contract requires. [token] is opaque; hand it straight
  * back to [EngineHandle.isCurrent].
+ *
+ * [kind] is E5d's addition: the owner of state (the controller) must know which kind of result it
+ * holds to choose the right commit path and the right display rule (NEXT_WORD skips the casing
+ * re-application PREFIX needs) — PROPOSALS.md, "E5c. Вид запроса" / "Контракт текста" amendment.
  */
 fun interface ResultCallback {
-    fun onResult(token: Any, suggestions: List<String>)
+    fun onResult(token: Any, suggestions: List<String>, kind: LookupKind)
 }
 
 /**
@@ -141,7 +146,7 @@ class MappedEngineHandle private constructor(
             personalCandidates: PersonalCandidateSource = PersonalCandidateSource.EMPTY,
         ): MappedEngineHandle? {
             val handoff = ResultHandoff { result ->
-                callback.onResult(result.token, result.suggestions)
+                callback.onResult(result.token, result.suggestions, result.kind)
             }
             val engine = MappedDictionaryEngine.start(
                 catalog, handoff, personalCandidates = personalCandidates,
