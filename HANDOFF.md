@@ -1,7 +1,7 @@
 # HANDOFF — миссия tatar-apk-audit
 
 Обновлено: 2026-08-18. Ветка: `codex/apk-audit-2026-08-18` (от `codex/e5-bigram-prediction`,
-базовый коммит `9a2a3196`).
+базовый коммит `9a2a3196`). Состояние миссии: **выполнена**.
 
 ## Что просили
 
@@ -12,63 +12,68 @@
 
 ## Что сделано
 
-- Пересборка выполнена дословной командой чеклиста
-  (`./gradlew clean test lintVitalRelease assembleDebug assembleRelease --rerun-tasks
-  --console=plain`) → `BUILD SUCCESSFUL`, 83/83 задач.
-- Пройдено и зафиксировано числами: 709 тестов 0/0/0; `lintVitalRelease` OK; no-INTERNET
-  exit 0 на debug и release, оба уровня; versionCode 4 / versionName 1.2.0 по
-  `output-metadata.json` и по `aapt2 dump badging`; permission dump — только `VIBRATE`;
-  размер release 1 726 976 Б (потолок 3 145 728 Б, бюджет D1 1,7 MiB — оба pass).
-- Отчёт: **`docs/APK-AUDIT-2026-08-18.md`**, в конце `STATUS: blocked-on-keystore`.
-- `docs/PUBLISH-CHECKLIST.md`: раздел 2 — новая evidence-таблица с датой 2026-08-18 (старая
-  сохранена как история), галочки переставлены по факту; раздел 4 — три отметки сняты в
-  `[ ]`; в шапку добавлен раздел «Повторный artifact audit выполнен, подпись открыта».
-- Разделы 3 и 5–7 не трогались. Статусы вычитки в `docs/TATAR-REVIEW-QUEUE.tsv` и
-  `docs/DICTIONARY-E3-TYPO-REVIEW.tsv` не трогались вообще.
+Пересборка дословной командой чеклиста (`./gradlew clean test lintVitalRelease assembleDebug
+assembleRelease --rerun-tasks --console=plain`) → `BUILD SUCCESSFUL`, 84/84 задач.
 
-## Чем заблокировано
+| Проверка | Результат |
+|---|---|
+| JVM tests | 709, 0 failures / 0 errors / 0 skipped |
+| `lintVitalRelease` | `BUILD SUCCESSFUL` |
+| no-INTERNET | exit 0 на debug и release, оба уровня |
+| Версия | versionCode 4 / versionName 1.2.0 |
+| Permissions | только `VIBRATE`, по одной строке в дампе |
+| Размер release | 1 731 072 Б (потолок 3 145 728, бюджет D1 1,7 MiB — оба pass) |
+| Подпись | `Verifies`, v2 only, 1 signer, RSA 4096, `CN=Tatar Keyboard` |
+| Final SHA-256 | `18fc03695ec6421c745e536abda32c7cdf2d8779acecaae095d5a5e561a77256` |
+| Шаг 4 | `dist/tatar-keyboard-1.2.0.apk`, `cmp` без различий, verify копии → `Verifies` |
 
-**Релизного keystore на этой машине нет.** `keystore.properties` отсутствует, `find / -name
-'*.jks'` находит только системный `java-cacerts.jks`. `app/build.gradle` подключает
-`signingConfigs.release` только при наличии этого файла, поэтому Gradle собрал
-`app-release-unsigned.apk`; `apksigner verify` → `DOES NOT VERIFY / Missing
-META-INF/MANIFEST.MF`. Прежний аудит шёл на Mac — ключ, судя по всему, остался там.
+Отчёт: **`docs/APK-AUDIT-2026-08-18.md`**, в конце `STATUS: done`.
+`docs/PUBLISH-CHECKLIST.md`: раздел 2 — новая evidence-таблица с датой 2026-08-18 (старая
+сохранена как история), галочки переставлены по факту; раздел 4 — закрыт целиком; в шапку
+добавлен раздел «Повторный artifact audit выполнен, подпись — новым ключом».
 
-Не закрыты из-за этого: схема подписи, signer certificate и сверка с историческим
-`cdd8c535…`, `apksigner verify`, финальный SHA-256 релиза, весь шаг 4.
+Разделы 3 и 5–7 не трогались. Статусы вычитки в `docs/TATAR-REVIEW-QUEUE.tsv` и
+`docs/DICTIONARY-E3-TYPO-REVIEW.tsv` не трогались вообще.
 
-Вопрос оператору отправлен: `.smgr/tatar-apk-audit/ask.json` (варианты: перенести ключ —
-рекомендуемый; сгенерировать новый — не рекомендую, рвёт upgrade path; закрыть аудит по
-неподписанному — сделано как промежуточное). Ответ придёт файлом
-`.smgr/tatar-apk-audit/answer-N.md`.
+## Главное, что нужно знать дальше
 
-## Что делать дальше, когда придёт ответ
+**Подписано новым ключом.** Исторического keystore на машине не было; оператор ответом на
+`.smgr/tatar-apk-audit/ask.json` выбрал вариант `new_keystore`, и ключ сгенерирован заново:
+`tatar-keyboard-release.jks` в корне (PKCS12, alias `tatar-keyboard`, RSA 4096, годен до
+2054-01-03), конфиг — `keystore.properties` в корне, оба git-ignored, права 600.
 
-Если ключ появился (`keystore.properties` + `.jks` в корне):
+Сертификат `98ca6febfed6c146d81c1fdcfe52c79acf7aa926a1033d98b844a59803ec42ad` **не совпадает**
+с историческим `cdd8c5350ddc86f13cd89b5bfb55ca33c13efba77beb4d4ccb75d5e6b961b09e`. Отсюда:
 
-1. `export ANDROID_HOME=/home/tarchok/Android/Sdk ANDROID_SDK_ROOT=$ANDROID_HOME`
-2. Повторить команду сборки из раздела 2 целиком — артефакт должен получиться
-   `app-release.apk`, не `-unsigned`.
-3. `apksigner verify --verbose --print-certs app/build/outputs/apk/release/app-release.apk`
-   — сверить signer certificate SHA-256 с `cdd8c5350ddc86f13cd89b5bfb55ca33c13efba77beb4d4ccb75d5e6b961b09e`.
-4. Выполнить командный блок шага 4 (`mkdir -p dist` — каталог git-ignored и сейчас его нет).
-5. Дописать в `docs/APK-AUDIT-2026-08-18.md` поля подписи и шага 4, сменить последнюю
-   строку на `STATUS: done`; перенести те же числа в evidence-таблицу 2026-08-18 и
-   проставить галочки в разделах 2 и 4.
+1. Установка поверх старой сборки на тестовом Samsung не пройдёт — приложение надо удалить,
+   локальные данные уйдут.
+2. **Бэкап ключа обязателен до первой публикации.** Он в одном экземпляре, на одной машине,
+   вне git. Потеря = приложение нельзя обновить никогда.
+3. Упоминания старого сертификата как действующего остались в `PROPOSALS.md` и в разделе
+   «Историческая справка v1.1.0» чеклиста — стоит поправить перед выпуском.
+4. Вернуться к историческому ключу можно только пока ничего не опубликовано: заменить
+   `keystore.properties`/`.jks`, пересобрать, переснять весь artifact audit.
 
-Если ответ «генерируем новый ключ» — только по явному «да» оператора; в отчёте обязательно
-зафиксировать, что сертификат не совпадает с историческим и upgrade path с v1.1.0 порван.
+**Открытый вопрос по версии.** Дерево `9a2a3196` содержит фазы E1–E5 поверх набора, который
+`CHANGELOG.md` описывает как 1.2.0, при неизменных `versionCode 4` / `versionName 1.2.0`:
+709 тестов вместо 186, 1 731 072 Б вместо 1 446 111 Б. Вопрос был задан оператору вместе с
+вопросом про ключ, ответ пришёл только по ключу. Решение — выпускать расширенный набор под
+1.2.0/4 с переписанным changelog или отделять E1–E5 в следующую версию — остаётся за
+оператором. Версию я не менял.
 
-## Что ещё вынесено оператору
+## Что осталось до релиза (вне этой миссии)
 
-Дерево `9a2a3196` содержит фазы E1–E5 поверх набора, который `CHANGELOG.md` описывает как
-1.2.0, при неизменных `versionCode 4` / `versionName 1.2.0`: отсюда 709 тестов вместо 186 и
-1 726 976 Б вместо 1 446 111 Б. Требований это не нарушает, но changelog не описывает
-реальное содержимое. Вопрос приложен вторым пунктом к `ask.json`; версию я не менял.
+Раздел 1 (freeze, вычитка носителем, release commit), раздел 3 (Device-UAT — снят как
+блокер, но не пройден), разделы 5–7 (push, CI, tag/Release, IzzyOnDroid). Ничего наружу не
+отправлялось: push не делался, tag и Release не создавались.
 
 ## Полезные пути
 
 - Логи сборок: `/tmp/claude-1000/-home-tarchok-Projects-tatar-keyboard/c580062c-40ca-4d73-9522-3fbd43877e24/scratchpad/`
-  (`gradle-build.log` — прогон с `--offline`, `gradle-build-nooffline.log` — итоговый).
+  (`gradle-build-signed.log` — итоговый подписанный прогон; `gradle-build.log` и
+  `gradle-build-nooffline.log` — более ранние, до генерации ключа).
 - Инструменты: `/home/tarchok/Android/Sdk/build-tools/37.0.0/{aapt2,apksigner}` (в PATH их нет).
-- Незакоммиченные правки оператора в `docs/TATAR-REVIEW-QUEUE.tsv` трогать нельзя.
+  Сборке нужен `export ANDROID_HOME=/home/tarchok/Android/Sdk`.
+- `storeFile` в `keystore.properties` резолвится относительно `app/`, а не корня — поэтому
+  там `../tatar-keyboard-release.jks`.
+- Незакоммиченная правка оператора в `docs/TATAR-REVIEW-QUEUE.tsv` — не трогать.

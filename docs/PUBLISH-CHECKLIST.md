@@ -42,18 +42,24 @@ SHA-256 новой сборкой не получить в принципе. С�
 чеклисте — из обязательного гейта он становится необязательным списком для будущих
 итераций.
 
-## Повторный artifact audit выполнен, подпись открыта (2026-08-18)
+## Повторный artifact audit выполнен, подпись — новым ключом (2026-08-18)
 
-Шаги 2 и 4 пройдены заново на свежей сборке из коммита `9a2a3196`; полный отчёт —
-`docs/APK-AUDIT-2026-08-18.md`. Пройдено и заполнено новыми числами: JVM suite (709 тестов,
-0/0/0), `lintVitalRelease`, сборка debug и release из одного checkout, no-INTERNET на
-исходнике и на обоих APK, версия, permission dump, размер (1 726 976 Б против потолка
-3 145 728 Б).
+Шаги 2 и 4 пройдены заново и целиком на свежей сборке из коммита `9a2a3196`; полный отчёт —
+`docs/APK-AUDIT-2026-08-18.md`. Заполнено новыми числами: JVM suite (709 тестов, 0/0/0),
+`lintVitalRelease`, сборка debug и подписанного release APK из одного checkout, no-INTERNET
+на исходнике и на обоих APK, версия, permission dump, размер (1 731 072 Б против потолка
+3 145 728 Б), `apksigner verify` → `Verifies` (v2 only, один signer, RSA 4096), финальный
+SHA-256, копия в `dist/` с `cmp` без различий.
 
-Осталось открытым одно, зато существенное: **релизного keystore на машине сборки нет**, и
-release APK собрался неподписанным. Поэтому схема подписи, сертификат, сверка с историческим
-релизным сертификатом, финальный SHA-256 релиза и весь шаг 4 не закрыты. Отметки `[x]`,
-опиравшиеся на утраченный артефакт, в этих пунктах сняты. Вопрос о ключе вынесен оператору.
+**Существенная оговорка: подписано новым ключом.** Релизного keystore на машине сборки не
+оказалось вообще, и решением оператора от 2026-08-18 ключ сгенерирован заново (RSA 4096,
+`CN=Tatar Keyboard`, сертификат SHA-256
+`98ca6febfed6c146d81c1fdcfe52c79acf7aa926a1033d98b844a59803ec42ad`). С историческим
+релизным `cdd8c535…` он не совпадает, **upgrade path с v1.1.0 порван**: установка поверх
+старой сборки на тестовом устройстве потребует удаления приложения вместе с локальными
+данными. Ключ существует в одном экземпляре вне git — до публикации нужен его бэкап, иначе
+приложение нельзя будет обновить никогда. Раздел «Смена подписной идентичности» в отчёте
+перечисляет последствия целиком.
 
 Отдельно зафиксировано расхождение по объёму кандидата: дерево `9a2a3196` содержит фазы
 E1–E5 поверх набора, который `CHANGELOG.md` описывает как 1.2.0, но `versionCode`/
@@ -143,21 +149,25 @@ apksigner verify --verbose --print-certs \
   рост объясняется фазами E1–E5, легшими поверх кандидата (см.
   `docs/APK-AUDIT-2026-08-18.md`, раздел «Расхождение по объёму кандидата»).
 - [x] `lintVitalRelease` завершился `BUILD SUCCESSFUL` (пересборка 2026-08-18).
-- [ ] Debug и signed release APK собраны из того же frozen checkout. Частично: 2026-08-18
-  из одного checkout собраны оба APK, но release вышел **неподписанным**
-  (`app-release-unsigned.apk`) — релизного keystore на машине сборки нет вообще, см.
-  «Блокер» в `docs/APK-AUDIT-2026-08-18.md`. Пункт закроется только подписанным release APK.
+- [x] Debug и signed release APK собраны из того же frozen checkout: 2026-08-18 из коммита
+  `9a2a3196` одной командой собраны `app-debug.apk` и подписанный `app-release.apk`
+  (`BUILD SUCCESSFUL`, 84 actionable tasks: 84 executed).
 - [x] Source, debug APK и release APK не содержат `android.permission.INTERNET`.
   Пересборка 2026-08-18: `scripts/check-no-internet.sh` — exit 0 на обоих APK, оба уровня
   (source manifest, merged manifest артефакта) плюс backup-whitelist; в
   `app/src/main/AndroidManifest.xml` подстрока `android.permission.INTERNET` встречается 0 раз;
   в обоих APK единственное permission — `VIBRATE`.
-- [ ] Release APK подписан APK Signature Scheme v2 (v1=false, v2=true, v3/v3.1/v4=false),
-  один signer, RSA 4096, `DN CN=Tatar Keyboard`; signer certificate SHA-256 совпадает с
-  историческим релизным сертификатом v1.1.0, upgrade path сохранён; `apksigner verify` →
-  `Verifies`. **Не пройдено на пересборке 2026-08-18:** артефакт не подписан,
-  `apksigner verify` → `DOES NOT VERIFY / Missing META-INF/MANIFEST.MF`, exit 1. Прежняя
-  отметка `[x]` относилась к утраченному артефакту и снята. Причина — отсутствие keystore.
+- [x] Release APK подписан APK Signature Scheme v2 (v1=false, v2=true,
+  v3/v3.1/v3.2/v4=false), один signer, RSA 4096, `DN CN=Tatar Keyboard`; `apksigner verify`
+  → `Verifies`, exit 0. Проверено 2026-08-18 на `app-release.apk` и на копии в `dist/`.
+- [ ] Signer certificate SHA-256 совпадает с историческим релизным сертификатом v1.1.0,
+  upgrade path сохранён. **Не выполняется и выполнено не будет:** решением оператора от
+  2026-08-18 сгенерирован новый релизный ключ, сертификат артефакта —
+  `98ca6febfed6c146d81c1fdcfe52c79acf7aa926a1033d98b844a59803ec42ad` против исторического
+  `cdd8c5350ddc86f13cd89b5bfb55ca33c13efba77beb4d4ccb75d5e6b961b09e`. Установка поверх
+  сборки со старым ключом невозможна без удаления приложения. Пункт оставлен незакрытым
+  намеренно, чтобы факт разрыва upgrade path не потерялся; см. «Смена подписной
+  идентичности» в `docs/APK-AUDIT-2026-08-18.md`.
 - [x] `output-metadata.json` (`versionCode 4`, `versionName "1.2.0"`, `variantName
   release`) и manifest-разбор артефакта подтверждают версию. Пересборка 2026-08-18:
   metadata release — `versionCode 4`, `versionName "1.2.0"`, `variantName release`,
@@ -167,19 +177,20 @@ apksigner verify --verbose --print-certs \
   артефакта просмотрен целиком и содержит ровно одну строку. Пересборка 2026-08-18:
   `aapt2 dump permissions` на release и на debug даёт по две строки — `package:` и
   `uses-permission: name='android.permission.VIBRATE'`, больше ничего.
-- [x] APK не превышает 3 145 728 байт: **1 726 976** байт (пересборка 2026-08-18, артефакт
-  неподписанный; подпись добавит единицы килобайт). Запас до потолка — 1 418 752 байта.
-  Целевой бюджет D1 ≤ 1,7 MiB — **pass** (1,6470 MiB). Историческое число 1 446 111 Б
-  относится к утраченному артефакту от 2026-07-25.
+- [x] APK не превышает 3 145 728 байт: **1 731 072** байта (пересборка 2026-08-18,
+  подписанный артефакт). Запас до потолка — 1 414 656 байт. Целевой бюджет D1 ≤ 1,7 MiB —
+  **pass** (1,6509 MiB). Историческое число 1 446 111 Б относится к утраченному артефакту
+  от 2026-07-25.
 
 ### Evidence финального локального артефакта — пересборка 2026-08-18
 
 Заполнять после последней пересборки; `PENDING` не заменять промежуточными числами.
 Полный отчёт прогона — `docs/APK-AUDIT-2026-08-18.md`.
 
-**Артефакт не подписан.** Релизного keystore на машине сборки нет, поэтому Gradle собрал
-`app-release-unsigned.apk`. Поля про подпись, сертификат и финальный SHA-256 релиза
-заполнить нечем; SHA-256 ниже — хеш неподписанного файла и финальным не является.
+**Подписано новым ключом.** Релизного keystore на машине сборки не оказалось, и решением
+оператора от 2026-08-18 ключ сгенерирован заново. Схема подписи та же, что у исторического
+артефакта, но сам сертификат другой — сверка с историческим релизным не проходит и upgrade
+path с v1.1.0 порван. См. «Смена подписной идентичности» в `docs/APK-AUDIT-2026-08-18.md`.
 
 | Проверка | Результат v1.2.0 (2026-08-18) |
 |---|---|
@@ -187,14 +198,15 @@ apksigner verify --verbose --print-certs \
 | Дата сборки | 2026-08-18, artefacts 16:36:45 (debug) и 16:36:51 (release) |
 | Среда | Linux, OpenJDK 17.0.20, Gradle 9.6.0, AGP 9.2.1, build-tools 37.0.0 |
 | JVM tests | 709 tests, 0 failures / 0 errors / 0 skipped (73 suite-файла) |
-| Состояние сборки | `./gradlew clean test lintVitalRelease assembleDebug assembleRelease --rerun-tasks --console=plain` → `BUILD SUCCESSFUL`, 83 actionable tasks: 83 executed |
+| Состояние сборки | `./gradlew clean test lintVitalRelease assembleDebug assembleRelease --rerun-tasks --console=plain` → `BUILD SUCCESSFUL`, 84 actionable tasks: 84 executed |
 | `lintVitalRelease` | `BUILD SUCCESSFUL` |
 | Manifest version | versionName `1.2.0`, versionCode `4` (release и debug), minSdk 24, targetSdk 37 |
 | Permissions / no-INTERNET | только `android.permission.VIBRATE` в release и в debug; `check-no-internet.sh` exit 0 на обоих, оба уровня; в исходном манифесте INTERNET 0 вхождений |
-| APK signing schemes | **PENDING — артефакт не подписан**; `apksigner verify` → `DOES NOT VERIFY`, `Missing META-INF/MANIFEST.MF`, exit 1 |
-| Signer certificate SHA-256 | **PENDING — проверить нечем**; сверка с историческим `cdd8c5350ddc86f13cd89b5bfb55ca33c13efba77beb4d4ccb75d5e6b961b09e` не выполнялась |
-| APK size, bytes | 1 726 976 (release, unsigned) — pass против 3 145 728 и против 1,7 MiB; debug 3 326 176 |
-| Final APK SHA-256 | **PENDING**; неподписанный release APK — `54ac148dedc5c5a94feaf498ed68f10e8d23a54882c3aac7f48bc405e809c73f`, debug — `9a30f152204edddb204fd93966b7b39f74a958710ea41c439e3babddedff96f4` |
+| APK signing schemes | v2 only (v1=false, v2=true, v3=false, v3.1=false, v3.2=false, v4=false), 1 signer, RSA 4096, `DN CN=Tatar Keyboard`; `apksigner verify` → `Verifies`, exit 0 |
+| Signer certificate SHA-256 | `98ca6febfed6c146d81c1fdcfe52c79acf7aa926a1033d98b844a59803ec42ad` (SHA-1 `dc3e4a4de7b9d6edb74eaef19f14abe37049dd4f`, public key SHA-256 `353e5d51f23bbf7c0d5587ab59320bc61ffa438b8ae92764b91914d3a3dc8466`). **Новый ключ от 2026-08-18 — с историческим `cdd8c5350ddc86f13cd89b5bfb55ca33c13efba77beb4d4ccb75d5e6b961b09e` НЕ совпадает, upgrade path с v1.1.0 порван** |
+| APK size, bytes | 1 731 072 (release, signed) — pass против 3 145 728 (запас 1 414 656) и против 1,7 MiB (1,6509 MiB); debug 3 326 176 |
+| Final APK SHA-256 | `18fc03695ec6421c745e536abda32c7cdf2d8779acecaae095d5a5e561a77256`; debug — `9a30f152204edddb204fd93966b7b39f74a958710ea41c439e3babddedff96f4` |
+| Шаг 4 (`dist/`) | `dist/tatar-keyboard-1.2.0.apk` создан, `cmp` с build output без различий, оба 1 731 072 Б, SHA-256 копии совпадает, `apksigner verify` на копии → `Verifies` |
 
 ### Evidence утраченного артефакта (история, 2026-07-25)
 
@@ -302,13 +314,10 @@ privacy-гейтинг) продолжают описывать текущую �
 автопробела (`bacf177`) сборка и копия были повторены. Числа ниже относятся к текущей,
 пересобранной копии; старый артефакт полностью заменён.
 
-**Пометка 2026-08-18: шаг 4 на пересборке не выполнялся.** Каталог `dist/` остаётся пустым:
-release APK сегодняшней сборки **не подписан** (keystore на машине отсутствует), а шаг 4
-публикует под релизным именем `tatar-keyboard-1.2.0.apk` именно проаудированный подписанный
-артефакт. Положить туда неподписанный файл значило бы повторить инцидент, из-за которого
-прежнее свидетельство и было утрачено. Поэтому копия не создавалась, `cmp` не выполнялся,
-SHA-256 копии не снимался; три отметки ниже сняты в `[ ]`. Как только keystore появится,
-шаг 4 выполняется командным блоком ниже без изменений. Подробности —
+**Пометка 2026-08-18: шаг 4 выполнен заново.** Каталог `dist/` пересоздан, копия сделана из
+подписанного `app-release.apk` сегодняшней сборки командным блоком ниже (`shasum -a 256`
+заменён на `sha256sum` — Linux-эквивалент). Числа в трёх отметках ниже — свежие; всё, что
+относится к утраченному артефакту от 2026-07-25, помечено как историческое. Подробности —
 `docs/APK-AUDIT-2026-08-18.md`.
 
 **Пометка 2026-07-26: этой копии больше нет.** Абзац и три отметки ниже описывают
@@ -327,19 +336,19 @@ shasum -a 256 dist/tatar-keyboard-1.2.0.apk
 apksigner verify --verbose --print-certs dist/tatar-keyboard-1.2.0.apk
 ```
 
-- [ ] `dist/tatar-keyboard-1.2.0.apk` совпадает с audited build output — `cmp` с
-  `app/build/outputs/apk/release/app-release.apk` без различий. Не выполнено 2026-08-18:
-  подписанного артефакта нет, копия не создавалась. Историческое значение обеих сторон
-  `cmp` — 1 446 111 байт (утраченный артефакт).
-- [ ] SHA-256 и все поля evidence выше обновлены после копирования (кроме frozen commit
-  SHA — release commit ещё не создан). Не выполнено 2026-08-18: копировать нечего.
-- [ ] Повторная сборка после этого шага не выполнялась. Историческая запись прогона
-  2026-07-25: mtime build output и mtime копии в
-  `dist/` совпадают — 2026-07-25 02:02:38, то есть обе позже последнего коммита `c3ed443`
-  (02:02:24), содержимое побайтово идентично (`cmp`), SHA-256 обоих файлов —
-  `26afd03f200f2939e5ce3b5f102bf4dcd93b5fbb8635161cd393b941cff13bcf`. Любая новая сборка
-  обязывает повторить artifact audit и публикацию в `dist/` — как это и было сделано после
-  автопробела.
+- [x] `dist/tatar-keyboard-1.2.0.apk` совпадает с audited build output — `cmp` с
+  `app/build/outputs/apk/release/app-release.apk` без различий, оба **1 731 072** байта,
+  SHA-256 обоих `18fc03695ec6421c745e536abda32c7cdf2d8779acecaae095d5a5e561a77256`,
+  `apksigner verify` на копии → `Verifies`. Прогон 2026-08-18.
+- [x] SHA-256 и все поля evidence выше обновлены после копирования (кроме frozen commit
+  SHA — release commit ещё не создан).
+- [x] Повторная сборка после этого шага не выполнялась: mtime build output — 2026-08-18
+  16:46:39, mtime копии в `dist/` — 16:47:14, копия позже сборки, содержимое побайтово
+  идентично (`cmp` exit 0). Любая новая сборка обязывает повторить artifact audit и
+  публикацию в `dist/`.
+  Историческая запись прогона 2026-07-25 (утраченный артефакт): mtime build output и копии
+  совпадали — 02:02:38, позже коммита `c3ed443` (02:02:24), SHA-256 обоих —
+  `26afd03f200f2939e5ce3b5f102bf4dcd93b5fbb8635161cd393b941cff13bcf`.
 
 ## 5. Commit, push и CI
 
