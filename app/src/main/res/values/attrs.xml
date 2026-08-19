@@ -35,6 +35,12 @@
         <attr name="popupPanelBackgroundColor" format="color" />
         <attr name="keyPressedBackgroundColor" format="color" />
         <attr name="keyNormalBackgroundColor" format="color" />
+        <!-- Emoji panel: the sheet behind the grid. This is the keyboard background, not a key
+             colour, so the panel reads as the same surface the keys sit on. -->
+        <attr name="emojiPanelBackgroundColor" format="color" />
+        <!-- Emoji panel: fill of the two functional keys ("АБВ" and delete) on the bottom bar,
+             matching the functional keys of the letter keyboard. -->
+        <attr name="emojiPanelFunctionalKeyColor" format="color" />
     </declare-styleable>
 
     <declare-styleable name="KeyboardView">

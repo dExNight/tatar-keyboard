@@ -45,6 +45,14 @@ internal class EmojiPanelState {
     private var maxCellPx = 0
     private var bottomBarPx = 0
 
+    /**
+     * Width of each of the two functional slots ("АБВ" and delete). They are sized to their own
+     * label, not to `panelWidth / slotCount`: with ten categories an equal split leaves ~49px per
+     * slot on a 591px screen, which is narrower than the word "АБВ" and made the two labels paint
+     * over the neighbouring tabs. The tabs share whatever is left.
+     */
+    private var edgeSlotPx = 0
+
     private var scrollY = 0
 
     // Gesture bookkeeping.
@@ -74,10 +82,11 @@ internal class EmojiPanelState {
         }
     }
 
-    fun setCellMetrics(minCellPx: Int, maxCellPx: Int, bottomBarPx: Int) {
+    fun setCellMetrics(minCellPx: Int, maxCellPx: Int, bottomBarPx: Int, edgeSlotPx: Int = 0) {
         this.minCellPx = minCellPx
         this.maxCellPx = maxCellPx
         this.bottomBarPx = bottomBarPx
+        this.edgeSlotPx = edgeSlotPx.coerceAtLeast(0)
         clampScroll()
     }
 
@@ -106,11 +115,22 @@ internal class EmojiPanelState {
     /** Cell width in px: exactly `panelWidth / columns`, never clamped. */
     fun cellWidth(): Int = if (columns > 0) panelWidth / columns else 0
 
-    /** Cell height in px: equal to the width, clamped to the dp range once metrics are set. */
+    /**
+     * Cell height in px: the square cell (width, clamped to the dp range) adjusted so a whole
+     * number of rows fills the grid viewport exactly. Leaving it square left the viewport a
+     * non-multiple of the row height, which cost a visible half-row; nudging the height by a few
+     * px instead keeps every row whole and spends the full panel.
+     */
     fun cellHeight(): Int {
         val width = cellWidth()
         if (maxCellPx <= 0) return width
-        return width.coerceIn(minCellPx, maxCellPx)
+        val preferred = width.coerceIn(minCellPx, maxCellPx)
+        val viewport = gridViewportHeight()
+        if (viewport <= 0 || preferred <= 0) return preferred
+        // Round the row count up, not to nearest: a slightly shorter cell fits one more row and
+        // keeps the grid dense, where rounding down stretches four rows over the whole panel.
+        val rows = ((viewport + preferred - 1) / preferred).coerceAtLeast(1)
+        return (viewport / rows).coerceIn(minCellPx, maxCellPx)
     }
 
     fun columnLeft(column: Int): Int = if (columns > 0) panelWidth * column / columns else 0
@@ -128,9 +148,27 @@ internal class EmojiPanelState {
 
     fun contentHeight(): Int = rowCount() * cellHeight()
 
+    /** The space between the top of the panel and the bottom bar, before row alignment. */
     fun gridViewportHeight(): Int = (panelHeight - bottomBarPx).coerceAtLeast(0)
 
-    fun maxScrollY(): Int = (contentHeight() - gridViewportHeight()).coerceAtLeast(0)
+    /**
+     * The drawn height of the grid: the largest whole number of rows that fits the viewport. The
+     * viewport is almost never an exact multiple of the cell height, and drawing rows straight into
+     * it left a permanently half-clipped row above the bottom bar.
+     */
+    fun gridHeight(): Int {
+        val viewport = gridViewportHeight()
+        val height = cellHeight()
+        if (height <= 0) return viewport
+        val rows = viewport / height
+        if (rows <= 0) return viewport
+        return (rows * height).coerceAtMost(viewport)
+    }
+
+    /** The leftover of [gridViewportHeight] over [gridHeight], spent as padding above the grid. */
+    fun gridTop(): Int = ((gridViewportHeight() - gridHeight()) / 2).coerceAtLeast(0)
+
+    fun maxScrollY(): Int = (contentHeight() - gridHeight()).coerceAtLeast(0)
 
     fun scrollY(): Int = scrollY
 
@@ -151,7 +189,7 @@ internal class EmojiPanelState {
 
     fun lastVisibleRow(): Int {
         val height = cellHeight()
-        val viewport = gridViewportHeight()
+        val viewport = gridHeight()
         val rows = rowCount()
         if (height <= 0 || viewport <= 0 || rows == 0) return -1
         return ((scrollY + viewport - 1) / height).coerceIn(0, rows - 1)
@@ -179,14 +217,44 @@ internal class EmojiPanelState {
     /** Slots on the bottom bar: back key + tabs + delete key. */
     fun slotCount(): Int = tabCount() + 2
 
+    /**
+     * Width actually given to each functional slot: [edgeSlotPx], but never so much that the tabs
+     * between them are squeezed out on a narrow screen.
+     */
+    private fun edgeWidth(): Int {
+        if (edgeSlotPx <= 0) {
+            val slots = slotCount()
+            return if (slots > 0) panelWidth / slots else 0
+        }
+        return edgeSlotPx.coerceAtMost(panelWidth / 3)
+    }
+
     fun slotLeft(slot: Int): Int {
         val slots = slotCount()
-        return if (slots > 0) panelWidth * slot / slots else 0
+        if (slots <= 0) return 0
+        val edge = edgeWidth()
+        return when {
+            slot <= 0 -> 0
+            slot >= slots - 1 -> panelWidth - edge
+            else -> {
+                val tabs = slots - 2
+                edge + (panelWidth - 2 * edge) * (slot - 1) / tabs
+            }
+        }
     }
 
     fun slotRight(slot: Int): Int {
         val slots = slotCount()
-        return if (slots > 0) panelWidth * (slot + 1) / slots else 0
+        if (slots <= 0) return 0
+        val edge = edgeWidth()
+        return when {
+            slot <= 0 -> edge
+            slot >= slots - 1 -> panelWidth
+            else -> {
+                val tabs = slots - 2
+                edge + (panelWidth - 2 * edge) * slot / tabs
+            }
+        }
     }
 
     fun barTop(): Int = (panelHeight - bottomBarPx).coerceAtLeast(0)
@@ -210,8 +278,10 @@ internal class EmojiPanelState {
 
     // --- Hit testing --------------------------------------------------------------------------
 
-    fun isInGrid(x: Float, y: Float): Boolean =
-        x >= 0f && x < panelWidth && y >= 0f && y < gridViewportHeight()
+    fun isInGrid(x: Float, y: Float): Boolean {
+        val top = gridTop()
+        return x >= 0f && x < panelWidth && y >= top && y < top + gridHeight()
+    }
 
     /**
      * The target under ([x], [y]): a compact cell index (`>= 0`), [BACK_TARGET], [DELETE_TARGET],
@@ -232,7 +302,9 @@ internal class EmojiPanelState {
         }
         val height = cellHeight()
         if (height <= 0) return NO_TARGET
-        val contentY = y.toInt() + scrollY
+        val gridTop = gridTop()
+        if (y < gridTop || y >= gridTop + gridHeight()) return NO_TARGET
+        val contentY = (y.toInt() - gridTop) + scrollY
         val row = contentY / height
         var column = 0
         while (column < columns - 1 && x >= columnRight(column)) column++

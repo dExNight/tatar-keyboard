@@ -22,6 +22,7 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Rect
+import android.graphics.RectF
 import android.os.Bundle
 import android.util.AttributeSet
 import android.util.TypedValue
@@ -77,10 +78,21 @@ class EmojiPanelView @JvmOverloads constructor(
         private const val TAB_TEXT_SCALE = 0.52f
         private const val PRESSED_ALPHA = 90
         private const val SEPARATOR_ALPHA = 0x30
-        private const val ACTIVE_TAB_ALPHA = 0x1f
+        private const val ACTIVE_TAB_ALPHA = 0x33
         private const val MIN_CELL_DP = EmojiPanelState.MIN_CELL_DP.toFloat()
         private const val MAX_CELL_DP = EmojiPanelState.MAX_CELL_DP.toFloat()
-        private const val BOTTOM_BAR_DP = 44f
+        private const val BOTTOM_BAR_DP = 48f
+
+        // Corner radius of the two functional keys, the same ~5dp the letter keys use, so the bar
+        // reads as a row of this keyboard rather than as a strip of labels.
+        private const val KEY_RADIUS_DP = 5f
+
+        // Inset of a functional key inside its slot, matching the gap between letter keys.
+        private const val KEY_INSET_DP = 3f
+
+        // Padding around the "АБВ" label that sets how wide the two functional slots are.
+        private const val EDGE_SLOT_PADDING_DP = 14f
+
         private const val BACK_LABEL = "АБВ"
 
         // U+232B ERASE TO THE LEFT: a system glyph, so the panel ships no font of its own.
@@ -107,9 +119,13 @@ class EmojiPanelView @JvmOverloads constructor(
     private var velocityTracker: VelocityTracker? = null
 
     private val backgroundPaint = Paint()
-    private val pressedPaint = Paint()
+    private val pressedPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val separatorPaint = Paint()
-    private val activeTabPaint = Paint()
+    private val activeTabPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val functionalKeyPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+
+    /** The one reusable rect the rounded functional keys and the active tab are drawn through. */
+    private val keyRect = RectF()
     private val emojiPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         textAlign = Paint.Align.CENTER
     }
@@ -131,6 +147,17 @@ class EmojiPanelView @JvmOverloads constructor(
     private val minCellPx = dp(MIN_CELL_DP)
     private val maxCellPx = dp(MAX_CELL_DP)
     private val bottomBarPx = dp(BOTTOM_BAR_DP)
+    private val keyRadiusPx = dp(KEY_RADIUS_DP).toFloat()
+    private val keyInsetPx = dp(KEY_INSET_DP).toFloat()
+
+    /**
+     * Width of the "АБВ" and delete slots: the wider of the two labels plus padding, measured once
+     * here rather than assumed, so the labels can never overrun their slot onto a neighbouring tab.
+     */
+    private val edgeSlotPx = (
+        maxOf(labelPaint.measureText(BACK_LABEL), labelPaint.measureText(DELETE_LABEL)) +
+            2 * dp(EDGE_SLOT_PADDING_DP)
+        ).toInt()
     private val touchSlop = ViewConfiguration.get(context).scaledTouchSlop
     private val minFlingVelocity = ViewConfiguration.get(context).scaledMinimumFlingVelocity
     private val maxFlingVelocity = ViewConfiguration.get(context).scaledMaximumFlingVelocity
@@ -169,22 +196,28 @@ class EmojiPanelView @JvmOverloads constructor(
     init {
         val themeColors = context.theme.obtainStyledAttributes(
             intArrayOf(
-                R.attr.keyNormalBackgroundColor,
+                R.attr.emojiPanelBackgroundColor,
                 R.attr.functionalTextColor,
                 R.attr.keyPressedBackgroundColor,
                 R.attr.keyTextColor,
+                R.attr.emojiPanelFunctionalKeyColor,
+                R.attr.keyNormalBackgroundColor,
             ),
         )
-        backgroundPaint.color = themeColors.getColor(0, Color.LTGRAY)
+        // The sheet is the keyboard background, not the key colour: filling it with the key colour
+        // made the whole panel read as one unpainted rectangle instead of as the keyboard surface.
+        val keyColor = themeColors.getColor(5, Color.LTGRAY)
+        backgroundPaint.color = themeColors.getColor(0, keyColor)
         labelPaint.color = themeColors.getColor(1, Color.DKGRAY)
         tabPaint.color = themeColors.getColor(1, Color.DKGRAY)
         pressedPaint.color = themeColors.getColor(2, Color.GRAY)
         emojiPaint.color = themeColors.getColor(3, Color.BLACK)
+        functionalKeyPaint.color = themeColors.getColor(4, keyColor)
         themeColors.recycle()
         separatorPaint.color = withAlpha(labelPaint.color, SEPARATOR_ALPHA)
         activeTabPaint.color = withAlpha(labelPaint.color, ACTIVE_TAB_ALPHA)
         state.setColumns(currentColumns())
-        state.setCellMetrics(minCellPx, maxCellPx, bottomBarPx)
+        state.setCellMetrics(minCellPx, maxCellPx, bottomBarPx, edgeSlotPx)
         importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_YES
         ViewCompat.setAccessibilityDelegate(this, accessibilityHelper)
     }
@@ -258,7 +291,7 @@ class EmojiPanelView @JvmOverloads constructor(
     override fun onSizeChanged(width: Int, height: Int, oldWidth: Int, oldHeight: Int) {
         super.onSizeChanged(width, height, oldWidth, oldHeight)
         state.setColumns(currentColumns())
-        state.setCellMetrics(minCellPx, maxCellPx, bottomBarPx)
+        state.setCellMetrics(minCellPx, maxCellPx, bottomBarPx, edgeSlotPx)
         state.setViewport(width, height)
         emojiPaint.textSize = state.cellHeight() * EMOJI_TEXT_SCALE
         emojiPaint.getFontMetrics(emojiFontMetrics)
@@ -304,6 +337,12 @@ class EmojiPanelView @JvmOverloads constructor(
         val pressed = state.pressedTarget()
         val firstRow = state.firstVisibleRow()
         val lastRow = state.lastVisibleRow()
+        // The grid draws inside a whole number of rows; the clip keeps a row that is only partly
+        // scrolled into view from spilling over the bottom bar.
+        val gridTop = state.gridTop().toFloat()
+        val gridBottom = gridTop + state.gridHeight()
+        canvas.save()
+        canvas.clipRect(0f, gridTop, w, gridBottom)
         var row = firstRow
         while (row in firstRow..lastRow) {
             var column = 0
@@ -312,7 +351,7 @@ class EmojiPanelView @JvmOverloads constructor(
                 if (index >= entryCount) break
                 val left = state.columnLeft(column).toFloat()
                 val right = state.columnRight(column).toFloat()
-                val top = (row * cellHeight - scrollY).toFloat()
+                val top = gridTop + (row * cellHeight - scrollY).toFloat()
                 val bottom = top + cellHeight
                 if (EmojiPanelState.isCell(pressed) && pressed == index) {
                     canvas.drawRect(left, top, right, bottom, pressedPaint)
@@ -324,8 +363,11 @@ class EmojiPanelView @JvmOverloads constructor(
             }
             row++
         }
+        canvas.restore()
 
-        // Bottom bar: back key, category tabs, delete key.
+        // Bottom bar: back key, category tabs, delete key. The two functional keys are drawn as
+        // rounded tiles in the functional-key colour, so the bar matches the bottom row of the
+        // letter keyboard; the tabs stay flat on the sheet with a pill under the active one.
         val barTop = state.barTop().toFloat()
         canvas.drawLine(0f, barTop, w, barTop, separatorPaint)
         val slots = state.slotCount()
@@ -335,11 +377,15 @@ class EmojiPanelView @JvmOverloads constructor(
         while (slot < slots) {
             val left = state.slotLeft(slot).toFloat()
             val right = state.slotRight(slot).toFloat()
-            if (slot == activeTabSlot) {
-                canvas.drawRect(left, barTop, right, h, activeTabPaint)
+            val functional = slot == 0 || slot == slots - 1
+            keyRect.set(left + keyInsetPx, barTop + keyInsetPx, right - keyInsetPx, h - keyInsetPx)
+            if (functional) {
+                canvas.drawRoundRect(keyRect, keyRadiusPx, keyRadiusPx, functionalKeyPaint)
+            } else if (slot == activeTabSlot) {
+                canvas.drawRoundRect(keyRect, keyRadiusPx, keyRadiusPx, activeTabPaint)
             }
             if (slot == pressedSlot) {
-                canvas.drawRect(left, barTop, right, h, pressedPaint)
+                canvas.drawRoundRect(keyRect, keyRadiusPx, keyRadiusPx, pressedPaint)
             }
             val centerX = (left + right) / 2f
             when (slot) {
@@ -720,7 +766,8 @@ class EmojiPanelView @JvmOverloads constructor(
             val column = index % columns
             val row = index / columns
             val cellHeight = state.cellHeight()
-            val top = row * cellHeight - state.scrollY()
+            // Same origin the grid is drawn from, so a TalkBack node stays over its cell.
+            val top = state.gridTop() + row * cellHeight - state.scrollY()
             out.set(
                 state.columnLeft(column),
                 top,

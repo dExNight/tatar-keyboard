@@ -35,6 +35,14 @@ public final class InputView extends FrameLayout {
     private EmojiPanelView mEmojiPanelView;
     private Runnable mInsetsChangedListener;
 
+    /**
+     * Set while the emoji panel hid a visible suggestion strip, so {@link #hideEmojiPanel()} puts
+     * back exactly what was there. The strip has nothing to show while the panel is open and its
+     * reserved band was simply empty; the height it frees is handed to the panel instead, so the
+     * total keyboard height — and the content top inset — does not change when the panel opens.
+     */
+    private boolean mStripHiddenByEmojiPanel;
+
     public InputView(final Context context, final AttributeSet attrs) {
         super(context, attrs, 0);
     }
@@ -96,7 +104,18 @@ public final class InputView extends FrameLayout {
         if (panel == null) {
             return null;
         }
-        panel.setPanelHeightPx(keyboardHeightPx);
+        int panelHeightPx = keyboardHeightPx;
+        if (mSuggestionStripView != null && mSuggestionStripView.getVisibility() == VISIBLE) {
+            // Take the strip's measured height before hiding it, so the panel grows by exactly
+            // what the strip gave up and the keyboard keeps its height.
+            final int stripHeight = mSuggestionStripView.getHeight();
+            mSuggestionStripView.setVisibility(GONE);
+            mStripHiddenByEmojiPanel = true;
+            if (stripHeight > 0) {
+                panelHeightPx += stripHeight;
+            }
+        }
+        panel.setPanelHeightPx(panelHeightPx);
         panel.setSnapshot(snapshot);
         if (panel.getVisibility() != VISIBLE) {
             panel.setVisibility(VISIBLE);
@@ -105,15 +124,27 @@ public final class InputView extends FrameLayout {
         return panel;
     }
 
-    /** Hides the emoji panel without creating it. */
+    /** Hides the emoji panel without creating it, restoring any strip the panel hid. */
     public void hideEmojiPanel() {
-        if (mEmojiPanelView == null) {
-            return;
+        boolean changed = false;
+        if (mStripHiddenByEmojiPanel) {
+            mStripHiddenByEmojiPanel = false;
+            if (mSuggestionStripView != null) {
+                mSuggestionStripView.setVisibility(VISIBLE);
+                changed = true;
+            }
         }
-        if (mEmojiPanelView.getVisibility() != GONE) {
+        if (mEmojiPanelView != null && mEmojiPanelView.getVisibility() != GONE) {
             mEmojiPanelView.setVisibility(GONE);
+            changed = true;
+        }
+        if (changed) {
             notifyInsetsChanged();
         }
+    }
+
+    private boolean isEmojiPanelShowing() {
+        return mEmojiPanelView != null && mEmojiPanelView.getVisibility() == VISIBLE;
     }
 
     /** Shows the fixed-height strip, including the valid visible zero-results state. */
@@ -124,6 +155,14 @@ public final class InputView extends FrameLayout {
             return null;
         }
         strip.setSuggestions(first, second, third);
+        if (isEmojiPanelShowing()) {
+            // The panel owns the surface: keep the strip down and remember that it wanted to be
+            // up, so hideEmojiPanel() restores it. Without this a new input session started while
+            // the panel is open (a different field, a selection change) puts the empty band back
+            // over the panel.
+            mStripHiddenByEmojiPanel = true;
+            return strip;
+        }
         if (strip.getVisibility() != VISIBLE) {
             strip.setVisibility(VISIBLE);
             notifyInsetsChanged();
@@ -142,6 +181,10 @@ public final class InputView extends FrameLayout {
             return null;
         }
         strip.clearSuggestions();
+        if (isEmojiPanelShowing()) {
+            mStripHiddenByEmojiPanel = true;
+            return strip;
+        }
         if (strip.getVisibility() != VISIBLE) {
             strip.setVisibility(VISIBLE);
             notifyInsetsChanged();

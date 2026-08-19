@@ -72,24 +72,86 @@ class EmojiPanelStateTest {
     }
 
     @Test
-    fun cellHeightEqualsWidthClampedToTheDpRange() {
+    fun cellHeightIsWidthClampedToTheDpRangeThenFittedToWholeRows() {
         val state = EmojiPanelState()
         state.setColumns(8)
         state.setCellMetrics(minCellPx, maxCellPx, bottomBarPx)
 
-        // Narrow: width/8 = 30 < 36 -> clamped up.
+        // Narrow: width/8 = 30 < 36 -> clamped up, and the clamp wins over the row fit.
         state.setViewport(8 * 30, 400)
         assertEquals(30, state.cellWidth())
         assertEquals(36, state.cellHeight())
 
-        // In range: square.
+        // In range: the square 45 is nudged down to 44 so that a whole number of rows fills the
+        // 356px viewport exactly (8 * 44 = 352, against 7 * 45 = 315 with 41px wasted).
         state.setViewport(8 * 45, 400)
-        assertEquals(45, state.cellHeight())
+        assertEquals(45, state.cellWidth())
+        assertEquals(44, state.cellHeight())
 
-        // Wide: width/8 = 80 > 56 -> clamped down, width unchanged.
+        // Wide: width/8 = 80 > 56 -> the preferred height is clamped down to the 56 maximum, and
+        // the row fit then trims it further to 50 (7 * 50 = 350 of the 356px viewport). The clamp
+        // bounds the square size the fit starts from; it is not a floor on the result.
         state.setViewport(8 * 80, 400)
         assertEquals(80, state.cellWidth())
-        assertEquals(56, state.cellHeight())
+        assertEquals(50, state.cellHeight())
+        assertTrue("cell above the dp maximum", state.cellHeight() <= maxCellPx)
+        assertTrue("cell below the dp minimum", state.cellHeight() >= minCellPx)
+    }
+
+    /**
+     * The defect this fixes: the grid used to draw straight into `panelHeight - bottomBar`, which
+     * is almost never a multiple of the row height, so a half-row was permanently clipped above the
+     * bottom bar. The drawn grid must now be a whole number of rows and must never reach the bar.
+     */
+    @Test
+    fun gridHeightIsAWholeNumberOfRowsAndNeverOverlapsTheBottomBar() {
+        val state = EmojiPanelState()
+        state.setColumns(8)
+        state.setCellMetrics(minCellPx, maxCellPx, bottomBarPx)
+        for (height in 200..600 step 7) {
+            state.setViewport(8 * 45, height)
+            val cell = state.cellHeight()
+            val grid = state.gridHeight()
+            assertEquals("grid $grid not whole rows of $cell at height $height", 0, grid % cell)
+            assertTrue(
+                "grid bottom ${state.gridTop() + grid} past bar ${state.barTop()} at $height",
+                state.gridTop() + grid <= state.barTop(),
+            )
+        }
+    }
+
+    /**
+     * The other half of the bottom-bar defect: "АБВ" and the delete key are wider than an equal
+     * `panelWidth / slotCount` share once there are many categories, and their labels used to paint
+     * over the neighbouring tabs. Both functional slots must keep the width they were given, and
+     * the tabs must still divide the rest without overlapping.
+     */
+    @Test
+    fun functionalSlotsKeepTheirWidthAndTabsShareTheRest() {
+        val snapshot = multiCategorySnapshot(50, 20, 5, 10, 10, 10, 10, 10) // 8 tabs -> 10 slots
+        val state = EmojiPanelState()
+        state.setColumns(8)
+        val edge = 120
+        state.setCellMetrics(minCellPx, maxCellPx, bottomBarPx, edge)
+        val width = 591
+        state.setViewport(width, 400)
+        state.setSnapshot(snapshot)
+
+        val slots = state.slotCount()
+        assertEquals(edge, state.slotRight(0) - state.slotLeft(0))
+        assertEquals(edge, state.slotRight(slots - 1) - state.slotLeft(slots - 1))
+        assertEquals(0, state.slotLeft(0))
+        assertEquals(width, state.slotRight(slots - 1))
+
+        // Slots tile the bar left to right with no gap and no overlap.
+        for (slot in 1 until slots) {
+            assertEquals(
+                "slot $slot does not start where slot ${slot - 1} ends",
+                state.slotRight(slot - 1),
+                state.slotLeft(slot),
+            )
+            assertTrue("slot $slot is empty", state.slotRight(slot) > state.slotLeft(slot))
+        }
     }
 
     @Test
@@ -236,9 +298,11 @@ class EmojiPanelStateTest {
         state.setViewport(width, height)
         state.setSnapshot(snapshot)
 
-        // Top-left of the grid is cell 0.
-        assertEquals(0, state.targetAt(1f, 1f))
-        assertTrue(EmojiPanelState.isCell(state.targetAt(1f, 1f)))
+        // Top-left of the grid is cell 0. The grid starts at gridTop, not at the panel's top edge:
+        // the leftover of the viewport over a whole number of rows is padding above the grid.
+        val gridY = state.gridTop() + 1f
+        assertEquals(0, state.targetAt(1f, gridY))
+        assertTrue(EmojiPanelState.isCell(state.targetAt(1f, gridY)))
 
         val barY = (height - 1).toFloat()
         // Leftmost slot -> back key, rightmost -> delete key.
