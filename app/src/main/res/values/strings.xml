@@ -131,7 +131,7 @@
     <string name="show_number_row">Show separate number row</string>
     <string name="show_emoji_key">Show emoji key</string>
     <!-- Description for option to show the emoji key next to the space bar -->
-    <string name="show_emoji_key_summary">Key next to the space bar that opens the emoji panel</string>
+    <string name="show_emoji_key_summary">Opens the emoji panel: a key of its own next to the space bar, or a long press on the comma key when the language switch key is shown</string>
     <string name="space_swipe">Space swipe cursor move</string>
     <!-- Description for option to move the cursor by swiping on the space bar -->
     <string name="space_swipe_summary">Swipe the space bar to move the cursor</string>

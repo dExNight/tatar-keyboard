@@ -62,7 +62,7 @@
     <string name="pref_enable_ime_switch_summary">Тел төймәсе башка төймәсар кушымталарына да күчерә</string>
     <string name="show_number_row">Аерым саннар рәтен күрсәтү</string>
     <string name="show_emoji_key">Эмодзи төймәсен күрсәтү</string>
-    <string name="show_emoji_key_summary">Буш урын янындагы эмодзи панелен ачучы төймә</string>
+    <string name="show_emoji_key_summary">Эмодзи панелен ача: буш урын янындагы аерым төймә белән яки тел алмаштыру төймәсе күрсәтелгәндә өтергә озак басу белән</string>
     <string name="space_swipe">Буш урын белән курсорны күчерү</string>
     <string name="space_swipe_summary">Курсорны күчерү өчен бармагыгызны буш урын төймәсе буйлап шудырыгыз</string>
     <string name="delete_swipe">Шудырып бетерү</string>
