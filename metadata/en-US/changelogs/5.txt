@@ -1,0 +1,6 @@
+• Emoji panel with category tabs and 24 recent emoji, no bundled font
+• Personal dictionary that learns your Tatar words, off by default
+• Tatar suggestions now survive a typo in the word you are typing
+• Next-word prediction above the keyboard, offline like the rest
+• Optional Tatar autocorrect on space, undone with one backspace
+• Still no internet permission and no backup of what you type

@@ -151,6 +151,11 @@ Every row describes the current tree — branch head `c3ed443`, auto-space inclu
 | Release vital lint | same invocation | **BUILD SUCCESSFUL** (no fatal issues; pre-existing deprecation warnings only) |
 | D1f artifact gate | `./gradlew assembleRelease` + `aapt2 dump badging/permissions` + `apksigner verify --print-certs` | **PASS** — `dist/tatar-keyboard-1.2.0.apk`, 1 446 111 bytes, SHA-256 `26afd03f200f2939e5ce3b5f102bf4dcd93b5fbb8635161cd393b941cff13bcf`, versionName 1.2.0 / versionCode 4, package `org.tatarkeyboard.ime`, minSdk 24, only `android.permission.VIBRATE`, APK Signature Scheme **v2 only** (v1/v3/v3.1/v4 = false; 1 signer, RSA 4096, `CN=Tatar Keyboard`), certificate SHA-256 `cdd8c535…b09e` matching the historical release certificate |
 
+**Note 2026-08-19:** certificate `cdd8c535…` is no longer the active release certificate —
+the release key was regenerated on 2026-08-18 by operator decision; the active fingerprint is
+`98ca6feb…` (`docs/APK-AUDIT-1.3.0.md`). The row above stays true for its own artifact and
+date, but the old fingerprint must not be used as the release comparison target any more.
+
 The artifact was **rebuilt after** the auto-space commit `bacf177`, so the row above and
 the 186-test row describe the same tree. `dist/tatar-keyboard-1.2.0.apk` is byte-identical
 to `app/build/outputs/apk/release/app-release.apk` (`cmp`, both 1 446 111 bytes). The
