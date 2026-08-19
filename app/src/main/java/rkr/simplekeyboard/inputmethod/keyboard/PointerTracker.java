@@ -124,6 +124,11 @@ public final class PointerTracker implements PointerTrackerQueue.Element {
     // true if dragging finger is allowed.
     private boolean mIsAllowedDraggingFinger;
 
+    // true if this pointer went down on a modifier key (shift or the alpha/symbol switch key).
+    // Such a pointer may not leave that key until it has travelled the sliding-modifier slop from
+    // its touch-down point; see {@link #isMajorEnoughMoveToBeOnNewKey}.
+    private boolean mIsDownOnModifierKey;
+
     // TODO: Add PointerTrackerFactory singleton and move some class static methods into it.
     public static void init(final TypedArray mainKeyboardViewAttr, final TimerProxy timerProxy,
             final DrawingProxy drawingProxy) {
@@ -499,8 +504,9 @@ public final class PointerTracker implements PointerTrackerQueue.Element {
         // enabled by configuration, 2) this pointer starts dragging from modifier key, or 3) this
         // pointer's KeyDetector always allows key selection by dragging finger, such as
         // {@link MoreKeysKeyboard}.
+        mIsDownOnModifierKey = key != null && key.isModifier();
         mIsAllowedDraggingFinger = sParams.mKeySelectionByDraggingFinger
-                || (key != null && key.isModifier())
+                || mIsDownOnModifierKey
                 || mKeyDetector.alwaysAllowsKeySelectionByDraggingFinger();
         mKeyboardLayoutHasBeenChanged = false;
         mIsTrackingForActionDisabled = false;
@@ -509,8 +515,19 @@ public final class PointerTracker implements PointerTrackerQueue.Element {
             // This onPress call may have changed keyboard layout. Those cases are detected at
             // {@link #setKeyboard}. In those cases, we should update key according to the new
             // keyboard layout.
+            final Keyboard keyboardOnPress = mKeyboard;
             if (callListenerOnPressAndCheckKeyboardLayoutChange(key, 0 /* repeatCount */)) {
-                key = onDownKey(x, y);
+                // The keyboard view is bottom aligned, so a keyboard of a different height moves
+                // the origin of the touch coordinates. The Tatar alphabet keyboard carries an
+                // extra row for ә ө ү җ ң һ and is one row taller than the symbols keyboard
+                // (728px against 667px on a 440dpi phone), so the instant ?123 is pressed every
+                // touch coordinate that follows is shifted by 61px. Re-detect the key -- and
+                // record the touch-down point -- in the new keyboard's space, otherwise the move
+                // events that follow are measured against a point a whole row away. Upstream
+                // AOSP never meets this: there both keyboards have four rows.
+                final int verticalShift = keyboardOnPress == null || mKeyboard == null ? 0
+                        : mKeyboard.mOccupiedHeight - keyboardOnPress.mOccupiedHeight;
+                key = onDownKey(x, y + verticalShift);
             }
 
             startRepeatKey(key);
@@ -822,6 +839,18 @@ public final class PointerTracker implements PointerTrackerQueue.Element {
         }
         if (curKey == null /* && newKey != null */) {
             return true;
+        }
+        // A press that went down on a modifier key must travel a real distance from its
+        // touch-down point before it is allowed to leave that key. The hysteresis below is
+        // measured from the key edge, so without this gate a press landing near the edge of
+        // ?123 or shift leaves the key after 5dp of movement -- less than the platform's own
+        // 8dp touch slop -- which arms the momentary layout switch and springs it back on
+        // release. Measuring from the touch-down point instead makes the edge of the key as
+        // reliable as its centre. See docs/SYMBOL-KEY-EDGE-FIX.md.
+        if (mIsDownOnModifierKey && !mIsInDraggingFinger
+                && !mKeyDetector.isBeyondSlidingModifierSlop(CoordinateUtils.x(mDownCoordinates),
+                        CoordinateUtils.y(mDownCoordinates), x, y)) {
+            return false;
         }
         // Here curKey points to the different key from newKey.
         final int keyHysteresisDistanceSquared = mKeyDetector.getKeyHysteresisDistanceSquared(

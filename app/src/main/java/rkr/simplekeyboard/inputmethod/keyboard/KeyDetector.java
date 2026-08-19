@@ -24,13 +24,15 @@ package rkr.simplekeyboard.inputmethod.keyboard;
 public class KeyDetector {
     private final int mKeyHysteresisDistanceSquared;
     private final int mKeyHysteresisDistanceForSlidingModifierSquared;
+    private final int mSlidingModifierSlopSquared;
 
     private Keyboard mKeyboard;
     private int mCorrectionX;
     private int mCorrectionY;
 
     public KeyDetector() {
-        this(0.0f /* keyHysteresisDistance */, 0.0f /* keyHysteresisDistanceForSlidingModifier */);
+        this(0.0f /* keyHysteresisDistance */, 0.0f /* keyHysteresisDistanceForSlidingModifier */,
+                0.0f /* slidingModifierSlop */);
     }
 
     /**
@@ -40,12 +42,16 @@ public class KeyDetector {
      * movement will not be handled as meaningful movement. The unit is pixel.
      * @param keyHysteresisDistanceForSlidingModifier the same parameter for sliding input that
      * starts from a modifier key such as shift and symbols key.
+     * @param slidingModifierSlop how far a pointer that went down on a modifier key must travel
+     * from its touch-down point before it may leave that key at all. The unit is pixel.
      */
     public KeyDetector(final float keyHysteresisDistance,
-            final float keyHysteresisDistanceForSlidingModifier) {
+            final float keyHysteresisDistanceForSlidingModifier,
+            final float slidingModifierSlop) {
         mKeyHysteresisDistanceSquared = (int)(keyHysteresisDistance * keyHysteresisDistance);
         mKeyHysteresisDistanceForSlidingModifierSquared = (int)(
                 keyHysteresisDistanceForSlidingModifier * keyHysteresisDistanceForSlidingModifier);
+        mSlidingModifierSlopSquared = (int)(slidingModifierSlop * slidingModifierSlop);
     }
 
     public void setKeyboard(final Keyboard keyboard, final float correctionX,
@@ -61,6 +67,29 @@ public class KeyDetector {
     public int getKeyHysteresisDistanceSquared(final boolean isSlidingFromModifier) {
         return isSlidingFromModifier
                 ? mKeyHysteresisDistanceForSlidingModifierSquared : mKeyHysteresisDistanceSquared;
+    }
+
+    /**
+     * Whether a pointer that went down on a modifier key has travelled far enough from its
+     * touch-down point to count as deliberate sliding input rather than the tremor of a tap.
+     *
+     * <p>{@link #getKeyHysteresisDistanceSquared} is measured from the <em>key edge</em>, so a
+     * press that lands near the edge of a modifier key leaves that key after a movement of
+     * {@code keyHysteresisDistance} alone (5dp here, less than the platform's own 8dp touch slop),
+     * which arms the momentary layout switch that springs back on release. This slop is measured
+     * from the <em>touch-down point</em> instead, so it does not depend on where inside the key the
+     * press landed. See {@code docs/SYMBOL-KEY-EDGE-FIX.md}.</p>
+     *
+     * @param downX x-coordinate of the touch-down point
+     * @param downY y-coordinate of the touch-down point
+     * @param x current x-coordinate of the pointer
+     * @param y current y-coordinate of the pointer
+     */
+    public boolean isBeyondSlidingModifierSlop(final int downX, final int downY, final int x,
+            final int y) {
+        final int dx = x - downX;
+        final int dy = y - downY;
+        return dx * dx + dy * dy >= mSlidingModifierSlopSquared;
     }
 
     public int getTouchX(final int x) {

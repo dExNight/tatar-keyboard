@@ -80,6 +80,9 @@
         <attr name="keyHysteresisDistance" format="dimension" />
         <!-- Key detection hysteresis distance for shift/symbols sliding input. -->
         <attr name="keyHysteresisDistanceForSlidingModifier" format="dimension" />
+        <!-- How far a pointer that went down on a modifier key (shift, ?123) must travel from its
+             touch-down point before it is allowed to leave that key. -->
+        <attr name="slidingModifierSlop" format="dimension" />
         <!-- Touch noise threshold time in millisecond -->
         <attr name="touchNoiseThresholdTime" format="integer" />
         <!-- Touch noise threshold distance in millimeter -->
