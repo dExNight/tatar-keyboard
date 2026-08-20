@@ -22,7 +22,13 @@
 <resources>
     <bool name="config_use_fullscreen_mode">false</bool>
 
-    <dimen name="config_key_hysteresis_distance">5.0dp</dimen>
+    <!-- How far past the edge of the pressed key a pointer must move before the key changes.
+         5.0dp came from the Simple Keyboard fork and sits *below* the platform's own touch slop
+         (ViewConfiguration.getScaledTouchSlop(), 8dp), i.e. below the movement Android itself
+         still calls a tap: a press landing near the edge of a letter typed the neighbour on 5dp
+         of tremor. AOSP LatinIME keeps this pair with the sliding-modifier one above it;
+         HeliBoard raised this one to the platform touch slop. See docs/TOUCH-SLOP-TUNING.md. -->
+    <dimen name="config_key_hysteresis_distance">8.0dp</dimen>
 
     <!-- Preferable keyboard height in absolute scale: 1.285in -->
     <!-- This config_default_keyboard_height value should match with keyboard-heights.xml -->
