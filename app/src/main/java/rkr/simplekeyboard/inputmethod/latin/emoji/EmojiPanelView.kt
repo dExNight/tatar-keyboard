@@ -160,6 +160,9 @@ class EmojiPanelView @JvmOverloads constructor(
         private const val BACK_ID = 2_000_000
         private const val DELETE_ID = 2_000_001
         private const val SEARCH_ID = 2_000_002
+
+        // Skin-tone popup variants get their own id block above the functional keys.
+        private const val POPUP_ID_BASE = 3_000_000
     }
 
     private val state = EmojiPanelState()
@@ -1068,6 +1071,19 @@ class EmojiPanelView @JvmOverloads constructor(
             targetToVirtualId(state.targetAt(x, y))
 
         override fun getVisibleVirtualViews(virtualViewIds: MutableList<Int>) {
+            if (state.isPopupOpen()) {
+                // The popup owns the whole surface while it is up — a touch outside it dismisses
+                // rather than reaching the grid — so the node tree is exactly its variants. Leaving
+                // the grid exposed here would let a screen reader activate a cell the finger
+                // cannot.
+                var variant = 0
+                val variants = state.popupVariantCount()
+                while (variant < variants) {
+                    virtualViewIds.add(POPUP_ID_BASE + variant)
+                    variant++
+                }
+                return
+            }
             // Visible cells: the same sections and rows the content draws, so the node set matches
             // what is on screen and never exposes a scrolled-off cell.
             val columns = state.columnCount()
@@ -1117,6 +1133,18 @@ class EmojiPanelView @JvmOverloads constructor(
         ) {
             node.className = android.widget.Button::class.java.name
             when {
+                virtualViewId >= POPUP_ID_BASE -> {
+                    val variant = virtualViewId - POPUP_ID_BASE
+                    // The variant speaks its own sequence, exactly as a grid cell does: the panel
+                    // ships no emoji-name database for speech.
+                    node.contentDescription = popupVariants.getOrElse(variant) { popupBase }
+                    tempBounds.set(
+                        state.popupVariantLeft(variant),
+                        state.popupTop(),
+                        state.popupVariantRight(variant),
+                        state.popupBottom(),
+                    )
+                }
                 virtualViewId == BACK_ID -> {
                     node.contentDescription =
                         context.getString(R.string.spoken_description_to_alpha)
@@ -1184,6 +1212,8 @@ class EmojiPanelView @JvmOverloads constructor(
         }
 
         private fun targetToVirtualId(target: Int): Int = when {
+            EmojiPanelState.isPopupVariant(target) ->
+                POPUP_ID_BASE + EmojiPanelState.popupVariantIndexOf(target)
             EmojiPanelState.isCell(target) -> target
             EmojiPanelState.isBack(target) -> BACK_ID
             EmojiPanelState.isDelete(target) -> DELETE_ID
@@ -1193,6 +1223,8 @@ class EmojiPanelView @JvmOverloads constructor(
         }
 
         private fun virtualIdToTarget(virtualViewId: Int): Int = when {
+            virtualViewId >= POPUP_ID_BASE ->
+                EmojiPanelState.POPUP_TARGET_BASE - (virtualViewId - POPUP_ID_BASE)
             virtualViewId == BACK_ID -> EmojiPanelState.BACK_TARGET
             virtualViewId == DELETE_ID -> EmojiPanelState.DELETE_TARGET
             virtualViewId == SEARCH_ID -> EmojiPanelState.SEARCH_TARGET

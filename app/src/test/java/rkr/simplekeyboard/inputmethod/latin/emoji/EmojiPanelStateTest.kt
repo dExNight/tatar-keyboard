@@ -631,6 +631,23 @@ class EmojiPanelStateTest {
         assertEquals(0, state.scrollY())
     }
 
+    /**
+     * While the popup is up it owns the surface for a screen reader too: the node tree is exactly
+     * its variants. Leaving the grid exposed would let TalkBack activate a cell a finger cannot.
+     */
+    @Test
+    fun theOpenPopupIsTheWholeVirtualNodeTree() {
+        val state = configuredState(multiCategorySnapshot(64, 32))
+        val closedCount = state.virtualNodeCount()
+        assertEquals(state.visibleCellCount() + state.tabCount() + 3, closedCount)
+
+        state.openPopup(11, EmojiSkinTones.VARIANT_COUNT)
+        assertEquals(EmojiSkinTones.VARIANT_COUNT, state.virtualNodeCount())
+
+        state.closePopup()
+        assertEquals(closedCount, state.virtualNodeCount())
+    }
+
     /** Popup variants, tabs and the fixed targets live in blocks that can never collide. */
     @Test
     fun popupVariantTargetsNeverCollideWithTabsOrTheFixedTargets() {

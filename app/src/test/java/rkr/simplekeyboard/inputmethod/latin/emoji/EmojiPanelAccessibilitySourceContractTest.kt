@@ -73,6 +73,9 @@ class EmojiPanelAccessibilitySourceContractTest {
         val body = panel.substringAfter("override fun getVisibleVirtualViews(")
             .substringBefore("override fun onPopulateNodeForHost(")
         // Built from the SAME hit-test geometry the grid draws with, not a second geometry.
+        // While the skin-tone popup is up the tree is exactly its variants and nothing else.
+        assertTrue(body.contains("state.isPopupOpen()"))
+        assertTrue(body.contains("virtualViewIds.add(POPUP_ID_BASE + variant)"))
         assertTrue(body.contains("state.firstVisibleSection()"))
         assertTrue(body.contains("state.lastVisibleSection()"))
         assertTrue(body.contains("state.firstVisibleRowOf(section)"))

@@ -446,9 +446,12 @@ internal class EmojiPanelState {
 
     /**
      * Virtual-node count the accessibility delegate exposes: every visible cell, every tab, the
-     * search pill and the two functional keys. Kept here so it is verifiable without a device.
+     * search pill and the two functional keys — or, while the skin-tone popup is up, exactly its
+     * variants, because the popup owns the whole surface and a touch outside it dismisses rather
+     * than reaching the grid. Kept here so it is verifiable without a device.
      */
-    fun virtualNodeCount(): Int = visibleCellCount() + tabCount() + 3
+    fun virtualNodeCount(): Int =
+        if (isPopupOpen()) popupVariants else visibleCellCount() + tabCount() + 3
 
     // --- Hit testing --------------------------------------------------------------------------
 
