@@ -71,12 +71,21 @@ public final class BogusMoveEventDetector {
                 keyDiagonal * BOGUS_MOVE_ACCUMULATED_DISTANCE_THRESHOLD);
     }
 
+    /**
+     * Records the point a pointer went down at. Everything accumulated before that point is
+     * discarded: it is not travel of this finger from this down point.
+     *
+     * <p>Two things get discarded here. One is the tail of the previous gesture -- trackers are
+     * pooled per pointer id and reused, so the "last" coordinates a fresh down is measured
+     * against belong to wherever the previous press ended. The other is the jump in coordinates
+     * caused by a keyboard of a different height replacing the one that was just pressed: the
+     * view is bottom aligned, so the Tatar alphabet keyboard's extra row moves every following
+     * touch coordinate by 61px on a 440dpi phone. Neither is a finger moving. See
+     * {@code docs/TOUCH-SLOP-TUNING.md}.</p>
+     */
     public void onActualDownEvent(final int x, final int y) {
         mActualDownX = x;
         mActualDownY = y;
-    }
-
-    public void onDownKey() {
         mAccumulatedDistanceFromDownKey = 0;
     }
 

@@ -387,8 +387,14 @@ public final class PointerTracker implements PointerTrackerQueue.Element {
 
     private Key onDownKey(final int x, final int y) {
         CoordinateUtils.set(mDownCoordinates, x, y);
-        mBogusMoveEventDetector.onDownKey();
-        return onMoveToNewKey(onMoveKeyInternal(x, y), x, y);
+        // Record the down point *after* onMoveKeyInternal has run: that call feeds the detector
+        // the distance from mLastX/mLastY, which at this moment is either the tail of the
+        // previous gesture on this pooled tracker or, when this is the re-detection that follows
+        // a keyboard height change, the 61px the coordinate system itself moved. Neither is
+        // finger travel, and onActualDownEvent drops both.
+        final Key key = onMoveToNewKey(onMoveKeyInternal(x, y), x, y);
+        mBogusMoveEventDetector.onActualDownEvent(x, y);
+        return key;
     }
 
     private static int getDistance(final int x1, final int y1, final int x2, final int y2) {
@@ -477,7 +483,8 @@ public final class PointerTracker implements PointerTrackerQueue.Element {
         }
 
         final Key key = getKeyOn(x, y);
-        mBogusMoveEventDetector.onActualDownEvent(x, y);
+        // The down point is recorded by onDownKey() below, which also re-records it if pressing
+        // this key swapped in a keyboard of a different height.
         if (key != null && key.isModifier()) {
             // Before processing a down event of modifier key, all pointers already being
             // tracked should be released.
