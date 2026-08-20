@@ -77,6 +77,8 @@ import rkr.simplekeyboard.inputmethod.latin.dictionary.personalstore.PersonalDic
 import rkr.simplekeyboard.inputmethod.latin.dictionary.personalstore.PersonalForget;
 import rkr.simplekeyboard.inputmethod.latin.dictionary.personalstore.PersonalLearning;
 import rkr.simplekeyboard.inputmethod.latin.emoji.EmojiPanelController;
+import rkr.simplekeyboard.inputmethod.latin.emoji.EmojiSearchIndex;
+import rkr.simplekeyboard.inputmethod.latin.emoji.EmojiSearchQuery;
 import rkr.simplekeyboard.inputmethod.latin.emoji.EmojiSetSnapshot;
 import rkr.simplekeyboard.inputmethod.latin.emoji.EmojiSurface;
 import rkr.simplekeyboard.inputmethod.latin.emoji.RecentEmojiGate;
@@ -137,6 +139,18 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
 
     // Owns the emoji panel's single-per-process snapshot. Null until set up in onCreate().
     private EmojiPanelController mEmojiPanelController;
+
+    /**
+     * The emoji-search query while the search is open, and null otherwise. It holds every key press
+     * made during the search; not one of them reaches {@link InputLogic} or the editor.
+     */
+    private EmojiSearchQuery mEmojiSearchQuery;
+
+    /**
+     * The auto-caps state reported to the keyboard while the emoji search is open: no
+     * {@code TextUtils.CAP_MODE_*} bit at all. See {@link #maybeRouteToEmojiSearch}.
+     */
+    private static final int NO_AUTO_CAPS = 0;
 
     // Decides the one-shot offer to turn Tatar suggestions on. Null until set up in onCreate().
     private SuggestionsOfferController mSuggestionsOffer;
@@ -546,6 +560,16 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
                     mSuggestionsController.onSelectionChanged();
                 }
                 mKeyboardSwitcher.showEmojiPanel(snapshot);
+            }
+
+            @Override
+            public void showEmojiSearch(final EmojiSearchIndex index) {
+                mEmojiSearchQuery = new EmojiSearchQuery();
+                mKeyboardSwitcher.showEmojiSearch(index);
+                // The letters come back with shift unlatched: a query is not a sentence.
+                mKeyboardSwitcher.requestUpdatingShiftState(NO_AUTO_CAPS,
+                        getCurrentRecapitalizeState());
+                updateEmojiSearchView();
             }
 
             @Override
@@ -988,6 +1012,7 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
     public View onCreateInputView() {
         // The input view is being (re)created (rotation, theme or height change): a deferred show
         // for the old view must not fire. The panel's "was open" state never survives recreation.
+        abandonEmojiSearch();
         if (mEmojiPanelController != null) {
             mEmojiPanelController.onInputViewRecreated();
         }
@@ -1165,6 +1190,7 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
             // A new editor session: a deferred emoji-panel show armed for the previous one must not
             // fire now.
             mEmojiPanelController.onEditorSessionChanged();
+            abandonEmojiSearch();
         }
         if (mSuggestionsOffer != null) {
             // The boundary at which a deferred "could not turn suggestions on" message gets another
@@ -1206,6 +1232,7 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         if (mSuggestionsController != null) {
             mSuggestionsController.onFinishInput();
         }
+        abandonEmojiSearch();
         if (mEmojiPanelController != null) {
             mEmojiPanelController.onFinishInputView();
         }
@@ -1367,6 +1394,14 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
     }
 
     int getCurrentAutoCapsState() {
+        if (mEmojiSearchQuery != null) {
+            // While the emoji search is open the keys type into the query, not into the editor, so
+            // auto-caps has nothing to derive from: the editor's text never changes and shift would
+            // be re-armed after every letter, turning the whole query into capitals. Reporting no
+            // CAP_MODE bit here covers every path that asks — a key press, a layout switch, a
+            // keyboard reload — with one answer.
+            return NO_AUTO_CAPS;
+        }
         return mInputLogic.getCurrentAutoCapsState(mSettings.getCurrent(),
                 mRichImm.getCurrentSubtype().getKeyboardLayoutSet());
     }
@@ -1512,6 +1547,9 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
     // This method is public for testability of LatinIME, but also in the future it should
     // completely replace #onCodeInput.
     public void onEvent(final Event event) {
+        if (maybeRouteToEmojiSearch(event)) {
+            return;
+        }
         if (maybeRevertTatarAutocorrection(event)) {
             return;
         }
@@ -1660,7 +1698,79 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
      * until the search is left again.
      */
     public void onEmojiSearchRequested() {
-        // Wired in the search phase of this mission; the pill is inert until then.
+        if (mEmojiPanelController != null) {
+            mEmojiPanelController.onSearchRequested();
+        }
+    }
+
+    /**
+     * The emoji search was left — through the "✕" key, a backspace on an empty query, or any
+     * lifecycle event that abandons it. The query is dropped and the emoji grid comes back.
+     */
+    public void onEmojiSearchClosed() {
+        if (mEmojiSearchQuery == null) {
+            return;
+        }
+        mEmojiSearchQuery = null;
+        mKeyboardSwitcher.leaveEmojiSearch();
+    }
+
+    /**
+     * Routes one key press into the emoji-search query instead of into the editor, and returns true
+     * when it did. This is the single seam that makes the keyboard type "into itself": while the
+     * search is open the query grows here and {@link InputLogic} is never called, so no character
+     * the user types while searching can reach the application's text field and no composing region
+     * is ever started. A backspace on an already-empty query means "leave the search".
+     *
+     * <p>The keyboard's own state machine still sees the event, so shift and the symbols/letters
+     * switch behave exactly as they do while typing. Auto-caps is deliberately reported as OFF
+     * ({@code 0}, no {@code TextUtils.CAP_MODE_*} bit): it is derived from the editor's text, which
+     * the search never changes, so leaving it on would re-arm shift after every letter and turn the
+     * whole query into capitals.
+     */
+    private boolean maybeRouteToEmojiSearch(final Event event) {
+        final EmojiSearchQuery query = mEmojiSearchQuery;
+        if (query == null || !mKeyboardSwitcher.isEmojiSearchShown()) {
+            return false;
+        }
+        final boolean changed;
+        if (event.mKeyCode == Constants.CODE_DELETE) {
+            if (!query.backspace()) {
+                onEmojiSearchClosed();
+                mKeyboardSwitcher.onEvent(event, getCurrentAutoCapsState(),
+                        getCurrentRecapitalizeState());
+                return true;
+            }
+            changed = true;
+        } else if (event.mCodePoint != Event.NOT_A_CODE_POINT) {
+            changed = query.appendCodePoint(event.mCodePoint);
+        } else {
+            // Delete is handled above; every other key that carries no code point (the language
+            // key, the emoji key) is left to the ordinary path so the search never swallows it.
+            return false;
+        }
+        if (changed) {
+            updateEmojiSearchView();
+        }
+        mKeyboardSwitcher.onEvent(event, getCurrentAutoCapsState(), getCurrentRecapitalizeState());
+        return true;
+    }
+
+    /** Hands the current query text to the search bands, which re-run the match and redraw. */
+    private void updateEmojiSearchView() {
+        final EmojiSearchQuery query = mEmojiSearchQuery;
+        if (query != null) {
+            mKeyboardSwitcher.setEmojiSearchQuery(query.text());
+        }
+    }
+
+    /**
+     * Abandons an open emoji search without touching the surfaces; used by the lifecycle events
+     * that tear the input view down or move to another editor, where the keyboard switcher already
+     * resets its own state.
+     */
+    private void abandonEmojiSearch() {
+        mEmojiSearchQuery = null;
     }
 
     /**

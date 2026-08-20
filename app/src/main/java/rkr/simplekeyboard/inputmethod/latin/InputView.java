@@ -26,6 +26,8 @@ import android.widget.FrameLayout;
 
 import rkr.simplekeyboard.inputmethod.R;
 import rkr.simplekeyboard.inputmethod.latin.emoji.EmojiPanelView;
+import rkr.simplekeyboard.inputmethod.latin.emoji.EmojiSearchIndex;
+import rkr.simplekeyboard.inputmethod.latin.emoji.EmojiSearchView;
 import rkr.simplekeyboard.inputmethod.latin.emoji.EmojiSetSnapshot;
 import rkr.simplekeyboard.inputmethod.latin.suggestions.SuggestionStripView;
 
@@ -33,6 +35,7 @@ public final class InputView extends FrameLayout {
     private final Rect mTemporaryBounds = new Rect();
     private SuggestionStripView mSuggestionStripView;
     private EmojiPanelView mEmojiPanelView;
+    private EmojiSearchView mEmojiSearchView;
     private Runnable mInsetsChangedListener;
 
     /**
@@ -92,6 +95,87 @@ public final class InputView extends FrameLayout {
         return mEmojiPanelView;
     }
 
+    /** Creates the emoji search bands on first use. Merely inflating the keyboard never creates them. */
+    public EmojiSearchView getOrCreateEmojiSearchView() {
+        if (mEmojiSearchView != null) {
+            return mEmojiSearchView;
+        }
+        final View stub = findViewById(R.id.emoji_search_stub);
+        if (!(stub instanceof ViewStub)) {
+            return null;
+        }
+        final View inflated = ((ViewStub) stub).inflate();
+        if (!(inflated instanceof EmojiSearchView)) {
+            return null;
+        }
+        mEmojiSearchView = (EmojiSearchView) inflated;
+        return mEmojiSearchView;
+    }
+
+    public EmojiSearchView getEmojiSearchView() {
+        return mEmojiSearchView;
+    }
+
+    /**
+     * Enters the emoji search: the panel steps aside and the two search bands take the suggestion
+     * strip's place above the letter keyboard, which the caller makes visible again. The panel keeps
+     * its bound snapshot and its scroll position, so {@link #leaveEmojiSearch()} puts back exactly
+     * the grid the user left.
+     */
+    public EmojiSearchView enterEmojiSearch(final EmojiSearchIndex index) {
+        final EmojiSearchView search = getOrCreateEmojiSearchView();
+        if (search == null) {
+            return null;
+        }
+        boolean changed = false;
+        if (mEmojiPanelView != null && mEmojiPanelView.getVisibility() != GONE) {
+            mEmojiPanelView.setVisibility(GONE);
+            changed = true;
+        }
+        if (mSuggestionStripView != null && mSuggestionStripView.getVisibility() == VISIBLE) {
+            mSuggestionStripView.setVisibility(GONE);
+            mStripHiddenByEmojiPanel = true;
+            changed = true;
+        }
+        search.setIndex(index);
+        if (search.getVisibility() != VISIBLE) {
+            search.setVisibility(VISIBLE);
+            changed = true;
+        }
+        if (changed) {
+            notifyInsetsChanged();
+        }
+        return search;
+    }
+
+    /** Leaves the emoji search and shows the panel again, still holding its snapshot and scroll. */
+    public void leaveEmojiSearch() {
+        boolean changed = false;
+        if (mEmojiSearchView != null && mEmojiSearchView.getVisibility() != GONE) {
+            mEmojiSearchView.setVisibility(GONE);
+            changed = true;
+        }
+        if (mEmojiPanelView != null && mEmojiPanelView.getVisibility() != VISIBLE) {
+            mEmojiPanelView.setVisibility(VISIBLE);
+            changed = true;
+        }
+        if (changed) {
+            notifyInsetsChanged();
+        }
+    }
+
+    /** Hides the search bands without showing the panel; used when the search is abandoned. */
+    public void hideEmojiSearch() {
+        if (mEmojiSearchView != null && mEmojiSearchView.getVisibility() != GONE) {
+            mEmojiSearchView.setVisibility(GONE);
+            notifyInsetsChanged();
+        }
+    }
+
+    private boolean isEmojiSearchShowing() {
+        return mEmojiSearchView != null && mEmojiSearchView.getVisibility() == VISIBLE;
+    }
+
     /**
      * Shows the emoji panel sized to the current keyboard height, so that the content top inset is
      * identical whether the keyboard or the panel is visible. The caller hides the
@@ -144,7 +228,8 @@ public final class InputView extends FrameLayout {
     }
 
     private boolean isEmojiPanelShowing() {
-        return mEmojiPanelView != null && mEmojiPanelView.getVisibility() == VISIBLE;
+        return (mEmojiPanelView != null && mEmojiPanelView.getVisibility() == VISIBLE)
+                || isEmojiSearchShowing();
     }
 
     /** Shows the fixed-height strip, including the valid visible zero-results state. */
@@ -216,6 +301,9 @@ public final class InputView extends FrameLayout {
         if (mEmojiPanelView != null) {
             mEmojiPanelView.release();
         }
+        if (mEmojiSearchView != null) {
+            mEmojiSearchView.release();
+        }
         mInsetsChangedListener = null;
     }
 
@@ -255,6 +343,14 @@ public final class InputView extends FrameLayout {
                 && panel.getWidth() > 0 && panel.getHeight() > 0) {
             mTemporaryBounds.set(0, 0, panel.getWidth(), panel.getHeight());
             offsetDescendantRectToMyCoords(panel, mTemporaryBounds);
+            outBounds.union(mTemporaryBounds);
+        }
+
+        final EmojiSearchView search = mEmojiSearchView;
+        if (search != null && search.isShown() && search.isLaidOut()
+                && search.getWidth() > 0 && search.getHeight() > 0) {
+            mTemporaryBounds.set(0, 0, search.getWidth(), search.getHeight());
+            offsetDescendantRectToMyCoords(search, mTemporaryBounds);
             outBounds.union(mTemporaryBounds);
         }
         return true;

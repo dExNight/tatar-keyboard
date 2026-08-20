@@ -84,4 +84,7 @@
     <string name="spoken_emoji_category_flags">Флаглар</string>
 
     <string name="emoji_search_hint">Эмодзи эзләү</string>
+    <string name="emoji_search_type_hint">Сорауны языгыз</string>
+    <string name="emoji_search_no_results">Бернәрсә дә табылмады</string>
+    <string name="emoji_search_close">Эзләүне ябарга</string>
 </resources>

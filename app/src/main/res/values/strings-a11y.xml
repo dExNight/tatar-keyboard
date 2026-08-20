@@ -89,4 +89,7 @@
 
     <!-- Visible hint inside the emoji panel's search pill; also its TalkBack description. -->
     <string name="emoji_search_hint">Search emoji</string>
+    <string name="emoji_search_type_hint">Type to search emoji</string>
+    <string name="emoji_search_no_results">Nothing found</string>
+    <string name="emoji_search_close">Close search</string>
 </resources>

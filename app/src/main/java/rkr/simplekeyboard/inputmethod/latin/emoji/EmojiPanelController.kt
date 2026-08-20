@@ -35,6 +35,13 @@ interface EmojiSurface {
      * if the panel is not shown, this is a no-op. Defaulted so existing fakes need not implement it.
      */
     fun refreshAfterRecentsCleared(base: EmojiSetSnapshot) {}
+
+    /**
+     * Enter the emoji search with [index] bound: the panel steps aside, the letter keyboard comes
+     * back and the search bands take the suggestion strip's place. Defaulted so existing fakes need
+     * not implement it.
+     */
+    fun showEmojiSearch(index: EmojiSearchIndex) {}
 }
 
 /**
@@ -53,6 +60,15 @@ fun interface EmojiUiPoster {
  */
 fun interface EmojiSnapshotSource {
     fun build(): EmojiSetSnapshot
+}
+
+/**
+ * Reads and parses the emoji-search index off the UI thread. Production reads
+ * `assets/emoji/emoji_search_v1.txt`; JVM tests inject a fake and count how many times [load] runs,
+ * which is what makes "one load per process" observable without Android.
+ */
+fun interface EmojiSearchIndexSource {
+    fun load(): EmojiSearchIndex
 }
 
 /** Where a process's single snapshot preparation stands. */
@@ -84,6 +100,7 @@ class EmojiPanelController internal constructor(
     private val executorFactory: () -> ExecutorService?,
     private val snapshotSourceFactory: () -> EmojiSnapshotSource?,
     private val recentStoreFactory: () -> RecentEmojiStore? = { null },
+    private val searchIndexSourceFactory: () -> EmojiSearchIndexSource? = { null },
 ) {
     /** Production entry point. */
     constructor(
@@ -109,6 +126,7 @@ class EmojiPanelController internal constructor(
                 gate,
             )
         },
+        { AssetSearchIndexSource(context.applicationContext) },
     ) {
         setLive(this)
     }
@@ -133,6 +151,18 @@ class EmojiPanelController internal constructor(
     private var snapshot: EmojiSetSnapshot? = null
 
     private var preparation = EmojiPanelPreparation.NOT_PREPARED
+
+    /**
+     * The search index, loaded at most once per process and only when the user first opens the
+     * search — never on the cold-start path and never on the UI thread. `null` means "not loaded
+     * yet"; [EmojiSearchIndex.EMPTY] means "loaded and unusable", which is not retried.
+     */
+    private var searchIndex: EmojiSearchIndex? = null
+
+    private var searchLoading = false
+
+    /** The single latest-only deferred "show the search". Never more than one outstanding. */
+    private var pendingSearch = false
 
     // The single latest-only deferred show. Never more than one outstanding.
     private var pendingShow = false
@@ -170,9 +200,67 @@ class EmojiPanelController internal constructor(
         }
     }
 
+    /**
+     * The search pill was tapped. The index is loaded once per process on the background executor;
+     * until it arrives a single latest-only deferred show is armed, dropped by exactly the same
+     * lifecycle events that drop a deferred panel show.
+     */
+    fun onSearchRequested() {
+        if (destroyed) return
+        val loaded = searchIndex
+        if (loaded != null) {
+            if (!loaded.isEmpty) surface.showEmojiSearch(loaded)
+            return
+        }
+        pendingSearch = true
+        if (searchLoading) return
+        val backgroundExecutor = backgroundExecutor()
+        val source = try {
+            searchIndexSourceFactory()
+        } catch (_: Throwable) {
+            null
+        }
+        if (backgroundExecutor == null || source == null) {
+            searchIndex = EmojiSearchIndex.EMPTY
+            pendingSearch = false
+            return
+        }
+        searchLoading = true
+        val available = availableSequences
+        try {
+            backgroundExecutor.execute {
+                val built = try {
+                    val raw = source.load()
+                    if (available.isEmpty()) raw else raw.filterTo(available)
+                } catch (_: Throwable) {
+                    EmojiSearchIndex.EMPTY
+                }
+                uiPoster.post { onSearchIndexLoaded(built) }
+            }
+        } catch (_: Throwable) {
+            searchLoading = false
+            searchIndex = EmojiSearchIndex.EMPTY
+            pendingSearch = false
+        }
+    }
+
+    private fun onSearchIndexLoaded(loaded: EmojiSearchIndex) {
+        searchLoading = false
+        if (destroyed) return
+        searchIndex = loaded
+        if (pendingSearch) {
+            pendingSearch = false
+            if (!loaded.isEmpty) surface.showEmojiSearch(loaded)
+        }
+    }
+
+    /** The loaded index, or null while it has never been asked for; used by tests. */
+    fun searchIndexOrNull(): EmojiSearchIndex? = searchIndex
+
     /** Drops the single deferred show without letting it fire later. */
     private fun cancelPendingShow() {
         pendingShow = false
+        pendingSearch = false
     }
 
     /** A new editor session began; a deferred show for the previous one must not fire. */
@@ -236,6 +324,7 @@ class EmojiPanelController internal constructor(
     fun onDestroy() {
         destroyed = true
         pendingShow = false
+        pendingSearch = false
         if (liveInstance === this) setLive(null)
         executor?.shutdownNow()
         executor = null
@@ -419,5 +508,25 @@ private class AssetSnapshotSource(private val context: Context) : EmojiSnapshotS
 
     private companion object {
         const val ASSET_PATH = "emoji/emoji_set_v1.txt"
+    }
+}
+
+/**
+ * Production [EmojiSearchIndexSource]: reads and parses the packed search asset. Constructed
+ * cheaply on the UI thread (it only keeps the application context); the AssetManager is touched
+ * only inside [load], which runs on the controller's background executor the first time the user
+ * opens the search — never on the cold-start path. The result is returned to the caller and never
+ * written to any persistent store.
+ */
+private class AssetSearchIndexSource(private val context: Context) : EmojiSearchIndexSource {
+    override fun load(): EmojiSearchIndex =
+        try {
+            context.assets.open(ASSET_PATH).use { input -> EmojiSearchIndex.parse(input) }
+        } catch (_: Throwable) {
+            EmojiSearchIndex.EMPTY
+        }
+
+    private companion object {
+        const val ASSET_PATH = "emoji/emoji_search_v1.txt"
     }
 }

@@ -37,6 +37,12 @@
             android:layout="@layout/suggestion_strip"
             android:layout_width="match_parent"
             android:layout_height="40dp" />
+        <ViewStub
+            android:id="@+id/emoji_search_stub"
+            android:inflatedId="@+id/emoji_search_view"
+            android:layout="@layout/emoji_search"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content" />
         <rkr.simplekeyboard.inputmethod.keyboard.MainKeyboardView
             android:id="@+id/keyboard_view"
             android:layoutDirection="ltr"
