@@ -86,4 +86,7 @@
     <string name="spoken_emoji_category_objects">Objects</string>
     <string name="spoken_emoji_category_symbols">Symbols</string>
     <string name="spoken_emoji_category_flags">Flags</string>
+
+    <!-- Visible hint inside the emoji panel's search pill; also its TalkBack description. -->
+    <string name="emoji_search_hint">Search emoji</string>
 </resources>

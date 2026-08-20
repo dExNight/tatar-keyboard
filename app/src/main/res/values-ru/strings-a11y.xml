@@ -83,4 +83,6 @@
     <string name="spoken_emoji_category_objects">Предметы</string>
     <string name="spoken_emoji_category_symbols">Символы</string>
     <string name="spoken_emoji_category_flags">Флаги</string>
+
+    <string name="emoji_search_hint">Поиск эмодзи</string>
 </resources>

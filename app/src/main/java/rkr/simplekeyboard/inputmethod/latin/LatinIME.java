@@ -1655,6 +1655,15 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
     }
 
     /**
+     * The search pill in the emoji panel was tapped. The panel closes, the letter keyboard comes
+     * back and every key press is routed into the emoji-search query instead of into the editor
+     * until the search is left again.
+     */
+    public void onEmojiSearchRequested() {
+        // Wired in the search phase of this mission; the pill is inert until then.
+    }
+
+    /**
      * The emoji panel was hidden. The recent-emoji list is persisted at most once per hide, and only
      * when it changed; the write runs on the controller's background executor, never on the UI thread.
      */

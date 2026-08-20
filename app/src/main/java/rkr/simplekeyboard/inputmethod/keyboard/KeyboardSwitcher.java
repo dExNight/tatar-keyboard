@@ -436,6 +436,15 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions,
         }
     }
 
+    // Implements {@link EmojiPanelView.Listener}. The search pill opens the emoji-search mode,
+    // where the letter keyboard comes back and the query is typed into the keyboard itself.
+    @Override
+    public void onEmojiPanelSearch() {
+        if (mLatinIME != null) {
+            mLatinIME.onEmojiSearchRequested();
+        }
+    }
+
     // Implements {@link EmojiPanelView.Listener}. Insertion goes solely through the ordinary
     // text-input path; the panel never commits text itself. The use is then recorded in the
     // recent-emoji list through the gated, serialized controller path.

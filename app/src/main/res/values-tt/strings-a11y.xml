@@ -82,4 +82,6 @@
     <string name="spoken_emoji_category_objects">Әйберләр</string>
     <string name="spoken_emoji_category_symbols">Символлар</string>
     <string name="spoken_emoji_category_flags">Флаглар</string>
+
+    <string name="emoji_search_hint">Эмодзи эзләү</string>
 </resources>
