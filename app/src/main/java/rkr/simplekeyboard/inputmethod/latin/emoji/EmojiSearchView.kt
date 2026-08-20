@@ -289,7 +289,11 @@ class EmojiSearchView @JvmOverloads constructor(
             drawCaret(canvas, textLeft, centerY)
         } else {
             canvas.drawText(queryText, textLeft, baseline, queryPaint)
-            drawCaret(canvas, textLeft + queryPaint.measureText(queryText) + closeCrossPx, centerY)
+            drawCaret(
+                canvas,
+                EmojiSearchLayout.caretX(textLeft, queryPaint.measureText(queryText)),
+                centerY,
+            )
         }
 
         // The close key sits inside the right end of the pill.
