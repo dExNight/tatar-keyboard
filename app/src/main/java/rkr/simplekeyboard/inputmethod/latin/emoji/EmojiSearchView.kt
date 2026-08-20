@@ -166,7 +166,6 @@ class EmojiSearchView @JvmOverloads constructor(
     private val touchSlop = ViewConfiguration.get(context).scaledTouchSlop
 
     private val hintText: String = context.getString(R.string.emoji_search_hint)
-    private val typeMoreText: String = context.getString(R.string.emoji_search_type_hint)
     private val noResultsText: String = context.getString(R.string.emoji_search_no_results)
     private val closeDescription: String = context.getString(R.string.emoji_search_close)
 
@@ -229,10 +228,16 @@ class EmojiSearchView @JvmOverloads constructor(
 
     /** Re-runs the search for [query] and redraws. The query text is never sent anywhere else. */
     fun setQuery(query: String) {
+        val hadResultBand = EmojiSearchLayout.showsResultBand(queryText)
         queryText = query
         resultCount = index.search(query)
         scrollX = 0
         cancelGesture()
+        // The first character typed brings the result band into being and the last one deleted
+        // takes it away again, and either changes the measured height.
+        if (EmojiSearchLayout.showsResultBand(queryText) != hadResultBand) {
+            requestLayout()
+        }
         invalidate()
         invalidateAccessibilityRootIfExploring()
     }
@@ -249,9 +254,15 @@ class EmojiSearchView @JvmOverloads constructor(
         invalidateAccessibilityRootIfExploring()
     }
 
+    /**
+     * The query row always; the result band only while there is a query for it to report on. An
+     * empty query therefore measures 46dp instead of 100dp and the freed height goes back to what
+     * sits below in the stack, rather than holding an empty band open.
+     */
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
         val width = resolveSize(suggestedMinimumWidth, widthMeasureSpec)
-        setMeasuredDimension(width, resolveSize(queryRowPx + resultRowPx, heightMeasureSpec))
+        val height = EmojiSearchLayout.contentHeight(queryRowPx, resultRowPx, queryText)
+        setMeasuredDimension(width, resolveSize(height, heightMeasureSpec))
     }
 
     override fun onDraw(canvas: Canvas) {
@@ -321,10 +332,11 @@ class EmojiSearchView @JvmOverloads constructor(
         val centerOffset = -(resultFontMetrics.ascent + resultFontMetrics.descent) / 2f
         val baseline = top + resultRowPx / 2f + centerOffset
         if (resultCount == 0) {
-            val message = if (queryText.isEmpty()) typeMoreText else noResultsText
+            // An empty query has no band to draw in: it is not measured, so there is nothing here.
+            if (!EmojiSearchLayout.showsResultBand(queryText)) return
             val messageBaseline =
                 top + resultRowPx / 2f - (messageFontMetrics.ascent + messageFontMetrics.descent) / 2f
-            canvas.drawText(message, messageInsetPx, messageBaseline, messagePaint)
+            canvas.drawText(noResultsText, messageInsetPx, messageBaseline, messagePaint)
             return
         }
         val first = (scrollX / resultCellPx).coerceAtLeast(0)

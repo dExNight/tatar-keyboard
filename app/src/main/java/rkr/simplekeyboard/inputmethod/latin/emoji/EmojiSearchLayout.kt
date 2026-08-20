@@ -17,12 +17,13 @@
 package rkr.simplekeyboard.inputmethod.latin.emoji
 
 /**
- * The pieces of [EmojiSearchView] geometry that can be got wrong without anything crashing, so
+ * The two pieces of [EmojiSearchView] geometry that can be got wrong without anything crashing, so
  * they live here, Android-free, and are exercised on the plain JVM — the same split the panel makes
  * between the view and [EmojiPanelState].
  *
- * The rule here comes from a defect the operator found on a real phone in 1.6.0: the caret had a
- * key's constant added to its x and read as a trailing space.
+ * Both rules come from defects the operator found on a real phone in 1.6.0: the caret had a key's
+ * constant added to its x and read as a trailing space, and the result band was measured even when
+ * its only content was an invitation to type.
  */
 internal object EmojiSearchLayout {
 
@@ -32,4 +33,17 @@ internal object EmojiSearchLayout {
      * drawn from and [textWidth] is what the paint measured for it.
      */
     fun caretX(textLeft: Float, textWidth: Float): Float = textLeft + textWidth
+
+    /**
+     * Whether the band under the query row exists at all. An empty query has nothing to report, and
+     * a band filled with placeholder words is worse than a band that is not there: the space goes
+     * back to the keyboard instead.
+     */
+    fun showsResultBand(queryText: String): Boolean = queryText.isNotEmpty()
+
+    /**
+     * Height the view asks for: the query row always, the result band only while there is a query.
+     */
+    fun contentHeight(queryRowPx: Int, resultBandPx: Int, queryText: String): Int =
+        if (showsResultBand(queryText)) queryRowPx + resultBandPx else queryRowPx
 }

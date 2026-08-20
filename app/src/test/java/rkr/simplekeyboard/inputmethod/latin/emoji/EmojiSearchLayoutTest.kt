@@ -23,12 +23,12 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * The caret must sit at the end of the typed query — the first of the two defects the operator
- * found on a real phone in 1.6.0.
+ * The two rules the operator found broken on a real phone in 1.6.0: the caret must sit at the end
+ * of the typed query, and the result band must not exist while the query is empty.
  *
- * The pure half is checked directly; the half that lives inside `onDraw` is checked the way the
- * rest of this package checks drawing code — by grepping the frozen source, in the style of
- * [EmojiPanelSourceContractTest].
+ * The pure half is checked directly; the half that lives inside `onDraw` / `onMeasure` is checked
+ * the way the rest of this package checks drawing code — by grepping the frozen source, in the
+ * style of [EmojiPanelSourceContractTest].
  */
 class EmojiSearchLayoutTest {
 
@@ -93,6 +93,24 @@ class EmojiSearchLayoutTest {
         }
     }
 
+    @Test
+    fun theResultBandExistsOnlyWhileThereIsAQuery() {
+        assertFalse(EmojiSearchLayout.showsResultBand(""))
+        assertTrue(EmojiSearchLayout.showsResultBand("к"))
+        assertTrue(EmojiSearchLayout.showsResultBand("дьяво"))
+    }
+
+    @Test
+    fun anEmptyQueryMeasuresTheQueryRowAloneAndATypedOneAddsTheBand() {
+        assertEquals(46, EmojiSearchLayout.contentHeight(46, 54, ""))
+        assertEquals(100, EmojiSearchLayout.contentHeight(46, 54, "к"))
+        // The band is the whole of the difference: nothing else changes with the query.
+        assertEquals(
+            54,
+            EmojiSearchLayout.contentHeight(46, 54, "кот") - EmojiSearchLayout.contentHeight(46, 54, ""),
+        )
+    }
+
     // --- Defect 1: the caret sits at the end of the text ---------------------------------------
 
     /**
@@ -135,5 +153,55 @@ class EmojiSearchLayoutTest {
             outsideCloseKey.contains("closeCrossPx"),
         )
         assertTrue(closeSection.contains("closeCrossPx"))
+    }
+
+    // --- Defect 2: no result band while the query is empty -------------------------------------
+
+    /**
+     * 1.6.0 always measured `queryRowPx + resultRowPx`, so an empty query reserved 54dp for a band
+     * whose only content was the words "type a query". The band must not be measured at all then.
+     */
+    @Test
+    fun theMeasuredHeightDropsTheResultBandWhileTheQueryIsEmpty() {
+        val measure = bodyOf("override fun onMeasure", "override fun onDraw")
+        assertFalse(
+            "onMeasure still adds the result band unconditionally",
+            measure.contains("queryRowPx + resultRowPx"),
+        )
+        assertTrue(
+            "onMeasure must take its height from EmojiSearchLayout.contentHeight",
+            measure.contains("EmojiSearchLayout.contentHeight"),
+        )
+    }
+
+    /** The placeholder text is gone: an empty query draws no message at all. */
+    @Test
+    fun anEmptyQueryDrawsNoPlaceholderMessage() {
+        val results = bodyOf("private fun drawResults", "/** Widest scroll offset")
+        assertFalse(
+            "the \"type a query\" placeholder is still drawn",
+            results.contains("typeMoreText"),
+        )
+        assertTrue(
+            "the \"nothing found\" message stays for a query that found nothing",
+            results.contains("noResultsText"),
+        )
+    }
+
+    /** A query that gains or loses its first character changes the measured height, so re-layout. */
+    @Test
+    fun changingTheQueryRequestsLayoutBecauseTheHeightCanChange() {
+        val setQuery = bodyOf("fun setQuery(query: String)", "/** Drops the bound index")
+        assertTrue("setQuery must requestLayout when the band appears or goes", setQuery.contains("requestLayout()"))
+    }
+
+    /** No node is announced for a band that is not there. */
+    @Test
+    fun theAccessibilityTreeNeverAnnouncesTheAbsentResultBand() {
+        val visible = bodyOf("override fun getVisibleVirtualViews", "override fun onPopulateNodeForVirtualView")
+        assertTrue(
+            "result nodes must be guarded by the result count",
+            visible.contains("if (resultCount == 0"),
+        )
     }
 }
