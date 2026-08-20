@@ -112,6 +112,19 @@ class EmojiPanelView @JvmOverloads constructor(
         // a dark sheet; a light theme needs it drawn.
         private const val FLOATING_HALO_DP = 3f
 
+        // A sideways drag becomes a jump between sections once it travels this far. Four times the
+        // platform slop: far enough that a slanted scroll never trips it, short enough to flick.
+        private const val SWIPE_MIN_SLOPS = 4
+
+        // How long the section jump animates, in ms. Long enough to read as movement rather than a
+        // teleport, short enough not to feel like waiting.
+        private const val SECTION_JUMP_MS = 220
+
+        // The skin-tone popup: a rounded card of variant cells over the anchor.
+        private const val POPUP_RADIUS_DP = 10f
+        private const val POPUP_HALO_DP = 3f
+        private const val POPUP_SELECTED_ALPHA = 0x55
+
         // Insets of the pills inside their bands.
         private const val SEARCH_PILL_INSET_DP = 5f
         private const val TAB_PILL_INSET_DP = 4f
@@ -166,6 +179,11 @@ class EmojiPanelView @JvmOverloads constructor(
     private val floatingHaloPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
     }
+    private val popupPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val popupHaloPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+    }
+    private val popupSelectedPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val searchIconPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
         strokeCap = Paint.Cap.ROUND
@@ -239,7 +257,30 @@ class EmojiPanelView @JvmOverloads constructor(
      */
     private val backWidthPx = (labelPaint.measureText(BACK_LABEL) + 2 * dp(BACK_PADDING_DP)).toInt()
 
+    private val popupRadiusPx = dp(POPUP_RADIUS_DP).toFloat()
     private val touchSlop = ViewConfiguration.get(context).scaledTouchSlop
+    private val longPressTimeoutMs = ViewConfiguration.getLongPressTimeout().toLong()
+
+    /** Bound once the controller has read the packed asset; empty until then. */
+    private var skinTones: EmojiSkinTones = EmojiSkinTones.EMPTY
+
+    /** The neutral sequence the open popup belongs to, so a pick composes from the right base. */
+    private var popupBase: String = ""
+
+    /**
+     * True between the long press that opened the popup and the release that ends the same gesture.
+     * The release of the opening press must not dismiss what it has just put on screen: the finger
+     * is still on the anchor, which is outside the popup card. Keeping the popup up lets the two
+     * usual gestures both work — slide onto a variant and let go, or let go and then tap one.
+     */
+    private var popupOpenedThisGesture = false
+
+    /**
+     * The popup's variant strings, composed once when it opens and reused by every frame after.
+     * Composing them in [onDraw] would allocate six strings a frame, which the panel's contract
+     * forbids.
+     */
+    private val popupVariants = Array(EmojiSkinTones.VARIANT_COUNT) { "" }
     private val minFlingVelocity = ViewConfiguration.get(context).scaledMinimumFlingVelocity
     private val maxFlingVelocity = ViewConfiguration.get(context).scaledMaximumFlingVelocity
     private val repeatStartTimeoutMs =
@@ -268,6 +309,34 @@ class EmojiPanelView @JvmOverloads constructor(
     private val accessibilityManager =
         context.getSystemService(Context.ACCESSIBILITY_SERVICE) as AccessibilityManager
     private val accessibilityHelper = EmojiPanelAccessibilityHelper()
+
+    /**
+     * Opens the skin-tone popup when a press on a tone-capable cell outlives the platform long-press
+     * timeout. The pending tap is dropped, so the same press can never both insert the neutral
+     * emoji and open the popup.
+     */
+    private val longPressRunnable = Runnable {
+        val cell = state.downTarget()
+        if (!EmojiPanelState.isCell(cell) || state.isScrolling() || state.isSwiping()) {
+            return@Runnable
+        }
+        val sequence = state.entryAt(cell)
+        if (!skinTones.hasTones(sequence)) {
+            return@Runnable
+        }
+        popupBase = sequence
+        var variant = 0
+        while (variant < popupVariants.size) {
+            popupVariants[variant] = skinTones.variantAt(sequence, variant)
+            variant++
+        }
+        if (state.openPopup(cell, EmojiSkinTones.VARIANT_COUNT)) {
+            popupOpenedThisGesture = true
+            performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS)
+            invalidate()
+            invalidateAccessibilityRootIfExploring()
+        }
+    }
 
     private val deleteRepeatRunnable = object : Runnable {
         override fun run() {
@@ -311,6 +380,11 @@ class EmojiPanelView @JvmOverloads constructor(
         pressedPaint.alpha = PRESSED_ALPHA
         floatingHaloPaint.color = backgroundPaint.color
         floatingHaloPaint.strokeWidth = dp(FLOATING_HALO_DP).toFloat()
+        popupPaint.color = functionalColor
+        popupHaloPaint.color = backgroundPaint.color
+        popupHaloPaint.strokeWidth = dp(POPUP_HALO_DP).toFloat()
+        popupSelectedPaint.color = withAlpha(labelPaint.color, POPUP_SELECTED_ALPHA)
+        state.setSwipeMinDistance(touchSlop * SWIPE_MIN_SLOPS)
         applyMetrics()
         state.setColumns(currentColumns())
         importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_YES
@@ -332,6 +406,11 @@ class EmojiPanelView @JvmOverloads constructor(
 
     fun setListener(listener: Listener?) {
         this.listener = listener
+    }
+
+    /** Binds the skin-tone table; until it arrives a long press simply does nothing. */
+    fun setSkinTones(tones: EmojiSkinTones) {
+        skinTones = tones
     }
 
     /** Binds the published snapshot and precomputes the tab glyphs and the section titles. */
@@ -361,6 +440,9 @@ class EmojiPanelView @JvmOverloads constructor(
     /** Drops transient state, the delete repeat and the listener before detach or replacement. */
     fun release() {
         cancelDeleteRepeat()
+        cancelSkinTonePopupTimer()
+        popupOpenedThisGesture = false
+        state.closePopup()
         scroller.forceFinished(true)
         flingActive = false
         recycleVelocityTracker()
@@ -383,6 +465,8 @@ class EmojiPanelView @JvmOverloads constructor(
             return
         }
         cancelDeleteRepeat()
+        cancelSkinTonePopupTimer()
+        state.closePopup()
         scroller.forceFinished(true)
         flingActive = false
         state.cancelGesture()
@@ -445,6 +529,42 @@ class EmojiPanelView @JvmOverloads constructor(
         drawSearchBar(canvas, pressed)
         drawContent(canvas, w, pressed)
         drawFloatingKeys(canvas, pressed)
+        drawSkinTonePopup(canvas)
+    }
+
+    /** The skin-tone popup, drawn over everything: a rounded card of the neutral cell plus five tones. */
+    private fun drawSkinTonePopup(canvas: Canvas) {
+        if (!state.isPopupOpen()) return
+        val left = state.popupLeft().toFloat()
+        val top = state.popupTop().toFloat()
+        val right = state.popupRight().toFloat()
+        val bottom = state.popupBottom().toFloat()
+        if (right <= left || bottom <= top) return
+        keyRect.set(left, top, right, bottom)
+        canvas.drawRoundRect(keyRect, popupRadiusPx, popupRadiusPx, popupHaloPaint)
+        canvas.drawRoundRect(keyRect, popupRadiusPx, popupRadiusPx, popupPaint)
+
+        val emojiCenterOffset = -(emojiFontMetrics.ascent + emojiFontMetrics.descent) / 2f
+        val baseline = (top + bottom) / 2f + emojiCenterOffset
+        val selected = state.popupVariant()
+        var variant = 0
+        val variants = state.popupVariantCount()
+        while (variant < variants) {
+            val variantLeft = state.popupVariantLeft(variant).toFloat()
+            val variantRight = state.popupVariantRight(variant).toFloat()
+            if (variant == selected) {
+                val inset = (variantRight - variantLeft) * 0.06f
+                keyRect.set(variantLeft + inset, top + inset, variantRight - inset, bottom - inset)
+                canvas.drawRoundRect(keyRect, popupRadiusPx, popupRadiusPx, popupSelectedPaint)
+            }
+            canvas.drawText(
+                popupVariants[variant],
+                (variantLeft + variantRight) / 2f,
+                baseline,
+                emojiPaint,
+            )
+            variant++
+        }
     }
 
     /** The top row of category tabs; the active one sits under a round pill, as in the reference. */
@@ -629,6 +749,8 @@ class EmojiPanelView @JvmOverloads constructor(
                     listener?.onEmojiPanelDelete()
                     postDelayed(deleteRepeatRunnable, repeatStartTimeoutMs)
                 }
+                popupOpenedThisGesture = false
+                maybeArmLongPress(target)
                 invalidate()
                 return true
             }
@@ -645,6 +767,9 @@ class EmojiPanelView @JvmOverloads constructor(
                 if (!EmojiPanelState.isDelete(state.pressedTarget())) {
                     cancelDeleteRepeat()
                 }
+                if (!EmojiPanelState.isCell(state.pressedTarget())) {
+                    cancelSkinTonePopupTimer()
+                }
                 if (changed) invalidate()
                 return true
             }
@@ -652,12 +777,14 @@ class EmojiPanelView @JvmOverloads constructor(
             MotionEvent.ACTION_POINTER_UP -> {
                 if (state.onPointerUp(event.getPointerId(event.actionIndex))) {
                     cancelDeleteRepeat()
+                    cancelSkinTonePopupTimer()
                     invalidate()
                 }
                 return true
             }
             MotionEvent.ACTION_UP -> {
                 cancelDeleteRepeat()
+                cancelSkinTonePopupTimer()
                 velocityTracker?.addMovement(event)
                 val pointerIndex = event.actionIndex
                 val wasScrolling = state.isScrolling()
@@ -675,10 +802,13 @@ class EmojiPanelView @JvmOverloads constructor(
                     invalidateAccessibilityRootIfExploring()
                 }
                 dispatchTarget(target)
+                maybeJumpSection(state.consumeSwipe())
                 return true
             }
             MotionEvent.ACTION_CANCEL -> {
                 cancelDeleteRepeat()
+                cancelSkinTonePopupTimer()
+                state.closePopup()
                 scroller.forceFinished(true)
                 recycleVelocityTracker()
                 state.cancelGesture()
@@ -693,6 +823,9 @@ class EmojiPanelView @JvmOverloads constructor(
         super.onVisibilityChanged(changedView, visibility)
         if (visibility != VISIBLE) {
             cancelDeleteRepeat()
+            cancelSkinTonePopupTimer()
+            popupOpenedThisGesture = false
+            state.closePopup()
             state.cancelGesture()
         }
     }
@@ -707,6 +840,23 @@ class EmojiPanelView @JvmOverloads constructor(
 
     private fun dispatchTarget(target: Int) {
         when {
+            EmojiPanelState.isPopupVariant(target) -> {
+                val variant = EmojiPanelState.popupVariantIndexOf(target)
+                val sequence = popupVariants.getOrElse(variant) { popupBase }
+                state.closePopup()
+                popupOpenedThisGesture = false
+                invalidate()
+                invalidateAccessibilityRootIfExploring()
+                if (sequence.isNotEmpty()) listener?.onEmojiPanelPick(sequence)
+            }
+            target == EmojiPanelState.POPUP_DISMISS_TARGET -> {
+                if (!popupOpenedThisGesture) {
+                    state.closePopup()
+                    invalidateAccessibilityRootIfExploring()
+                }
+                popupOpenedThisGesture = false
+                invalidate()
+            }
             EmojiPanelState.isCell(target) -> listener?.onEmojiPanelPick(state.entryAt(target))
             EmojiPanelState.isBack(target) -> listener?.onEmojiPanelBackToKeyboard()
             EmojiPanelState.isSearch(target) -> listener?.onEmojiPanelSearch()
@@ -722,6 +872,39 @@ class EmojiPanelView @JvmOverloads constructor(
         if (deleteRepeat.cancel()) {
             removeCallbacks(deleteRepeatRunnable)
         }
+    }
+
+    /** Arms the skin-tone long press, but only over a cell whose emoji actually has tones. */
+    private fun maybeArmLongPress(target: Int) {
+        cancelSkinTonePopupTimer()
+        if (skinTones.isEmpty || !EmojiPanelState.isCell(target) || state.isPopupOpen()) {
+            return
+        }
+        if (!skinTones.hasTones(state.entryAt(target))) {
+            return
+        }
+        postDelayed(longPressRunnable, longPressTimeoutMs)
+    }
+
+    private fun cancelSkinTonePopupTimer() {
+        removeCallbacks(longPressRunnable)
+    }
+
+    /**
+     * Animates a sideways flick into a jump to the neighbouring section. The same single [scroller]
+     * that carries a fling carries this, so there is still no second animator and no allocation.
+     */
+    private fun maybeJumpSection(direction: Int) {
+        if (direction == 0) return
+        val sections = state.sectionCount()
+        if (sections <= 0) return
+        val target = (state.activeCategory() + direction).coerceIn(0, sections - 1)
+        val from = state.scrollY()
+        val to = state.sectionTop(target).coerceIn(0, state.maxScrollY())
+        if (to == from) return
+        scroller.forceFinished(true)
+        scroller.startScroll(0, from, 0, to - from, SECTION_JUMP_MS)
+        postInvalidateOnAnimation()
     }
 
     /** Obtains the per-gesture [VelocityTracker] at most once; DOWN calls this, UP/CANCEL recycle. */
@@ -796,6 +979,15 @@ class EmojiPanelView @JvmOverloads constructor(
      * tab scrolls to its section. Returns true when it did something.
      */
     private fun activateForAccessibility(target: Int): Boolean = when {
+        EmojiPanelState.isPopupVariant(target) -> {
+            val variant = EmojiPanelState.popupVariantIndexOf(target)
+            val sequence = popupVariants.getOrElse(variant) { popupBase }
+            state.closePopup()
+            invalidate()
+            invalidateAccessibilityRootIfExploring()
+            if (sequence.isNotEmpty()) listener?.onEmojiPanelPick(sequence)
+            true
+        }
         EmojiPanelState.isCell(target) -> {
             listener?.onEmojiPanelPick(state.entryAt(target))
             true

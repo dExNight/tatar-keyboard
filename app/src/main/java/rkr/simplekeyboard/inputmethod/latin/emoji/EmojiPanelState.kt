@@ -70,14 +70,27 @@ internal class EmojiPanelState {
 
     private var scrollY = 0
 
+    /** Minimum horizontal travel that turns a sideways drag into a jump between sections. */
+    private var swipeMinPx = 0
+
     // Gesture bookkeeping.
     private var downTarget = NO_TARGET
     private var pressedTarget = NO_TARGET
     private var activePointerId = INVALID_POINTER_ID
     private var downInGrid = false
     private var scrolling = false
+    private var swiping = false
+    private var downX = 0f
     private var downY = 0f
     private var lastMoveY = 0f
+
+    /** Set by [onUp] and drained by the view: -1 previous section, +1 next, 0 nothing. */
+    private var pendingSwipe = 0
+
+    // The long-press popup of skin-tone variants; NO_TARGET in [popupCell] means "closed".
+    private var popupCell = NO_TARGET
+    private var popupVariants = 0
+    private var popupVariant = NO_TARGET
 
     // --- Configuration ------------------------------------------------------------------------
 
@@ -117,6 +130,15 @@ internal class EmojiPanelState {
         this.floatingInsetPx = floatingInsetPx.coerceAtLeast(0)
         this.backWidthPx = backWidthPx.coerceAtLeast(0)
         rebuildLayout()
+    }
+
+    /**
+     * Sets how far a sideways drag must travel before it counts as a jump between sections. The
+     * view measures it from the platform touch slop; keeping it a parameter is what lets the rule
+     * be exercised on the JVM.
+     */
+    fun setSwipeMinDistance(px: Int) {
+        swipeMinPx = px.coerceAtLeast(0)
     }
 
     fun setViewport(width: Int, height: Int) {
@@ -353,6 +375,72 @@ internal class EmojiPanelState {
 
     fun deleteRight(): Int = (panelWidth - floatingInsetPx).coerceAtLeast(0)
 
+    // --- Skin-tone popup ------------------------------------------------------------------------
+
+    /**
+     * Opens the variant popup over cell [cell] with [variants] entries. The popup is a row of
+     * cell-sized slots centred on its anchor, pushed inside the panel horizontally and drawn above
+     * the anchor row — or below it when the anchor is too close to the top.
+     */
+    fun openPopup(cell: Int, variants: Int): Boolean {
+        if (cell < 0 || cell >= entryCount() || variants <= 0) return false
+        popupCell = cell
+        popupVariants = variants
+        popupVariant = NO_TARGET
+        return true
+    }
+
+    fun closePopup(): Boolean {
+        if (popupCell == NO_TARGET) return false
+        popupCell = NO_TARGET
+        popupVariants = 0
+        popupVariant = NO_TARGET
+        return true
+    }
+
+    fun isPopupOpen(): Boolean = popupCell != NO_TARGET
+
+    fun popupCell(): Int = popupCell
+
+    fun popupVariantCount(): Int = popupVariants
+
+    /** The variant the finger is currently over, or [NO_TARGET]. */
+    fun popupVariant(): Int = popupVariant
+
+    fun popupWidth(): Int = popupVariants * cellWidth()
+
+    fun popupHeight(): Int = cellHeight()
+
+    fun popupLeft(): Int {
+        if (!isPopupOpen()) return 0
+        val columns = this.columns.coerceAtLeast(1)
+        val section = sectionOfIndex(popupCell)
+        val column = (popupCell - sectionStart[section]) % columns
+        val centre = (columnLeft(column) + columnRight(column)) / 2
+        val width = popupWidth()
+        return (centre - width / 2).coerceIn(0, (panelWidth - width).coerceAtLeast(0))
+    }
+
+    fun popupRight(): Int = popupLeft() + popupWidth()
+
+    /** Top of the popup in view coordinates; above the anchor row, or below it when it would clip. */
+    fun popupTop(): Int {
+        if (!isPopupOpen()) return 0
+        val columns = this.columns.coerceAtLeast(1)
+        val section = sectionOfIndex(popupCell)
+        val row = (popupCell - sectionStart[section]) / columns
+        val height = cellHeight()
+        val anchorTop = gridTop() + sectionGridTop(section) + row * height - scrollY
+        val above = anchorTop - height
+        return if (above >= gridTop()) above else anchorTop + height
+    }
+
+    fun popupBottom(): Int = popupTop() + popupHeight()
+
+    fun popupVariantLeft(variant: Int): Int = popupLeft() + variant * cellWidth()
+
+    fun popupVariantRight(variant: Int): Int = popupLeft() + (variant + 1) * cellWidth()
+
     /** The slot a target paints in, kept for the pressed highlight of a tab. */
     fun slotOfTarget(target: Int): Int = if (isTab(target)) tabIndexOf(target) else NO_TARGET
 
@@ -379,6 +467,17 @@ internal class EmojiPanelState {
      */
     fun targetAt(x: Float, y: Float): Int {
         if (x < 0f || x >= panelWidth || y < 0f || y >= panelHeight) return NO_TARGET
+        if (isPopupOpen()) {
+            // While the popup is up it owns the whole surface: it is drawn over everything, and a
+            // touch outside it dismisses rather than reaching the grid underneath.
+            if (y >= popupTop() && y < popupBottom() && x >= popupLeft() && x < popupRight()) {
+                val cellWidth = cellWidth()
+                if (cellWidth <= 0) return NO_TARGET
+                val variant = ((x - popupLeft()) / cellWidth).toInt()
+                if (variant in 0 until popupVariants) return POPUP_TARGET_BASE - variant
+            }
+            return NO_TARGET
+        }
         if (floatingPx > 0) {
             val top = floatingTop()
             val bottom = floatingBottom()
@@ -422,10 +521,13 @@ internal class EmojiPanelState {
         downTarget = target
         pressedTarget = target
         activePointerId = pointerId
-        downInGrid = isInGrid(x, y)
+        downInGrid = isInGrid(x, y) && !isPopupOpen()
+        downX = x
         downY = y
         lastMoveY = y
         scrolling = false
+        swiping = false
+        if (isPopupOpen()) popupVariant = if (isPopupVariant(target)) popupVariantIndexOf(target) else NO_TARGET
         return target
     }
 
@@ -433,12 +535,35 @@ internal class EmojiPanelState {
     fun onMove(pointerId: Int, x: Float, y: Float, touchSlop: Int): Boolean {
         if (pointerId != activePointerId || activePointerId == INVALID_POINTER_ID) return false
         var changed = false
-        if (!scrolling && downInGrid && abs(y - downY) > touchSlop) {
-            scrolling = true
-            if (pressedTarget != NO_TARGET) {
+        if (isPopupOpen()) {
+            // The finger slides along the open popup and the highlighted variant follows it.
+            val here = targetAt(x, y)
+            val variant = if (isPopupVariant(here)) popupVariantIndexOf(here) else NO_TARGET
+            if (variant != popupVariant) {
+                popupVariant = variant
+                changed = true
+            }
+            return changed
+        }
+        // The axis is decided once, by whichever direction clears the slop first: a vertical drag
+        // scrolls the content, a horizontal one jumps between sections. Deciding once is what keeps
+        // a slightly slanted scroll from turning into a section jump halfway through.
+        if (!scrolling && !swiping && downInGrid) {
+            val dx = abs(x - downX)
+            val dy = abs(y - downY)
+            if (dy > touchSlop && dy >= dx) {
+                scrolling = true
+            } else if (dx > touchSlop && dx > dy) {
+                swiping = true
+            }
+            if ((scrolling || swiping) && pressedTarget != NO_TARGET) {
                 pressedTarget = NO_TARGET
                 changed = true
             }
+        }
+        if (swiping) {
+            lastMoveY = y
+            return changed
         }
         if (scrolling) {
             val delta = (lastMoveY - y).toInt()
@@ -462,13 +587,34 @@ internal class EmojiPanelState {
             cancelGesture()
             return NO_TARGET
         }
+        if (isPopupOpen()) {
+            // A release on a variant picks it; a release anywhere else dismisses the popup. The
+            // caller closes the popup either way.
+            val here = targetAt(x, y)
+            cancelGesture()
+            return if (isPopupVariant(here)) here else POPUP_DISMISS_TARGET
+        }
         val result = when {
+            swiping -> {
+                val travel = x - downX
+                if (abs(travel) >= swipeMinPx && swipeMinPx > 0) {
+                    pendingSwipe = if (travel < 0f) 1 else -1
+                }
+                NO_TARGET
+            }
             scrolling -> NO_TARGET
             targetAt(x, y) == downTarget -> downTarget
             else -> NO_TARGET
         }
         cancelGesture()
         return result
+    }
+
+    /** Drains the swipe left by the last [onUp]: -1 previous section, +1 next, 0 nothing. */
+    fun consumeSwipe(): Int {
+        val swipe = pendingSwipe
+        pendingSwipe = 0
+        return swipe
     }
 
     /** Ends the gesture only when Android reports the active pointer went up. */
@@ -479,12 +625,14 @@ internal class EmojiPanelState {
         val changed = downTarget != NO_TARGET ||
             pressedTarget != NO_TARGET ||
             activePointerId != INVALID_POINTER_ID ||
-            scrolling
+            scrolling ||
+            swiping
         downTarget = NO_TARGET
         pressedTarget = NO_TARGET
         activePointerId = INVALID_POINTER_ID
         downInGrid = false
         scrolling = false
+        swiping = false
         return changed
     }
 
@@ -495,6 +643,8 @@ internal class EmojiPanelState {
     fun activePointerId(): Int = activePointerId
 
     fun isScrolling(): Boolean = scrolling
+
+    fun isSwiping(): Boolean = swiping
 
     /**
      * Recomputes the two section-offset arrays. Called only from the four setters that can change
@@ -547,6 +697,14 @@ internal class EmojiPanelState {
         const val DELETE_TARGET = -3
         const val SEARCH_TARGET = -4
 
+        /** Returned by [onUp] when a release dismissed the popup without picking a variant. */
+        const val POPUP_DISMISS_TARGET = -5
+
+        // Popup variants occupy a short block well above the tab block, so the two never collide:
+        // variant k is POPUP_TARGET_BASE - k, and there are at most VARIANT_COUNT of them.
+        const val POPUP_TARGET_BASE = -50
+        private const val POPUP_TARGET_SPAN = 16
+
         // Tabs occupy the block at and below this value: tab k is encoded as TAB_TARGET_BASE - k.
         const val TAB_TARGET_BASE = -100
 
@@ -558,6 +716,9 @@ internal class EmojiPanelState {
         fun isSearch(target: Int): Boolean = target == SEARCH_TARGET
         fun isTab(target: Int): Boolean = target <= TAB_TARGET_BASE
         fun tabIndexOf(target: Int): Int = TAB_TARGET_BASE - target
+        fun isPopupVariant(target: Int): Boolean =
+            target <= POPUP_TARGET_BASE && target > POPUP_TARGET_BASE - POPUP_TARGET_SPAN
+        fun popupVariantIndexOf(target: Int): Int = POPUP_TARGET_BASE - target
     }
 }
 

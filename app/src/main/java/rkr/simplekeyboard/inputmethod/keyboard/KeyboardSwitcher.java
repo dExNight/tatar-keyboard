@@ -39,6 +39,7 @@ import rkr.simplekeyboard.inputmethod.latin.common.Constants;
 import rkr.simplekeyboard.inputmethod.latin.emoji.EmojiPanelView;
 import rkr.simplekeyboard.inputmethod.latin.emoji.EmojiSearchIndex;
 import rkr.simplekeyboard.inputmethod.latin.emoji.EmojiSearchView;
+import rkr.simplekeyboard.inputmethod.latin.emoji.EmojiSkinTones;
 import rkr.simplekeyboard.inputmethod.latin.emoji.EmojiSetSnapshot;
 import rkr.simplekeyboard.inputmethod.latin.settings.Settings;
 import rkr.simplekeyboard.inputmethod.latin.settings.SettingsValues;
@@ -55,6 +56,9 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions,
     private InputView mCurrentInputView;
     private boolean mEmojiPanelShown;
     private boolean mEmojiSearchShown;
+
+    /** Held so a panel created after the table arrived (or recreated later) still gets it. */
+    private EmojiSkinTones mEmojiSkinTones;
     private LatinIME mLatinIME;
     private RichInputMethodManager mRichImm;
 
@@ -403,8 +407,26 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions,
             return;
         }
         panel.setListener(this);
+        if (mEmojiSkinTones != null) {
+            panel.setSkinTones(mEmojiSkinTones);
+        }
         mEmojiPanelShown = true;
         mKeyboardView.setVisibility(View.GONE);
+    }
+
+    /**
+     * Binds the skin-tone table to the panel. Kept here rather than passed through
+     * {@link #showEmojiPanel}: the table is read once per process and outlives every show.
+     */
+    public void bindEmojiSkinTones(final EmojiSkinTones tones) {
+        mEmojiSkinTones = tones;
+        if (mCurrentInputView == null) {
+            return;
+        }
+        final EmojiPanelView panel = mCurrentInputView.getEmojiPanelView();
+        if (panel != null) {
+            panel.setSkinTones(tones);
+        }
     }
 
     public boolean isEmojiSearchShown() {

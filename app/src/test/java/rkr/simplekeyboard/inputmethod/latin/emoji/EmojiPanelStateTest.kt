@@ -68,6 +68,8 @@ class EmojiPanelStateTest {
         return EmojiSet.parse(text)
     }
 
+    private val swipeMinPx = 32
+
     private fun configuredState(
         snapshot: EmojiSetSnapshot,
         width: Int = 8 * 40,
@@ -76,6 +78,7 @@ class EmojiPanelStateTest {
         val state = EmojiPanelState()
         state.setColumns(8)
         state.applyMetrics()
+        state.setSwipeMinDistance(swipeMinPx)
         state.setViewport(width, height)
         state.setSnapshot(snapshot)
         return state
@@ -469,6 +472,185 @@ class EmojiPanelStateTest {
         }
         assertTrue(EmojiPanelState.isSearch(EmojiPanelState.SEARCH_TARGET))
         assertFalse(EmojiPanelState.isSearch(EmojiPanelState.BACK_TARGET))
+    }
+
+    // --- Sideways swipe between sections -------------------------------------------------------
+
+    /**
+     * The axis is decided once, by whichever direction clears the slop first. Deciding once is what
+     * stops a slightly slanted scroll from turning into a section jump halfway down the drag.
+     */
+    @Test
+    fun aSidewaysDragJumpsASectionAndAVerticalOneScrolls() {
+        val state = configuredState(multiCategorySnapshot(80, 80, 80))
+        val startY = (gridTopPx + headerPx + 20).toFloat()
+
+        // Horizontal first: the axis locks sideways and the content does not scroll.
+        state.onDown(1, 200f, startY)
+        state.onMove(1, 240f, startY + 4f, 8)
+        assertTrue(state.isSwiping())
+        assertFalse(state.isScrolling())
+        assertEquals(0, state.scrollY())
+        state.onMove(1, 300f, startY + 6f, 8)
+        assertEquals(0, state.scrollY())
+        assertEquals(EmojiPanelState.NO_TARGET, state.onUp(1, 300f, startY + 6f))
+        assertEquals(-1, state.consumeSwipe())
+        // Drained exactly once.
+        assertEquals(0, state.consumeSwipe())
+
+        // Vertical first: the axis locks down and the content scrolls as before.
+        state.onDown(1, 200f, startY + 100f)
+        state.onMove(1, 204f, startY + 40f, 8)
+        assertTrue(state.isScrolling())
+        assertFalse(state.isSwiping())
+        assertTrue(state.scrollY() > 0)
+        state.onUp(1, 204f, startY + 40f)
+        assertEquals(0, state.consumeSwipe())
+    }
+
+    @Test
+    fun aSwipeLeftAsksForTheNextSectionAndRightForThePrevious() {
+        val state = configuredState(multiCategorySnapshot(80, 80, 80))
+        val y = (gridTopPx + headerPx + 20).toFloat()
+
+        state.onDown(1, 300f, y)
+        state.onMove(1, 260f, y, 8)
+        state.onUp(1, 300f - swipeMinPx, y)
+        assertEquals("left swipe -> next section", 1, state.consumeSwipe())
+
+        state.onDown(1, 100f, y)
+        state.onMove(1, 140f, y, 8)
+        state.onUp(1, 100f + swipeMinPx, y)
+        assertEquals("right swipe -> previous section", -1, state.consumeSwipe())
+    }
+
+    /** A sideways drag that never travels far enough is not a swipe: it must change nothing. */
+    @Test
+    fun aShortSidewaysDragIsNotASwipe() {
+        val state = configuredState(multiCategorySnapshot(80, 80, 80))
+        val y = (gridTopPx + headerPx + 20).toFloat()
+        state.onDown(1, 300f, y)
+        state.onMove(1, 315f, y, 8)
+        state.onUp(1, 315f, y)
+        assertEquals(0, state.consumeSwipe())
+        assertEquals(0, state.scrollY())
+    }
+
+    /** A drag that became a swipe must never also activate the cell it started on. */
+    @Test
+    fun aSwipeNeverActivatesTheCellItStartedOn() {
+        val state = configuredState(multiCategorySnapshot(80, 80, 80))
+        val y = (gridTopPx + headerPx + 20).toFloat()
+        assertTrue(EmojiPanelState.isCell(state.onDown(1, 300f, y)))
+        state.onMove(1, 200f, y, 8)
+        assertEquals(EmojiPanelState.NO_TARGET, state.pressedTarget())
+        assertEquals(EmojiPanelState.NO_TARGET, state.onUp(1, 200f, y))
+    }
+
+    // --- Skin-tone popup -----------------------------------------------------------------------
+
+    @Test
+    fun thePopupOpensOverItsAnchorAndStaysInsideThePanel() {
+        val width = 8 * 40
+        val state = configuredState(multiCategorySnapshot(64), width)
+        val variants = 6
+
+        // A cell in the middle: the popup is centred on it and sits above its row.
+        assertTrue(state.openPopup(11, variants))
+        assertTrue(state.isPopupOpen())
+        assertEquals(11, state.popupCell())
+        assertEquals(variants, state.popupVariantCount())
+        assertEquals(variants * state.cellWidth(), state.popupWidth())
+        assertEquals(state.cellHeight(), state.popupHeight())
+        assertTrue("popup runs off the left", state.popupLeft() >= 0)
+        assertTrue("popup runs off the right", state.popupRight() <= width)
+
+        // The first row has nothing above it, so the popup drops below the anchor instead.
+        state.closePopup()
+        state.openPopup(0, variants)
+        val anchorTop = gridTopPx + headerPx
+        assertEquals(anchorTop + state.cellHeight(), state.popupTop())
+
+        // A row further down has room above and the popup goes there.
+        state.closePopup()
+        state.openPopup(8 * 3, variants)
+        assertEquals(anchorTop + 2 * state.cellHeight(), state.popupTop())
+    }
+
+    @Test
+    fun theOpenPopupOwnsTheWholeSurface() {
+        val state = configuredState(multiCategorySnapshot(64))
+        state.openPopup(11, 6)
+
+        // A touch inside the card resolves to a variant.
+        val y = (state.popupTop() + 1).toFloat()
+        for (variant in 0 until 6) {
+            val x = (state.popupVariantLeft(variant) + 1).toFloat()
+            val target = state.targetAt(x, y)
+            assertTrue("variant $variant", EmojiPanelState.isPopupVariant(target))
+            assertEquals(variant, EmojiPanelState.popupVariantIndexOf(target))
+        }
+        // Everything else is inert while it is up: no cells, no tabs, no search, no floating keys.
+        assertEquals(EmojiPanelState.NO_TARGET, state.targetAt(1f, 1f))
+        assertEquals(EmojiPanelState.NO_TARGET, state.targetAt(1f, (tabBarPx + 1).toFloat()))
+        assertEquals(
+            EmojiPanelState.NO_TARGET,
+            state.targetAt(1f, (400 - floatingInsetPx - 1).toFloat()),
+        )
+    }
+
+    @Test
+    fun aReleaseOnAVariantPicksItAndAReleaseElsewhereDismisses() {
+        val state = configuredState(multiCategorySnapshot(64))
+        state.openPopup(11, 6)
+        val y = (state.popupTop() + 1).toFloat()
+        val x = (state.popupVariantLeft(2) + 1).toFloat()
+
+        state.onDown(1, x, y)
+        val picked = state.onUp(1, x, y)
+        assertTrue(EmojiPanelState.isPopupVariant(picked))
+        assertEquals(2, EmojiPanelState.popupVariantIndexOf(picked))
+
+        state.onDown(1, x, y)
+        assertEquals(EmojiPanelState.POPUP_DISMISS_TARGET, state.onUp(1, 1f, 1f))
+    }
+
+    /** Sliding along the open popup moves the highlight without picking anything. */
+    @Test
+    fun theHighlightFollowsTheFingerAlongThePopup() {
+        val state = configuredState(multiCategorySnapshot(64))
+        state.openPopup(11, 6)
+        val y = (state.popupTop() + 1).toFloat()
+        state.onDown(1, (state.popupVariantLeft(0) + 1).toFloat(), y)
+        assertEquals(0, state.popupVariant())
+        assertTrue(state.onMove(1, (state.popupVariantLeft(3) + 1).toFloat(), y, 8))
+        assertEquals(3, state.popupVariant())
+        // Off the card: nothing highlighted, and the content still has not scrolled.
+        assertTrue(state.onMove(1, 1f, 1f, 8))
+        assertEquals(EmojiPanelState.NO_TARGET, state.popupVariant())
+        assertEquals(0, state.scrollY())
+    }
+
+    /** Popup variants, tabs and the fixed targets live in blocks that can never collide. */
+    @Test
+    fun popupVariantTargetsNeverCollideWithTabsOrTheFixedTargets() {
+        for (variant in 0 until EmojiSkinTones.VARIANT_COUNT) {
+            val target = EmojiPanelState.POPUP_TARGET_BASE - variant
+            assertTrue(EmojiPanelState.isPopupVariant(target))
+            assertEquals(variant, EmojiPanelState.popupVariantIndexOf(target))
+            assertFalse("variant $variant reads as a tab", EmojiPanelState.isTab(target))
+            assertFalse(EmojiPanelState.isCell(target))
+            assertFalse(EmojiPanelState.isBack(target))
+            assertFalse(EmojiPanelState.isDelete(target))
+            assertFalse(EmojiPanelState.isSearch(target))
+        }
+        for (tab in 0 until 32) {
+            val target = EmojiPanelState.TAB_TARGET_BASE - tab
+            assertTrue(EmojiPanelState.isTab(target))
+            assertFalse("tab $tab reads as a popup variant", EmojiPanelState.isPopupVariant(target))
+        }
+        assertFalse(EmojiPanelState.isPopupVariant(EmojiPanelState.POPUP_DISMISS_TARGET))
+        assertFalse(EmojiPanelState.isTab(EmojiPanelState.POPUP_DISMISS_TARGET))
     }
 
     @Test

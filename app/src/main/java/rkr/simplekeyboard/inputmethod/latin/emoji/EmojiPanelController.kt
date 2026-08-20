@@ -42,6 +42,12 @@ interface EmojiSurface {
      * not implement it.
      */
     fun showEmojiSearch(index: EmojiSearchIndex) {}
+
+    /**
+     * The skin-tone table finished loading. Bind it to the panel so a long press on a tone-capable
+     * cell offers the five tones. Defaulted so existing fakes need not implement it.
+     */
+    fun bindSkinTones(tones: EmojiSkinTones) {}
 }
 
 /**
@@ -60,6 +66,14 @@ fun interface EmojiUiPoster {
  */
 fun interface EmojiSnapshotSource {
     fun build(): EmojiSetSnapshot
+}
+
+/**
+ * Reads and parses the skin-tone table off the UI thread. Production reads
+ * `assets/emoji/emoji_skin_v1.txt`; JVM tests inject a fake.
+ */
+fun interface EmojiSkinToneSource {
+    fun load(): EmojiSkinTones
 }
 
 /**
@@ -101,6 +115,7 @@ class EmojiPanelController internal constructor(
     private val snapshotSourceFactory: () -> EmojiSnapshotSource?,
     private val recentStoreFactory: () -> RecentEmojiStore? = { null },
     private val searchIndexSourceFactory: () -> EmojiSearchIndexSource? = { null },
+    private val skinToneSourceFactory: () -> EmojiSkinToneSource? = { null },
 ) {
     /** Production entry point. */
     constructor(
@@ -127,6 +142,7 @@ class EmojiPanelController internal constructor(
             )
         },
         { AssetSearchIndexSource(context.applicationContext) },
+        { AssetSkinToneSource(context.applicationContext) },
     ) {
         setLive(this)
     }
@@ -160,6 +176,12 @@ class EmojiPanelController internal constructor(
     private var searchIndex: EmojiSearchIndex? = null
 
     private var searchLoading = false
+
+    /**
+     * The skin-tone table, read on the same one-shot background preparation as the snapshot. It is
+     * 1.5 KB, so it costs nothing to read alongside; it is never re-read.
+     */
+    private var skinTones: EmojiSkinTones = EmojiSkinTones.EMPTY
 
     /** The single latest-only deferred "show the search". Never more than one outstanding. */
     private var pendingSearch = false
@@ -345,6 +367,11 @@ class EmojiPanelController internal constructor(
             finishUnavailable()
             return
         }
+        val skinSource = try {
+            skinToneSourceFactory()
+        } catch (_: Throwable) {
+            null
+        }
         try {
             backgroundExecutor.execute {
                 val built = try {
@@ -352,21 +379,36 @@ class EmojiPanelController internal constructor(
                 } catch (_: Throwable) {
                     EmojiSetSnapshot.EMPTY
                 }
-                uiPoster.post { onPrepared(built) }
+                // The tone table rides along on the same background pass; a failure to read it only
+                // costs the long-press variants, never the panel.
+                val tones = try {
+                    skinSource?.load() ?: EmojiSkinTones.EMPTY
+                } catch (_: Throwable) {
+                    EmojiSkinTones.EMPTY
+                }
+                uiPoster.post { onPrepared(built, tones) }
             }
         } catch (_: Throwable) {
             finishUnavailable()
         }
     }
 
-    private fun onPrepared(built: EmojiSetSnapshot) {
+    private fun onPrepared(built: EmojiSetSnapshot, tones: EmojiSkinTones) {
         if (destroyed) return
         if (built.isEmpty) {
             finishUnavailable()
             return
         }
         snapshot = built
-        availableSequences = EmojiDisplaySnapshots.availableSequences(built)
+        skinTones = tones
+        // The recents may hold a toned pick, so the set they are checked against has to know the
+        // toned forms too — otherwise a skin-toned emoji would be silently dropped from "recent".
+        availableSequences = if (tones.isEmpty) {
+            EmojiDisplaySnapshots.availableSequences(built)
+        } else {
+            EmojiDisplaySnapshots.availableSequences(built) + tones.allTonedSequences()
+        }
+        if (!tones.isEmpty) surface.bindSkinTones(tones)
         preparation = EmojiPanelPreparation.READY
         if (pendingShow) {
             pendingShow = false
@@ -518,6 +560,23 @@ private class AssetSnapshotSource(private val context: Context) : EmojiSnapshotS
  * opens the search — never on the cold-start path. The result is returned to the caller and never
  * written to any persistent store.
  */
+/**
+ * Production [EmojiSkinToneSource]: reads and parses the packed skin-tone asset on the controller's
+ * background executor, as part of the one-shot preparation. Never touched on the cold-start path.
+ */
+private class AssetSkinToneSource(private val context: Context) : EmojiSkinToneSource {
+    override fun load(): EmojiSkinTones =
+        try {
+            context.assets.open(ASSET_PATH).use { input -> EmojiSkinTones.parse(input) }
+        } catch (_: Throwable) {
+            EmojiSkinTones.EMPTY
+        }
+
+    private companion object {
+        const val ASSET_PATH = "emoji/emoji_skin_v1.txt"
+    }
+}
+
 private class AssetSearchIndexSource(private val context: Context) : EmojiSearchIndexSource {
     override fun load(): EmojiSearchIndex =
         try {

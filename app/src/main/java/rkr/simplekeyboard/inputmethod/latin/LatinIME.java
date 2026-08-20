@@ -79,6 +79,7 @@ import rkr.simplekeyboard.inputmethod.latin.dictionary.personalstore.PersonalLea
 import rkr.simplekeyboard.inputmethod.latin.emoji.EmojiPanelController;
 import rkr.simplekeyboard.inputmethod.latin.emoji.EmojiSearchIndex;
 import rkr.simplekeyboard.inputmethod.latin.emoji.EmojiSearchQuery;
+import rkr.simplekeyboard.inputmethod.latin.emoji.EmojiSkinTones;
 import rkr.simplekeyboard.inputmethod.latin.emoji.EmojiSetSnapshot;
 import rkr.simplekeyboard.inputmethod.latin.emoji.EmojiSurface;
 import rkr.simplekeyboard.inputmethod.latin.emoji.RecentEmojiGate;
@@ -560,6 +561,11 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
                     mSuggestionsController.onSelectionChanged();
                 }
                 mKeyboardSwitcher.showEmojiPanel(snapshot);
+            }
+
+            @Override
+            public void bindSkinTones(final EmojiSkinTones tones) {
+                mKeyboardSwitcher.bindEmojiSkinTones(tones);
             }
 
             @Override
