@@ -88,4 +88,47 @@ class EmojiPackagePrivacyTest {
             writers.toSet() == setOf("RecentEmojiStore.kt"),
         )
     }
+
+    /**
+     * The emoji-search query never reaches the editor. The keyboard types "into itself" while the
+     * search is open, so no part of the package may commit text, start a composing region or read
+     * the field, and the query must not be persisted anywhere either.
+     */
+    @Test
+    fun theSearchQueryNeverReachesTheEditorAndIsNeverStored() {
+        // Built from fragments so this test's own list is not a hit when the package is grepped.
+        val editorApis = listOf(
+            "commit" + "Text",
+            "set" + "ComposingText",
+            "finish" + "ComposingText",
+            "getText" + "BeforeCursor",
+            "getText" + "AfterCursor",
+            "get" + "SelectedText",
+            "delete" + "SurroundingText",
+            "Input" + "Connection",
+        )
+        for (forbidden in editorApis) {
+            assertFalse("emoji package touches the editor via $forbidden", source.contains(forbidden))
+        }
+        val query = File(packageDir(), "EmojiSearchQuery.kt").readText()
+        // The query lives in memory for the length of one search and nowhere else.
+        for (forbidden in listOf("File(", "Uri", "Intent", "Bundle", "SharedPreferences")) {
+            assertFalse("the query escapes via $forbidden", query.contains(forbidden))
+        }
+    }
+
+    /** The search index is read from the packed asset and never written back or cached on disk. */
+    @Test
+    fun theSearchIndexIsReadOnlyAndLoadedOffTheStartupPath() {
+        val controller = File(packageDir(), "EmojiPanelController.kt").readText()
+        assertTrue(controller.contains("emoji/emoji_search_v1.txt"))
+        // Loaded on the background executor, from onSearchRequested — never eagerly.
+        val onSearch = controller.substringAfter("fun onSearchRequested()")
+            .substringBefore("private fun onSearchIndexLoaded(")
+        assertTrue(onSearch.contains("backgroundExecutor.execute"))
+        val index = File(packageDir(), "EmojiSearchIndex.kt").readText()
+        for (forbidden in listOf("FileOutputStream", "openFileOutput", "SharedPreferences")) {
+            assertFalse("the index is persisted via $forbidden", index.contains(forbidden))
+        }
+    }
 }

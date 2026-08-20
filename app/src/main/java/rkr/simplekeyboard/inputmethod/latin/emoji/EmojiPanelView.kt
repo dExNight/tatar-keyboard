@@ -107,6 +107,11 @@ class EmojiPanelView @JvmOverloads constructor(
         private const val FLOATING_KEY_DP = 44f
         private const val FLOATING_INSET_DP = 8f
 
+        // A halo of the sheet colour around each floating key, so the key never blurs into the
+        // emoji it is drawn over. The reference gets that separation for free from a dark button on
+        // a dark sheet; a light theme needs it drawn.
+        private const val FLOATING_HALO_DP = 3f
+
         // Insets of the pills inside their bands.
         private const val SEARCH_PILL_INSET_DP = 5f
         private const val TAB_PILL_INSET_DP = 4f
@@ -158,6 +163,9 @@ class EmojiPanelView @JvmOverloads constructor(
     private val activeTabPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val searchPillPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val functionalKeyPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val floatingHaloPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+    }
     private val searchIconPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
         strokeCap = Paint.Cap.ROUND
@@ -301,6 +309,8 @@ class EmojiPanelView @JvmOverloads constructor(
         clockIconPaint.color = labelPaint.color
         clockIconPaint.strokeWidth = dp(CLOCK_ICON_STROKE_DP).toFloat()
         pressedPaint.alpha = PRESSED_ALPHA
+        floatingHaloPaint.color = backgroundPaint.color
+        floatingHaloPaint.strokeWidth = dp(FLOATING_HALO_DP).toFloat()
         applyMetrics()
         state.setColumns(currentColumns())
         importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_YES
@@ -584,6 +594,7 @@ class EmojiPanelView @JvmOverloads constructor(
         val labelBaseline = (top + bottom) / 2f - (labelFontMetrics.ascent + labelFontMetrics.descent) / 2f
 
         keyRect.set(state.backLeft().toFloat(), top, state.backRight().toFloat(), bottom)
+        canvas.drawRoundRect(keyRect, radius, radius, floatingHaloPaint)
         canvas.drawRoundRect(keyRect, radius, radius, functionalKeyPaint)
         if (EmojiPanelState.isBack(pressed)) {
             canvas.drawRoundRect(keyRect, radius, radius, pressedPaint)
@@ -591,6 +602,7 @@ class EmojiPanelView @JvmOverloads constructor(
         canvas.drawText(BACK_LABEL, keyRect.centerX(), labelBaseline, labelPaint)
 
         keyRect.set(state.deleteLeft().toFloat(), top, state.deleteRight().toFloat(), bottom)
+        canvas.drawRoundRect(keyRect, radius, radius, floatingHaloPaint)
         canvas.drawRoundRect(keyRect, radius, radius, functionalKeyPaint)
         if (EmojiPanelState.isDelete(pressed)) {
             canvas.drawRoundRect(keyRect, radius, radius, pressedPaint)

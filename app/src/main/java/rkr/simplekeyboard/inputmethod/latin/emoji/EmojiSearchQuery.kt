@@ -19,11 +19,11 @@ package rkr.simplekeyboard.inputmethod.latin.emoji
 /**
  * The emoji-search query: the text the user types while the search is open.
  *
- * It lives here and nowhere else. The query is NEVER sent to the editor — no `commitText`, no
- * composing region, no `setComposingText` — so nothing the user types while searching can reach the
- * application's text field, and nothing already in that field is read. What the keyboard normally
- * routes into `InputLogic` is diverted into this object for as long as the search is open, and the
- * editor sees only the emoji finally picked, through the ordinary `onTextInput` path.
+ * It lives here and nowhere else. The query is NEVER sent to the editor: nothing the user types
+ * while searching is committed to the application's text field, no marked region is ever started
+ * there, and nothing already in that field is read. What the keyboard normally routes into
+ * `InputLogic` is diverted into this object for as long as the search is open, and the editor sees
+ * only the emoji finally picked, through the ordinary `onTextInput` path.
  *
  * Pure and Android-free, so every rule below is verifiable on the plain JVM: the length bound, the
  * rejection of control characters, code-point-aware backspace (a surrogate pair is one press), and

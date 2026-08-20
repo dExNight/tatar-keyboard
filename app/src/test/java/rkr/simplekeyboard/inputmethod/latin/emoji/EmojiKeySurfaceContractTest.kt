@@ -81,13 +81,17 @@ class EmojiKeySurfaceContractTest {
 
     @Test
     fun visibleInputBoundsUnionsThePanelWithTheSameUnionCall() {
-        // Exactly two union() calls now: the pre-existing strip one and the new panel one.
+        // Exactly three union() calls now: the strip, the emoji panel, and the emoji search bands.
+        // Every surface that can be on screen joins the touchable region, so a touch on it never
+        // falls through to the application behind the keyboard.
         assertEquals(
-            2,
+            3,
             "outBounds\\.union\\(mTemporaryBounds\\)".toRegex().findAll(inputView).count(),
         )
         assertTrue(inputView.contains("mEmojiPanelView"))
         assertTrue(inputView.contains("panel.isShown()"))
+        assertTrue(inputView.contains("mEmojiSearchView"))
+        assertTrue(inputView.contains("search.isShown()"))
     }
 
     // --- The emoji key never edits the editor -------------------------------------------------

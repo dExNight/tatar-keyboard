@@ -1719,8 +1719,8 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
      * Routes one key press into the emoji-search query instead of into the editor, and returns true
      * when it did. This is the single seam that makes the keyboard type "into itself": while the
      * search is open the query grows here and {@link InputLogic} is never called, so no character
-     * the user types while searching can reach the application's text field and no composing region
-     * is ever started. A backspace on an already-empty query means "leave the search".
+     * the user types while searching can reach the application's text field and no marked region is
+     * ever started there. A backspace on an already-empty query means "leave the search".
      *
      * <p>The keyboard's own state machine still sees the event, so shift and the symbols/letters
      * switch behave exactly as they do while typing. Auto-caps is deliberately reported as OFF
