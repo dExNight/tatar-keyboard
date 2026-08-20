@@ -66,3 +66,4 @@ tat_*-sentences.txt
 
 # Сырые отчёты прогонов (числа переносятся в markdown вручную, сам JSON не коммитится)
 docs/*.generated.json
+.smgr/
