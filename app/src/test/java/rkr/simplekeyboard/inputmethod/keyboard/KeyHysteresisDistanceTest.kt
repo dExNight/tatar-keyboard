@@ -162,10 +162,23 @@ class KeyHysteresisDistanceTest {
         assertEquals(8.0, shippedSlidingModifierHysteresisDp(), 0.0)
     }
 
-    /** Tablets keep AOSP's much larger value; this fix is about phones and must not touch it. */
+    /**
+     * One value for every device. `values-sw600dp/config.xml` used to override the hysteresis with
+     * AOSP's 35.0dp -- seven times the phone's, more than half the width of a key on many tablet
+     * layouts, and never measured by this project, which has no tablet AVD and does not count
+     * tablets among its devices. It is gone, so a tablet now gets the 8.0dp that *is* measured.
+     * The test fails if any qualifier declares the dimension again.
+     */
     @Test
-    fun theTabletValueIsUntouched() {
-        assertEquals(35.0, dimenDp("-sw600dp", "config.xml", "config_key_hysteresis_distance"), 0.0)
+    fun theHysteresisIsDeclaredExactlyOnceInTheWholeTree() {
+        val declaring = resValues().parentFile.listFiles()!!
+            .filter { it.isDirectory && it.name.startsWith("values") }
+            .flatMap { dir -> dir.listFiles()!!.filter { it.name.endsWith(".xml") } }
+            .filter { it.readText().contains("\"config_key_hysteresis_distance\"") }
+            .map { "${it.parentFile.name}/${it.name}" }
+            .sorted()
+        assertEquals(listOf("values/config.xml"), declaring)
+        assertEquals(8.0, shippedHysteresisDp(), 0.0)
     }
 
     // ---------------------------------------------------------------- what gets better
