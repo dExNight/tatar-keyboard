@@ -147,6 +147,7 @@ data class DictionaryArtifactSpec(
             expectedRawSha256 =
                 "875bc667d7e9866229df3d462b4adabc95734c433d6f0a2ac9652d224e5086b6",
             expectedEntryCount = 100_000,
+            bigrams = BigramArtifactSpec.RUSSIAN_BIGRAMS_V1,
         )
 
         /**

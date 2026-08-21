@@ -113,6 +113,36 @@ data class BigramArtifactSpec(
                 "fb686476f6252f61f9d26632ccbd228f13aa1bffca7fe9bfff5f24baf9e0b05b",
             expectedHeadCount = 9_996,
         )
+
+        /**
+         * The ru table packed 2026-08-21 by `scripts/bigram_asset_pack.py pack --language rus`
+         * from the same three Leipzig corpora the Russian dictionary is built from, at the same
+         * H = 10 000 / K = 6 the Tatar table uses — `docs/RUSSIAN-BIGRAMS.md` records the matrix
+         * that chose it and every number below.
+         *
+         * 10 000 heads, none dropped: unlike Tatar, every one of the top-10 000 Russian forms
+         * occurs as the head of an in-vocabulary pair in the training corpora.
+         *
+         * Its own family and its own directory, so the Tatar table already inflated on a device
+         * updating from 1.7.0 is neither renamed, re-inflated, nor sharing this language's lease
+         * counter.
+         */
+        @JvmField
+        val RUSSIAN_BIGRAMS_V1 = BigramArtifactSpec(
+            family = "russian_bigrams",
+            generation = 1,
+            fileLanguageTag = "ru",
+            subtypeId = PersonalSubtypes.RUSSIAN,
+            storageDirectoryName = "bigrams-ru",
+            assetPath = "bigrams/russian_bigrams_v1.tatbigr.zlib",
+            expectedCompressedSize = 207_608,
+            expectedCompressedSha256 =
+                "6ccb3ecc75d5c4d27d6f2b6b42a62628c3462ebd00a8e5fecffb9cdc87acb1ef",
+            expectedRawSize = 635_838,
+            expectedRawSha256 =
+                "48f8ec6ab7bd262f847351a43633bde405d85aac82f8030b8b8f1de0a0491954",
+            expectedHeadCount = 10_000,
+        )
     }
 }
 
