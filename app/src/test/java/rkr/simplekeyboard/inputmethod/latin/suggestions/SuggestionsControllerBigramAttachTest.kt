@@ -138,11 +138,11 @@ class SuggestionsControllerBigramAttachTest {
         strip,
         editor,
         UiPoster { it.run() },
-        { engine },
+        { _, _ -> engine },
         { executor },
-        { null },
+        { _, _ -> null },
         true,
-        bigramPreparationFactory,
+        { backgroundExecutor, _ -> bigramPreparationFactory(backgroundExecutor) },
     )
 
     @Test

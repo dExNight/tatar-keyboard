@@ -138,24 +138,24 @@
     <string name="delete_swipe">Delete swipe</string>
     <!-- Description for option to delete more text by swiping on the delete key -->
     <string name="delete_swipe_summary">Swipe the delete key to delete more text</string>
-    <!-- Option to show Tatar word suggestions above the keyboard while typing -->
-    <string name="tatar_suggestions">Tatar word suggestions</string>
-    <!-- Description for the Tatar word suggestions option -->
-    <string name="tatar_suggestions_summary">Show suggested and predicted Tatar words above the keyboard as you type</string>
-    <!-- Title of the one-time dialog offering to turn Tatar word suggestions on -->
-    <string name="tatar_suggestions_offer_title">Turn on Tatar suggestions?</string>
-    <!-- Body of the one-time dialog offering to turn Tatar word suggestions on -->
-    <string name="tatar_suggestions_offer_message">Suggested and predicted Tatar words can appear above the keyboard as you type. The word list stays on your device and no internet connection is used.</string>
-    <!-- Button that turns Tatar word suggestions on -->
+    <!-- Option to show word suggestions above the keyboard while typing -->
+    <string name="tatar_suggestions">Word suggestions</string>
+    <!-- Description for the word suggestions option -->
+    <string name="tatar_suggestions_summary">Show suggested and predicted words above the keyboard as you type, in Tatar and in Russian</string>
+    <!-- Title of the one-time dialog offering to turn word suggestions on -->
+    <string name="tatar_suggestions_offer_title">Turn on word suggestions?</string>
+    <!-- Body of the one-time dialog offering to turn word suggestions on -->
+    <string name="tatar_suggestions_offer_message">Suggested and predicted words can appear above the keyboard as you type, in Tatar and in Russian. The word lists stay on your device and no internet connection is used.</string>
+    <!-- Button that turns word suggestions on -->
     <string name="tatar_suggestions_offer_enable">Turn on</string>
-    <!-- Button that declines the offer to turn Tatar word suggestions on -->
+    <!-- Button that declines the offer to turn word suggestions on -->
     <string name="tatar_suggestions_offer_dismiss">Not now</string>
-    <!-- Message shown once when Tatar word suggestions could not be turned on -->
-    <string name="tatar_suggestions_unavailable">Tatar suggestions could not be turned on right now. You can try again later.</string>
-    <!-- Option to replace a misspelled Tatar word with a dictionary word when a separator is typed -->
-    <string name="tatar_autocorrect">Autocorrect Tatar words</string>
-    <!-- Description for the Tatar autocorrection option. Says plainly that text already typed is changed and how to undo it. -->
-    <string name="tatar_autocorrect_summary">Fix a misspelled Tatar word when you type a space or punctuation. Press backspace right after to get back what you typed.</string>
+    <!-- Message shown once when word suggestions could not be turned on -->
+    <string name="tatar_suggestions_unavailable">Word suggestions could not be turned on right now. You can try again later.</string>
+    <!-- Option to replace a misspelled word with a dictionary word when a separator is typed -->
+    <string name="tatar_autocorrect">Autocorrect words</string>
+    <!-- Description for the autocorrection option. Says plainly that text already typed is changed and how to undo it. -->
+    <string name="tatar_autocorrect_summary">Fix a misspelled word when you type a space or punctuation. Press backspace right after to get back what you typed.</string>
     <!-- Option to remember words the user types and suggest them later -->
     <string name="personal_dictionary">Personal dictionary</string>
     <!-- Description for the personal dictionary option. Says plainly that words are saved on the device and that turning the option off keeps what was already saved. -->

@@ -22,7 +22,17 @@ class AtomicDictionaryStore(
         require(supportedArtifacts.isNotEmpty())
         require(supportedArtifacts.map { it.generation }.distinct().size == supportedArtifacts.size)
         require(supportedArtifacts.map { it.finalFileName }.distinct().size == supportedArtifacts.size)
+        // One store serves exactly one family, in that family's own directory. Retention counts
+        // files by [finalFilePattern] and the process-wide lease map is keyed by directory, so a
+        // store spanning two families would count the other language's file against this one's
+        // retention budget and would refuse to activate it while the other holds a lease.
+        require(supportedArtifacts.map { it.family }.distinct().size == 1)
+        require(supportedArtifacts.map { it.storageDirectoryName }.distinct().size == 1)
     }
+
+    /** The one family this store owns; every name it writes, matches or deletes carries it. */
+    private val temporaryPrefix: String = supportedArtifacts.first().temporaryFilePrefix
+    private val finalFilePattern: Regex = supportedArtifacts.first().finalFilePattern
 
     fun ensurePublished(spec: DictionaryArtifactSpec): PreparationResult {
         if (supportedArtifacts.none { it == spec }) {
@@ -201,7 +211,7 @@ class AtomicDictionaryStore(
 
     private fun cleanupTemps(directory: File) {
         val temporaryFiles = directory.listFiles { file ->
-            file.isFile && file.name.startsWith(TEMP_PREFIX) && file.name.endsWith(TEMP_SUFFIX)
+            file.isFile && file.name.startsWith(temporaryPrefix) && file.name.endsWith(TEMP_SUFFIX)
         } ?: throw IOException("cannot list dictionary directory")
         if (temporaryFiles.isEmpty()) return
         for (file in temporaryFiles) {
@@ -278,7 +288,7 @@ class AtomicDictionaryStore(
 
     private fun managedFinals(directory: File): List<File> =
         directory.listFiles { file ->
-            file.isFile && FINAL_FILE_PATTERN.matches(file.name)
+            file.isFile && finalFilePattern.matches(file.name)
         }?.toList() ?: throw IOException("cannot list dictionary directory")
 
     private fun generationForFile(file: File): Int? = supportedArtifacts
@@ -295,7 +305,7 @@ class AtomicDictionaryStore(
         for (counter in 0 until MAX_TEMP_ATTEMPTS) {
             val file = File(
                 directory,
-                "$TEMP_PREFIX$destinationName.$timestamp.$counter$TEMP_SUFFIX",
+                "$temporaryPrefix$destinationName.$timestamp.$counter$TEMP_SUFFIX",
             )
             if (fileOps.createNewFile(file)) return file
         }
@@ -333,10 +343,7 @@ class AtomicDictionaryStore(
         private const val MAX_TEMP_ATTEMPTS = 100
         private const val MAX_FINAL_ARTIFACTS = 2
         private const val MAX_FINALS_BEFORE_STAGING = 1
-        private const val TEMP_PREFIX = ".tatar_top100k-"
         private const val TEMP_SUFFIX = ".tmp"
-        private val FINAL_FILE_PATTERN =
-            Regex("tatar_top100k-v[0-9]{6}-s[0-9]+-f[0-9]+-[0-9a-f]{64}\\.tdict")
     }
 }
 

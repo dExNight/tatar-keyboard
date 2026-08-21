@@ -13,13 +13,23 @@ import java.util.concurrent.Executor
 
 @Keep
 object AndroidDictionaryStorageFactory {
+    /**
+     * Storage for ONE artifact. [artifact] names both the asset to inflate and the directory to
+     * inflate it into ([DictionaryArtifactSpec.storageDirectoryName]), so a second language gets a
+     * second controller rather than a second code path — and the Tatar one keeps addressing the
+     * very directory and file name it published in 1.6.1.
+     */
     @JvmStatic
-    fun create(context: Context, executor: Executor): DictionaryStorageController {
+    @JvmOverloads
+    fun create(
+        context: Context,
+        executor: Executor,
+        artifact: DictionaryArtifactSpec = DictionaryArtifactSpec.TATAR_TOP100K_V1,
+    ): DictionaryStorageController {
         val deviceProtectedContext = context.createDeviceProtectedStorageContext()
-        val artifact = DictionaryArtifactSpec.TATAR_TOP100K_V1
         val store = AtomicDictionaryStore(
             directoryProvider = DeviceProtectedDirectoryProvider {
-                File(deviceProtectedContext.filesDir, "dictionaries")
+                File(deviceProtectedContext.filesDir, artifact.storageDirectoryName)
             },
             assetInputProvider = AssetInputProvider { spec ->
                 context.assets.open(spec.assetPath, AssetManager.ACCESS_STREAMING)

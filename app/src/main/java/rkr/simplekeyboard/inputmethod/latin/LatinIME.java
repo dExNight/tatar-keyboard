@@ -55,7 +55,7 @@ import java.io.PrintWriter;
 import java.util.Locale;
 import java.util.concurrent.TimeUnit;
 
-import kotlin.jvm.functions.Function1;
+import kotlin.jvm.functions.Function2;
 
 import rkr.simplekeyboard.inputmethod.R;
 import rkr.simplekeyboard.inputmethod.compat.EditorInfoCompatUtils;
@@ -70,6 +70,7 @@ import rkr.simplekeyboard.inputmethod.keyboard.MainKeyboardView;
 import rkr.simplekeyboard.inputmethod.latin.common.Constants;
 import rkr.simplekeyboard.inputmethod.latin.define.DebugFlags;
 import rkr.simplekeyboard.inputmethod.latin.inputlogic.InputLogic;
+import rkr.simplekeyboard.inputmethod.latin.dictionary.storage.DictionaryArtifactSpec;
 import rkr.simplekeyboard.inputmethod.latin.dictionary.storage.PublishedDictionaryCatalog;
 import rkr.simplekeyboard.inputmethod.latin.dictionary.personal.PersonalCandidateSource;
 import rkr.simplekeyboard.inputmethod.latin.dictionary.personal.PersonalSubtypes;
@@ -498,12 +499,16 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         // already owns: no second store and no throwaway executor are built per engine start. It is
         // null until a preparation request has actually created the storage, and a null catalog
         // simply yields no engine — the strip stays GONE and plain typing is untouched.
-        final Function1<ResultCallback, EngineHandle> engineFactory = resultCallback -> {
+        // subtypeId names the language the controller is starting an engine for; every language
+        // has its own catalog and its own personal store, so both are resolved from it and never
+        // from a constant.
+        final Function2<String, ResultCallback, EngineHandle> engineFactory =
+                (subtypeId, resultCallback) -> {
             final SuggestionsController controller = mSuggestionsController;
             if (controller == null) {
                 return null;
             }
-            final PublishedDictionaryCatalog catalog = controller.engineCatalog();
+            final PublishedDictionaryCatalog catalog = controller.engineCatalog(subtypeId);
             if (catalog == null) {
                 return null;
             }
@@ -512,7 +517,7 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
             // keystroke without restarting the engine, its lease or its mapping. Reading is bound to
             // the active subtype: personal words of one language can never surface in another.
             final PersonalCandidateSource personalCandidates =
-                    PersonalDictionaries.sourceFor(this, PersonalSubtypes.TATAR_RU,
+                    PersonalDictionaries.sourceFor(this, subtypeId,
                             () -> Settings.readPersonalDictionaryEnabled(mDevicePrefs));
             return MappedEngineHandle.start(catalog, resultCallback, personalCandidates);
         };
@@ -520,12 +525,15 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         mSuggestionsController = new SuggestionsController(
                 this, stripSurface, editorSurface, mHandler, engineFactory);
         // E4c: clean completions become writes ONLY through this sink, and only when all five
-        // factors hold at the moment of the event. isTatarSuggestionsEligible() already carries
+        // factors hold at the moment of the event. isSuggestionsEligible() already carries
         // three of them — the field allows suggestions, it does not ask us not to personalize, and
         // an absent editorInfo is not eligible at all — so what is added here is the personal
         // dictionary setting, the unlock state and the postal-address exclusion.
+        // The sink resolves the subtype at the moment of the event, not at construction: a word
+        // completed on the Russian layout belongs in the Russian personal store, and the sink is
+        // built once for the service's whole lifetime.
         mSuggestionsController.setCompletionSink(PersonalLearning.sinkFor(
-                this, PersonalSubtypes.TATAR_RU, this::mayLearnPersonalWords));
+                this, this::activeDictionarySubtype, this::mayLearnPersonalWords));
         // D3: read live off the already-rebuilt SettingsValues, which carries the subordination to
         // the suggestions switch, so flipping either setting takes effect on the next separator
         // without restarting the engine or touching its lease.
@@ -628,7 +636,9 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
 
             @Override
             public boolean isTatarSubtypeActive() {
-                return PersonalSubtypes.TATAR_RU.equals(mRichImm.getCurrentSubtype().getLocale());
+                // Any layout with a dictionary: the offer is about the suggestion strip, and the
+                // strip now answers in Russian as well as in Tatar.
+                return activeDictionarySubtype() != null;
             }
 
             @Override
@@ -765,8 +775,11 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         if (!Settings.readPersonalDictionaryEnabled(mDevicePrefs)) {
             return;
         }
-        final String savedForm =
-                PersonalForget.savedFormOf(this, PersonalSubtypes.TATAR_RU, shownWord);
+        final String subtypeId = activeDictionarySubtype();
+        if (subtypeId == null) {
+            return;
+        }
+        final String savedForm = PersonalForget.savedFormOf(this, subtypeId, shownWord);
         if (savedForm == null) {
             // An ordinary dictionary word: a long press on it is a no-op by contract.
             return;
@@ -783,7 +796,7 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
                 DialogUtils.getPlatformDialogThemeContext(this))
                 .setTitle(getString(R.string.personal_dictionary_forget_title, savedForm))
                 .setPositiveButton(R.string.personal_dictionary_delete, (di, which) ->
-                        PersonalForget.confirmForget(this, PersonalSubtypes.TATAR_RU, shownWord))
+                        PersonalForget.confirmForget(this, subtypeId, shownWord))
                 .setNegativeButton(android.R.string.cancel, null)
                 .create();
         dialog.setCancelable(true);
@@ -865,7 +878,7 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         }
         if (enabled) {
             mSuggestionsController.onSuggestionsSettingEnabled(
-                    isTatarSuggestionsEligible(true));
+                    isSuggestionsEligible(true), activeDictionarySubtype());
             updateKeyNeighbors();
         } else {
             mSuggestionsController.onSuggestionsSettingDisabled();
@@ -881,10 +894,23 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
     }
 
     /**
-     * Computes whether opt-in Tatar suggestions may run for the current field and subtype.
+     * The subtype whose dictionary should answer right now, or null when the active layout ships
+     * none.
+     *
+     * This is the ONE place the app decides which language it is suggesting in. It reads the live
+     * subtype and asks {@link DictionaryArtifactSpec#forSubtype} whether a dictionary exists for it,
+     * so adding a third language is adding a spec — never another branch here.
      */
-    private boolean isTatarSuggestionsEligible() {
-        return isTatarSuggestionsEligible(mSettings.getCurrent().mTatarSuggestionsEnabled);
+    private String activeDictionarySubtype() {
+        final String locale = mRichImm.getCurrentSubtype().getLocale();
+        return DictionaryArtifactSpec.forSubtype(locale) == null ? null : locale;
+    }
+
+    /**
+     * Computes whether opt-in word suggestions may run for the current field and subtype.
+     */
+    private boolean isSuggestionsEligible() {
+        return isSuggestionsEligible(mSettings.getCurrent().mTatarSuggestionsEnabled);
     }
 
     /**
@@ -894,10 +920,10 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
      * same SharedPreferences instance, the platform does not order them, so {@link SettingsValues}
      * may still carry the previous value at the moment the change reaches this service.
      */
-    private boolean isTatarSuggestionsEligible(final boolean suggestionsEnabled) {
+    private boolean isSuggestionsEligible(final boolean suggestionsEnabled) {
         final SettingsValues settingsValues = mSettings.getCurrent();
         return suggestionsEnabled
-                && PersonalSubtypes.TATAR_RU.equals(mRichImm.getCurrentSubtype().getLocale())
+                && activeDictionarySubtype() != null
                 && settingsValues.mInputAttributes.mShouldShowSuggestions
                 // IME_FLAG_NO_PERSONALIZED_LEARNING closes eligibility outright: the strip reserves
                 // no band and not a single prefix reaches the engine in such a field, even for a
@@ -920,7 +946,7 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
      * names are precisely what this feature is for.</p>
      */
     private boolean mayLearnPersonalWords() {
-        if (!isTatarSuggestionsEligible()) {
+        if (!isSuggestionsEligible()) {
             return false;
         }
         if (!Settings.readPersonalDictionaryEnabled(mDevicePrefs)) {
@@ -950,12 +976,17 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
             return;
         }
         final Keyboard keyboard = mKeyboardSwitcher.getKeyboard();
+        final String subtypeId = activeDictionarySubtype();
         KeyNeighborTable table = null;
-        if (keyboard != null && keyboard.mId.isAlphabetKeyboard() && isTatarSuggestionsEligible()) {
+        if (keyboard != null && keyboard.mId.isAlphabetKeyboard() && subtypeId != null
+                && isSuggestionsEligible()) {
+            // KeyboardId carries the subtype in its equals/hashCode, so this memo is per layout AND
+            // per language: switching layouts rebuilds the table instead of handing the engine the
+            // neighbours of the layout the user just left.
             if (keyboard.mId.equals(mNeighborTableKeyboardId) && mNeighborTable != null) {
                 table = mNeighborTable;
             } else {
-                table = KeyNeighborTableBuilder.fromKeyboard(keyboard, PersonalSubtypes.TATAR_RU);
+                table = KeyNeighborTableBuilder.fromKeyboard(keyboard, subtypeId);
                 mNeighborTableKeyboardId = keyboard.mId;
                 mNeighborTable = table;
             }
@@ -1088,7 +1119,8 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         mInputLogic.onSubtypeChanged();
         loadKeyboard();
         if (mSuggestionsController != null) {
-            mSuggestionsController.onSubtypeChanged(isTatarSuggestionsEligible());
+            mSuggestionsController.onSubtypeChanged(
+                    isSuggestionsEligible(), activeDictionarySubtype());
             updateKeyNeighbors();
         }
     }
@@ -1189,7 +1221,8 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         }
 
         if (mSuggestionsController != null) {
-            mSuggestionsController.onStartInput(isTatarSuggestionsEligible());
+            mSuggestionsController.onStartInput(
+                    isSuggestionsEligible(), activeDictionarySubtype());
             updateKeyNeighbors();
         }
         if (mEmojiPanelController != null) {

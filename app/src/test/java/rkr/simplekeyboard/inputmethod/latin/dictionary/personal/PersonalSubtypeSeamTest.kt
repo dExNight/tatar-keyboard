@@ -47,11 +47,16 @@ class PersonalSubtypeSeamTest {
             "java/rkr/simplekeyboard/inputmethod/latin/LatinIME.java",
         ).readText()
 
-        // Both former literal sites now read the single constant, and neither keeps a bare literal.
-        assertTrue(controller.contains("SUBTYPE_ID = PersonalSubtypes.TATAR_RU"))
+        // Both former literal sites still read the single constant, and neither keeps a bare
+        // literal. The controller's use of it narrowed when the dictionary became multilingual:
+        // the subtype a lookup is keyed by is now the ACTIVE one, and the constant is only the
+        // language a call that names none means.
+        assertTrue(controller.contains("DEFAULT_LANGUAGE = PersonalSubtypes.TATAR_RU"))
         assertFalse("SuggestionsController still holds a bare \"tt_RU\" literal",
             controller.contains("\"tt_RU\""))
-        assertTrue(latinIme.contains("PersonalSubtypes.TATAR_RU.equals(mRichImm.getCurrentSubtype().getLocale())"))
+        // LatinIME no longer compares against one language at all: it asks which dictionary the
+        // live subtype has, so a third language is a spec and not another branch here.
+        assertTrue(latinIme.contains("DictionaryArtifactSpec.forSubtype(locale)"))
         assertFalse("LatinIME still holds a bare \"tt_RU\" literal", latinIme.contains("\"tt_RU\""))
     }
 

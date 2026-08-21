@@ -22,7 +22,37 @@ from typing import Iterable, Sequence, TextIO
 DEFAULT_CUTOFFS = (100_000, 150_000, 250_000)
 TATAR_ALPHABET = frozenset("аәбвгдеёжҗзийклмнңоөпрстуүфхһцчшщъыьэюя")
 TATAR_SPECIFIC = frozenset("әөүҗңһ")
+RUSSIAN_ALPHABET = frozenset("абвгдеёжзийклмнопрстуфхцчшщъыьэюя")
+RUSSIAN_SPECIFIC = frozenset("ёъ")
 MAX_WORD_LENGTH = 64
+
+
+@dataclass(frozen=True)
+class Language:
+    """One packable language: its tag, its accepted alphabet and its marker letters.
+
+    ``alphabet`` is the ONLY thing that decides which corpus rows survive filtering, and it is
+    the same set the Kotlin validator enforces on the packed asset. ``specific`` is reporting
+    only: the letters whose presence marks a word as characteristic of this language rather
+    than of the shared Cyrillic core (Tatar's six extra letters; Russian's «ё» and «ъ», which no
+    Tatar word carries in the same role).
+    """
+
+    tag: str
+    display: str
+    alphabet: frozenset[str]
+    specific: frozenset[str]
+
+
+TATAR = Language("tat", "Tatar", TATAR_ALPHABET, TATAR_SPECIFIC)
+RUSSIAN = Language("rus", "Russian", RUSSIAN_ALPHABET, RUSSIAN_SPECIFIC)
+LANGUAGES = {language.tag: language for language in (TATAR, RUSSIAN)}
+DEFAULT_LANGUAGE = TATAR
+
+
+def language_for(tag: str) -> Language:
+    """The [Language] registered under [tag]; raises ``KeyError`` for an unknown tag."""
+    return LANGUAGES[tag]
 
 
 class MalformedRowError(ValueError):
@@ -50,15 +80,26 @@ class SourceStats:
         return result
 
 
-def normalize_word(raw_word: str) -> tuple[str | None, str | None]:
-    """Return a normalized Tatar Cyrillic word, or a filtering reason."""
+def normalize_word(
+    raw_word: str, alphabet: frozenset[str] = TATAR_ALPHABET
+) -> tuple[str | None, str | None]:
+    """Return a normalized Cyrillic word of [alphabet], or a filtering reason.
+
+    The default is the Tatar alphabet, so every caller written before the dictionary became
+    multilingual keeps its exact behaviour, byte for byte, including the filtering reason it
+    records.
+    """
     word = unicodedata.normalize("NFC", raw_word.strip()).lower()
     if not word:
         return None, "empty_word"
     if len(word) > MAX_WORD_LENGTH:
         return None, "too_long"
-    if any(character not in TATAR_ALPHABET for character in word):
-        return None, "outside_tatar_alphabet"
+    if any(character not in alphabet for character in word):
+        return None, (
+            "outside_tatar_alphabet"
+            if alphabet is TATAR_ALPHABET
+            else "outside_alphabet"
+        )
     return word, None
 
 
@@ -105,6 +146,7 @@ def read_source(
     frequencies: Counter[str],
     *,
     skip_malformed: bool,
+    alphabet: frozenset[str] = TATAR_ALPHABET,
 ) -> SourceStats:
     stats = SourceStats(path=source)
     for line_number, line in enumerate(stream, start=1):
@@ -120,7 +162,7 @@ def read_source(
             continue
 
         stats.parsed_tokens += frequency
-        word, reason = normalize_word(raw_word)
+        word, reason = normalize_word(raw_word, alphabet)
         if reason is not None:
             stats.rows_filtered += 1
             stats.filtered_reasons[reason] += 1
@@ -154,6 +196,7 @@ def build_report(
     frequencies: Counter[str],
     source_stats: Sequence[SourceStats],
     cutoffs: Sequence[int],
+    language: Language = DEFAULT_LANGUAGE,
 ) -> tuple[dict[str, object], list[tuple[str, int]]]:
     entries = sorted_entries(frequencies)
     accepted_tokens = sum(frequencies.values())
@@ -193,21 +236,23 @@ def build_report(
             }
         )
 
-    tatar_specific_words = sum(
-        1 for word, _ in entries if any(letter in word for letter in TATAR_SPECIFIC)
+    specific_letters = language.specific
+    specific_words = sum(
+        1 for word, _ in entries if any(letter in word for letter in specific_letters)
     )
-    tatar_specific_tokens = sum(
+    specific_tokens = sum(
         frequency
         for word, frequency in entries
-        if any(letter in word for letter in TATAR_SPECIFIC)
+        if any(letter in word for letter in specific_letters)
     )
     total_accepted_rows = sum(stats.rows_accepted for stats in source_stats)
     report: dict[str, object] = {
-        "schema_version": 1,
+        "schema_version": 2,
         "normalization": {
             "unicode": "NFC",
             "case": "Unicode lowercase",
-            "alphabet": "Tatar Cyrillic letters only",
+            "alphabet": f"{language.display} Cyrillic letters only",
+            "language": language.tag,
             "max_word_length": MAX_WORD_LENGTH,
             "tie_break": "descending frequency, then ascending Unicode word order",
         },
@@ -224,10 +269,14 @@ def build_report(
             "unique_words": len(entries),
             "duplicates_merged": total_accepted_rows - len(entries),
             "hapax_words": sum(1 for _, frequency in entries if frequency == 1),
-            "tatar_specific_words": tatar_specific_words,
-            "tatar_specific_tokens": tatar_specific_tokens,
-            "tatar_specific_word_ratio": tatar_specific_words / len(entries) if entries else 0.0,
-            "tatar_specific_token_ratio": tatar_specific_tokens / accepted_tokens if accepted_tokens else 0.0,
+            # Renamed from tatar_specific_* in schema 2: the same counter now serves whichever
+            # language was packed, and calling a Russian «ё» count "tatar_specific" would be a lie
+            # in the one artifact a reader consults to check the data.
+            "language_specific_letters": "".join(sorted(specific_letters)),
+            "language_specific_words": specific_words,
+            "language_specific_tokens": specific_tokens,
+            "language_specific_word_ratio": specific_words / len(entries) if entries else 0.0,
+            "language_specific_token_ratio": specific_tokens / accepted_tokens if accepted_tokens else 0.0,
             "all_words_serialized_tsv_bytes": len(serialized_bytes(entries)),
             "all_words_packed_nul_u32_bytes": packed_nul_u32_size(entries),
             "all_words_packed_nul_u32_plus_offsets_bytes": (
@@ -259,6 +308,12 @@ def create_argument_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("inputs", nargs="+", type=Path, help="Leipzig *-words.txt files")
     parser.add_argument(
+        "--language",
+        choices=sorted(LANGUAGES),
+        default=DEFAULT_LANGUAGE.tag,
+        help="alphabet to filter by (default: tat)",
+    )
+    parser.add_argument(
         "--cutoffs",
         type=parse_cutoffs,
         default=DEFAULT_CUTOFFS,
@@ -284,6 +339,7 @@ def create_argument_parser() -> argparse.ArgumentParser:
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = create_argument_parser().parse_args(argv)
+    language = language_for(args.language)
     frequencies: Counter[str] = Counter()
     sources: list[SourceStats] = []
     try:
@@ -295,11 +351,14 @@ def main(argv: Sequence[str] | None = None) -> int:
                         str(path),
                         frequencies,
                         skip_malformed=args.skip_malformed,
+                        alphabet=language.alphabet,
                     )
                 )
         if not frequencies:
-            raise NoUsableWordsError("inputs contain no usable Tatar words")
-        report, entries = build_report(frequencies, sources, args.cutoffs)
+            raise NoUsableWordsError(
+                f"inputs contain no usable {language.display} words"
+            )
+        report, entries = build_report(frequencies, sources, args.cutoffs, language)
         if args.output_words:
             write_entries(args.output_words, entries)
     except (MalformedRowError, NoUsableWordsError, OSError, UnicodeError) as error:

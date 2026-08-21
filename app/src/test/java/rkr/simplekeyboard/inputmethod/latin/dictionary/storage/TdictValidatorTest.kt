@@ -91,6 +91,9 @@ class TdictValidatorTest {
         val artifact = DictionaryTestFixtures.artifact()
         val oversizedCompressed = ByteArray(128) { it.toByte() }
         val compressedSpec = DictionaryArtifactSpec(
+            family = "tatar_top100k",
+            languageTag = "tt_RU",
+            storageDirectoryName = "dictionaries",
             generation = 30,
             assetPath = "oversized",
             expectedCompressedSize = 64,
@@ -105,6 +108,9 @@ class TdictValidatorTest {
         val largeRaw = ByteArray(artifact.raw.size + 1)
         val compressed = DictionaryTestFixtures.compress(largeRaw)
         val rawSpec = DictionaryArtifactSpec(
+            family = "tatar_top100k",
+            languageTag = "tt_RU",
+            storageDirectoryName = "dictionaries",
             generation = 31,
             assetPath = "raw-oversized",
             expectedCompressedSize = compressed.size.toLong(),

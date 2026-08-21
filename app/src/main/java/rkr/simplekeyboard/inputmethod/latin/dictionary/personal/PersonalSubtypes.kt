@@ -28,13 +28,26 @@ package rkr.simplekeyboard.inputmethod.latin.dictionary.personal
  *
  * The literal `"tt_RU"` used to live twice, in `SuggestionsController.SUBTYPE_ID` and in
  * `LatinIME.isTatarSuggestionsEligible()`, kept in sync by hand. Both now read [TATAR_RU], so the
- * eligibility signal and the storage key can never drift apart. The app is monolingual and stays
- * so, but the format carries a language tag from version 1 anyway, so a later Zamanälif (Latin)
- * subtype never forces a migration of the words the user already saved.
+ * eligibility signal and the storage key can never drift apart.
+ *
+ * That the format carried a language tag from version 1 is what made the second language free:
+ * [RUSSIAN] simply declares its own alphabet and gets its own store, its own file
+ * (`personal-ru-s1-f1.tpers`) and its own snapshot, with no migration and without a single Tatar
+ * word moving. Personal dictionaries are per language on purpose, and there is still no shared
+ * "default" store: a name the user saved while writing Tatar has no business appearing in the band
+ * while they write Russian, and the alphabet filter of each store says so by construction.
  */
 object PersonalSubtypes {
     /** The Tatar Cyrillic subtype identifier ([rkr.simplekeyboard.inputmethod.latin.Subtype.getLocale]). */
     const val TATAR_RU = "tt_RU"
+
+    /**
+     * The Russian subtype identifier — plain `"ru"`, exactly what
+     * `SubtypeLocaleUtils.LOCALE_RUSSIAN` builds the subtype with. NOT `"ru_RU"`: the subtype the
+     * user actually gets carries the bare language tag, and a store keyed by anything else would
+     * simply never be reached.
+     */
+    const val RUSSIAN = "ru"
 
     /**
      * The lowercase Tatar Cyrillic alphabet, identical to the code-point set enforced by
@@ -46,11 +59,23 @@ object PersonalSubtypes {
         "аәбвгдеёжҗзийклмнңоөпрстуүфхһцчшщъыьэюя".codePoints().toArray().toSet()
 
     /**
+     * The lowercase Russian alphabet, all 33 letters, identical to the set
+     * `scripts/dictionary_coverage.py::RUSSIAN_ALPHABET` filters the packed Russian asset by.
+     *
+     * «ё» is a letter of its own here, not folded into «е». Folding would be a decision about the
+     * user's own spelling: someone who reaches for the long press to write «ещё» means «ещё», and
+     * a store that silently kept «еще» would hand that spelling back to them forever.
+     */
+    private val RUSSIAN_ALPHABET: Set<Int> =
+        "абвгдеёжзийклмнопрстуфхцчшщъыьэюя".codePoints().toArray().toSet()
+
+    /**
      * The alphabet for [subtypeId], or null when the subtype declares none. A null alphabet means
      * the personal dictionary is off for that subtype: there is no fallback to another language.
      */
     fun alphabetFor(subtypeId: String): Set<Int>? = when (subtypeId) {
         TATAR_RU -> TATAR_RU_ALPHABET
+        RUSSIAN -> RUSSIAN_ALPHABET
         else -> null
     }
 

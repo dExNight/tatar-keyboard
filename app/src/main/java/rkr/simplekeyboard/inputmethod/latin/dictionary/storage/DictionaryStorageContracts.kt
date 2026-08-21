@@ -1,6 +1,7 @@
 package rkr.simplekeyboard.inputmethod.latin.dictionary.storage
 
 import androidx.annotation.Keep
+import rkr.simplekeyboard.inputmethod.latin.dictionary.personal.PersonalSubtypes
 import java.io.Closeable
 import java.io.File
 import java.io.FileDescriptor
@@ -8,7 +9,28 @@ import java.io.IOException
 import java.io.InputStream
 import java.util.Locale
 
+/**
+ * One shipped dictionary asset.
+ *
+ * [family] and [storageDirectoryName] are what make the artifact multilingual. Both are literals
+ * of the spec rather than values derived from [languageTag], and deliberately so: the Tatar
+ * artifact shipped in 1.6.1 under the name `tatar_top100k-v…` in `<device-protected>/dictionaries`,
+ * and a device that updates to a build with a second language must find that exact file where it
+ * left it. A tidier scheme (one directory, one `<lang>_top100k` name for everyone) would rename a
+ * file the user already has and pay for it with a needless 2.5 MB re-inflation — or, if the
+ * rename were only partial, with a store that cannot find its own dictionary. Backward
+ * compatibility wins; the family is the seam that lets a new language pick its own name without
+ * touching the old one.
+ *
+ * Each family owns its OWN directory. The store's retention, temp-cleanup and lease bookkeeping
+ * are all keyed by the canonical directory path
+ * ([ProcessDictionaryStorageOwner]), so two families sharing one directory would share one lease
+ * counter and the second language could never be activated while the first held a lease.
+ */
 data class DictionaryArtifactSpec(
+    val family: String,
+    val languageTag: String,
+    val storageDirectoryName: String,
     val generation: Int,
     val assetPath: String,
     val expectedCompressedSize: Long,
@@ -23,6 +45,9 @@ data class DictionaryArtifactSpec(
 ) {
     init {
         require(generation > 0)
+        require(FAMILY_PATTERN.matches(family))
+        require(languageTag.isNotBlank())
+        require(FAMILY_PATTERN.matches(storageDirectoryName.replace('-', '_')))
         require(assetPath.isNotBlank())
         require(expectedCompressedSize in 1..maxCompressedSize)
         require(expectedRawSize in TdictFormat.HEADER_SIZE.toLong()..maxRawSize)
@@ -34,16 +59,34 @@ data class DictionaryArtifactSpec(
     val finalFileName: String
         get() = String.format(
             Locale.ROOT,
-            "tatar_top100k-v%06d-s%d-f%d-%s.tdict",
+            "%s-v%06d-s%d-f%d-%s.tdict",
+            family,
             generation,
             schemaId,
             formatVersion,
             expectedRawSha256.lowercase(),
         )
 
+    /** The temp-file prefix of this family; never shared with another family's directory. */
+    val temporaryFilePrefix: String
+        get() = ".$family-"
+
+    /** Matches exactly the final files this family owns, and nothing else. */
+    val finalFilePattern: Regex
+        get() = Regex("${Regex.escape(family)}-v[0-9]{6}-s[0-9]+-f[0-9]+-[0-9a-f]{64}\\.tdict")
+
     companion object {
+        private val FAMILY_PATTERN = Regex("[a-z][a-z0-9_]*")
+
+        /**
+         * D1a, shipped since 1.1.0. The family name and the directory are FROZEN: changing either
+         * makes every device that already inflated this file inflate it again.
+         */
         @JvmField
         val TATAR_TOP100K_V1 = DictionaryArtifactSpec(
+            family = "tatar_top100k",
+            languageTag = PersonalSubtypes.TATAR_RU,
+            storageDirectoryName = "dictionaries",
             generation = 1,
             assetPath = "dictionaries/tatar_top100k_v1.tdict.zlib",
             expectedCompressedSize = 600_606,
@@ -54,6 +97,52 @@ data class DictionaryArtifactSpec(
                 "798d3257700c092cdf17cbe148eb0383b82eb6a2230132af417c6a1b8548f558",
             expectedEntryCount = 100_000,
         )
+
+        /**
+         * The Russian top-100k, packed 2026-08-21 by `scripts/dictionary_pack.py build
+         * --language rus` from three Leipzig corpora — `docs/RUSSIAN-DICTIONARY.md` records the
+         * sources, the alphabet decisions and every number below.
+         *
+         * Its own family and its own directory, so the Tatar file already inflated on a device
+         * updating from 1.6.1 is neither renamed, re-inflated, nor counted against this
+         * language's retention budget.
+         *
+         * The words are checked against `TdictValidator`'s Tatar alphabet, which is a strict
+         * SUPERSET of the Russian one — every Russian letter is a Tatar letter. That check is
+         * therefore weaker for this artifact than for the Tatar one, and deliberately left as it
+         * is: for a SHIPPED asset the exact-SHA-256 match below is the real guard, and the
+         * alphabet check only ever backs it up against corruption that the checksum, the UTF-8
+         * decode and the sort-order check would all have caught first.
+         */
+        @JvmField
+        val RUSSIAN_TOP100K_V1 = DictionaryArtifactSpec(
+            family = "russian_top100k",
+            languageTag = PersonalSubtypes.RUSSIAN,
+            storageDirectoryName = "dictionaries-ru",
+            generation = 1,
+            assetPath = "dictionaries/russian_top100k_v1.tdict.zlib",
+            expectedCompressedSize = 606_315,
+            expectedCompressedSha256 =
+                "f4b91cef2a4e10c096997f358811b71cdb17d0a10097b03ab3b9de9324c2c48f",
+            expectedRawSize = 2_540_622,
+            expectedRawSha256 =
+                "875bc667d7e9866229df3d462b4adabc95734c433d6f0a2ac9652d224e5086b6",
+            expectedEntryCount = 100_000,
+        )
+
+        /**
+         * Every dictionary the app ships, newest language last. This list IS the answer to "which
+         * languages have a dictionary": the suggestion controller, the storage factory and the
+         * settings screen all resolve through [forSubtype] rather than testing subtype identifiers
+         * of their own.
+         */
+        @JvmField
+        val ALL: List<DictionaryArtifactSpec> = listOf(TATAR_TOP100K_V1, RUSSIAN_TOP100K_V1)
+
+        /** The dictionary of [subtypeId], or null when that subtype ships none. */
+        @JvmStatic
+        fun forSubtype(subtypeId: String): DictionaryArtifactSpec? =
+            ALL.firstOrNull { it.languageTag == subtypeId }
     }
 }
 

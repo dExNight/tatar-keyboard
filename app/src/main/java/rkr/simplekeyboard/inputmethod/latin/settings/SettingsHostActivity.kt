@@ -441,6 +441,22 @@ class SettingsHostActivity : Activity() {
     private fun personalSubtypeIds(): List<String> =
             richImm.getEnabledSubtypes(true).map { it.locale }.distinct()
 
+    /**
+     * The store a hand-added word goes into: the language the keyboard is currently set to, when it
+     * has a personal dictionary, and otherwise the first enabled subtype that does.
+     *
+     * With two languages "the first enabled one" is no longer good enough — it would file a Russian
+     * word under Tatar for a user whose Tatar layout simply sits earlier in the system's list. The
+     * live subtype is the closest thing this screen has to "the language the user means"; the
+     * screen shows every language's words in separate sections either way, so a wrong guess stays
+     * visible and fixable rather than silent.
+     */
+    private fun targetSubtypeForAddedWord(subtypeIds: List<String>): String? {
+        val current = richImm.currentSubtype?.locale
+        if (current != null && PersonalSubtypes.alphabetFor(current) != null) return current
+        return subtypeIds.firstOrNull { PersonalSubtypes.alphabetFor(it) != null }
+    }
+
     private fun showAddPersonalWordDialog(
             controller: PersonalDictionaryScreenController, subtypeIds: List<String>) {
         val field = layoutInflater.inflate(R.layout.row_text_input, contentView, false) as EditText
@@ -451,7 +467,7 @@ class SettingsHostActivity : Activity() {
                 .setTitle(R.string.personal_dictionary_add)
                 .setView(field)
                 .setPositiveButton(R.string.personal_dictionary_add_action) { _, _ ->
-                    val subtypeId = subtypeIds.firstOrNull { PersonalSubtypes.alphabetFor(it) != null }
+                    val subtypeId = targetSubtypeForAddedWord(subtypeIds)
                     val added = subtypeId != null
                             && controller.addWord(subtypeId, field.text.toString())
                     if (!added) {
