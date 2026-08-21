@@ -295,7 +295,8 @@ class EmojiSearchView @JvmOverloads constructor(
 
         val textLeft = pillInsetXPx + textInsetPx
         val baseline = centerY - (queryFontMetrics.ascent + queryFontMetrics.descent) / 2f
-        if (queryText.isEmpty()) {
+        if (!EmojiSearchLayout.hasQuery(queryText)) {
+            // Spaces alone are not a query: the field reads as untouched, hint and all.
             canvas.drawText(hintText, textLeft, baseline, messagePaint)
             drawCaret(canvas, textLeft, centerY)
         } else {
@@ -522,7 +523,8 @@ class EmojiSearchView @JvmOverloads constructor(
             when {
                 virtualViewId == QUERY_ID -> {
                     node.className = android.widget.EditText::class.java.name
-                    node.contentDescription = if (queryText.isEmpty()) hintText else queryText
+                    node.contentDescription =
+                        if (EmojiSearchLayout.hasQuery(queryText)) queryText else hintText
                     tempBounds.set(0, 0, width, queryRowPx)
                 }
                 virtualViewId == CLOSE_ID -> {

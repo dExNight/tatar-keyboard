@@ -35,11 +35,21 @@ internal object EmojiSearchLayout {
     fun caretX(textLeft: Float, textWidth: Float): Float = textLeft + textWidth
 
     /**
-     * Whether the band under the query row exists at all. An empty query has nothing to report, and
-     * a band filled with placeholder words is worse than a band that is not there: the space goes
-     * back to the keyboard instead.
+     * Whether the field holds a query at all — the one answer the whole view uses, for the band,
+     * for the measured height, for the hint and for what a screen reader is told.
+     *
+     * A run of spaces is not a query. [EmojiSearchIndex.search] trims before matching, so spaces
+     * alone can never have a result; a view that called them a query opened a band whose only
+     * content was the words "nothing found" over a field the user sees as untouched.
      */
-    fun showsResultBand(queryText: String): Boolean = queryText.isNotEmpty()
+    fun hasQuery(queryText: String): Boolean = queryText.isNotBlank()
+
+    /**
+     * Whether the band under the query row exists at all — [hasQuery] and nothing else. An empty
+     * query has nothing to report, and a band filled with placeholder words is worse than a band
+     * that is not there: the space goes back to the keyboard instead.
+     */
+    fun showsResultBand(queryText: String): Boolean = hasQuery(queryText)
 
     /**
      * Height the view asks for: the query row always, the result band only while there is a query.

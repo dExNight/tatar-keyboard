@@ -204,4 +204,67 @@ class EmojiSearchLayoutTest {
             visible.contains("if (resultCount == 0"),
         )
     }
+
+    // --- Defect 3: a query of spaces is not a query --------------------------------------------
+
+    /**
+     * The operator typed a space into the empty field in 1.6.1 and got a band saying "nothing
+     * found". The search itself trims before matching, so a run of spaces can never have a result;
+     * every other part of the view has to agree with that and treat such a field as empty.
+     */
+    @Test
+    fun aQueryOfNothingButSpacesIsNotAQuery() {
+        assertFalse(EmojiSearchLayout.hasQuery(""))
+        assertFalse(EmojiSearchLayout.hasQuery(" "))
+        assertFalse(EmojiSearchLayout.hasQuery("      "))
+        // Tabs and newlines never reach the query, but blankness must not depend on that.
+        assertFalse(EmojiSearchLayout.hasQuery("\u00a0 \u2009"))
+        assertTrue(EmojiSearchLayout.hasQuery("к"))
+        // A space around real text is still real text: only the all-blank field is empty.
+        assertTrue(EmojiSearchLayout.hasQuery(" к "))
+        assertTrue(EmojiSearchLayout.hasQuery("кот "))
+    }
+
+    @Test
+    fun theResultBandDoesNotExistForAQueryOfSpaces() {
+        assertFalse(EmojiSearchLayout.showsResultBand(" "))
+        assertFalse(EmojiSearchLayout.showsResultBand("   "))
+        assertTrue(EmojiSearchLayout.showsResultBand(" кот"))
+        // The measured height is the plain query row, exactly as for the untouched field.
+        assertEquals(
+            EmojiSearchLayout.contentHeight(46, 54, ""),
+            EmojiSearchLayout.contentHeight(46, 54, "   "),
+        )
+    }
+
+    /**
+     * One answer to "is there a query", in [EmojiSearchLayout]. A second copy inside `onDraw` or
+     * inside the accessibility tree is how the band, the height and the spoken node drift apart.
+     */
+    @Test
+    fun theViewNeverAsksWhetherTheQueryIsEmptyOnItsOwn() {
+        val ownChecks = Regex("queryText\\.(isEmpty|isNotEmpty|isBlank|isNotBlank)\\(\\)")
+            .findAll(view)
+            .map { it.value }
+            .toList()
+        assertTrue(
+            "the view still decides emptiness itself: $ownChecks",
+            ownChecks.isEmpty(),
+        )
+    }
+
+    /** The hint and the spoken node follow the same rule as the band. */
+    @Test
+    fun theHintAndTheSpokenNodeGoThroughTheSameRuleAsTheBand() {
+        val queryRow = bodyOf("private fun drawQueryRow", "private fun drawCaret")
+        assertTrue(
+            "the hint branch must ask EmojiSearchLayout.hasQuery",
+            queryRow.contains("EmojiSearchLayout.hasQuery(queryText)"),
+        )
+        val node = bodyOf("override fun onPopulateNodeForVirtualView", "override fun onPerformActionForVirtualView")
+        assertTrue(
+            "the query node must ask EmojiSearchLayout.hasQuery",
+            node.contains("EmojiSearchLayout.hasQuery(queryText)"),
+        )
+    }
 }
