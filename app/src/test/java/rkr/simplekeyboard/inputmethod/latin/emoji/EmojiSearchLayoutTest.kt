@@ -23,8 +23,9 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * The two rules the operator found broken on a real phone in 1.6.0: the caret must sit at the end
- * of the typed query, and the result band must not exist while the query is empty.
+ * The rules the operator found broken on a real phone. In 1.6.0: the caret must sit at the end of
+ * the typed query, and the result band must not exist while the query is empty. In 1.6.1: a field
+ * holding nothing but spaces is not a query, and the caret must not stand on the hint.
  *
  * The pure half is checked directly; the half that lives inside `onDraw` / `onMeasure` is checked
  * the way the rest of this package checks drawing code — by grepping the frozen source, in the
@@ -265,6 +266,46 @@ class EmojiSearchLayoutTest {
         assertTrue(
             "the query node must ask EmojiSearchLayout.hasQuery",
             node.contains("EmojiSearchLayout.hasQuery(queryText)"),
+        )
+    }
+
+    // --- Defect 4: the caret must not stand on the hint ----------------------------------------
+
+    /**
+     * With an empty field 1.6.1 drew the hint from `textLeft` and the caret at `textLeft` too, so
+     * the caret stood on the first letter of "Поиск эмодзи"
+     * (`operator-shots/1.6.0-empty-query-plaque.jpg`). The hint starts past the caret's right edge.
+     */
+    @Test
+    fun theHintStartsPastTheRightEdgeOfTheCaret() {
+        val textLeft = 40f
+        val stroke = 1.5f
+        val gap = 3f
+        val hintLeft = EmojiSearchLayout.hintLeft(EmojiSearchLayout.caretX(textLeft, 0f), stroke, gap)
+        assertTrue("the hint must not start on the caret", hintLeft > textLeft + stroke / 2f)
+        assertEquals(textLeft + stroke / 2f + gap, hintLeft, 0f)
+        // A wider caret pushes the hint further, so the clearance never depends on density.
+        assertEquals(
+            gap,
+            EmojiSearchLayout.hintLeft(textLeft, 4f, gap) - (textLeft + 2f),
+            0f,
+        )
+    }
+
+    /** The drawn hint takes its x from that rule and not from the text origin. */
+    @Test
+    fun theHintIsDrawnFromTheOffsetAndNotFromTheTextOrigin() {
+        val queryRow = bodyOf("private fun drawQueryRow", "private fun drawCaret")
+        val hintCalls = argumentsOf(queryRow, "drawText(")
+            .filter { it.startsWith("hintText,") }
+        assertEquals("expected exactly one hint drawText", 1, hintCalls.size)
+        assertFalse(
+            "the hint is still drawn from the caret's own x: ${hintCalls[0]}",
+            hintCalls[0].contains("hintText, textLeft,"),
+        )
+        assertTrue(
+            "the hint x must come from EmojiSearchLayout.hintLeft",
+            queryRow.contains("EmojiSearchLayout.hintLeft("),
         )
     }
 }

@@ -17,13 +17,14 @@
 package rkr.simplekeyboard.inputmethod.latin.emoji
 
 /**
- * The two pieces of [EmojiSearchView] geometry that can be got wrong without anything crashing, so
- * they live here, Android-free, and are exercised on the plain JVM — the same split the panel makes
- * between the view and [EmojiPanelState].
+ * The pieces of [EmojiSearchView] geometry and state that can be got wrong without anything
+ * crashing, so they live here, Android-free, and are exercised on the plain JVM — the same split
+ * the panel makes between the view and [EmojiPanelState].
  *
- * Both rules come from defects the operator found on a real phone in 1.6.0: the caret had a key's
- * constant added to its x and read as a trailing space, and the result band was measured even when
- * its only content was an invitation to type.
+ * Every rule here comes from a defect the operator found on a real phone. In 1.6.0: the caret had a
+ * key's constant added to its x and read as a trailing space, and the result band was measured even
+ * when its only content was an invitation to type. In 1.6.1: a field holding nothing but spaces
+ * counted as a query, and the caret stood on the first letter of the hint.
  */
 internal object EmojiSearchLayout {
 
@@ -33,6 +34,14 @@ internal object EmojiSearchLayout {
      * drawn from and [textWidth] is what the paint measured for it.
      */
     fun caretX(textLeft: Float, textWidth: Float): Float = textLeft + textWidth
+
+    /**
+     * Where the hint is drawn from while there is no query: past the right edge of the caret, which
+     * stands at [caretX] and is [caretStrokeWidth] wide, plus [gapPx] of air. Drawing the hint from
+     * the caret's own x is what put the caret on the first letter of the hint itself.
+     */
+    fun hintLeft(caretX: Float, caretStrokeWidth: Float, gapPx: Float): Float =
+        caretX + caretStrokeWidth / 2f + gapPx
 
     /**
      * Whether the field holds a query at all — the one answer the whole view uses, for the band,

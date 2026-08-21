@@ -85,6 +85,8 @@ class EmojiSearchView @JvmOverloads constructor(
         private const val SEARCH_ICON_HANDLE_DP = 5f
         private const val CLOSE_STROKE_DP = 1.8f
         private const val CARET_STROKE_DP = 1.5f
+        /** Air between the caret's right edge and the first letter of the hint. */
+        private const val HINT_GAP_DP = 3f
 
         private const val QUERY_TEXT_SIZE_SP = 16f
         private const val MESSAGE_TEXT_SIZE_SP = 14f
@@ -162,6 +164,7 @@ class EmojiSearchView @JvmOverloads constructor(
     private val messageInsetPx = dp(MESSAGE_INSET_DP).toFloat()
     private val searchIconRadiusPx = dp(SEARCH_ICON_RADIUS_DP).toFloat()
     private val searchIconHandlePx = dp(SEARCH_ICON_HANDLE_DP).toFloat()
+    private val hintGapPx = dp(HINT_GAP_DP).toFloat()
 
     private val touchSlop = ViewConfiguration.get(context).scaledTouchSlop
 
@@ -296,8 +299,19 @@ class EmojiSearchView @JvmOverloads constructor(
         val textLeft = pillInsetXPx + textInsetPx
         val baseline = centerY - (queryFontMetrics.ascent + queryFontMetrics.descent) / 2f
         if (!EmojiSearchLayout.hasQuery(queryText)) {
-            // Spaces alone are not a query: the field reads as untouched, hint and all.
-            canvas.drawText(hintText, textLeft, baseline, messagePaint)
+            // Spaces alone are not a query: the field reads as untouched, hint and all. The caret
+            // keeps the text's own origin and the hint steps aside for it, the way an empty focused
+            // EditText reads on the platform; drawing both from textLeft put the caret on the "П".
+            canvas.drawText(
+                hintText,
+                EmojiSearchLayout.hintLeft(
+                    EmojiSearchLayout.caretX(textLeft, 0f),
+                    caretPaint.strokeWidth,
+                    hintGapPx,
+                ),
+                baseline,
+                messagePaint,
+            )
             drawCaret(canvas, textLeft, centerY)
         } else {
             canvas.drawText(queryText, textLeft, baseline, queryPaint)
