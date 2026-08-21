@@ -215,21 +215,24 @@ private class DeviceProtectedBigramPreparation(
 
     companion object {
         /**
-         * Next-word prediction is Tatar-only for now: only `tatar_bigrams_v1.tatbigr.zlib` ships,
-         * and a Russian table is a separate task. Every other subtype gets null, which leaves
-         * NEXT_WORD answering an empty list — the exact fail-closed shape a missing table already
-         * had, with no effect on prefix suggestions or ordinary input.
+         * Storage for the next-word table of [subtypeId], or null when that subtype ships none —
+         * asked of the SAME registry [DeviceProtectedDictionaryPreparation.create] asks for the
+         * dictionary, so the two can never end up on different languages. A language present in
+         * the registry with no table, and a subtype absent from it entirely, both land here as
+         * null and leave NEXT_WORD answering an empty list: the exact fail-closed shape a missing
+         * table already had, with no effect on prefix suggestions or ordinary input.
          */
         fun create(
             context: Context,
             executor: ExecutorService,
             subtypeId: String,
         ): BigramPreparation? = try {
-            if (subtypeId != PersonalSubtypes.TATAR_RU) {
+            val artifact = DictionaryArtifactSpec.bigramsForSubtype(subtypeId)
+            if (artifact == null) {
                 null
             } else {
                 DeviceProtectedBigramPreparation(
-                    AndroidBigramStorageFactory.create(context, executor),
+                    AndroidBigramStorageFactory.create(context, executor, artifact),
                 )
             }
         } catch (_: Throwable) {

@@ -11,7 +11,8 @@ import java.io.IOException
  * dictionary — same seams ([DeviceProtectedDirectoryProvider], [DurableFileOps], [StorageClock],
  * [SpaceProbe], the temp -> fsync -> validate -> atomicRename -> syncDirectory pattern), a
  * DIFFERENT concrete class (PROPOSALS.md, "E5b. Хранение"): [BigramArtifactSpec.finalFileName]
- * has its own naming, [FINAL_FILE_PATTERN] its own regex, [MAX_FINAL_ARTIFACTS] its own limit,
+ * has its own naming, [BigramArtifactSpec.finalFilePattern] its own regex, [MAX_FINAL_ARTIFACTS]
+ * its own limit,
  * and — the reason a separate class exists rather than a parameterized shared one —
  * [ProcessBigramStorageOwner] is a SEPARATE process-wide registry from
  * [ProcessDictionaryStorageOwner]. Both key their shared state by the canonical path of the
@@ -38,7 +39,16 @@ class AtomicBigramStore(
         require(supportedArtifacts.isNotEmpty())
         require(supportedArtifacts.map { it.generation }.distinct().size == supportedArtifacts.size)
         require(supportedArtifacts.map { it.finalFileName }.distinct().size == supportedArtifacts.size)
+        // One store instance serves ONE family in ONE directory: retention and temp cleanup scan by
+        // [BigramArtifactSpec.finalFilePattern] and the process-wide lease map is keyed by
+        // directory, so a second family here would share this one's lease counter and could never
+        // be activated while it held a lease — the same rule [AtomicDictionaryStore] enforces.
+        require(supportedArtifacts.map { it.family }.distinct().size == 1)
+        require(supportedArtifacts.map { it.storageDirectoryName }.distinct().size == 1)
     }
+
+    private val temporaryPrefix: String = supportedArtifacts.first().temporaryFilePrefix
+    private val finalFilePattern: Regex = supportedArtifacts.first().finalFilePattern
 
     fun ensurePublished(spec: BigramArtifactSpec): BigramPreparationResult {
         if (supportedArtifacts.none { it == spec }) {
@@ -206,7 +216,7 @@ class AtomicBigramStore(
 
     private fun cleanupTemps(directory: File) {
         val temporaryFiles = directory.listFiles { file ->
-            file.isFile && file.name.startsWith(TEMP_PREFIX) && file.name.endsWith(TEMP_SUFFIX)
+            file.isFile && file.name.startsWith(temporaryPrefix) && file.name.endsWith(TEMP_SUFFIX)
         } ?: throw IOException("cannot list bigram directory")
         if (temporaryFiles.isEmpty()) return
         for (file in temporaryFiles) {
@@ -275,7 +285,7 @@ class AtomicBigramStore(
 
     private fun managedFinals(directory: File): List<File> =
         directory.listFiles { file ->
-            file.isFile && FINAL_FILE_PATTERN.matches(file.name)
+            file.isFile && finalFilePattern.matches(file.name)
         }?.toList() ?: throw IOException("cannot list bigram directory")
 
     private fun generationForFile(file: File): Int? = supportedArtifacts
@@ -288,7 +298,7 @@ class AtomicBigramStore(
     private fun createExclusiveTemp(directory: File, destinationName: String): File {
         val timestamp = clock.nowMillis()
         for (counter in 0 until MAX_TEMP_ATTEMPTS) {
-            val file = File(directory, "$TEMP_PREFIX$destinationName.$timestamp.$counter$TEMP_SUFFIX")
+            val file = File(directory, "$temporaryPrefix$destinationName.$timestamp.$counter$TEMP_SUFFIX")
             if (fileOps.createNewFile(file)) return file
         }
         throw IOException("cannot create exclusive bigram temp")
@@ -309,7 +319,7 @@ class AtomicBigramStore(
         file: File,
     ) = PublishedBigramTable(
         generation = spec.generation,
-        languageTag = spec.languageTag,
+        fileLanguageTag = spec.fileLanguageTag,
         file = file,
         rawSize = rawSize,
         headCount = headCount,
@@ -328,10 +338,7 @@ class AtomicBigramStore(
         private const val MAX_TEMP_ATTEMPTS = 100
         private const val MAX_FINAL_ARTIFACTS = 2
         private const val MAX_FINALS_BEFORE_STAGING = 1
-        private const val TEMP_PREFIX = ".tatar_bigrams-"
         private const val TEMP_SUFFIX = ".tmp"
-        private val FINAL_FILE_PATTERN =
-            Regex("tatar_bigrams-[a-z]{2,3}-v[0-9]{6}-s[0-9]+-f[0-9]+-[0-9a-f]{64}\\.tatbigr")
     }
 }
 

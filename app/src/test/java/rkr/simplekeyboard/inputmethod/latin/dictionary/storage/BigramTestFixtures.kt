@@ -21,15 +21,28 @@ internal data class TestBigramArtifact(
 internal object BigramTestFixtures {
     fun artifact(
         generation: Int = 1,
-        languageTag: String = "tt",
+        fileLanguageTag: String = "tt",
         headsToSuccesses: List<Pair<String, List<String>>> = listOf(
             "аб" to listOf("аба", "әби"),
             "аба" to listOf("әби"),
         ),
+        family: String = "tatar_bigrams",
+        storageDirectoryName: String = "bigrams",
     ): TestBigramArtifact {
         val raw = raw(headsToSuccesses)
         val compressed = compress(raw)
-        return TestBigramArtifact(spec(generation, languageTag, raw, compressed), raw, compressed)
+        return TestBigramArtifact(
+            spec(
+                generation,
+                fileLanguageTag,
+                raw,
+                compressed,
+                family = family,
+                storageDirectoryName = storageDirectoryName,
+            ),
+            raw,
+            compressed,
+        )
     }
 
     fun raw(headsToSuccesses: List<Pair<String, List<String>>>): ByteArray {
@@ -98,16 +111,21 @@ internal object BigramTestFixtures {
 
     fun spec(
         generation: Int,
-        languageTag: String,
+        fileLanguageTag: String,
         raw: ByteArray,
         compressed: ByteArray = compress(raw),
         expectedRawSize: Long = raw.size.toLong(),
         maxCompressedSize: Long = 250_000,
         maxRawSize: Long = 1_048_576,
+        family: String = "tatar_bigrams",
+        storageDirectoryName: String = "bigrams",
     ) = BigramArtifactSpec(
+        family = family,
         generation = generation,
-        languageTag = languageTag,
-        assetPath = "fixture-$languageTag-$generation.zlib",
+        fileLanguageTag = fileLanguageTag,
+        subtypeId = fileLanguageTag,
+        storageDirectoryName = storageDirectoryName,
+        assetPath = "fixture-$fileLanguageTag-$generation.zlib",
         expectedCompressedSize = minOf(compressed.size.toLong(), maxCompressedSize),
         expectedCompressedSha256 = sha256(compressed),
         expectedRawSize = expectedRawSize,

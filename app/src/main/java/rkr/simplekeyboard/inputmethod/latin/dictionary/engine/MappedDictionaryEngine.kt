@@ -77,7 +77,7 @@ class MappedDictionaryEngine private constructor(
         return try {
             val table = lease.table
             val bigramIdentity = BigramTableIdentity(
-                table.generation, table.languageTag, table.schemaId, table.formatVersion, table.rawSha256,
+                table.generation, table.fileLanguageTag, table.schemaId, table.formatVersion, table.rawSha256,
             )
             mapped = mapper.mapReadOnly(table.file, table.rawSize)
             val index = TatBigrPrefixIndex.open(

@@ -542,8 +542,12 @@ class DictionaryPackTest(unittest.TestCase):
         result = subprocess.run(
             ["git", "ls-files"], cwd=ROOT, check=True, capture_output=True, text=True
         )
+        # `-sentences.txt` is here for the same reason `-words.txt` is: it is the licensed
+        # input the bigram tables are counted from (`scripts/bigram_asset_pack.py`), and the
+        # Russian table added a second language's worth of them on 2026-08-21.
         pattern = re.compile(
-            r"(^|/)((tat|rus)_(mixed|news|web|wikipedia).*-words\.txt|.*\.tar\.gz)$"
+            r"(^|/)((tat|rus)_(mixed|news|web|wikipedia).*-(words|sentences)\.txt"
+            r"|.*\.tar\.gz)$"
         )
         self.assertFalse(any(pattern.search(path) for path in result.stdout.splitlines()))
 

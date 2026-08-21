@@ -36,6 +36,10 @@ so the generator must never produce one; the alternative (storing H exactly as r
 make the generator capable of emitting a file its own validator calls corrupt. Dropped heads, if
 any, are named in the report — nothing is silently resized.
 
+Multilingual since 2026-08-21 (`docs/RUSSIAN-BIGRAMS.md`): ``--language`` picks the alphabet the
+tokenizer and the shipped-vocabulary read apply, and defaults to Tatar, so the shipped Tatar asset
+rebuilds byte for byte from the same inputs and the same command line as before.
+
 Usage:
 
     python3 scripts/bigram_asset_pack.py pack \\
@@ -62,6 +66,7 @@ from typing import Sequence, TextIO
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+import dictionary_coverage as coverage  # noqa: E402
 from bigram_pack import (  # noqa: E402
     MAX_COMPRESSED_BYTES,
     MAX_RAW_BYTES,
@@ -423,13 +428,22 @@ def run_pack(
     heads: int,
     successes_per_head: int,
     shards: int,
+    language: coverage.Language = coverage.DEFAULT_LANGUAGE,
 ) -> tuple[PackResult, dict[str, object]]:
     started = time.monotonic()
-    vocabulary, frequencies = read_shipped_vocabulary(asset_path)
+    vocabulary, frequencies = read_shipped_vocabulary(asset_path, language)
     ordered_heads = select_heads(frequencies, heads)
-    table = count_pairs(train_paths, frozenset(ordered_heads), vocabulary, shards, stats=[])
+    table = count_pairs(
+        train_paths,
+        frozenset(ordered_heads),
+        vocabulary,
+        shards,
+        stats=[],
+        alphabet=language.alphabet,
+    )
     result = pack_bigram_table(ordered_heads, table, successes_per_head)
     report = {
+        "language": language.tag,
         "requested_heads": heads,
         "successes_per_head": successes_per_head,
         "actual_head_count": result.head_count,
@@ -465,6 +479,9 @@ def create_argument_parser() -> argparse.ArgumentParser:
     pack.add_argument("--out-raw", required=True, type=Path)
     pack.add_argument("--out-compressed", required=True, type=Path)
     pack.add_argument("--report", type=Path)
+    pack.add_argument(
+        "--language", default=coverage.DEFAULT_LANGUAGE.tag, choices=sorted(coverage.LANGUAGES)
+    )
     return parser
 
 
@@ -478,6 +495,7 @@ def main(argv: Sequence[str] | None = None, stream: TextIO = sys.stdout) -> int:
         arguments.heads,
         arguments.successes_per_head,
         arguments.shards,
+        coverage.language_for(arguments.language),
     )
     text = json.dumps(report, ensure_ascii=False, indent=2, sort_keys=True)
     if arguments.report is not None:

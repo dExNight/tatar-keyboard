@@ -38,6 +38,23 @@ data class DictionaryArtifactSpec(
     val expectedRawSize: Long,
     val expectedRawSha256: String,
     val expectedEntryCount: Long,
+    /**
+     * The next-word table of this language, or null when the language ships none.
+     *
+     * This field is what makes "which language is active" a question with ONE answer. A bigram
+     * table is a separate artifact with a separate schema, validator and store — none of that
+     * changes — but it is not a separate *language*, and giving it its own subtype-to-artifact
+     * resolver would make two independent copies of one rule, which is exactly how a fix ends up
+     * landing in one copy and silently not in the other. So the language registry stays single:
+     * [ALL] lists the languages, [forSubtype] answers for both artifact kinds, and a language
+     * whose table is missing says so here, in the open, instead of through a factory that returns
+     * null for reasons the reader has to reconstruct.
+     *
+     * A table can therefore never exist for a language that has no dictionary, and the two can
+     * never disagree about which language they belong to: the [init] block below requires the
+     * language tags to match.
+     */
+    val bigrams: BigramArtifactSpec? = null,
     val schemaId: Int = TdictFormat.SCHEMA_ID,
     val formatVersion: Int = TdictFormat.FORMAT_VERSION,
     val maxCompressedSize: Long = TdictFormat.MAX_COMPRESSED_SIZE,
@@ -54,6 +71,7 @@ data class DictionaryArtifactSpec(
         require(expectedEntryCount > 0)
         require(expectedCompressedSha256.isSha256())
         require(expectedRawSha256.isSha256())
+        require(bigrams == null || bigrams.subtypeId == languageTag)
     }
 
     val finalFileName: String
@@ -96,6 +114,7 @@ data class DictionaryArtifactSpec(
             expectedRawSha256 =
                 "798d3257700c092cdf17cbe148eb0383b82eb6a2230132af417c6a1b8548f558",
             expectedEntryCount = 100_000,
+            bigrams = BigramArtifactSpec.TATAR_BIGRAMS_V1,
         )
 
         /**
@@ -131,10 +150,10 @@ data class DictionaryArtifactSpec(
         )
 
         /**
-         * Every dictionary the app ships, newest language last. This list IS the answer to "which
-         * languages have a dictionary": the suggestion controller, the storage factory and the
-         * settings screen all resolve through [forSubtype] rather than testing subtype identifiers
-         * of their own.
+         * Every language the app ships, newest last. This list IS the answer to "which languages
+         * have a dictionary" AND to "which of them also predict the next word": the suggestion
+         * controller, both storage factories and the settings screen all resolve through
+         * [forSubtype] rather than testing subtype identifiers of their own.
          */
         @JvmField
         val ALL: List<DictionaryArtifactSpec> = listOf(TATAR_TOP100K_V1, RUSSIAN_TOP100K_V1)
@@ -143,6 +162,19 @@ data class DictionaryArtifactSpec(
         @JvmStatic
         fun forSubtype(subtypeId: String): DictionaryArtifactSpec? =
             ALL.firstOrNull { it.languageTag == subtypeId }
+
+        /**
+         * The next-word table of [subtypeId], or null when that subtype ships no table — either
+         * because it ships no dictionary at all, or because its language has no table yet.
+         *
+         * Both cases leave NEXT_WORD answering an empty list, which is the fail-closed behaviour a
+         * missing table has always had: silence, never another language's predictions. Which of
+         * the two cases holds is readable off [ALL] — a language present with `bigrams == null`
+         * has no table; a subtype absent from [ALL] has no dictionary either.
+         */
+        @JvmStatic
+        fun bigramsForSubtype(subtypeId: String): BigramArtifactSpec? =
+            forSubtype(subtypeId)?.bigrams
     }
 }
 

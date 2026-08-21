@@ -8,20 +8,27 @@ import java.util.concurrent.Executor
 
 /**
  * Production wiring for the bigram-table store — the E5c counterpart of
- * [AndroidDictionaryStorageFactory], pointed at its own device-protected subdirectory
- * (`bigrams/`, never `filesDir/dictionaries`) with its own artifact, own regex/retention
+ * [AndroidDictionaryStorageFactory], pointed at [artifact]'s own device-protected subdirectory
+ * (never `filesDir/dictionaries`) with its own artifact, own regex/retention
  * (`AtomicBigramStore`), and the same production [DurableFileOps] ([AndroidDurableFileOps]) the
  * dictionary store already uses — the fsync/rename semantics are format-agnostic.
+ *
+ * [artifact] is passed in rather than chosen here, exactly like [AndroidDictionaryStorageFactory]:
+ * the choice of language is made once, in [DictionaryArtifactSpec.forSubtype], and this factory
+ * only wires up whatever that choice produced.
  */
 @Keep
 object AndroidBigramStorageFactory {
     @JvmStatic
-    fun create(context: Context, executor: Executor): BigramStorageController {
+    fun create(
+        context: Context,
+        executor: Executor,
+        artifact: BigramArtifactSpec,
+    ): BigramStorageController {
         val deviceProtectedContext = context.createDeviceProtectedStorageContext()
-        val artifact = BigramArtifactSpec.TATAR_BIGRAMS_V1
         val store = AtomicBigramStore(
             directoryProvider = DeviceProtectedDirectoryProvider {
-                File(deviceProtectedContext.filesDir, "bigrams")
+                File(deviceProtectedContext.filesDir, artifact.storageDirectoryName)
             },
             assetInputProvider = BigramAssetInputProvider { spec ->
                 context.assets.open(spec.assetPath, AssetManager.ACCESS_STREAMING)

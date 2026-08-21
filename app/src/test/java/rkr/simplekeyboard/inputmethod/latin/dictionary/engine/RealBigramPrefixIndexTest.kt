@@ -129,7 +129,7 @@ class RealBigramPrefixIndexTest {
                 val validated = TatBigrValidator().validateRaw(rawFile, spec)
                 val raw = rawFile.readBytes()
                 val identity = BigramTableIdentity(
-                    spec.generation, spec.languageTag, validated.schemaId, validated.formatVersion,
+                    spec.generation, spec.fileLanguageTag, validated.schemaId, validated.formatVersion,
                     validated.rawSha256,
                 )
                 realIndex = TatBigrPrefixIndex.open(

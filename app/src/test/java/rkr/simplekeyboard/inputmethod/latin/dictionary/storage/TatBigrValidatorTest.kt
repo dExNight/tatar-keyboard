@@ -93,8 +93,11 @@ class TatBigrValidatorTest {
         val artifact = BigramTestFixtures.artifact()
         val oversizedCompressed = ByteArray(128) { it.toByte() }
         val compressedSpec = BigramArtifactSpec(
+            family = "tatar_bigrams",
             generation = 30,
-            languageTag = "tt",
+            fileLanguageTag = "tt",
+            subtypeId = "tt_RU",
+            storageDirectoryName = "bigrams",
             assetPath = "oversized",
             expectedCompressedSize = 64,
             expectedCompressedSha256 = BigramTestFixtures.sha256(oversizedCompressed),
@@ -108,8 +111,11 @@ class TatBigrValidatorTest {
         val largeRaw = ByteArray(artifact.raw.size + 1)
         val compressed = BigramTestFixtures.compress(largeRaw)
         val rawSpec = BigramArtifactSpec(
+            family = "tatar_bigrams",
             generation = 31,
-            languageTag = "tt",
+            fileLanguageTag = "tt",
+            subtypeId = "tt_RU",
+            storageDirectoryName = "bigrams",
             assetPath = "raw-oversized",
             expectedCompressedSize = compressed.size.toLong(),
             expectedCompressedSha256 = BigramTestFixtures.sha256(compressed),

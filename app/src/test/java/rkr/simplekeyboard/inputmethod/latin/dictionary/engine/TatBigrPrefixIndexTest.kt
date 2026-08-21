@@ -138,7 +138,7 @@ class TatBigrPrefixIndexTest {
                 .inflateAsset(asset.inputStream(), output, spec)
         }.toByteArray()
         val identity = BigramTableIdentity(
-            spec.generation, spec.languageTag, spec.schemaId, spec.formatVersion, spec.expectedRawSha256,
+            spec.generation, spec.fileLanguageTag, spec.schemaId, spec.formatVersion, spec.expectedRawSha256,
         )
         val index = TatBigrPrefixIndex.open(
             ByteBuffer.wrap(decompressed),
