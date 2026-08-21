@@ -171,11 +171,11 @@ class KeyHysteresisDistanceTest {
      */
     @Test
     fun theHysteresisIsDeclaredExactlyOnceInTheWholeTree() {
-        val declaring = resValues().parentFile.listFiles()!!
+        val declaring = resValues().parentFile!!.listFiles()!!
             .filter { it.isDirectory && it.name.startsWith("values") }
             .flatMap { dir -> dir.listFiles()!!.filter { it.name.endsWith(".xml") } }
             .filter { it.readText().contains("\"config_key_hysteresis_distance\"") }
-            .map { "${it.parentFile.name}/${it.name}" }
+            .map { "${it.parentFile!!.name}/${it.name}" }
             .sorted()
         assertEquals(listOf("values/config.xml"), declaring)
         assertEquals(8.0, shippedHysteresisDp(), 0.0)
