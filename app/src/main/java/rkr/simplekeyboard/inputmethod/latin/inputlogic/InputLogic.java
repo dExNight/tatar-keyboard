@@ -577,9 +577,24 @@ public final class InputLogic {
                         && TatarWordUtils.needsAutoSpace(mConnection.getCachedTextAfterCursor())
                         ? replacement + AUTO_SPACE : replacement;
         mConnection.beginBatchEdit();
-        mConnection.deleteTextBeforeCursor(expectedPrefix.length());
-        mConnection.commitText(textToCommit, 1);
+        // beginBatchEdit() is what refreshes the connection from the framework, so this is the
+        // earliest the question can be asked. "No connection" means the editor went away between
+        // the band being painted and the tap. The edit below would still RUN in that state —
+        // RichInputConnection updates its own text cache before it checks the connection — and this
+        // method would then return true over an edit that reached no editor at all: the caller
+        // unbinds the candidates and clears the band for text that does not exist, and every later
+        // decision taken from the cache (the trailing word, the letter after the cursor, the suffix
+        // an undo matches) is taken from fiction. Nothing is touched instead, and false is the
+        // truth. The batch is still closed on this path, exactly once, like on the other one.
+        final boolean connected = mConnection.isConnected();
+        if (connected) {
+            mConnection.deleteTextBeforeCursor(expectedPrefix.length());
+            mConnection.commitText(textToCommit, 1);
+        }
         mConnection.endBatchEdit();
+        if (!connected) {
+            return false;
+        }
         // A space this code inserted must not arm the double-space-to-period gesture: the next
         // real space press has to behave like a first one, exactly as it does after a typed
         // letter. Leaving mLastSpaceDownTime armed would turn "сүзләр " + space into "сүзләр. "
@@ -681,8 +696,23 @@ public final class InputLogic {
                 TatarWordUtils.needsAutoSpace(mConnection.getCachedTextAfterCursor())
                         ? suggestion + AUTO_SPACE : suggestion;
         mConnection.beginBatchEdit();
-        mConnection.commitText(textToCommit, 1);
+        // beginBatchEdit() is what refreshes the connection from the framework, so this is the
+        // earliest the question can be asked. "No connection" means the editor went away between
+        // the band being painted and the tap. The edit below would still RUN in that state —
+        // RichInputConnection updates its own text cache before it checks the connection — and this
+        // method would then return true over an edit that reached no editor at all: the caller
+        // unbinds the candidates and clears the band for text that does not exist, and every later
+        // decision taken from the cache (the trailing word, the letter after the cursor, the suffix
+        // an undo matches) is taken from fiction. Nothing is touched instead, and false is the
+        // truth. The batch is still closed on this path, exactly once, like on the other one.
+        final boolean connected = mConnection.isConnected();
+        if (connected) {
+            mConnection.commitText(textToCommit, 1);
+        }
         mConnection.endBatchEdit();
+        if (!connected) {
+            return false;
+        }
         // Same reasoning as replaceTrailingWord: a space this code inserted must not arm the
         // double-space-to-period gesture, and a pending revert no longer describes the text before
         // the cursor after this edit.
