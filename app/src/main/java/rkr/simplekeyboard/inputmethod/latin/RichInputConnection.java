@@ -376,8 +376,15 @@ public final class RichInputConnection {
         if (!textBeforeCursor.isEmpty() && textBeforeCursor.length() >= numChars) {
             mTextBeforeCursor = textBeforeCursor.substring(0, textBeforeCursor.length() - numChars);
         }
-        if (mExpectedSelStart >= numChars) {
-            mExpectedSelStart -= numChars;
+        if (hasCursorPosition()) {
+            if (mExpectedSelStart >= numChars) {
+                mExpectedSelStart -= numChars;
+            }
+            // Deleting before the cursor always leaves it collapsed: every other mutator of this
+            // class does the same. Leaving the end behind made the keyboard believe a selection
+            // was active after a plain backspace, which rejected taps on suggestions and made
+            // onUpdateSelection mistake our own backspace for an external cursor move.
+            mExpectedSelEnd = mExpectedSelStart;
         }
 
         if (isConnected()) {
