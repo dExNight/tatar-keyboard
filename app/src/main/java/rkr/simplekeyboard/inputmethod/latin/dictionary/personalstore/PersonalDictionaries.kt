@@ -56,11 +56,29 @@ object PersonalDictionaries {
     @Volatile
     private var erasureListener: Runnable? = null
 
+    /**
+     * Notified when an unreadable personal file has been set aside on a store's first open, so the
+     * user can be told why the list is empty.
+     *
+     * The flag beside it exists because the event does not respect the keyboard's lifecycle: the
+     * store opens from the engine's background executor, and from the settings screen, both of which
+     * can happen with no input window up and no listener installed. Dropping the notice then would
+     * put the subsystem straight back to losing data silently, so it waits instead, and the IME picks
+     * it up at the next input start.
+     */
+    @Volatile
+    private var quarantineListener: Runnable? = null
+
+    @Volatile
+    private var quarantinePending = false
+
     /** The store for [subtypeId], created on first use. Safe to call from any thread. */
     internal fun storeFor(context: Context, subtypeId: String): PersonalDictionaryStore =
         synchronized(lock) {
             stores.getOrPut(subtypeId) {
-                AndroidPersonalDictionaryStorage.create(context, subtypeId, executorLocked())
+                AndroidPersonalDictionaryStorage.create(context, subtypeId, executorLocked()) {
+                    notifyQuarantined()
+                }
             }
         }
 
@@ -102,6 +120,32 @@ object PersonalDictionaries {
         erasureListener?.run()
     }
 
+    @JvmStatic
+    fun setQuarantineListener(listener: Runnable?) {
+        quarantineListener = listener
+    }
+
+    /** Whether a notice is still waiting to be shown; see [quarantineListener]. */
+    @JvmStatic
+    fun hasPendingQuarantineNotice(): Boolean = quarantinePending
+
+    /**
+     * Takes the waiting notice, if there is one. The caller clears it only when it is really about to
+     * be shown, so a notice raised while the window was down is not spent on nobody.
+     */
+    @JvmStatic
+    fun consumeQuarantineNotice(): Boolean {
+        if (!quarantinePending) return false
+        quarantinePending = false
+        return true
+    }
+
+    /** Called on the store's worker when it set an unreadable file aside. */
+    private fun notifyQuarantined() {
+        quarantinePending = true
+        quarantineListener?.run()
+    }
+
     private fun executorLocked(): ExecutorService =
         sharedExecutor ?: Executors.newSingleThreadExecutor { runnable ->
             Thread(runnable, "personal-dictionary").apply { isDaemon = true }
@@ -115,5 +159,7 @@ object PersonalDictionaries {
             sharedExecutor = null
         }
         erasureListener = null
+        quarantineListener = null
+        quarantinePending = false
     }
 }

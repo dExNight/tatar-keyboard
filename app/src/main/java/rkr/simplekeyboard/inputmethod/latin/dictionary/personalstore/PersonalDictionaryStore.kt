@@ -61,6 +61,7 @@ internal class PersonalDictionaryStore(
     private val validator: TpersValidator = TpersValidator(),
     private val unlockGate: () -> Boolean = { true },
     private val maxEntries: Int = TpersFormat.MAX_PERSONAL_ENTRIES.toInt(),
+    private val quarantineNotice: PersonalQuarantineNotice? = null,
 ) {
     private val alphabet: Set<Int>? = PersonalSubtypes.alphabetFor(subtypeId)
 
@@ -209,8 +210,9 @@ internal class PersonalDictionaryStore(
 
     /**
      * Erases this subtype's personal dictionary: empties memory and deletes the file, the pending
-     * counters and the salt. The salt goes too, so the hashes of a future session cannot be compared
-     * with those of the erased one; a new one is created on demand.
+     * counters, the salt and any quarantined copy of an unreadable file. The salt goes too, so the
+     * hashes of a future session cannot be compared with those of the erased one; a new one is
+     * created on demand.
      */
     fun clearAll(outcome: PersonalMutationOutcome? = null) = onWorker {
         entries = PersonalEntries.empty(maxEntries)
@@ -237,7 +239,12 @@ internal class PersonalDictionaryStore(
             deleted { deleteFile(directory, File(directory, pendingFileName())) }
         val saltGone = directory != null &&
             deleted { deleteFile(directory, File(directory, SALT_FILE_NAME)) }
-        outcome?.onFinished(dictionaryGone && countersGone && saltGone)
+        // B2 keeps a copy of an unreadable file (see [quarantine]), and that copy is the user's own
+        // words, which no screen shows. "Erase all" is the only way they can ask for those bytes to
+        // go, so a copy left behind is a failed erasure — not a detail.
+        val quarantineGone = directory != null &&
+            deleted { deleteFile(directory, File(directory, quarantineFileName())) }
+        outcome?.onFinished(dictionaryGone && countersGone && saltGone && quarantineGone)
     }
 
     /**
@@ -309,8 +316,8 @@ internal class PersonalDictionaryStore(
     /**
      * Opens the directory once: honours the unlock gate (before the first unlock the path is
      * physically inaccessible, so the feature stays empty and untouched), removes stale temps, reads
-     * the file into the model, and DELETES a corrupt file (quarantine — no copy is kept), publishing
-     * an empty snapshot in the same step. Returns true once the store is loaded.
+     * the file into the model, and sets an unreadable file ASIDE (see [quarantine]), publishing an
+     * empty snapshot in the same step. Returns true once the store is loaded.
      */
     private fun open(): Boolean {
         if (loaded) return true
@@ -335,7 +342,7 @@ internal class PersonalDictionaryStore(
                 null
             }
             if (validated == null) {
-                runCatching { deleteFile(directory, file) }
+                quarantine(directory, file)
                 entries = PersonalEntries.empty(maxEntries)
                 snapshot = PersonalDictionary.EMPTY
                 return true
@@ -453,6 +460,42 @@ internal class PersonalDictionaryStore(
         }
     }
 
+    /**
+     * B2. Moves an unreadable file into this subtype's single quarantine slot instead of deleting
+     * it, and tells [quarantineNotice] that the list the user will see is empty for a reason.
+     *
+     * Validation fails for an interrupted write (a power cut mid-replace), a checksum that no longer
+     * matches, or a format a later version changes — and what usually survives such a failure is
+     * most of the words. Deleting destroyed the only data this keyboard keeps about its user, with
+     * no copy and nothing said; a repair path added later can only read those words if they still
+     * exist. Between losing the data and keeping one extra file, the file wins.
+     *
+     * ONE slot per language, replaced by the next corruption, so the copy cannot accumulate: the
+     * ceiling on disk is one file, not one per failure. Its name is not the name the reader looks
+     * for, so nothing ever validates, reads or publishes it, and it is not a temp either, so
+     * [cleanupTemps] leaves it alone. "Erase all" removes it — see [clearAll].
+     *
+     * If the move itself cannot happen the unreadable file is removed after all: leaving it where
+     * the reader looks would fail validation again on every single start, and the copy is worth
+     * strictly less than a feature that works.
+     */
+    private fun quarantine(directory: File, file: File) {
+        val moved = try {
+            fileOps.atomicReplace(file, File(directory, quarantineFileName()))
+            fileOps.syncDirectory(directory)
+            true
+        } catch (_: Exception) {
+            false
+        }
+        if (!moved) runCatching { deleteFile(directory, file) }
+        // Said in both cases: what the user is told is that the list is empty and that they did not
+        // do it, which is equally true whether the copy was kept or could not be made.
+        quarantineNotice?.onQuarantined()
+    }
+
+    private fun quarantineFileName(): String =
+        TpersFormat.personalFileName(subtypeId) + QUARANTINE_SUFFIX
+
     private fun pendingFileName(): String = "pending-$subtypeId-s1-f1.bin"
 
     private fun deleteFile(): Boolean {
@@ -502,5 +545,11 @@ internal class PersonalDictionaryStore(
         private const val FREE_SPACE_RESERVE_BYTES = 64L * 1024L
         private const val SALT_FILE_NAME = "salt.bin"
         private const val SALT_SIZE = 16
+
+        /**
+         * Appended to the ordinary file name for the one quarantine slot (B2). Deliberately not a
+         * `.tpers` name and not a temp name: nothing reads it, nothing cleans it up by accident.
+         */
+        private const val QUARANTINE_SUFFIX = ".quarantine"
     }
 }

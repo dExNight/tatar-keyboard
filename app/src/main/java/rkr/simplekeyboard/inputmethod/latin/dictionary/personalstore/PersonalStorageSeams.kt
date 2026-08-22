@@ -59,3 +59,19 @@ fun interface PersonalOutputOpener {
 internal fun interface PersonalMutationOutcome {
     fun onFinished(succeeded: Boolean)
 }
+
+/**
+ * Told once when an unreadable personal file has been set aside, so that the empty list the user is
+ * about to see can be explained instead of just appearing.
+ *
+ * Its own seam rather than a second use of [PersonalMutationOutcome]: this is not the outcome of
+ * anything the user asked for. It arrives unprompted, on the store's first open, and it carries no
+ * boolean because there is nothing to succeed or fail — the words could not be read, and that is the
+ * whole message. It carries nothing else for the same reason as everything else here: the word and
+ * the path do not leave the store.
+ *
+ * Called on the store's worker thread. A caller that touches UI must marshal it itself.
+ */
+internal fun interface PersonalQuarantineNotice {
+    fun onQuarantined()
+}

@@ -549,6 +549,11 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
                 controller.onPersonalDictionaryErased();
             }
         }));
+        // B2. The saved words could not be read, so the store set the file aside and the list the
+        // user sees is empty through no act of theirs. Same hop for the same reason: the notice comes
+        // from the store's worker.
+        PersonalDictionaries.setQuarantineListener(
+                () -> mHandler.post(this::showPersonalDictionaryUnreadableDialog));
     }
 
     /**
@@ -873,6 +878,43 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
     }
 
     /**
+     * Tells the user, once, that the saved words could not be read — so the empty list is explained
+     * rather than merely appearing. Same shape and the same window attachment as
+     * {@link #showPersonalForgetFailedDialog()}, and a dialog for the same reason.
+     *
+     * <p>The notice is CONSUMED here, after both window checks pass and immediately before the
+     * dialog is shown, not when it was raised: the store opens from a background executor and from
+     * the settings screen, so it can be raised with no keyboard window up. Clearing it any earlier
+     * would spend the one message on nobody, which is the silence this whole register is about. It is
+     * consumed exactly once, so a second input view start does not repeat it.</p>
+     *
+     * <p>The body names no word, no file and no cause. It may be shown over any app.</p>
+     */
+    private void showPersonalDictionaryUnreadableDialog() {
+        final MainKeyboardView mainKeyboardView = mKeyboardSwitcher.getMainKeyboardView();
+        if (mainKeyboardView == null) {
+            return;
+        }
+        final IBinder windowToken = mainKeyboardView.getWindowToken();
+        if (windowToken == null) {
+            return;
+        }
+        if (!PersonalDictionaries.consumeQuarantineNotice()) {
+            return;
+        }
+        final AlertDialog dialog = new AlertDialog.Builder(
+                DialogUtils.getPlatformDialogThemeContext(this))
+                .setMessage(R.string.personal_dictionary_unreadable)
+                .setPositiveButton(android.R.string.ok, null)
+                .create();
+        dialog.setCancelable(true);
+        dialog.setCanceledOnTouchOutside(true);
+        attachDialogToInputWindow(dialog, windowToken);
+        mOptionsDialog = dialog;
+        dialog.show();
+    }
+
+    /**
      * Attaches a dialog to the IME window exactly the way the subtype picker does. Without the
      * window token and the attached-dialog type the window manager refuses a dialog owned by an
      * input method; without FLAG_ALT_FOCUSABLE_IM the keyboard and the dialog fight over input.
@@ -1034,6 +1076,7 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         // Dropped first: the listener holds this service, and the store outlives it (it is
         // process-wide). Leaving it registered would keep a destroyed IME reachable.
         PersonalDictionaries.setErasureListener(null);
+        PersonalDictionaries.setQuarantineListener(null);
         if (mSuggestionsController != null) {
             mSuggestionsController.onDestroy();
         }
@@ -1271,6 +1314,11 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
             // chance. It is not a trigger for the offer itself: showing the keyboard proves nothing
             // about wanting to type Tatar.
             mSuggestionsOffer.onInputViewStarted();
+        }
+        if (PersonalDictionaries.hasPendingQuarantineNotice()) {
+            // The same boundary, for the same reason: a notice raised while no window was up would
+            // otherwise be dropped, and the user would be left with an empty list and no explanation.
+            mHandler.post(this::showPersonalDictionaryUnreadableDialog);
         }
 
         if (TRACE) Debug.startMethodTracing("/data/trace/latinime");

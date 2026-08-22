@@ -21,6 +21,7 @@ import java.io.FileDescriptor
 import java.io.FileOutputStream
 import java.io.IOException
 import java.util.concurrent.Executor
+import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -35,7 +36,7 @@ import rkr.simplekeyboard.inputmethod.latin.dictionary.storage.SpaceProbe
 
 /**
  * Missions `tt-personal-dict` and `tt-version-1.8.2`: the store half of the silent-failure
- * register in `docs/SILENT-AUDIT.md` — A2, A3, A5, B1 and B3.
+ * register in `docs/SILENT-AUDIT.md` — A2, A3, A5, B1, and the last two, B2 and B3.
  *
  * The whole subsystem chose fail-closed and forbade itself logging, and then never built a channel
  * for "this did not work". Every test here is about that missing channel, and each one names the
@@ -290,6 +291,173 @@ class PersonalDictionarySilentFailureTest {
     }
 
 
+    // ---- B2: an unreadable file is set aside, not destroyed --------------------------------------
+
+    /**
+     * B2. Validation failure used to DELETE the file: a truncated write after a power cut, a checksum
+     * that no longer matches, a format the next version changes — any of them wiped the only data
+     * this keyboard keeps about its user, with no copy and no message.
+     *
+     * The bytes are moved aside instead. Most corruption of this file is an interrupted write, so
+     * what survives is most of the words; a future version with a repair path can only read them if
+     * they still exist, and after a delete they never can.
+     */
+    @Test
+    fun anUnreadableFileIsMovedAsideInsteadOfDestroyed() {
+        val directory = newPersonalDir()
+        store(directory).addManually("абыйлар")
+        val unreadableBytes = corruptTheDictionary(directory)
+
+        val store = store(directory)
+        store.prime()
+
+        assertFalse(
+            "the unreadable file must not stay where the reader looks for a valid one",
+            destinationFile(directory).exists(),
+        )
+        assertTrue("the bytes are still on the device", quarantineFile(directory).isFile)
+        assertArrayEquals(
+            "byte for byte: a repair path that cannot read the original is worth nothing",
+            unreadableBytes,
+            quarantineFile(directory).readBytes(),
+        )
+        assertTrue("and fail-closed still holds — nothing unreadable is published", store.snapshot.isEmpty)
+    }
+
+    /**
+     * B2, the condition that makes the copy affordable: there is ONE quarantine slot per language,
+     * and the next corruption overwrites it. Growth on disk is bounded by one file, not by how many
+     * times the file has ever gone bad.
+     */
+    @Test
+    fun aSecondUnreadableFileOverwritesTheOneQuarantineSlot() {
+        val directory = newPersonalDir()
+        store(directory).addManually("абыйлар")
+        corruptTheDictionary(directory)
+        store(directory).prime()
+
+        // A fresh valid file is written after the first quarantine, and then it goes bad too.
+        store(directory).addManually("сүзлек")
+        val secondUnreadableBytes = corruptTheDictionary(directory)
+        store(directory).prime()
+
+        assertEquals(
+            "one slot, however many corruptions: the copy may not accumulate on the device",
+            1,
+            quarantineFiles(directory).size,
+        )
+        assertArrayEquals(
+            "and the slot holds the latest corruption, not the first",
+            secondUnreadableBytes,
+            quarantineFile(directory).readBytes(),
+        )
+    }
+
+    /**
+     * B2, the condition without which keeping the copy would be indefensible: "Erase all" erases it.
+     * These bytes are the user's own words, no screen shows them, and a privacy promise the user
+     * cannot enforce is not a promise.
+     */
+    @Test
+    fun erasingEverythingRemovesTheQuarantineCopyToo() {
+        val directory = newPersonalDir()
+        store(directory).addManually("абыйлар")
+        corruptTheDictionary(directory)
+        store(directory).prime()
+        assertTrue("the copy exists before the erasure", quarantineFile(directory).isFile)
+
+        val outcomes = mutableListOf<Boolean>()
+        store(directory).clearAll { outcomes.add(it) }
+
+        assertFalse(
+            "the one copy of the user's words that no screen shows must still be removable",
+            quarantineFile(directory).exists(),
+        )
+        assertEquals(listOf(true), outcomes)
+    }
+
+    /** B2. A quarantine copy that will not go is a failed erasure: the words are still on the device. */
+    @Test
+    fun anErasureThatCannotRemoveTheQuarantineCopyIsNotReportedAsSuccess() {
+        val directory = newPersonalDir()
+        store(directory).addManually("абыйлар")
+        corruptTheDictionary(directory)
+        store(directory).prime()
+
+        val stubborn = object : PassthroughOps() {
+            override fun delete(file: File): Boolean =
+                if (file.name.endsWith(QUARANTINE_SUFFIX)) false else super.delete(file)
+        }
+        val outcomes = mutableListOf<Boolean>()
+        store(directory, ops = stubborn).clearAll { outcomes.add(it) }
+
+        assertTrue("the copy is the file that could not go", quarantineFile(directory).isFile)
+        assertEquals(
+            "words still on the device after 'erase everything' is not success",
+            listOf(false), outcomes,
+        )
+    }
+
+    /**
+     * B2, the other half of the finding: the user is TOLD. An empty list that the user did not empty
+     * is exactly the silence this whole register is about — they cannot tell whether they erased it
+     * themselves, and the subsystem may not log, so this notice is the only thing that ever says so.
+     *
+     * Once, not once per open: the second `prime()` here is the ordinary second reader arriving.
+     */
+    @Test
+    fun theUserIsToldOnceWhenAnUnreadableFileIsSetAside() {
+        val directory = newPersonalDir()
+        store(directory).addManually("абыйлар")
+        corruptTheDictionary(directory)
+
+        var notices = 0
+        val store = store(directory, notice = PersonalQuarantineNotice { notices++ })
+        store.prime()
+        store.prime()
+
+        assertEquals("exactly one notice per corruption", 1, notices)
+    }
+
+    /** B2. And nothing at all is said when the file reads fine — the notice is not a startup event. */
+    @Test
+    fun aReadableFileSaysNothing() {
+        val directory = newPersonalDir()
+        store(directory).addManually("абыйлар")
+
+        var notices = 0
+        store(directory, notice = PersonalQuarantineNotice { notices++ }).prime()
+
+        assertEquals(0, notices)
+    }
+
+    /**
+     * B2. If the move itself cannot happen, the unreadable file is removed after all — leaving it
+     * where the reader looks would fail validation again on every single start — and the user is told
+     * either way, because what they are told is that the list is empty and that they did not do it.
+     */
+    @Test
+    fun theUserIsToldEvenWhenTheCopyCannotBeMade() {
+        val directory = newPersonalDir()
+        store(directory).addManually("абыйлар")
+        corruptTheDictionary(directory)
+        val cannotMove = object : PassthroughOps() {
+            override fun atomicReplace(source: File, destination: File) =
+                throw IOException("no rename")
+        }
+
+        var notices = 0
+        val store = store(directory, ops = cannotMove, notice = PersonalQuarantineNotice { notices++ })
+        store.prime()
+
+        assertEquals(1, notices)
+        assertFalse(
+            "an unreadable file left in place would fail validation on every start",
+            destinationFile(directory).exists(),
+        )
+        assertTrue(store.snapshot.isEmpty)
+    }
+
     // ---- B3: a failed removal is an answer, not a dead process ----------------------------------
 
     /**
@@ -377,6 +545,7 @@ class PersonalDictionarySilentFailureTest {
         spaceProbe: SpaceProbe = SpaceProbe { Long.MAX_VALUE },
         unlockGate: () -> Boolean = { true },
         executor: Executor = directExecutor,
+        notice: PersonalQuarantineNotice? = null,
     ): PersonalDictionaryStore = PersonalDictionaryStore(
         subtypeId = subtype,
         directoryProvider = { directory },
@@ -386,6 +555,7 @@ class PersonalDictionarySilentFailureTest {
         clock = { 1000L },
         executor = executor,
         unlockGate = unlockGate,
+        quarantineNotice = notice,
     )
 
     private fun destinationFile(directory: File) =
@@ -395,6 +565,26 @@ class PersonalDictionarySilentFailureTest {
         directory.listFiles { file -> file.name.startsWith("pending-") }?.firstOrNull()
 
     private fun saltFile(directory: File) = File(directory, "salt.bin")
+
+    /** Flips one payload byte so the checksum no longer matches; returns the unreadable bytes. */
+    private fun corruptTheDictionary(directory: File): ByteArray {
+        val destination = destinationFile(directory)
+        val bytes = destination.readBytes()
+        bytes[bytes.size - 1] = (bytes[bytes.size - 1].toInt() xor 0x7f).toByte()
+        destination.writeBytes(bytes)
+        return bytes
+    }
+
+    private fun quarantineFile(directory: File) =
+        File(directory, TpersFormat.personalFileName(subtype) + QUARANTINE_SUFFIX)
+
+    private fun quarantineFiles(directory: File): List<File> =
+        directory.listFiles { file -> file.name.endsWith(QUARANTINE_SUFFIX) }?.toList() ?: emptyList()
+
+    private companion object {
+        /** The suffix the store appends for the one quarantine slot; see `PersonalDictionaryStore`. */
+        const val QUARANTINE_SUFFIX = ".quarantine"
+    }
 
     /** Performs every durable op for real; a test overrides the one it wants to fail. */
     private open class PassthroughOps : DurableFileOps {

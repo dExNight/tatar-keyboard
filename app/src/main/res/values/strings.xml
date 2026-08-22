@@ -194,6 +194,8 @@
     <string name="personal_dictionary_delete_failed">Could not remove the word. It is still saved.</string>
     <!-- Shown when erasing every saved word did not remove everything -->
     <string name="personal_dictionary_erase_failed">Could not erase everything. Some saved words are still on this device.</string>
+    <!-- Shown once when the saved words could not be read, so the list appears empty -->
+    <string name="personal_dictionary_unreadable">Saved words could not be read, so the list is empty. You can add words again.</string>
     <!-- Title of the settings item and its confirmation dialog that erases recently used emoji -->
     <string name="clear_recent_emoji">Clear recent emoji</string>
     <!-- Body of the confirmation dialog that erases recently used emoji -->

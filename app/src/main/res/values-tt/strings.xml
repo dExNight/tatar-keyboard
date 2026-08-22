@@ -95,6 +95,7 @@
     <string name="personal_dictionary_save_failed">Сүзне сакларга булмады. Кабат карап карагыз.</string>
     <string name="personal_dictionary_delete_failed">Сүзне бетерергә булмады. Ул сүзлектә калды.</string>
     <string name="personal_dictionary_erase_failed">Барысын да бетерергә булмады. Сакланган сүзләрнең бер өлеше җиһазда калды.</string>
+    <string name="personal_dictionary_unreadable">Сакланган сүзләрне укырга булмады, шуңа күрә исемлек буш. Сүзләрне яңадан өстәп була.</string>
     <string name="clear_recent_emoji">Соңгы эмодзиләрне чистарту</string>
     <string name="clear_recent_emoji_confirm">Бу җиһазда сакланган барлык соңгы эмодзиләрне бетерергәме? Бу гамәлне кире кайтарып булмый.</string>
     <string name="clear_recent_emoji_action">Чистарту</string>

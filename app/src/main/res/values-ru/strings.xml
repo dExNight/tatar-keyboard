@@ -93,6 +93,7 @@
     <string name="personal_dictionary_save_failed">Не удалось сохранить слово. Попробуйте ещё раз.</string>
     <string name="personal_dictionary_delete_failed">Не удалось удалить слово. Оно осталось в словаре.</string>
     <string name="personal_dictionary_erase_failed">Не удалось стереть всё. Часть сохранённых слов осталась на устройстве.</string>
+    <string name="personal_dictionary_unreadable">Сохранённые слова не удалось прочитать, поэтому список пуст. Слова можно добавить заново.</string>
     <string name="clear_recent_emoji">Очистить недавние эмодзи</string>
     <string name="clear_recent_emoji_confirm">Удалить все недавно использованные эмодзи, сохранённые на этом устройстве? Это действие нельзя отменить.</string>
     <string name="clear_recent_emoji_action">Очистить</string>
