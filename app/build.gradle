@@ -12,8 +12,8 @@ android {
         compileSdk 37
         minSdkVersion 24
         targetSdkVersion 37
-        versionCode 12
-        versionName "1.8.1"
+        versionCode 13
+        versionName "1.8.2"
         // E3b instrumental harness (androidTest only). The legacy platform runner needs no external
         // dependency, so it resolves offline; androidTest never contributes to the release APK.
         testInstrumentationRunner "android.test.InstrumentationTestRunner"
