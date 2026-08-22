@@ -875,7 +875,18 @@ class SuggestionsController internal constructor(
     private fun requestPreparationIfNeeded(explicitEnable: Boolean = false) {
         if (destroyed) return
         val slot = activeSlot() ?: return
-        if (slot.preparationRequested) return
+        if (slot.preparationRequested) {
+            // The request is already in flight, but its PROVENANCE can still be upgraded, and must
+            // be. A preparation started implicitly by opening a field takes hundreds of milliseconds
+            // (unpacking and validating the artifact); the user who sees no band in that window goes
+            // to the settings and flips the switch OFF -> ON, which lands here. Dropping the explicit
+            // enable on the floor meant the Unavailable result that followed was attributed to the
+            // implicit request and reported to nobody — the switch looked like it simply did nothing,
+            // the one outcome DictionaryUnavailableListener exists to prevent. Upgrade only: an
+            // implicit call never downgrades an explicit request that is already outstanding.
+            if (explicitEnable) slot.preparationRequestedByExplicitEnable = true
+            return
+        }
         // A dictionary that is already published is never prepared again: readiness outlives every
         // later transition of the setting.
         if (slot.dictionaryReady) return
