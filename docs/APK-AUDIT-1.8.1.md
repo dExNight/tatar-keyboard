@@ -439,3 +439,5 @@ git log --oneline 812e4bf..46f3b3a
 `git ls-remote --tags origin`.
 
 STATUS: done
+
+СБОРКА 1.8.1 СДАНА
