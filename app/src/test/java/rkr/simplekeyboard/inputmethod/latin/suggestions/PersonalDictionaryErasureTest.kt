@@ -175,9 +175,14 @@ class PersonalDictionaryErasureTest {
         val controller = File(sourceRoot(),
             "java/rkr/simplekeyboard/inputmethod/latin/settings/PersonalDictionaryScreenController.kt")
             .readText()
+        // The signature grew a completion callback (mission tt-personal-dict, finding A2): the
+        // screen may not repaint or claim success before the erasure has actually run. What this
+        // test guards — one call, every subtype it is given — is unchanged.
         assertTrue("erase-all iterates every subtype it is given",
-            controller.contains("fun eraseAll(subtypeIds: List<String>)"))
-        assertTrue(controller.contains("for (subtypeId in subtypeIds)"))
+            controller.contains("fun eraseAll(subtypeIds: List<String>,"))
+        assertTrue("the list it loops over is derived from ALL of them",
+            controller.contains("val targets = subtypeIds.filter"))
+        assertTrue(controller.contains("for (subtypeId in targets)"))
         assertTrue("and it notifies the IME so the band unbinds",
             controller.contains("PersonalDictionaries.notifyErased()"))
 

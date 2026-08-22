@@ -42,11 +42,31 @@ object PersonalForget {
         return if (index >= 0) snapshot.rawFormAt(index) else null
     }
 
-    /** Removes the confirmed word and unbinds whatever the band is showing. */
+    /**
+     * Removes the confirmed word and unbinds whatever the band is showing.
+     *
+     * The unbinding is immediate — that is the "erased means erased" guarantee and it cannot wait
+     * for a disk write. The REMOVAL, however, may not happen at all: the store rewrites the whole
+     * file and a rewrite can fail. That used to be entirely silent, and it was the worst possible
+     * kind of silent, because the dialog had already closed and the word had already left the band:
+     * everything the user could see said the word was gone, and it came back on the next keystroke.
+     *
+     * [onFailed] runs when the word is still saved, on the store's worker thread — the caller
+     * marshals it wherever it needs to. It is a bare [Runnable] on purpose: it carries no word, no
+     * path and no reason, because none of those may leave this package.
+     */
     @JvmStatic
-    fun confirmForget(context: Context, subtypeId: String, shownWord: String) {
+    @JvmOverloads
+    fun confirmForget(
+        context: Context,
+        subtypeId: String,
+        shownWord: String,
+        onFailed: Runnable? = null,
+    ) {
         val normalized = PersonalWordFilter.normalize(shownWord)
-        PersonalDictionaries.storeFor(context, subtypeId).forget(normalized)
+        PersonalDictionaries.storeFor(context, subtypeId).forget(normalized) { removed ->
+            if (!removed) onFailed?.run()
+        }
         PersonalDictionaries.notifyErased()
     }
 }

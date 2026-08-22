@@ -43,3 +43,19 @@ fun interface PersonalDirectoryProvider {
 fun interface PersonalOutputOpener {
     fun open(temp: File): FileOutputStream
 }
+
+/**
+ * The outcome of ONE mutation the user asked for by hand, delivered AFTER the event has actually
+ * run on the store's worker — never before it.
+ *
+ * It exists because the subsystem had no channel at all for "this did not work": logging is
+ * forbidden here by the privacy policy, and every mutation is an event on a background worker whose
+ * result nobody waited for, so a screen could only ever report the queueing, not the writing. This
+ * carries one boolean and nothing else — the word and the path stay inside the store, exactly as
+ * that same policy requires.
+ *
+ * Called on the store's worker thread. A caller that touches UI must marshal it itself.
+ */
+internal fun interface PersonalMutationOutcome {
+    fun onFinished(succeeded: Boolean)
+}

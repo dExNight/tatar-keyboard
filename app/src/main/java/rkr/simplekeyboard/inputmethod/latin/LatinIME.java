@@ -796,7 +796,8 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
                 DialogUtils.getPlatformDialogThemeContext(this))
                 .setTitle(getString(R.string.personal_dictionary_forget_title, savedForm))
                 .setPositiveButton(R.string.personal_dictionary_delete, (di, which) ->
-                        PersonalForget.confirmForget(this, subtypeId, shownWord))
+                        PersonalForget.confirmForget(this, subtypeId, shownWord,
+                                () -> mHandler.post(this::showPersonalForgetFailedDialog)))
                 .setNegativeButton(android.R.string.cancel, null)
                 .create();
         dialog.setCancelable(true);
@@ -828,6 +829,40 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         final AlertDialog dialog = new AlertDialog.Builder(
                 DialogUtils.getPlatformDialogThemeContext(this))
                 .setMessage(R.string.tatar_suggestions_unavailable)
+                .setPositiveButton(android.R.string.ok, null)
+                .create();
+        dialog.setCancelable(true);
+        dialog.setCanceledOnTouchOutside(true);
+        attachDialogToInputWindow(dialog, windowToken);
+        mOptionsDialog = dialog;
+        dialog.show();
+    }
+
+    /**
+     * Says that a word the user asked to forget is still saved.
+     *
+     * Same shape and same reasoning as {@link #showSuggestionsUnavailableDialog()}: a dialog rather
+     * than a Toast, because a toast from a background process is at the platform's discretion and
+     * this is the only notice the user will ever get — the personal-dictionary subsystem may not
+     * log, and nothing else waits for the result of the write. The body names no word, no file and
+     * no cause; the word is the one thing that must not appear here, since the message can be shown
+     * over any app.
+     *
+     * <p>Arrives from the store's worker through the handler, so by the time it runs the keyboard
+     * window may be gone; both null checks below are the ordinary answer to that.</p>
+     */
+    private void showPersonalForgetFailedDialog() {
+        final MainKeyboardView mainKeyboardView = mKeyboardSwitcher.getMainKeyboardView();
+        if (mainKeyboardView == null) {
+            return;
+        }
+        final IBinder windowToken = mainKeyboardView.getWindowToken();
+        if (windowToken == null) {
+            return;
+        }
+        final AlertDialog dialog = new AlertDialog.Builder(
+                DialogUtils.getPlatformDialogThemeContext(this))
+                .setMessage(R.string.personal_dictionary_delete_failed)
                 .setPositiveButton(android.R.string.ok, null)
                 .create();
         dialog.setCancelable(true);

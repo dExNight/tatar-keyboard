@@ -468,13 +468,16 @@ class SettingsHostActivity : Activity() {
                 .setView(field)
                 .setPositiveButton(R.string.personal_dictionary_add_action) { _, _ ->
                     val subtypeId = targetSubtypeForAddedWord(subtypeIds)
-                    val added = subtypeId != null
-                            && controller.addWord(subtypeId, field.text.toString())
-                    if (!added) {
+                    val accepted = subtypeId != null
+                            && controller.addWord(subtypeId, field.text.toString()) { saved ->
+                                afterPersonalMutation(saved,
+                                        R.string.personal_dictionary_save_failed)
+                            }
+                    if (!accepted) {
                         Toast.makeText(this, R.string.personal_dictionary_add_rejected,
                                 Toast.LENGTH_SHORT).show()
+                        showScreen(Screen.PERSONAL_DICTIONARY)
                     }
-                    showScreen(Screen.PERSONAL_DICTIONARY)
                 }
                 .setNegativeButton(android.R.string.cancel, null)
                 .show()
@@ -486,8 +489,10 @@ class SettingsHostActivity : Activity() {
         currentDialog = AlertDialog.Builder(this)
                 .setTitle(getString(R.string.personal_dictionary_forget_title, row.rawForm))
                 .setPositiveButton(R.string.personal_dictionary_delete) { _, _ ->
-                    controller.removeWord(row.subtypeId, row.normalizedForm)
-                    showScreen(Screen.PERSONAL_DICTIONARY)
+                    controller.removeWord(row.subtypeId, row.normalizedForm) { removed ->
+                        afterPersonalMutation(removed,
+                                R.string.personal_dictionary_delete_failed)
+                    }
                 }
                 .setNegativeButton(android.R.string.cancel, null)
                 .show()
@@ -500,11 +505,32 @@ class SettingsHostActivity : Activity() {
                 .setTitle(R.string.personal_dictionary_erase_all)
                 .setMessage(R.string.personal_dictionary_erase_confirm)
                 .setPositiveButton(R.string.personal_dictionary_erase_action) { _, _ ->
-                    controller.eraseAll(subtypeIds)
-                    showScreen(Screen.PERSONAL_DICTIONARY)
+                    controller.eraseAll(subtypeIds) { erased ->
+                        afterPersonalMutation(erased,
+                                R.string.personal_dictionary_erase_failed)
+                    }
                 }
                 .setNegativeButton(android.R.string.cancel, null)
                 .show()
+    }
+
+    /**
+     * The one place the personal-dictionary screen reacts to a mutation that has actually finished.
+     *
+     * Both halves matter and neither used to happen. The list is repainted only NOW, because the
+     * published snapshot is what it reads and the snapshot did not exist yet at the moment the
+     * dialog closed — the added word was simply missing from the list, which reads as "the button
+     * did nothing". And a mutation that failed says so: the subsystem may not log, so a message on
+     * screen is the only channel it has, and it names no word, no file and no cause.
+     */
+    private fun afterPersonalMutation(succeeded: Boolean, failureMessageRes: Int) {
+        if (isFinishing || isDestroyed) return
+        if (!succeeded) {
+            Toast.makeText(this, failureMessageRes, Toast.LENGTH_LONG).show()
+        }
+        if (currentScreen == Screen.PERSONAL_DICTIONARY) {
+            showScreen(Screen.PERSONAL_DICTIONARY)
+        }
     }
 
     /**

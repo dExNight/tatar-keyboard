@@ -85,10 +85,24 @@ internal class PersonalDictionaryStore(
     var snapshot: PersonalDictionary = PersonalDictionary.EMPTY
         private set
 
-    /** Manually adds one word (E4b's "Add word…" path); a no-op if the word is not eligible. */
-    fun addManually(word: String) = onWorker {
-        val normalized = eligibleNormalizedForm(word) ?: return@onWorker
-        commitWrite(entries.upsert(word, normalized))
+    /**
+     * Manually adds one word (E4b's "Add word…" path); a no-op if the word is not eligible.
+     *
+     * [outcome] is told what actually happened, on the worker, once the whole-file write has either
+     * succeeded or failed — never at the moment the event was queued. Without it the screen could
+     * only report that it had asked, and a write that ran out of space or failed re-validation would
+     * be invisible: no list entry, no message, no retry.
+     */
+    fun addManually(word: String, outcome: PersonalMutationOutcome? = null) = onWorker {
+        val normalized = eligibleNormalizedForm(word)
+        if (normalized == null) {
+            outcome?.onFinished(false)
+            return@onWorker
+        }
+        // Evaluated first and reported second, deliberately: inside `outcome?.onFinished(...)` a
+        // null outcome would short-circuit the argument too, and the write itself would vanish.
+        val saved = commitWrite(entries.upsert(word, normalized))
+        outcome?.onFinished(saved)
     }
 
     /**
@@ -121,10 +135,30 @@ internal class PersonalDictionaryStore(
         pendingDirty = true
     }
 
-    /** Removes one word and rewrites (or deletes, when it was the last) the file. */
-    fun forget(word: String) = onWorker {
-        if (!open()) return@onWorker
-        alphabet ?: return@onWorker
+    /**
+     * Removes one word and rewrites (or deletes, when it was the last) the file.
+     *
+     * Two things the caller is entitled to and did not use to get:
+     *
+     * * [outcome] is told whether the word is really gone. A failed rewrite leaves the word both in
+     *   memory and on disk, and the user had already been told the opposite — the dialog closed and
+     *   the band was cleared — so the word came back on the next keystroke with nothing said.
+     * * The removal is published to READERS before the write, not after it. "Erased means erased" is
+     *   the whole value of this feature, and the engine reads [snapshot] from its own thread: while
+     *   the write was in flight — two fsyncs, tens to hundreds of milliseconds on the cheap devices
+     *   this project targets — a keystroke could still bring the erased word back onto the band. If
+     *   the write then fails, the previous snapshot is restored, because at that point the word IS
+     *   still saved and pretending otherwise would be the same lie in the other direction.
+     */
+    fun forget(word: String, outcome: PersonalMutationOutcome? = null) = onWorker {
+        if (!open()) {
+            outcome?.onFinished(false)
+            return@onWorker
+        }
+        if (alphabet == null) {
+            outcome?.onFinished(false)
+            return@onWorker
+        }
         val normalized = PersonalWordFilter.normalize(word)
         // The pending hash goes with the word: forgetting it must not leave progress behind that
         // would re-learn it after three more completions.
@@ -136,15 +170,21 @@ internal class PersonalDictionaryStore(
             }
         }
         val candidate = entries.remove(normalized)
-        if (candidate === entries) return@onWorker
-        if (candidate.isEmpty) {
-            if (deleteFile()) {
-                entries = candidate
-                snapshot = PersonalDictionary.EMPTY
-            }
-        } else {
-            commitWrite(candidate)
+        if (candidate === entries) {
+            // The word was not in this dictionary at all: nothing to remove, and from where the
+            // user stands it is gone, which is what they asked for.
+            outcome?.onFinished(true)
+            return@onWorker
         }
+        val previousSnapshot = snapshot
+        snapshot = if (candidate.isEmpty) PersonalDictionary.EMPTY else candidate.toSnapshot(subtypeId)
+        val removed = if (candidate.isEmpty) deleteFile() else writeWhole(candidate)
+        if (removed) {
+            entries = candidate
+        } else {
+            snapshot = previousSnapshot
+        }
+        outcome?.onFinished(removed)
     }
 
     /**
@@ -152,7 +192,7 @@ internal class PersonalDictionaryStore(
      * counters and the salt. The salt goes too, so the hashes of a future session cannot be compared
      * with those of the erased one; a new one is created on demand.
      */
-    fun clearAll() = onWorker {
+    fun clearAll(outcome: PersonalMutationOutcome? = null) = onWorker {
         entries = PersonalEntries.empty(maxEntries)
         pendingCounterFlush = false
         pending = PendingCounters.EMPTY
@@ -160,15 +200,24 @@ internal class PersonalDictionaryStore(
         salt = null
         snapshot = PersonalDictionary.EMPTY
         loaded = true
-        if (!unlockGate()) return@onWorker
-        try {
-            deleteFile()
-            val directory = directoryProvider.personalDirectory()
-            deleteFile(directory, File(directory, pendingFileName()))
-            deleteFile(directory, File(directory, SALT_FILE_NAME))
-        } catch (_: Exception) {
-            // Fail-closed: the feature is already empty in memory.
+        if (!unlockGate()) {
+            // Memory is empty, the files are untouched and the next process start reads them all
+            // back. The screen shows an empty list either way, so this is exactly the case that must
+            // not pass for success.
+            outcome?.onFinished(false)
+            return@onWorker
         }
+        // Three INDEPENDENT deletions. They used to share one try, so a failure on the first one
+        // skipped the other two and left the salt and the pending counters behind: the same salt
+        // means the same hashes, so words two-thirds of the way to being learned kept their
+        // progress and re-appeared after three more completions, with the screen showing nothing.
+        val dictionaryGone = deleted { deleteFile() }
+        val directory = runCatching { directoryProvider.personalDirectory() }.getOrNull()
+        val countersGone = directory != null &&
+            deleted { deleteFile(directory, File(directory, pendingFileName())) }
+        val saltGone = directory != null &&
+            deleted { deleteFile(directory, File(directory, SALT_FILE_NAME)) }
+        outcome?.onFinished(dictionaryGone && countersGone && saltGone)
     }
 
     /**
@@ -218,11 +267,23 @@ internal class PersonalDictionaryStore(
         return PersonalWordFilter.acceptedNormalizedForm(word, alpha)
     }
 
-    private fun commitWrite(candidate: PersonalEntries) {
-        if (writeWhole(candidate)) {
-            entries = candidate
-            snapshot = candidate.toSnapshot(subtypeId)
-        }
+    private fun commitWrite(candidate: PersonalEntries): Boolean {
+        if (!writeWhole(candidate)) return false
+        entries = candidate
+        snapshot = candidate.toSnapshot(subtypeId)
+        return true
+    }
+
+    /**
+     * Runs ONE erasure step so that its failure can neither skip the next step nor escape: returns
+     * whether it went through. Nothing is logged — not the path, not the reason — which is why the
+     * boolean has to travel back to the caller instead.
+     */
+    private inline fun deleted(step: () -> Unit): Boolean = try {
+        step()
+        true
+    } catch (_: Exception) {
+        false
     }
 
     /**
