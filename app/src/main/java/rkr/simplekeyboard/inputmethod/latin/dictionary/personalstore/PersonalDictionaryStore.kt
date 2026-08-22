@@ -151,14 +151,28 @@ internal class PersonalDictionaryStore(
      *   still saved and pretending otherwise would be the same lie in the other direction.
      */
     fun forget(word: String, outcome: PersonalMutationOutcome? = null) = onWorker {
-        if (!open()) {
-            outcome?.onFinished(false)
-            return@onWorker
+        // B3. This was the one mutation whose body ran outside a `try`, and the exception did not
+        // stay inside it: the worker is a bare single-thread executor created without an
+        // `UncaughtExceptionHandler`, so `deleteFile()` throwing on the removal of the LAST saved
+        // word reached the default handler — `KillApplicationHandler`. The keyboard died in the
+        // middle of typing in someone else's app.
+        //
+        // Falling over protected nothing here. The usual argument for a loud crash assumes data is
+        // being lost; a delete that did not happen loses nothing — the word simply stays saved. The
+        // cost was a dead IME and there was no gain, so the refusal travels the channel instead, and
+        // [outcome] hears exactly one answer whatever happens below.
+        val removed = try {
+            removeOnWorker(word)
+        } catch (_: Exception) {
+            false
         }
-        if (alphabet == null) {
-            outcome?.onFinished(false)
-            return@onWorker
-        }
+        outcome?.onFinished(removed)
+    }
+
+    /** The body of [forget], on the worker: returns whether the word is really gone. */
+    private fun removeOnWorker(word: String): Boolean {
+        if (!open()) return false
+        if (alphabet == null) return false
         val normalized = PersonalWordFilter.normalize(word)
         // The pending hash goes with the word: forgetting it must not leave progress behind that
         // would re-learn it after three more completions.
@@ -173,18 +187,24 @@ internal class PersonalDictionaryStore(
         if (candidate === entries) {
             // The word was not in this dictionary at all: nothing to remove, and from where the
             // user stands it is gone, which is what they asked for.
-            outcome?.onFinished(true)
-            return@onWorker
+            return true
         }
         val previousSnapshot = snapshot
         snapshot = if (candidate.isEmpty) PersonalDictionary.EMPTY else candidate.toSnapshot(subtypeId)
-        val removed = if (candidate.isEmpty) deleteFile() else writeWhole(candidate)
+        // B3, the part that makes the refusal true rather than merely quiet: a throw here becomes
+        // `false` HERE, inside the mutation, so the restore below still runs. The word is still on
+        // disk at this point, and a snapshot that hides it would turn one lie into a permanent one.
+        val removed = try {
+            if (candidate.isEmpty) deleteFile() else writeWhole(candidate)
+        } catch (_: Exception) {
+            false
+        }
         if (removed) {
             entries = candidate
         } else {
             snapshot = previousSnapshot
         }
-        outcome?.onFinished(removed)
+        return removed
     }
 
     /**

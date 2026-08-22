@@ -34,8 +34,8 @@ import rkr.simplekeyboard.inputmethod.latin.dictionary.storage.DurableFileOps
 import rkr.simplekeyboard.inputmethod.latin.dictionary.storage.SpaceProbe
 
 /**
- * Mission `tt-personal-dict`: the store half of the silent-failure register in
- * `docs/SILENT-AUDIT.md` — A2, A3, A5 and B1.
+ * Missions `tt-personal-dict` and `tt-version-1.8.2`: the store half of the silent-failure
+ * register in `docs/SILENT-AUDIT.md` — A2, A3, A5, B1 and B3.
  *
  * The whole subsystem chose fail-closed and forbade itself logging, and then never built a channel
  * for "this did not work". Every test here is about that missing channel, and each one names the
@@ -290,6 +290,67 @@ class PersonalDictionarySilentFailureTest {
     }
 
 
+    // ---- B3: a failed removal is an answer, not a dead process ----------------------------------
+
+    /**
+     * B3. `forget` was the ONE mutation without a `try`, and its exception did not stay inside it.
+     * `deleteFile()` never returns false — it returns true or throws — so removing the LAST saved
+     * word threw straight out of the lambda, onto a single-thread executor created without an
+     * `UncaughtExceptionHandler`, where the default handler is `KillApplicationHandler`: the keyboard
+     * died in the middle of typing in someone else's app.
+     *
+     * The executor here is that production worker in miniature — one thread per event, with a handler
+     * standing exactly where the killer stands in the app. Anything it collects would have been a
+     * dead IME.
+     */
+    @Test
+    fun aRemovalThatCannotDeleteTheFileAnswersInsteadOfKillingTheWorker() {
+        val directory = newPersonalDir()
+        store(directory).addManually("абыйлар")
+        val stubborn = object : PassthroughOps() {
+            override fun delete(file: File): Boolean =
+                if (file.name.endsWith(".tpers")) false else super.delete(file)
+        }
+        val uncaught = mutableListOf<Throwable>()
+        val faulting = store(directory, ops = stubborn, executor = workerWithKiller(uncaught))
+
+        val outcomes = mutableListOf<Boolean>()
+        faulting.forget("абыйлар") { outcomes.add(it) }
+
+        assertEquals(
+            "nothing may reach the worker's uncaught handler: in production that handler kills the IME",
+            emptyList<Throwable>(), uncaught,
+        )
+        assertEquals("the user hears a refusal instead", listOf(false), outcomes)
+    }
+
+    /**
+     * B3, the state the refusal has to describe truthfully: a delete that did not happen leaves the
+     * word saved, so the published snapshot must show it again. Falling over protected nothing here —
+     * that is the whole reason the crash was the wrong answer — but neither may the store claim the
+     * word is gone.
+     */
+    @Test
+    fun aRemovalThatCannotDeleteTheFileLeavesTheWordSavedAndSaysSo() {
+        val directory = newPersonalDir()
+        store(directory).addManually("абыйлар")
+        val stubborn = object : PassthroughOps() {
+            override fun delete(file: File): Boolean =
+                if (file.name.endsWith(".tpers")) false else super.delete(file)
+        }
+        val faulting = store(directory, ops = stubborn)
+
+        val outcomes = mutableListOf<Boolean>()
+        faulting.forget("абыйлар") { outcomes.add(it) }
+
+        assertEquals(listOf(false), outcomes)
+        assertTrue("the word is still on disk", destinationFile(directory).isFile)
+        assertTrue(
+            "and still published, because it is still saved",
+            faulting.snapshot.indexOfNormalized("абыйлар") >= 0,
+        )
+    }
+
     // ---- helpers --------------------------------------------------------------------------------
 
     private val directExecutor = Executor { it.run() }
@@ -297,12 +358,25 @@ class PersonalDictionarySilentFailureTest {
     private fun newPersonalDir(): File =
         File(temporaryFolder.newFolder(), "personal").also { assertTrue(it.mkdirs()) }
 
+    /**
+     * The production worker in miniature: one thread per event, joined so the test stays as
+     * sequential as the direct executor, and an `UncaughtExceptionHandler` standing where
+     * `KillApplicationHandler` stands in the app.
+     */
+    private fun workerWithKiller(uncaught: MutableList<Throwable>) = Executor { runnable ->
+        val thread = Thread(runnable, "personal-dictionary-test")
+        thread.setUncaughtExceptionHandler { _, error -> uncaught.add(error) }
+        thread.start()
+        thread.join()
+    }
+
     private fun store(
         directory: File,
         ops: DurableFileOps = PassthroughOps(),
         opener: PersonalOutputOpener = PersonalOutputOpener { temp -> FileOutputStream(temp) },
         spaceProbe: SpaceProbe = SpaceProbe { Long.MAX_VALUE },
         unlockGate: () -> Boolean = { true },
+        executor: Executor = directExecutor,
     ): PersonalDictionaryStore = PersonalDictionaryStore(
         subtypeId = subtype,
         directoryProvider = { directory },
@@ -310,7 +384,7 @@ class PersonalDictionarySilentFailureTest {
         outputOpener = opener,
         spaceProbe = spaceProbe,
         clock = { 1000L },
-        executor = directExecutor,
+        executor = executor,
         unlockGate = unlockGate,
     )
 
