@@ -18,7 +18,6 @@ package rkr.simplekeyboard.inputmethod.latin.suggestions
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
-import org.junit.Ignore
 import org.junit.Test
 import rkr.simplekeyboard.inputmethod.latin.RichInputConnection
 import rkr.simplekeyboard.inputmethod.latin.dictionary.engine.LookupKind
@@ -28,7 +27,9 @@ import java.util.concurrent.TimeUnit
 /**
  * Mission tt-tap-repro. Reproduces, from the symptom, the two defects the operator saw on 1.8.0.
  * The cursor-bookkeeping cause behind both symptom-2 tests was fixed in 1.8.1; they pass now and
- * stay here as regression tests. The single symptom-1 test is @Ignore'd — see its own comment.
+ * stay here as regression tests. The symptom-1 test was @Ignore'd until mission tt-final: the
+ * operator's 2026-08-22 decision made the repaint part of the assignment, and the invariant it
+ * asserts — what the strip paints is tappable — now holds.
  *
  * The fakes here differ from [SuggestionsControllerTest]'s in ONE deliberate way: the engine has
  * real latest-only token semantics (a fresh token per request, `isCurrent` true only for the newest
@@ -205,25 +206,47 @@ class TapReproTest {
             val token = engine.newestToken() ?: return
             callback!!.onResult(token, suggestions.toList(), LookupKind.PREFIX)
         }
+
+        /** The NEXT_WORD sibling of [deliver]. */
+        fun deliverNextWord(vararg suggestions: String) {
+            val token = engine.newestToken() ?: return
+            callback!!.onResult(token, suggestions.toList(), LookupKind.NEXT_WORD)
+        }
     }
 
     // --- Symptom 1 -------------------------------------------------------------------------------
 
     /**
+     * The invariant, checked the way a finger checks it: whatever the strip is painting AT THIS
+     * INSTANT must reach the editor when tapped.
+     *
+     * Deliberately stated as a property of the visible band rather than as an expected band
+     * content, so it holds whichever way the controller chooses to keep it. An empty band satisfies
+     * it by having nothing to offer — which is why every caller below also asserts that the band
+     * comes back, so "paint nothing, ever" cannot pass.
+     *
+     * Consumes the tap it makes: a successful commit clears the band, so this may only be called at
+     * the instant under test, never as a warm-up.
+     */
+    private fun assertNothingPaintedIsDead(h: Harness) {
+        val painted = h.strip.visibleWords
+        if (painted.isEmpty()) return
+        val before = h.editor.commits.size + h.editor.predictedCommits.size
+        h.strip.tap(painted[0])
+        assertTrue(
+            "the strip is painting \"${painted[0]}\" and tapping it reached nothing",
+            h.editor.commits.size + h.editor.predictedCommits.size > before,
+        )
+    }
+
+    /**
      * "Ячейка подсвечивается, но текст не меняется."
      *
-     * The invariant under test is the one the user relies on: WHAT THE STRIP IS PAINTING IS
-     * TAPPABLE. Any word the strip shows must, when tapped, reach the editor as a commit.
+     * The window: the live cached word has moved off the prefix the painted candidates were
+     * computed for, and the answer to the new prefix has not come back yet. The controller unbinds
+     * the candidates the instant the prefix changes, so a tap in this window can never commit —
+     * whatever is still on the strip is a dead button.
      */
-    @Ignore(
-        "Second, independent defect, NOT the cause of the operator's two symptoms (see " +
-            "docs/TAP-REPRO.md, section 'Главная версия досье: что с ней стало'). The strip keeps " +
-            "painting candidates the controller has already unbound, so a tap inside that window " +
-            "is a guaranteed no-op. Closing it is a UX trade-off, not a correctness fix — either " +
-            "the band blanks on every keystroke, or the window stays. Asked the operator in " +
-            "mission tt-version-1.8.1 (.smgr/tt-version-1.8.1/ask.json); re-enable this test when " +
-            "he picks. The test itself is correct and was left runnable on purpose."
-    )
     @Test
     fun tappingAWordTheStripIsPaintingAlwaysReachesTheEditor() {
         val h = Harness()
@@ -234,24 +257,69 @@ class TapReproTest {
         h.deliver("синең", "сине", "сингапур")
         assertEquals(listOf("синең", "сине", "сингапур"), h.strip.visibleWords)
 
-        // The live cached word moves off the prefix those candidates were computed for, and the
-        // result of the new lookup has not come back yet. Nothing repaints the strip.
+        // One more letter. The lookup for "синеп" is in flight; nothing has answered it yet.
         h.type("синеп")
+        assertNothingPaintedIsDead(h)
 
-        assertEquals(
-            "the strip is still painting the old candidates",
-            listOf("синең", "сине", "сингапур"),
-            h.strip.visibleWords,
-        )
+        // And the band is not simply gone for good: the answer to the new prefix fills it back,
+        // and what it paints is tappable like anything else.
+        h.deliver("синеп", "синепле")
+        assertEquals(listOf("синеп", "синепле"), h.strip.visibleWords)
+        h.strip.tap("синеп")
+        assertEquals("синеп" to "синеп", h.editor.commits.last())
+    }
 
-        // The user taps what they can see.
-        h.strip.tap("синең")
+    /**
+     * The same window on the NEXT_WORD side: a prediction band painted for one context word, then
+     * the context word underneath it changes.
+     */
+    @Test
+    fun tappingAPaintedPredictionAlwaysReachesTheEditor() {
+        val h = Harness()
+        h.controller.onStartInput(eligible = true)
 
-        assertEquals(
-            "a painted word was tapped and nothing reached the editor",
-            1,
-            h.editor.commits.size,
-        )
+        // Empty trailing word plus a context word is the NEXT_WORD path.
+        h.editor.nextWordContext = "мин"
+        h.type("")
+        h.deliverNextWord("барам", "киләм")
+        assertEquals(listOf("барам", "киләм"), h.strip.visibleWords)
+
+        // The word before the cursor is now a different one; the prediction on screen describes
+        // text the user has already left.
+        h.editor.nextWordContext = "син"
+        h.type("")
+        assertNothingPaintedIsDead(h)
+
+        h.deliverNextWord("барасың")
+        assertEquals(listOf("барасың"), h.strip.visibleWords)
+        h.strip.tap("барасың")
+        assertEquals("син" to "барасың", h.editor.predictedCommits.last())
+    }
+
+    /**
+     * Rule 3 of the mission dossier, as a test: ordinary monolingual typing must not change. The
+     * words the user ends up looking at after each answered keystroke are exactly the ones the
+     * engine returned, in order, and every one of them commits.
+     */
+    @Test
+    fun ordinaryTypingStillShowsTheEngineAnswerForEveryKeystroke() {
+        val h = Harness()
+        h.controller.onStartInput(eligible = true)
+
+        h.type("к")
+        h.deliver("китап", "кеше", "кайда")
+        assertEquals(listOf("китап", "кеше", "кайда"), h.strip.visibleWords)
+
+        h.type("ки")
+        h.deliver("китап", "кием", "кичә")
+        assertEquals(listOf("китап", "кием", "кичә"), h.strip.visibleWords)
+
+        h.type("кит")
+        h.deliver("китап", "китә", "китте")
+        assertEquals(listOf("китап", "китә", "китте"), h.strip.visibleWords)
+
+        h.strip.tap("китап")
+        assertEquals("кит" to "китап", h.editor.commits.last())
     }
 
     // --- Symptom 2 -------------------------------------------------------------------------------

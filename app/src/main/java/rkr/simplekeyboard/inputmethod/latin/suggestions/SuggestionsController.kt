@@ -1339,13 +1339,18 @@ class SuggestionsController internal constructor(
         }
         // Prefix changed relative to what is on screen: invalidate the displayed candidates NOW so
         // a tap arriving before the new result can never commit the old candidate against the new
-        // prefix.
+        // prefix. [unbindPaintedBand] takes the words off the strip in the same breath — see its
+        // own comment for why unbinding alone is not enough.
         if (word != displayedPrefix) {
             displayedPrefix = null
+            unbindPaintedBand()
         }
         // A non-empty prefix is unconditionally PREFIX mode: drop whatever NEXT_WORD state might
         // still be bound from a moment ago, so the two kinds never coexist in the band.
-        displayedContextWord = null
+        if (displayedContextWord != null) {
+            displayedContextWord = null
+            unbindPaintedBand()
+        }
         // A fresh lookup of the active language supersedes whatever the companion was asked
         // before it: the answer is about a word the user has already typed past.
         clearCompanionRequest()
@@ -1373,11 +1378,15 @@ class SuggestionsController internal constructor(
         }
         if (context != displayedContextWord) {
             displayedContextWord = null
+            unbindPaintedBand()
         }
         // A NEXT_WORD request is unconditionally not PREFIX mode: drop whatever prefix candidates
         // might still be bound (there should not be any, since this path only runs on an empty
         // prefix, but the invariant is enforced here rather than assumed).
-        displayedPrefix = null
+        if (displayedPrefix != null) {
+            displayedPrefix = null
+            unbindPaintedBand()
+        }
         clearCompanionRequest()
         pendingContextWord = context
         requestSessionId = sessionId
@@ -1386,6 +1395,31 @@ class SuggestionsController internal constructor(
         if (token == null) {
             clearToReservedBand()
         }
+    }
+
+    /**
+     * Takes off the strip whatever it is still painting, once the candidates behind it have been
+     * unbound. Keeps the reserved height, so the keyboard does not resize.
+     *
+     * The invariant this exists for is the one the user relies on and the only one they can check:
+     * **what the strip is painting is tappable.** Unbinding alone does not hold it. [onTap] reads
+     * [displayedPrefix]/[displayedContextWord] and returns without committing when both are null,
+     * so between the unbind and the arrival of the fresh result every word still on the strip is a
+     * button that does nothing and says nothing — the exact shape of failure this keyboard treats
+     * as a defect even where the code is formally right.
+     *
+     * Costs one repaint per keystroke that changes the prefix, and only when words were actually
+     * painted: `bandBaseCells` empty means the strip is already blank and nothing is touched. The
+     * blank lasts one engine round trip, which the caller has just dispatched (see
+     * docs/FINAL-POLISH.md for the measured length of that window).
+     *
+     * Deliberately does NOT touch [requestSessionId] — unlike [clearToReservedBand], the callers
+     * here are about to issue a lookup and the result of that lookup must be allowed to land.
+     */
+    private fun unbindPaintedBand() {
+        if (bandBaseCells.isEmpty()) return
+        bandBaseCells = emptyList()
+        strip.reserve()
     }
 
     /**
@@ -1398,8 +1432,6 @@ class SuggestionsController internal constructor(
     private fun clearToReservedBand() {
         displayedPrefix = null
         displayedContextWord = null
-        bandBaseCells = emptyList()
-        clearCompanionRequest()
         bandBaseCells = emptyList()
         clearCompanionRequest()
         requestSessionId = NO_SESSION
@@ -1619,8 +1651,6 @@ class SuggestionsController internal constructor(
         // Whatever the band was showing described the word that no longer stands there.
         displayedPrefix = null
         displayedContextWord = null
-        bandBaseCells = emptyList()
-        clearCompanionRequest()
         bandBaseCells = emptyList()
         clearCompanionRequest()
         armedReplacement = Replacement(
