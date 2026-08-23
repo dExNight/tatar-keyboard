@@ -466,6 +466,52 @@ class SuggestionsControllerLanguagePriorityTest {
         assertEquals(emptyList<String>(), h.engine(russian).nextWordRequests)
     }
 
+    // --- Цена на UI-потоке ----------------------------------------------------------------------
+
+    /**
+     * Everything the rule adds to the UI thread itself, measured: dispatching the second lookup and
+     * merging its answer into the band. The lookup's own compute happens on the other engine's
+     * worker thread and is measured separately ([LanguagePriorityCostTest]); what is left here is
+     * the only work that can ever sit between a keystroke and a frame.
+     *
+     * The budget is deliberately loose — this is a few string comparisons and one strip call, so a
+     * whole millisecond is already three orders of magnitude of headroom over what it should cost.
+     * It exists to catch a future change that puts real work on this path, not to police jitter.
+     */
+    @Test
+    fun theUiThreadWorkTheRuleAddsPerKeystrokeIsUnderAMillisecond() {
+        val h = Harness()
+        h.warmBoth(PersonalSubtypes.TATAR_RU)
+        val current = listOf("бераз")
+        val other = listOf("берег", "берёза", "беречь")
+        repeat(2_000) {
+            h.editor.word = "бер"
+            h.controller.onTextChanged()
+            h.deliver(PersonalSubtypes.TATAR_RU, current)
+            h.deliver(PersonalSubtypes.RUSSIAN, other)
+        }
+
+        val timings = LongArray(5_000)
+        for (sample in timings.indices) {
+            h.editor.word = "бер"
+            h.controller.onTextChanged()
+            h.deliver(PersonalSubtypes.TATAR_RU, current)
+            val started = System.nanoTime()
+            h.deliver(PersonalSubtypes.RUSSIAN, other)
+            timings[sample] = System.nanoTime() - started
+        }
+        timings.sort()
+        val median = timings[timings.size / 2] / 1_000_000.0
+        val p95 = timings[(timings.size * 95) / 100] / 1_000_000.0
+        println(
+            "lang-priority ui-thread merge median=" +
+                "${"%.4f".format(java.util.Locale.ROOT, median)} ms " +
+                "p95=${"%.4f".format(java.util.Locale.ROOT, p95)} ms",
+        )
+        assertTrue("p95=$p95 ms", p95 <= 1.0)
+        assertEquals(listOf("бераз", "берег", "берёза"), h.strip.lastCells())
+    }
+
     @Test
     fun aPrefixResultNeverFillsANextWordBandAndBackwards() {
         val h = Harness()
