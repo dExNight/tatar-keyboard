@@ -150,7 +150,9 @@ class PersonalDictionaryFeedbackSourceContractTest {
     fun everyOutcomeIsMarshalledOntoTheUiThread() {
         // The store answers on its own worker; a Toast and a repaint may not happen there.
         assertTrue(screenController.contains("private val uiPoster: (Runnable) -> Unit"))
-        assertEquals("three mutations, four exits — eraseAll answers on both of its branches", 4,
+        // Six entry points, eight exits: eraseAll and quarantines each answer on both of their
+        // branches (nothing to do, and the counted fan-out). Every one of them ends on the UI thread.
+        assertEquals("no answer may be left on the store's worker", 8,
             Regex("uiPoster \\{").findAll(screenController).count())
     }
 

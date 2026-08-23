@@ -58,11 +58,13 @@ class PersonalQuarantineNoticeSourceContractTest {
 
     @Test
     fun theUnreadableFileIsSetAsideAtTheOneSiteThatUsedToDeleteIt() {
-        val open = bodyOf(store, "private fun open(): Boolean {", "\n    /**")
-        assertTrue("the validation-failure branch moves the file", open.contains("quarantine(directory, file)"))
+        // `open()` split into the gate and the body when the notice became durable (mission
+        // `tt-quarantine`, B5); the validation-failure branch is in the body.
+        val load = bodyOf(store, "private fun load() {", "\n    /**")
+        assertTrue("the validation-failure branch moves the file", load.contains("quarantine(directory, file)"))
         assertFalse(
             "and the delete that shipped is gone from that branch",
-            open.contains("runCatching { deleteFile(directory, file) }"),
+            load.contains("runCatching { deleteFile(directory, file) }"),
         )
 
         val quarantine = bodyOf(store, "private fun quarantine(directory: File, file: File) {", "\n    private fun quarantineFileName")
@@ -72,7 +74,30 @@ class PersonalQuarantineNoticeSourceContractTest {
             quarantine.contains("fileOps.syncDirectory(directory)"))
         assertTrue("a move that cannot happen still clears the path the reader looks at",
             quarantine.contains("if (!moved) runCatching { deleteFile(directory, file) }"))
-        assertTrue("and the user is told either way", quarantine.contains("quarantineNotice?.onQuarantined()"))
+        assertTrue("and the user is marked as owed a notice either way",
+            quarantine.contains("writeBytesDurably(directory, File(directory, quarantineNoticeFileName()), ByteArray(1))"))
+    }
+
+    /**
+     * B5. The seam is called from ONE place, and that place is every open — not only the open that
+     * quarantined something. That is what carries an unspoken notice across a process death.
+     */
+    @Test
+    fun theNoticeIsRaisedFromEveryOpenThatFindsTheMark() {
+        val open = bodyOf(store, "private fun open(): Boolean {", "\n    /** The body of [open]")
+        assertTrue("this session's loss and a previous session's both raise it",
+            open.contains("if (justQuarantined || quarantineNoticeIsMarked()) {"))
+        assertTrue(open.contains("quarantineNotice?.onQuarantined()"))
+        assertEquals(
+            "and nowhere else calls the seam",
+            1,
+            Regex(Regex.escape("quarantineNotice?.onQuarantined()")).findAll(store).count(),
+        )
+        assertTrue("the mark is a flag, not text: one byte whose existence is the message",
+            store.contains("quarantine-notice-\$subtypeId-s1-f1.flag"))
+        assertTrue("and it is spent only once the notice has really been shown",
+            bodyOf(store, "fun noticeDelivered() = onWorker {", "\n    /**")
+                .contains("deleted { deleteFile(directory, File(directory, quarantineNoticeFileName())) }"))
     }
 
     @Test
@@ -92,7 +117,12 @@ class PersonalQuarantineNoticeSourceContractTest {
         assertTrue("its own independent step, like the other three",
             clearAll.contains("deleted { deleteFile(directory, File(directory, quarantineFileName())) }"))
         assertTrue("and a copy left behind sinks the answer",
-            clearAll.contains("outcome?.onFinished(dictionaryGone && countersGone && saltGone && quarantineGone)"))
+            clearAll.contains("report(outcome, dictionaryGone && countersGone && saltGone && quarantineGone)"))
+        // B5. The mark is not one of the user's words: a mark that would not delete must not turn
+        // "your words are gone" into "the erasure failed".
+        assertFalse("the mark is not part of the answer",
+            clearAll.contains("&& quarantineNoticeGone"))
+        assertTrue("but it does go", clearAll.contains("quarantineNoticeFileName()"))
     }
 
     // --- B3, the store side ----------------------------------------------------------------------
@@ -103,11 +133,12 @@ class PersonalQuarantineNoticeSourceContractTest {
             "/** The body of [forget]")
         assertTrue("the whole body runs inside a try", forget.contains("val removed = try {"))
         assertTrue(forget.contains("removeOnWorker(word)"))
-        assertTrue("and one answer leaves it either way", forget.contains("outcome?.onFinished(removed)"))
+        assertTrue("and one answer leaves it either way", forget.contains("report(outcome, removed)"))
 
         val body = bodyOf(store, "private fun removeOnWorker(word: String): Boolean {", "\n    /**")
         assertTrue("the delete itself becomes false rather than an exception",
-            body.contains("val removed = try {\n            if (candidate.isEmpty) deleteFile() else writeWhole(candidate)"))
+            body.contains("val removed = try {\n            if (candidate.isEmpty) {"))
+        assertTrue(body.contains("\n                deleteFile()\n                true\n            } else {\n                writeWhole(candidate)"))
         assertTrue("so the snapshot restore still runs: the word IS still saved",
             body.contains("snapshot = previousSnapshot"))
     }
@@ -199,6 +230,23 @@ class PersonalQuarantineNoticeSourceContractTest {
         val shippedClearAll = "outcome?.onFinished(dictionaryGone && countersGone && saltGone)"
         assertFalse("three booleans must not satisfy the four-boolean check",
             shippedClearAll.contains("&& quarantineGone"))
+
+        // Mission `tt-quarantine`, B3 and B5: the shapes 1.8.2 shipped, fed to the checks above.
+        val unguardedAnswer = "outcome?.onFinished(removed)"
+        assertFalse("the callback outside the try must not satisfy the guarded-answer check",
+            unguardedAnswer.contains("report(outcome, removed)"))
+
+        val deadBranch = "val removed = try {\n            if (candidate.isEmpty) deleteFile() else writeWhole(candidate)"
+        assertFalse("the branch on a value that could only be true must not satisfy the honest shape",
+            deadBranch.contains("val removed = try {\n            if (candidate.isEmpty) {"))
+
+        val processLocalMark = "quarantineNotice?.onQuarantined()"
+        assertFalse("a notice raised straight from the quarantine must not satisfy the durable-mark check",
+            processLocalMark.contains("writeBytesDurably(directory, File(directory, quarantineNoticeFileName()), ByteArray(1))"))
+
+        val volatileFlagOnly = "quarantinePending = false\n        return true"
+        assertFalse("clearing the in-memory flag alone must not satisfy the durable-clear check",
+            volatileFlagOnly.contains("store.noticeDelivered()"))
 
         val shippedIme = "PersonalDictionaries.setErasureListener(null);"
         assertFalse("the erasure listener alone must not satisfy the quarantine-listener check",

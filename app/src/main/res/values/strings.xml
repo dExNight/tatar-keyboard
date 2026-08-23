@@ -195,7 +195,31 @@
     <!-- Shown when erasing every saved word did not remove everything -->
     <string name="personal_dictionary_erase_failed">Could not erase everything. Some saved words are still on this device.</string>
     <!-- Shown once when the saved words could not be read, so the list appears empty -->
-    <string name="personal_dictionary_unreadable">Saved words could not be read, so the list is empty. You can add words again.</string>
+    <string name="personal_dictionary_unreadable">Saved words could not be read, so the list is empty. A copy was kept \u2014 open Saved words to bring back what can still be read.</string>
+    <!-- Title of the card offering the kept copy of words that could not be read. Says what happened, not why. -->
+    <string name="personal_dictionary_quarantine_title">Words that could not be read</string>
+    <!-- Beside the title when part of the copy is damaged. The count is what was READ, and the damage must be said in the same breath: a partial recovery presented as a whole one is the outcome this feature must never produce. -->
+    <plurals name="personal_dictionary_quarantine_partial">
+        <item quantity="one">%1$d word can be brought back. The rest of the copy is damaged and cannot be recovered.</item>
+        <item quantity="other">%1$d words can be brought back. The rest of the copy is damaged and cannot be recovered.</item>
+    </plurals>
+    <!-- Beside the title when the whole copy could be read -->
+    <plurals name="personal_dictionary_quarantine_whole">
+        <item quantity="one">%1$d word can be brought back.</item>
+        <item quantity="other">%1$d words can be brought back.</item>
+    </plurals>
+    <!-- Beside the title when nothing at all could be read out of the copy. It is still offered, because the copy is still on the device and the user is entitled to remove it. -->
+    <string name="personal_dictionary_quarantine_none">None of these words can be brought back. The copy is still on this device.</string>
+    <!-- Action that puts the readable words back into the saved list -->
+    <string name="personal_dictionary_quarantine_restore">Bring the words back</string>
+    <!-- Action that removes the kept copy -->
+    <string name="personal_dictionary_quarantine_discard">Delete the copy</string>
+    <!-- Body of the confirmation dialog for deleting the kept copy -->
+    <string name="personal_dictionary_quarantine_discard_confirm">Remove the copy of the words that could not be read? This cannot be undone.</string>
+    <!-- Shown when bringing the words back did not happen. Says where the words are now. -->
+    <string name="personal_dictionary_quarantine_restore_failed">Could not bring the words back. They are still only in the copy.</string>
+    <!-- Shown when the copy could not be removed -->
+    <string name="personal_dictionary_quarantine_discard_failed">Could not delete the copy. It is still on this device.</string>
     <!-- Title of the settings item and its confirmation dialog that erases recently used emoji -->
     <string name="clear_recent_emoji">Clear recent emoji</string>
     <!-- Body of the confirmation dialog that erases recently used emoji -->

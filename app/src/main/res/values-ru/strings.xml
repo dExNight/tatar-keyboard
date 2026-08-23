@@ -93,7 +93,26 @@
     <string name="personal_dictionary_save_failed">Не удалось сохранить слово. Попробуйте ещё раз.</string>
     <string name="personal_dictionary_delete_failed">Не удалось удалить слово. Оно осталось в словаре.</string>
     <string name="personal_dictionary_erase_failed">Не удалось стереть всё. Часть сохранённых слов осталась на устройстве.</string>
-    <string name="personal_dictionary_unreadable">Сохранённые слова не удалось прочитать, поэтому список пуст. Слова можно добавить заново.</string>
+    <string name="personal_dictionary_unreadable">Сохранённые слова не удалось прочитать, поэтому список пуст. Их копия сохранена \u2014 откройте «Сохранённые слова», чтобы вернуть то, что ещё читается.</string>
+    <string name="personal_dictionary_quarantine_title">Слова, которые не удалось прочитать</string>
+    <plurals name="personal_dictionary_quarantine_partial">
+        <item quantity="one">Можно вернуть %1$d слово. Остальная часть копии повреждена, её не восстановить.</item>
+        <item quantity="few">Можно вернуть %1$d слова. Остальная часть копии повреждена, её не восстановить.</item>
+        <item quantity="many">Можно вернуть %1$d слов. Остальная часть копии повреждена, её не восстановить.</item>
+        <item quantity="other">Можно вернуть %1$d слова. Остальная часть копии повреждена, её не восстановить.</item>
+    </plurals>
+    <plurals name="personal_dictionary_quarantine_whole">
+        <item quantity="one">Можно вернуть %1$d слово.</item>
+        <item quantity="few">Можно вернуть %1$d слова.</item>
+        <item quantity="many">Можно вернуть %1$d слов.</item>
+        <item quantity="other">Можно вернуть %1$d слова.</item>
+    </plurals>
+    <string name="personal_dictionary_quarantine_none">Ни одного слова вернуть не удаётся. Копия по-прежнему хранится на этом устройстве.</string>
+    <string name="personal_dictionary_quarantine_restore">Вернуть слова</string>
+    <string name="personal_dictionary_quarantine_discard">Удалить копию</string>
+    <string name="personal_dictionary_quarantine_discard_confirm">Удалить копию слов, которые не удалось прочитать? Это действие необратимо.</string>
+    <string name="personal_dictionary_quarantine_restore_failed">Не удалось вернуть слова. Они остались только в копии.</string>
+    <string name="personal_dictionary_quarantine_discard_failed">Не удалось удалить копию. Она осталась на этом устройстве.</string>
     <string name="clear_recent_emoji">Очистить недавние эмодзи</string>
     <string name="clear_recent_emoji_confirm">Удалить все недавно использованные эмодзи, сохранённые на этом устройстве? Это действие нельзя отменить.</string>
     <string name="clear_recent_emoji_action">Очистить</string>

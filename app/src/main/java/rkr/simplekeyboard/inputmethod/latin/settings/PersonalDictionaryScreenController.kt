@@ -19,11 +19,13 @@ package rkr.simplekeyboard.inputmethod.latin.settings
 import android.content.Context
 import android.os.Handler
 import android.os.Looper
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 import rkr.simplekeyboard.inputmethod.latin.dictionary.personal.PersonalDictionary
 import rkr.simplekeyboard.inputmethod.latin.dictionary.personal.PersonalSubtypes
 import rkr.simplekeyboard.inputmethod.latin.dictionary.personalstore.PersonalDictionaries
+import rkr.simplekeyboard.inputmethod.latin.dictionary.personalstore.PersonalQuarantineReport
 import rkr.simplekeyboard.inputmethod.latin.dictionary.personalstore.PersonalWordFilter
 
 /**
@@ -83,6 +85,56 @@ internal class PersonalDictionaryScreenController(
         PersonalDictionaries.storeFor(context, subtypeId)
             .forget(word) { removed -> uiPoster { onRemoved(removed) } }
         PersonalDictionaries.notifyErased()
+    }
+
+    /**
+     * Asks every language whether it has a quarantine copy, and answers ONCE, on the UI thread, with
+     * the languages that do.
+     *
+     * The screen cannot ask this synchronously: reading the copy is file work and belongs on the
+     * store's worker, like every other read in this subsystem. So the screen paints without the card
+     * and repaints when the answers arrive — the same shape the mutations already use, for the same
+     * reason.
+     *
+     * A language absent from the map has no copy. A language present with a count of zero HAS one
+     * that yielded nothing, and still deserves its card: those bytes are on the device and the user
+     * is the only one who can decide to remove them.
+     */
+    fun quarantines(
+        subtypeIds: List<String>,
+        onReady: (Map<String, PersonalQuarantineReport>) -> Unit,
+    ) {
+        val targets = subtypeIds.filter { PersonalSubtypes.alphabetFor(it) != null }
+        if (targets.isEmpty()) {
+            uiPoster { onReady(emptyMap()) }
+            return
+        }
+        val found = ConcurrentHashMap<String, PersonalQuarantineReport>()
+        val remaining = AtomicInteger(targets.size)
+        for (subtypeId in targets) {
+            PersonalDictionaries.storeFor(context, subtypeId).inspectQuarantine { report ->
+                if (report != null) found[subtypeId] = report
+                if (remaining.decrementAndGet() == 0) {
+                    uiPoster { onReady(found.toMap()) }
+                }
+            }
+        }
+    }
+
+    /**
+     * Puts the readable words of one language's copy back into its dictionary, at the user's
+     * request. The copy is left where it is: what could not be read this time is still there for a
+     * later reader, and removing it is the user's own separate decision ([discardQuarantine]).
+     */
+    fun restoreQuarantine(subtypeId: String, onRestored: (Boolean) -> Unit) {
+        PersonalDictionaries.storeFor(context, subtypeId)
+            .restoreQuarantine { restored -> uiPoster { onRestored(restored) } }
+    }
+
+    /** Removes one language's copy and nothing else. */
+    fun discardQuarantine(subtypeId: String, onDiscarded: (Boolean) -> Unit) {
+        PersonalDictionaries.storeFor(context, subtypeId)
+            .discardQuarantine { discarded -> uiPoster { onDiscarded(discarded) } }
     }
 
     /**

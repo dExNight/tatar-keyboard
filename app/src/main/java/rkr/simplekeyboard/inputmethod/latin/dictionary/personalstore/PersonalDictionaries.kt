@@ -132,11 +132,20 @@ object PersonalDictionaries {
     /**
      * Takes the waiting notice, if there is one. The caller clears it only when it is really about to
      * be shown, so a notice raised while the window was down is not spent on nobody.
+     *
+     * B5. Spending it also clears the DURABLE half of the mark, on every store that is open — the
+     * in-memory flag alone died with the process, and the loss went unmentioned for ever after. Each
+     * store queues its own deletion on the shared worker, so no file is touched on the caller's
+     * thread. A language whose store has not been opened in this process keeps its own mark and
+     * raises its own notice when it opens: one notice per language that lost something, which is the
+     * number of things that actually happened.
      */
     @JvmStatic
     fun consumeQuarantineNotice(): Boolean {
         if (!quarantinePending) return false
         quarantinePending = false
+        val live = synchronized(lock) { stores.values.toList() }
+        for (store in live) store.noticeDelivered()
         return true
     }
 

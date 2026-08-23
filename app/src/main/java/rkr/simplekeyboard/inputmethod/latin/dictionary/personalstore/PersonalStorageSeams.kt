@@ -75,3 +75,31 @@ internal fun interface PersonalMutationOutcome {
 internal fun interface PersonalQuarantineNotice {
     fun onQuarantined()
 }
+
+/**
+ * What a quarantined copy of an unreadable personal file turned out to hold, delivered on the
+ * store's worker after the copy has actually been read.
+ *
+ * Two numbers and no words: [wordCount] is how many words came back, and [readToEnd] is whether
+ * anything is known lost. The words themselves go straight into the dictionary if the user asks for
+ * that; they do not travel through this seam, because a screen only needs to know how many there
+ * are before the person decides.
+ *
+ * NOT a Kotlin `data class` for the usual reason of this package — nothing here may grow a
+ * synthesised `toString` that prints its way into a log.
+ */
+internal class PersonalQuarantineReport internal constructor(
+    val wordCount: Int,
+    val readToEnd: Boolean,
+)
+
+/**
+ * Told what a quarantined copy holds, or that there is none: `null` means no copy at all, which is a
+ * different answer from a copy that yielded nothing (that one arrives as a report with a zero count,
+ * because the file is still there and can still be removed).
+ *
+ * Called on the store's worker thread. A caller that touches UI must marshal it itself.
+ */
+internal fun interface PersonalQuarantineReportSink {
+    fun onInspected(report: PersonalQuarantineReport?)
+}
