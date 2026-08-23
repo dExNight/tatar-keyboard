@@ -411,12 +411,16 @@ class SettingsHostActivity : Activity() {
         addPersonalQuarantineCards(controller, subtypeIds)
 
         if (content.totalCount == 0) {
-            addCard(listOf(inflateRow(R.layout.row_link,
-                    getString(if (personalSearchQuery.isEmpty()) {
-                        R.string.personal_dictionary_empty
-                    } else {
-                        R.string.personal_dictionary_no_matches
-                    }), null).also {
+            // Three states, not two. "Nothing saved yet" while the personal dictionary is ALREADY on
+            // used to end with "…once the personal dictionary is on", sending the person to look for
+            // a switch that is not off. The hint belongs only to the state it describes.
+            val emptyMessage = when {
+                personalSearchQuery.isNotEmpty() -> R.string.personal_dictionary_no_matches
+                Settings.readPersonalDictionaryEnabled(prefs) ->
+                    R.string.personal_dictionary_empty_ready
+                else -> R.string.personal_dictionary_empty
+            }
+            addCard(listOf(inflateRow(R.layout.row_link, getString(emptyMessage), null).also {
                 it.findViewById<View>(R.id.row_chevron).visibility = View.GONE
             }))
         }
@@ -1088,11 +1092,21 @@ class SettingsHostActivity : Activity() {
     // Row actions
     // ---------------------------------------------------------------------
 
+    /**
+     * Opens a link, or says that nothing on this device can.
+     *
+     * The log line alone was the whole answer before: the row took the tap, the screen did not
+     * change, and only `adb logcat` knew why. On a keyboard whose one claim is privacy, "Privacy
+     * Policy" being a row that does nothing is the worst row to lose quietly. The log line stays for
+     * a developer; the Toast is for the person holding the phone, and it names no package and no
+     * intent — neither is anything they could act on.
+     */
     private fun openUrl(uri: String) {
         try {
             startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(uri)))
         } catch (e: ActivityNotFoundException) {
             Log.e(TAG, "Browser not found")
+            Toast.makeText(this, R.string.no_app_for_link, Toast.LENGTH_LONG).show()
         }
     }
 

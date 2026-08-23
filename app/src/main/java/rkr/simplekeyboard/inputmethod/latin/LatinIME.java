@@ -592,6 +592,11 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
             }
 
             @Override
+            public void onEmojiSearchUnavailable() {
+                LatinIME.this.onEmojiSearchUnavailable();
+            }
+
+            @Override
             public void refreshAfterRecentsCleared(final EmojiSetSnapshot base) {
                 // The recents were cleared while the panel is open: re-bind the base snapshot (which
                 // carries no recents category) through the same show path, so the Recent tab
@@ -778,15 +783,25 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
      */
     private void showForgetPersonalWordDialog(final String shownWord) {
         if (!Settings.readPersonalDictionaryEnabled(mDevicePrefs)) {
+            // The DEFAULT state of the keyboard: the personal dictionary ships off, so without this
+            // the long press is silent for every user who never turned it on — which is everyone,
+            // until they do. Answered with the one thing they can act on.
+            showPersonalDictionaryOffDialog();
             return;
         }
         final String subtypeId = activeDictionarySubtype();
         if (subtypeId == null) {
+            // The active layout keeps no personal dictionary, so nothing here was ever the user's.
+            showNotASavedWordDialog();
             return;
         }
         final String savedForm = PersonalForget.savedFormOf(this, subtypeId, shownWord);
         if (savedForm == null) {
-            // An ordinary dictionary word: a long press on it is a no-op by contract.
+            // An ordinary dictionary word. Nothing can be forgotten here, but the gesture still gets
+            // an answer: the user cannot tell their own saved words apart from the dictionary's by
+            // looking at the band, so a silent long press reads as "long press is broken" rather
+            // than "this word is not yours".
+            showNotASavedWordDialog();
             return;
         }
         final MainKeyboardView mainKeyboardView = mKeyboardSwitcher.getMainKeyboardView();
@@ -834,6 +849,93 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         final AlertDialog dialog = new AlertDialog.Builder(
                 DialogUtils.getPlatformDialogThemeContext(this))
                 .setMessage(R.string.tatar_suggestions_unavailable)
+                .setPositiveButton(android.R.string.ok, null)
+                .create();
+        dialog.setCancelable(true);
+        dialog.setCanceledOnTouchOutside(true);
+        attachDialogToInputWindow(dialog, windowToken);
+        mOptionsDialog = dialog;
+        dialog.show();
+    }
+
+    /**
+     * Says that saved words are switched off, so a long press has nothing it could forget.
+     *
+     * The personal dictionary ships OFF, so this is the answer almost every long press gets until
+     * the person turns it on — and the switch is the one action they can take, so the message names
+     * it. Same shape and the same window attachment as the other notices here.
+     */
+    private void showPersonalDictionaryOffDialog() {
+        final MainKeyboardView mainKeyboardView = mKeyboardSwitcher.getMainKeyboardView();
+        if (mainKeyboardView == null) {
+            return;
+        }
+        final IBinder windowToken = mainKeyboardView.getWindowToken();
+        if (windowToken == null) {
+            return;
+        }
+        final AlertDialog dialog = new AlertDialog.Builder(
+                DialogUtils.getPlatformDialogThemeContext(this))
+                .setMessage(R.string.personal_dictionary_off_nothing_to_forget)
+                .setPositiveButton(android.R.string.ok, null)
+                .create();
+        dialog.setCancelable(true);
+        dialog.setCanceledOnTouchOutside(true);
+        attachDialogToInputWindow(dialog, windowToken);
+        mOptionsDialog = dialog;
+        dialog.show();
+    }
+
+    /**
+     * Says that the long-pressed word is not one of the user's own saved words.
+     *
+     * Same shape and same reasoning as {@link #showSuggestionsUnavailableDialog()}: a dialog rather
+     * than a Toast, because a toast from a background process is at the platform's discretion and
+     * this is the only answer the gesture will ever get. The body names no word — the message can
+     * be shown over any app, and what the person typed must not appear on top of someone else's
+     * screen.
+     */
+    private void showNotASavedWordDialog() {
+        final MainKeyboardView mainKeyboardView = mKeyboardSwitcher.getMainKeyboardView();
+        if (mainKeyboardView == null) {
+            return;
+        }
+        final IBinder windowToken = mainKeyboardView.getWindowToken();
+        if (windowToken == null) {
+            return;
+        }
+        final AlertDialog dialog = new AlertDialog.Builder(
+                DialogUtils.getPlatformDialogThemeContext(this))
+                .setMessage(R.string.personal_dictionary_not_saved)
+                .setPositiveButton(android.R.string.ok, null)
+                .create();
+        dialog.setCancelable(true);
+        dialog.setCanceledOnTouchOutside(true);
+        attachDialogToInputWindow(dialog, windowToken);
+        mOptionsDialog = dialog;
+        dialog.show();
+    }
+
+    /**
+     * Says that emoji are not available in this process, so the key that was just pressed — or the
+     * search pill that was just tapped — has nothing to open.
+     *
+     * Answered on EVERY press rather than once: the key stays on the keyboard and the person will
+     * press it again, and a one-shot notice would put the silence straight back. Same shape and the
+     * same window attachment as the other notices here; the body names no file and no cause.
+     */
+    private void showEmojiUnavailableDialog() {
+        final MainKeyboardView mainKeyboardView = mKeyboardSwitcher.getMainKeyboardView();
+        if (mainKeyboardView == null) {
+            return;
+        }
+        final IBinder windowToken = mainKeyboardView.getWindowToken();
+        if (windowToken == null) {
+            return;
+        }
+        final AlertDialog dialog = new AlertDialog.Builder(
+                DialogUtils.getPlatformDialogThemeContext(this))
+                .setMessage(R.string.emoji_unavailable)
                 .setPositiveButton(android.R.string.ok, null)
                 .create();
         dialog.setCancelable(true);
@@ -1798,9 +1900,26 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
      * the keyboard switcher once the controller asks to show the panel.
      */
     public void showEmojiPanel() {
-        if (mEmojiPanelController != null) {
-            mEmojiPanelController.onEmojiKeyPressed();
+        if (mEmojiPanelController == null) {
+            return;
         }
+        // False means the panel will not show in THIS process: the snapshot could not be built and
+        // the preparation is never retried. Discarding that answer left a key that is drawn on the
+        // keyboard, takes the press and does nothing, for as long as the process lives.
+        if (!mEmojiPanelController.onEmojiKeyPressed()) {
+            showEmojiUnavailableDialog();
+        }
+    }
+
+    /**
+     * The search pill inside the emoji panel was tapped and no search can be opened.
+     *
+     * Same register as {@link #showEmojiUnavailableDialog()} and for the same reason: the verdict
+     * "the index is unusable" is cached for the life of the process, so without this the pill stays
+     * painted and stays dead.
+     */
+    public void onEmojiSearchUnavailable() {
+        showEmojiUnavailableDialog();
     }
 
     /**

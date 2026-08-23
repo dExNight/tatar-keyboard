@@ -48,6 +48,16 @@ interface EmojiSurface {
      * cell offers the five tones. Defaulted so existing fakes need not implement it.
      */
     fun bindSkinTones(tones: EmojiSkinTones) {}
+
+    /**
+     * The search pill was tapped and no search can be opened, now or later in this process.
+     *
+     * The pill is painted whether or not the index can be read, and the verdict "unusable" is
+     * cached for the life of the process — so without this the pill is a button that stays on the
+     * screen and does nothing, forever, without a word. Defaulted so existing fakes need not
+     * implement it.
+     */
+    fun onEmojiSearchUnavailable() {}
 }
 
 /**
@@ -231,7 +241,9 @@ class EmojiPanelController internal constructor(
         if (destroyed) return
         val loaded = searchIndex
         if (loaded != null) {
-            if (!loaded.isEmpty) surface.showEmojiSearch(loaded)
+            // The verdict is cached for the life of the process, so this is the branch a real
+            // finger reaches on every tap after the first — nobody taps a dead button only once.
+            if (loaded.isEmpty) surface.onEmojiSearchUnavailable() else surface.showEmojiSearch(loaded)
             return
         }
         pendingSearch = true
@@ -245,6 +257,7 @@ class EmojiPanelController internal constructor(
         if (backgroundExecutor == null || source == null) {
             searchIndex = EmojiSearchIndex.EMPTY
             pendingSearch = false
+            surface.onEmojiSearchUnavailable()
             return
         }
         searchLoading = true
@@ -263,6 +276,7 @@ class EmojiPanelController internal constructor(
             searchLoading = false
             searchIndex = EmojiSearchIndex.EMPTY
             pendingSearch = false
+            surface.onEmojiSearchUnavailable()
         }
     }
 
@@ -272,7 +286,9 @@ class EmojiPanelController internal constructor(
         searchIndex = loaded
         if (pendingSearch) {
             pendingSearch = false
-            if (!loaded.isEmpty) surface.showEmojiSearch(loaded)
+            // Answered either way: the tap that armed this is the one being served, and an index
+            // that came back unusable is the whole reason the pill would otherwise go quiet.
+            if (loaded.isEmpty) surface.onEmojiSearchUnavailable() else surface.showEmojiSearch(loaded)
         }
     }
 

@@ -121,4 +121,9 @@
     <string name="change_keyboard">Төймәсарны алыштыру</string>
     <string name="privacy_policy">Хосусыйлык сәясәте</string>
     <string name="license">Лицензия</string>
+    <string name="personal_dictionary_not_saved">Бу сүз җыелма сүзлектән. Клавиатура сездән отып алган сүзләрне генә онытырга мөмкин.</string>
+    <string name="emoji_unavailable">Эмодзи хәзер юк. Клавиатураны яңадан җибәрү ярдәм итәргә мөмкин.</string>
+    <string name="no_app_for_link">Бу җиһазда сылтамаларны ача торган кушымта юк.</string>
+    <string name="personal_dictionary_empty_ready">Әлегә бернәрсә дә сакланмаган. Сез язган сүзләр монда күренә башлар.</string>
+    <string name="personal_dictionary_off_nothing_to_forget">Сүзләрне саклау сүндерелгән, онытыр нәрсә юк. Язган сүзләрегез исендә калсын өчен клавиатура көйләүләрендә «Шәхси сүзлек»не кабызыгыз.</string>
 </resources>

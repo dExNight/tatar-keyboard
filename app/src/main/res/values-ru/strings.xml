@@ -125,4 +125,9 @@
     <string name="change_keyboard">Сменить клавиатуру</string>
     <string name="privacy_policy">Политика конфиденциальности</string>
     <string name="license">Лицензия</string>
+    <string name="personal_dictionary_not_saved">Это слово из встроенного словаря. Забыть можно только те слова, которые клавиатура запомнила за вами.</string>
+    <string name="emoji_unavailable">Эмодзи сейчас недоступны. Может помочь перезапуск клавиатуры.</string>
+    <string name="no_app_for_link">На устройстве нет приложения, которое открывает ссылки.</string>
+    <string name="personal_dictionary_empty_ready">Пока ничего не сохранено. Набранные слова будут появляться здесь.</string>
+    <string name="personal_dictionary_off_nothing_to_forget">Сохранение слов выключено, забывать нечего. Включите «Личный словарь» в настройках клавиатуры, чтобы набранные слова запоминались.</string>
 </resources>
