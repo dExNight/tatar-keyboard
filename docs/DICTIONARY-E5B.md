@@ -217,7 +217,7 @@ seams `DeviceProtectedDirectoryProvider`, `DurableFileOps`, `StorageClock`,
 `SpaceProbe` — but in **its own device-protected subdirectory**, never
 `filesDir/dictionaries`, with its own final-file naming
 (`tatar_bigrams-<language>-v%06d-s%d-f%d-<sha256>.tatbigr`, `AtomicBigramStore.
-FINAL_FILE_PATTERN`) and its own process-wide lease registry
+FINAL_FILE_PATTERN`†) and its own process-wide lease registry
 (`ProcessBigramStorageOwner`, separate object from `ProcessDictionaryStorageOwner`).
 `AtomicBigramStoreTest.aLiveDictionaryLeaseNeverBlocksOrIsBlockedByABigramLease` wires
 one of each store to two different temporary directories and proves neither store's
@@ -310,7 +310,7 @@ Level 2 OK: backup closed as a whitelist (allowBackup=false, both editions, no <
   (`GeneratorGuardrailTest`), and by the runtime validator on inflate
   (`rejectsCompressedAndRawCaps`).
 - [x] Own device-protected subdirectory, own final-file regex, own retention limit
-  (`AtomicBigramStore`, `FINAL_FILE_PATTERN`, `MAX_FINAL_ARTIFACTS`), own process-wide
+  (`AtomicBigramStore`, `FINAL_FILE_PATTERN`†, `MAX_FINAL_ARTIFACTS`), own process-wide
   lease registry (`ProcessBigramStorageOwner`) — proven independent of the dictionary
   store's registry by `AtomicBigramStoreTest.
   aLiveDictionaryLeaseNeverBlocksOrIsBlockedByABigramLease`, which runs both stores
@@ -349,3 +349,20 @@ symmetry for empty-*word* rejection, not for empty-*table* rejection) and not a 
 gap (the runtime validator is always spec-bound to the one pinned artifact, so a
 zero-head file could never reach it as anything but a SHA-256/size mismatch either
 way). Recorded here for completeness rather than silently left out of the record.
+
+**† Reference update (2026-08-23) — a pointer, not a change to the record.** The two places
+marked † above cite `AtomicBigramStore.FINAL_FILE_PATTERN`, the constant that held the
+final-file regex on 2026-08-17. That constant no longer exists. The regex moved to
+`BigramArtifactSpec.finalFilePattern` (`BigramStorageContracts.kt`) because it became
+family-dependent: the Russian table added a second family (`family = "russian_bigrams"`,
+directory `bigrams-ru`, `docs/RUSSIAN-BIGRAMS.md`), and one store-wide constant cannot name
+the final files of every family. `AtomicBigramStore` now takes both the temp prefix and the
+regex off the spec (`AtomicBigramStore.kt`, `temporaryPrefix`/`finalFilePattern`) and requires
+every artifact it supports to share one family and one storage directory. `TEMP_PREFIX`
+disappeared with it. Two parts of those citations did **not** change and are still exactly
+right: `MAX_FINAL_ARTIFACTS` is still a private const in `AtomicBigramStore` (= 2), and the
+quoted name shape still describes the shipped Tatar file — `family` is `tatar_bigrams` and the
+current format string is `"%s-%s-v%06d-s%d-f%d-%s.tatbigr"`, family first, then the file
+language tag. The sentences above are left as written: this document is the acceptance record
+of 2026-08-17 and describes the code as of that date; rewriting them would make the record
+false. Recorded by mission `tt-cleanup` — see `docs/CLEANUP.md`.
