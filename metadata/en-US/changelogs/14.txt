@@ -1,0 +1,5 @@
+• A personal dictionary that could not be read can now be brought back
+• The copy is shown on the Saved words screen, with how much of it survived
+• The notice about unreadable words now survives a keyboard restart
+• Prediction tables repacked: 100 KB smaller, not one suggestion changed
+• Still no internet permission and no new dependencies
