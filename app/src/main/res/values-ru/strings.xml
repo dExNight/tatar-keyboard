@@ -74,6 +74,8 @@
     <string name="tatar_suggestions_offer_enable">Включить</string>
     <string name="tatar_suggestions_offer_dismiss">Не сейчас</string>
     <string name="tatar_suggestions_unavailable">Сейчас не удалось включить подсказки слов. Можно попробовать позже.</string>
+    <string name="tatar_autocorrect">Исправление слов</string>
+    <string name="tatar_autocorrect_summary">Исправляет слово с опечаткой, когда вы ставите пробел или знак препинания. Нажмите стирание сразу после, чтобы вернуть набранное.</string>
     <string name="personal_dictionary">Личный словарь</string>
     <string name="personal_dictionary_summary">Запоминать набранные вами слова и предлагать их позже. Сохраняются только на этом устройстве. Выключение не удаляет накопленное — стереть можно на экране «Личный словарь».</string>
     <string name="personal_dictionary_screen">Сохранённые слова</string>
