@@ -375,6 +375,47 @@ class GeneratorGuardrailTest(unittest.TestCase):
             pack.MAX_COMPRESSED_BYTES = original
 
 
+class HeadSelectionIsIndependentOfPairEvidenceTest(unittest.TestCase):
+    """The mechanism docs/BIGRAM-ADJACENCY.md measured, pinned so it cannot be re-litigated quietly.
+
+    ``run_pack`` calls ``select_heads(frequencies, heads)`` on the shipped .tdict's UNIGRAM
+    frequencies and only then counts pairs, so the head SET is decided before a single sentence is
+    tokenized. That is why no change to the adjacency rule — the one
+    docs/RUSSIAN-BIGRAMS.md section 12 item 3 proposed — can give a successor to a word that is not
+    already a head: "позвони" is absent from russian_top100k_v1 entirely and "приходи" sits at
+    unigram rank 88 861, nine times below the shipped H = 10 000 cutoff.
+    """
+
+    def test_bigram_evidence_never_promotes_a_word_to_a_head(self) -> None:
+        with TemporaryDirectory() as raw_directory:
+            directory = Path(raw_directory)
+            # _write_asset assigns frequency 1000 - index, so dictionary order IS frequency order:
+            # "шалтырат" (Tatar imperative "call!") is the LEAST frequent of the three.
+            asset_path = _write_asset(directory, ["алма", "китап", "шалтырат"])
+            train = directory / "train-sentences.txt"
+            # "шалтырат" heads three clean, bare, punctuation-free pairs; "алма" heads exactly one.
+            # No tokenizer rule is in play here at all — the evidence is as good as evidence gets.
+            train.write_text(
+                "1\tшалтырат алма\n"
+                "2\tшалтырат алма\n"
+                "3\tшалтырат китап\n"
+                "4\tалма китап\n"
+                "5\tкитап алма\n",
+                encoding="utf-8",
+            )
+
+            result, report = pack.run_pack([train], asset_path, 2, 4, 1)
+
+            parsed = pack.validate_raw(result.raw)
+            # Abundant pair evidence loses to unigram rank: the head set is exactly the top 2.
+            self.assertNotIn("шалтырат", parsed.head_words)
+            self.assertEqual(["алма", "китап"], parsed.head_words)
+            self.assertEqual(2, report["requested_heads"])
+            # And it is reachable as a SUCCESSOR, which is the only role the cutoff leaves it —
+            # proving its absence above is the cutoff, not a vocabulary or tokenization failure.
+            self.assertIn("шалтырат", pack.read_shipped_vocabulary(asset_path, pack.coverage.language_for("tat"))[0])
+
+
 class EndToEndCliTest(unittest.TestCase):
     def test_cli_pack_writes_matching_atomic_outputs_and_report(self) -> None:
         with TemporaryDirectory() as raw_directory:
