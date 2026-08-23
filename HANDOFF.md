@@ -1,60 +1,79 @@
-# HANDOFF — миссия tt-quarantine
+# HANDOFF — миссия tt-version-1.8.3
 
-**Статус: закончена.** Отчёт — `docs/QUARANTINE.md`, он же несёт маркер завершения последней
-строкой. Фраза-маркер намеренно не повторяется больше нигде, включая этот файл.
+**Статус: в работе.** Готово когда `docs/APK-AUDIT-1.8.3.md` кончается строкой
+`СБОРКА 1.8.3 СДАНА` (ровно один раз, последней строкой, и только после проверки руками).
 
-Ветка `codex/version-1.6.0`. Наружу не уходило ничего. Версия не поднимается, релиз не
-собирается (это `tt-version-1.8.3`). Keystore не трогается и не пересоздаётся.
+Ветка `codex/version-1.6.0`. Наружу не уходило ничего: ни push, ни тега, ни релиза, ни merge.
+Keystore не трогался и не пересоздавался.
 
-## Карта кода (составлена, сверена по исходникам)
+## Коммиты этой миссии (все локальные)
 
-| Что | Где |
+| Хеш | Что |
 |---|---|
-| Копия создаётся | `PersonalDictionaryStore.kt:482` `quarantine(directory, file)`, вызов из `open()` `:345` |
-| Имя слота | `:496` `personalFileName(subtypeId) + ".quarantine"`, один на язык |
-| Копию убирает «Стереть всё» | `:245` пятый `deleted { }` в `clearAll` |
-| Флаг извещения (процессный!) | `PersonalDictionaries.kt:73` `@Volatile quarantinePending` + `:130 has…`, `:137 consume…` |
-| Извещение показывает | `LatinIME.java:893` `showPersonalDictionaryUnreadableDialog()`, второй шанс `:1318` |
-| Экран личного словаря | `SettingsHostActivity.kt:377` `buildPersonalDictionaryScreen()` |
-| Мутации/канал отказа | `PersonalDictionaryScreenController.kt`, `SettingsHostActivity.afterPersonalMutation() :526` |
-| Формат `.tpers` | `personal/TpersFormat.kt`, валидатор `personal/TpersValidator.kt` |
-| Модель записей | `personalstore/PersonalEntries.kt` (`upsert` дедуплицирует по нормализованной форме) |
+| `4ad8a83` | работа `tt-quarantine`: код, тесты, строки, очередь вычитки |
+| `00733b2` | `docs/QUARANTINE.md` + HANDOFF предыдущей миссии |
+| `bcc4391` | **frozen commit**: versionCode 14, versionName 1.8.3, `changelogs/14.txt`, раздел `[1.8.2]`→`[1.8.3]` в CHANGELOG |
 
-## Сделано (код и тесты закрыты, всё зелёное)
+Релиз собран **из `bcc4391`**, дерево было чистым.
 
-| Часть | Где | Тесты |
-|---|---|---|
-| 1. Спасение слов | `personalstore/PersonalQuarantineSalvage.kt` (новый) | `PersonalQuarantineSalvageTest` — 19 |
-| 2. Экран | `SettingsHostActivity.addPersonalQuarantineCards()` + `PersonalDictionaryScreenController.quarantines/restoreQuarantine/discardQuarantine` | `PersonalQuarantineScreenSourceContractTest` — 9 |
-| 3. Извещение на диске | `PersonalDictionaryStore`: `quarantineNoticeFileName()`, запись в `quarantine()`, подъём в `open()`, снятие в `noticeDelivered()`; `PersonalDictionaries.consumeQuarantineNotice()` снимает у всех живых сторов | `PersonalQuarantineRecoveryTest` — 22 |
-| 4. Тесты | см. выше | — |
-| 6. Дыра в трёх мутациях | `PersonalDictionaryStore.report()` — единственный выход ответа, внутри `try/catch`; мёртвая ветка убрана, `deleteFile()` стал `Unit` | `PersonalQuarantineRecoveryTest`, `PersonalQuarantineNoticeSourceContractTest` |
+## Числа, уже снятые (все — из команд этой сессии)
 
-Полный прогон: **913 тестов, 0 падений, 1 пропуск**. `lintVitalRelease` — чисто.
+| Что | Значение |
+|---|---|
+| JVM-тесты | **913**, 0 падений, 0 ошибок, **1 skip** (чужой `TapReproTest`), 90 suite-файлов |
+| Python-наборы | **157** тестов, 0 падений, 1 skip (27+18+6+31+35+40) |
+| `lintVitalRelease` | `No issues found.`, return-value `0` |
+| release APK | **2 491 557 Б** (1.8.2 — 2 582 745, **−91 188**) |
+| debug APK | 4 130 006 Б |
+| SHA-256 release | `a5b1279357f0f8e0f03ba746ed88a750bcd3e369a23e1e5555ce6c2901fdb85c` |
+| SHA-256 debug | `6a1c6a16dc57ca5c02ee59e1ca393e88f69e9bf96b3008528feaa329b07470a1` |
+| `cmp dist/… app-release.apk` | без различий |
+| сертификат | `98ca6feb…42ad` — **совпал** с требуемым; v2-only, RSA 4096 |
+| разрешения | ровно `VIBRATE` (и на debug) |
+| no-INTERNET gate | exit 0 на исходнике, debug и release |
+| запас до 3 145 728 Б | **654 171 Б (20,80 %)** |
 
-Строки: 10 новых + переписанное `personal_dictionary_unreadable` в `values`, `values-ru`,
-`values-tt`; строки очереди добавлены в `docs/TATAR-REVIEW-QUEUE.tsv` (`approved`, правило
-оператора от 2026-08-20).
+Слагаемые размера (сжатые размеры записей zip): ассеты биграмм **−100 203**
+(tt −52 393, ru −47 810), `classes.dex` **+2 425**, `resources.arsc` **+6 592**, `res/` +1,
+прочее +1; сумма −91 184, файл −91 188 (4 Б — заголовки zip).
 
-### Красное до правки
+## Проверка обновления поверх 1.8.2 (главный риск релиза) — ПРОЙДЕНА
 
-Доказано на HEAD в отдельном worktree (`git worktree add … HEAD`, свой `local.properties`
-и `gradle-wrapper.jar`):
+Эмулятор `tatar_e5_test`, Android 11 / API 30, 1080×2280, density 440. Состояние сброшено
+(`adb uninstall`), поставлена **`dist/tatar-keyboard-1.8.2.apk`**, включены подсказки и личный
+словарь, обе таблицы развёрнуты в K = 6, сохранено слово в личный словарь. Затем
+`adb install -r dist/tatar-keyboard-1.8.3.apk` — **обновление поверх, не чистая установка**.
 
-* маркер извещения не пишется — `AssertionError: and written down, because nobody may have been listening`;
-* обратный вызов с исключением уходил в uncaught-обработчик воркера во **всех пяти** случаях:
-  `addManually saved`, `addManually rejected`, `forget present`, `forget absent`, `clearAll`.
+* обе таблицы переразвернулись при первом же наборе, меньше чем за секунду:
+  tt `…fb686476…` 644 148 Б → `…1e614224…` **512 338 Б**;
+  ru `…48f8ec6a…` 635 838 Б → `…264b09fc…` **505 768 Б**;
+* полоса подсказок **побайтно та же** до и после обновления на пяти татарских головах
+  (`бер`, `мин`, `бу`, `ул`, `без`) и четырёх русских (`по`, `при`, `том`, `позвони` —
+  у повелительной полоса пуста в обеих версиях);
+* личный словарь пережил обновление: `personal-tt_RU-s1-f1.tpers`, md5 `ab116194…` — тот же.
 
-Один тест (`aNoticeSeamThatThrowsDoesNotKillTheWorker`) на HEAD **зелёный**: этот вызов уже
-стоял внутри `try` в `open()`. Он оставлен как охранник от регрессии и так и описан в отчёте —
-не выдавать его за закрытую дыру.
+**Найдено по дороге:** старые таблицы с диска не уходят (`MAX_FINAL_ARTIFACTS = 2`), поэтому
+после обновления на устройстве лежат обе — 1 156 486 Б вместо 644 148 в `bigrams/` и
+1 141 606 вместо 635 838 в `bigrams-ru/`. На устройстве релиз **прибавил** ~1 018 106 Б, хотя
+APK убавил 91 188. Не чинилось; в отчёт разделом «найдено, не починено».
 
-## Что дальше
+**Ещё:** `screencap` на этом AVD **работает** на Messages и на клавиатуре (предыдущие отчёты
+считали его неработающим) и **не работает** на экране настроек приложения — там `uiautomator dump`.
 
-Ничего по этой миссии. Всё, что осталось за её границами, перечислено в отчёте разделом
-«Найдено по дороге, не починено» — это список оператору, а не задача.
+## Осталось
 
-Наружу по-прежнему не уходило ничего: ни push, ни тега, ни релиза. Изменения лежат в рабочем
-дереве незакоммиченными — коммит остаётся за оператором.
+1. Личный словарь на подписанной 1.8.3: сохранить, удалить, «Стереть всё».
+2. Восстановление из карантина на устройстве.
+3. Холодный старт против инварианта 400 мс (медиана и худший, число прогонов).
+4. `docs/APK-AUDIT-1.8.3.md` по образцу `docs/APK-AUDIT-1.8.2.md`; маркер — последней строкой.
+5. Ретаргет `docs/PUBLISH-CHECKLIST.md` на v1.8.3.
+6. Решения по ходу — в `## РЕШЕНИЯ ПО ХОДУ` досье `~/.supermanager/missions/tt-version-1.8.3/dossier.md`.
+
+## Рабочие инструменты сессии
+
+`…/scratchpad/kb.py` — набор кириллицы тапами по калиброванной сетке (tt и ru раскладки),
+`pred.sh` — «очистить поле, набрать `<lead> <слово> ␣`, вырезать полосу подсказок»,
+`stack.py` — склейка вырезок. Поле обязательно чистить через `MOVE_END` + backspace: тап в
+непустое поле ставит каретку в середину строки.
 
 ## Незакрытых вопросов к оператору нет
