@@ -37,16 +37,33 @@ class TatBigrValidatorTest {
 
     @Test
     fun acceptsCommittedTatarBigramAssetWithFrozenProvenance() {
-        val asset = locateCommittedAsset().readBytes()
-        val rawFile = temporaryFolder.newFile("tt.tatbigr")
-        rawFile.outputStream().use { output ->
-            validator.inflateAsset(asset.inputStream(), output, BigramArtifactSpec.TATAR_BIGRAMS_V1)
-        }
+        val validated = validateCommitted(
+            "tatar_bigrams_v1.tatbigr.zlib",
+            BigramArtifactSpec.TATAR_BIGRAMS_V1,
+        )
 
-        val validated = validator.validateRaw(rawFile, BigramArtifactSpec.TATAR_BIGRAMS_V1)
-
+        // K = 4 since 2026-08-23 (docs/BIGRAM-ADJACENCY.md). The head count is unchanged by that
+        // drop — the same four zero-successor words are dropped at K = 4 as at K = 6 — so a 9 996
+        // here that survives a K change is the point, not a coincidence.
         assertEquals(9_996, validated.headCount)
-        assertEquals(644_148, validated.rawSize)
+        assertEquals(512_338, validated.rawSize)
+        assertEquals(39_921, validated.pairCount)
+    }
+
+    /**
+     * The ru table shipped in 1.8.x with no test against its real committed bytes while the tt
+     * table had one; the K = 4 repack touched both, so both are pinned now.
+     */
+    @Test
+    fun acceptsCommittedRussianBigramAssetWithFrozenProvenance() {
+        val validated = validateCommitted(
+            "russian_bigrams_v1.tatbigr.zlib",
+            BigramArtifactSpec.RUSSIAN_BIGRAMS_V1,
+        )
+
+        assertEquals(10_000, validated.headCount)
+        assertEquals(505_768, validated.rawSize)
+        assertEquals(39_996, validated.pairCount)
     }
 
     @Test
@@ -296,13 +313,25 @@ class TatBigrValidatorTest {
             },
         )
 
-    private fun locateCommittedAsset(): File {
+    private fun validateCommitted(
+        assetFileName: String,
+        spec: BigramArtifactSpec,
+    ): ValidatedBigramTable {
+        val asset = locateCommittedAsset(assetFileName).readBytes()
+        val rawFile = temporaryFolder.newFile("${spec.fileLanguageTag}.tatbigr")
+        rawFile.outputStream().use { output ->
+            validator.inflateAsset(asset.inputStream(), output, spec)
+        }
+        return validator.validateRaw(rawFile, spec)
+    }
+
+    private fun locateCommittedAsset(assetFileName: String): File {
         val candidates = listOf(
-            File("src/main/assets/bigrams/tatar_bigrams_v1.tatbigr.zlib"),
-            File("app/src/main/assets/bigrams/tatar_bigrams_v1.tatbigr.zlib"),
+            File("src/main/assets/bigrams/$assetFileName"),
+            File("app/src/main/assets/bigrams/$assetFileName"),
         )
         return candidates.firstOrNull(File::isFile)
-            ?: error("cannot locate committed bigram asset from ${File(".").absolutePath}")
+            ?: error("cannot locate $assetFileName from ${File(".").absolutePath}")
     }
 
     private fun assertValidationFails(block: () -> Unit) {

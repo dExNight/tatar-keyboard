@@ -91,11 +91,18 @@ data class BigramArtifactSpec(
         private val FILE_LANGUAGE_TAG_PATTERN = Regex("[a-z]{2,3}")
 
         /**
-         * The tt table packed 2026-08-17 by `scripts/bigram_asset_pack.py pack` from the E5a-
-         * chosen configuration (H=10 000, K=6 — docs/DICTIONARY-E5B.md records the choice and
-         * why). 9 996 heads, not 10 000: four top-10 000-by-frequency words never occur as the
-         * head of an in-vocabulary pair in mixed+web and are dropped rather than stored with an
-         * empty range (docs/DICTIONARY-E5B.md, "Dropped heads").
+         * The tt table repacked 2026-08-23 by `scripts/bigram_asset_pack.py pack` at H = 10 000,
+         * **K = 4** — down from the K = 6 of 1.6.0…1.8.2, which stored ranks 5 and 6 that nothing
+         * ever read (`TatBigrPrefixIndex.MAX_RESULTS` is 3). Verified head-by-head on both
+         * artifacts before the swap: the head set is identical and not one of the 9 996 heads
+         * changes the three successors the strip displays, so this is 52 860 fewer bytes at
+         * byte-identical behaviour. docs/BIGRAM-ADJACENCY.md records the proof;
+         * docs/DICTIONARY-E5B.md records the original E5a choice.
+         *
+         * 9 996 heads, not 10 000: four top-10 000-by-frequency words never occur as the head of
+         * an in-vocabulary pair in mixed+web and are dropped rather than stored with an empty
+         * range (docs/DICTIONARY-E5B.md, "Dropped heads"). K does not affect that set — the same
+         * four drop at K = 4.
          */
         @JvmField
         val TATAR_BIGRAMS_V1 = BigramArtifactSpec(
@@ -105,20 +112,22 @@ data class BigramArtifactSpec(
             subtypeId = PersonalSubtypes.TATAR_RU,
             storageDirectoryName = "bigrams",
             assetPath = "bigrams/tatar_bigrams_v1.tatbigr.zlib",
-            expectedCompressedSize = 226_428,
+            expectedCompressedSize = 173_568,
             expectedCompressedSha256 =
-                "89eb4aa82be45a57ea94daa0379ca3d8a07f1c630e5c532960832787b1e1ab8d",
-            expectedRawSize = 644_148,
+                "4ed46a1ef4059040fe338426c64d5ed1c0b2a29d90b4a028e5228473d3a9fc17",
+            expectedRawSize = 512_338,
             expectedRawSha256 =
-                "fb686476f6252f61f9d26632ccbd228f13aa1bffca7fe9bfff5f24baf9e0b05b",
+                "1e61422465f89b859f48c1d578479154287aa61b9b696b5c4726814af8de1b6c",
             expectedHeadCount = 9_996,
         )
 
         /**
-         * The ru table packed 2026-08-21 by `scripts/bigram_asset_pack.py pack --language rus`
+         * The ru table repacked 2026-08-23 by `scripts/bigram_asset_pack.py pack --language rus`
          * from the same three Leipzig corpora the Russian dictionary is built from, at the same
-         * H = 10 000 / K = 6 the Tatar table uses — `docs/RUSSIAN-BIGRAMS.md` records the matrix
-         * that chose it and every number below.
+         * H = 10 000 / **K = 4** the Tatar table now uses — `docs/RUSSIAN-BIGRAMS.md` records the
+         * matrix that chose H and the original K = 6; docs/BIGRAM-ADJACENCY.md records the drop to
+         * K = 4 and the head-by-head proof that none of the 10 000 heads changes its displayed
+         * three successors. 47 098 fewer bytes at byte-identical behaviour.
          *
          * 10 000 heads, none dropped: unlike Tatar, every one of the top-10 000 Russian forms
          * occurs as the head of an in-vocabulary pair in the training corpora.
@@ -135,12 +144,12 @@ data class BigramArtifactSpec(
             subtypeId = PersonalSubtypes.RUSSIAN,
             storageDirectoryName = "bigrams-ru",
             assetPath = "bigrams/russian_bigrams_v1.tatbigr.zlib",
-            expectedCompressedSize = 207_608,
+            expectedCompressedSize = 160_510,
             expectedCompressedSha256 =
-                "6ccb3ecc75d5c4d27d6f2b6b42a62628c3462ebd00a8e5fecffb9cdc87acb1ef",
-            expectedRawSize = 635_838,
+                "741f55b94fc0c367833a6e2aa2f22b1332debb59fcfe19f9429a71aed56bff73",
+            expectedRawSize = 505_768,
             expectedRawSha256 =
-                "48f8ec6ab7bd262f847351a43633bde405d85aac82f8030b8b8f1de0a0491954",
+                "264b09fc6e73becf4cfe47cfecb26e6911f56d39707e038e2702b97244cbb631",
             expectedHeadCount = 10_000,
         )
     }
