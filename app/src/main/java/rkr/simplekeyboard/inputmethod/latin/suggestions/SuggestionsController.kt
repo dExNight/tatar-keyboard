@@ -471,6 +471,25 @@ class SuggestionsController internal constructor(
     private var pendingContextWord: String = ""
     private var displayedContextWord: String? = null
 
+    // --- Правило приоритета языков (docs/LANG-PRIORITY.md). The layout the user chose with their
+    // own hand owns the band; the other language may only fill the cells that language left empty,
+    // and only from the end.
+    //
+    // [bandBaseCells] is what is on the strip right now, in strip order and already re-cased — the
+    // exact strings handed to [StripSurface.showSuggestions]. The companion's candidates are
+    // APPENDED to this list and never mixed into it, which is what makes "no cell the current
+    // language occupies ever changes" true by construction rather than by review.
+    private var bandBaseCells: List<String> = emptyList()
+
+    // The one outstanding companion lookup, or null when there is none. The kind and the exact text
+    // it was made for are kept here so a result that arrives after the user has typed on is dropped
+    // by comparing against them, never by trusting the engine's own currency check alone: the
+    // companion engine is not asked again on every keystroke, so its newest token can be an old
+    // word's.
+    private var companionSlot: LanguageSlot? = null
+    private var companionKind: LookupKind? = null
+    private var companionQuery: String = ""
+
     // --- E4c clean-run state. Nothing here is persisted and nothing leaves this object except one
     // completed word handed to [completionSink]; with the default sink that is a no-op.
     /** The trailing word as last seen. Empty between words. */
@@ -556,6 +575,8 @@ class SuggestionsController internal constructor(
         sessionId++
         displayedPrefix = null
         displayedContextWord = null
+        bandBaseCells = emptyList()
+        clearCompanionRequest()
         setActiveLanguage(subtypeId)
         this.eligible = eligible && activeLanguage != null
         if (!this.eligible) {
@@ -609,6 +630,8 @@ class SuggestionsController internal constructor(
         // live editor state, so drop the displayed binding immediately.
         displayedPrefix = null
         displayedContextWord = null
+        bandBaseCells = emptyList()
+        clearCompanionRequest()
         // Keep the reserved band only after an engine has actually published. Eligibility while
         // the dictionary is preparing/unavailable remains fail-closed at GONE/0dp.
         if (eligible) {
@@ -631,6 +654,8 @@ class SuggestionsController internal constructor(
         sessionId++
         displayedPrefix = null
         displayedContextWord = null
+        bandBaseCells = emptyList()
+        clearCompanionRequest()
         // Close eligibility before hiding/finishing. A readiness notification queued behind this
         // lifecycle boundary must not start or publish an engine for the finished editor session.
         eligible = false
@@ -660,6 +685,8 @@ class SuggestionsController internal constructor(
         activeSlot()?.engine?.finishInput()
         displayedPrefix = null
         displayedContextWord = null
+        bandBaseCells = emptyList()
+        clearCompanionRequest()
         setActiveLanguage(subtypeId)
         this.eligible = eligible && activeLanguage != null
         if (this.eligible) {
@@ -714,6 +741,8 @@ class SuggestionsController internal constructor(
         activeSlot()?.engine?.finishInput()
         displayedPrefix = null
         displayedContextWord = null
+        bandBaseCells = emptyList()
+        clearCompanionRequest()
         displayedSessionId = NO_SESSION
         if (eligible) strip.reserve() else strip.hideSuggestions()
     }
@@ -737,6 +766,8 @@ class SuggestionsController internal constructor(
         eligible = false
         displayedPrefix = null
         displayedContextWord = null
+        bandBaseCells = emptyList()
+        clearCompanionRequest()
         requestSessionId = NO_SESSION
         strip.hideSuggestions()
         // The setting is global, so EVERY language stops, not just the active one: a warm engine of
@@ -823,6 +854,8 @@ class SuggestionsController internal constructor(
         clearRevertState()
         displayedPrefix = null
         displayedContextWord = null
+        bandBaseCells = emptyList()
+        clearCompanionRequest()
         for (slot in slots.values) {
             val handle = slot.engine ?: continue
             if (destroyHandle(handle)) {
@@ -1152,6 +1185,117 @@ class SuggestionsController internal constructor(
      * available) is enforced — "Сосуществование" in the same amendment: a non-empty prefix always
      * means PREFIX-only, an empty one means NEXT_WORD-only or nothing, never both in the same band.
      */
+    /**
+     * The language that may fill the cells the active one leaves empty, or null when there is none.
+     *
+     * "May" is deliberately narrow: the slot must already hold a live engine. A language whose
+     * dictionary was never prepared is NOT prepared for this, and a cold engine is NOT started for
+     * it — starting one costs an mmap and a worker thread on the input path, and the cold-start
+     * invariant is not something a tail cell is worth. The shipped languages are read off
+     * [DictionaryArtifactSpec.ALL] in its own order, so which language answers is fixed by the
+     * registry rather than by iteration order of the slot map.
+     */
+    private fun companionSlotForFill(): LanguageSlot? {
+        val active = activeLanguage ?: return null
+        for (spec in DictionaryArtifactSpec.ALL) {
+            if (spec.languageTag == active) continue
+            val slot = slots[spec.languageTag] ?: continue
+            if (slot.releasePending) continue
+            if (slot.engine != null) return slot
+        }
+        return null
+    }
+
+    /**
+     * Asks the companion language for [query], but only after the active language has already
+     * answered and left a cell empty.
+     *
+     * Deliberately lazy. The active language fills all three cells for about nine keystrokes in ten
+     * (docs/LANG-PRIORITY.md, "Цена"), so asking both engines on every press would pay twice for
+     * nothing nine times out of ten; and because this runs only AFTER the active result was applied,
+     * the first cell reaches the screen at exactly the moment it does today.
+     */
+    private fun requestCompanionFill(kind: LookupKind, query: String) {
+        clearCompanionRequest()
+        if (query.isEmpty()) return
+        val slot = companionSlotForFill() ?: return
+        val engine = slot.engine ?: return
+        val bytes = TatarWordUtils.toLookupBytes(TatarWordUtils.normalizeForLookup(query))
+        val token = when (kind) {
+            LookupKind.PREFIX -> engine.request(sessionId, slot.subtypeId, bytes)
+            LookupKind.NEXT_WORD -> engine.requestNextWord(sessionId, slot.subtypeId, bytes)
+        }
+        if (token == null) return
+        companionSlot = slot
+        companionKind = kind
+        companionQuery = query
+    }
+
+    /** Forgets the outstanding companion lookup; a result for it can no longer reach the band. */
+    private fun clearCompanionRequest() {
+        companionSlot = null
+        companionKind = null
+        companionQuery = ""
+    }
+
+    /**
+     * Appends the companion language's candidates to the cells the active language left empty.
+     *
+     * Every guard here fails towards leaving the band exactly as the active language painted it.
+     * The three that carry the rule itself: the result must belong to the ONE outstanding companion
+     * lookup, the text it was made for must still be the text under the cursor, and the base cells
+     * are copied first, so no candidate of the active language can be displaced or reordered.
+     */
+    private fun applyCompanionResult(
+        slot: LanguageSlot,
+        token: Any,
+        suggestions: List<String>,
+        kind: LookupKind,
+    ) {
+        if (!eligible) return
+        if (slot !== companionSlot || kind != companionKind) return
+        if (sessionId != requestSessionId) return
+        if (slot.releasePending) return
+        val engine = slot.engine ?: return
+        if (!engine.isCurrent(token)) return
+        val query = companionQuery
+        val live = when (kind) {
+            LookupKind.PREFIX -> pendingPrefix
+            LookupKind.NEXT_WORD -> pendingContextWord
+        }
+        if (live != query) return
+        clearCompanionRequest()
+        if (suggestions.isEmpty()) return
+        val base = bandBaseCells
+        if (base.size >= SuggestionStripState.CELL_COUNT) return
+        // PREFIX re-applies the typed capitalization to every cell it shows, so the companion's
+        // candidates get exactly the same treatment; NEXT_WORD applies none, to either language.
+        val casing = if (kind == LookupKind.PREFIX) TatarWordUtils.classifyCasing(query) else null
+        val cells = ArrayList<String>(SuggestionStripState.CELL_COUNT)
+        cells.addAll(base)
+        for (candidate in suggestions) {
+            val shown = if (casing == null) candidate else TatarWordUtils.applyCasing(candidate, casing)
+            // A word both languages offer occupies ONE cell, and it is the one the active language
+            // already gave it.
+            if (cells.contains(shown)) continue
+            cells.add(shown)
+            if (cells.size >= SuggestionStripState.CELL_COUNT) break
+        }
+        if (cells.size == base.size) return
+        when (kind) {
+            LookupKind.PREFIX -> displayedPrefix = query
+            LookupKind.NEXT_WORD -> displayedContextWord = query
+        }
+        displayedSessionId = sessionId
+        showBand(cells)
+    }
+
+    /** The single call into the strip that paints words, and the only writer of [bandBaseCells]. */
+    private fun showBand(cells: List<String>) {
+        bandBaseCells = cells
+        strip.showSuggestions(cells[0], cells.getOrNull(1), cells.getOrNull(2))
+    }
+
     private fun requestCurrentPrefix() {
         if (!eligible) return
         val activeEngine = usableEngine()
@@ -1160,6 +1304,8 @@ class SuggestionsController internal constructor(
             // band until publishEngine() establishes that the dictionary is actually available.
             displayedPrefix = null
             displayedContextWord = null
+            bandBaseCells = emptyList()
+            clearCompanionRequest()
             strip.hideSuggestions()
             return
         }
@@ -1200,6 +1346,9 @@ class SuggestionsController internal constructor(
         // A non-empty prefix is unconditionally PREFIX mode: drop whatever NEXT_WORD state might
         // still be bound from a moment ago, so the two kinds never coexist in the band.
         displayedContextWord = null
+        // A fresh lookup of the active language supersedes whatever the companion was asked
+        // before it: the answer is about a word the user has already typed past.
+        clearCompanionRequest()
         pendingPrefix = word
         requestSessionId = sessionId
         val prefixBytes = TatarWordUtils.toLookupBytes(TatarWordUtils.normalizeForLookup(word))
@@ -1229,6 +1378,7 @@ class SuggestionsController internal constructor(
         // might still be bound (there should not be any, since this path only runs on an empty
         // prefix, but the invariant is enforced here rather than assumed).
         displayedPrefix = null
+        clearCompanionRequest()
         pendingContextWord = context
         requestSessionId = sessionId
         val contextBytes = TatarWordUtils.toLookupBytes(TatarWordUtils.normalizeForLookup(context))
@@ -1248,6 +1398,10 @@ class SuggestionsController internal constructor(
     private fun clearToReservedBand() {
         displayedPrefix = null
         displayedContextWord = null
+        bandBaseCells = emptyList()
+        clearCompanionRequest()
+        bandBaseCells = emptyList()
+        clearCompanionRequest()
         requestSessionId = NO_SESSION
         strip.reserve()
     }
@@ -1317,10 +1471,17 @@ class SuggestionsController internal constructor(
     ) {
         if (!eligible) return
         // A result computed by the engine of a language the user has left may never repaint the
-        // band. The session check below already covers it (every language change bumps the session),
-        // and the engine's own token carries the dictionary identity, but the owner of the state
-        // says so itself rather than relying on either.
-        if (slot !== activeSlot()) return
+        // band ON ITS OWN. The session check below already covers it (every language change bumps
+        // the session), and the engine's own token carries the dictionary identity, but the owner of
+        // the state says so itself rather than relying on either.
+        //
+        // The ONE thing such a result may do is fill cells the active language left empty, and only
+        // when this controller asked it to — that path is [applyCompanionResult] and it never
+        // touches a cell the active language occupies.
+        if (slot !== activeSlot()) {
+            applyCompanionResult(slot, token, suggestions, kind)
+            return
+        }
         if (sessionId != requestSessionId) return
         val activeEngine = usableEngine() ?: return
         if (!activeEngine.isCurrent(token)) return
@@ -1348,7 +1509,11 @@ class SuggestionsController internal constructor(
                 }
             }
             displayedPrefix = null
+            bandBaseCells = emptyList()
             strip.reserve()
+            // Nothing of the active language is displaced by an empty band, so the companion may
+            // fill it from the first cell — that is the one case where its candidate leads.
+            requestCompanionFill(LookupKind.PREFIX, pendingPrefix)
             return
         }
         // The result passed the session and engine currency guards, so pendingPrefix is exactly the
@@ -1360,11 +1525,15 @@ class SuggestionsController internal constructor(
         // the prefix this result was computed for, never from the live editor state, and the strip
         // hands the very same string back on tap, so the displayed and the inserted form match.
         val casing = TatarWordUtils.classifyCasing(pendingPrefix)
-        strip.showSuggestions(
-            TatarWordUtils.applyCasing(suggestions[0], casing),
-            suggestions.getOrNull(1)?.let { TatarWordUtils.applyCasing(it, casing) },
-            suggestions.getOrNull(2)?.let { TatarWordUtils.applyCasing(it, casing) },
-        )
+        val cells = ArrayList<String>(SuggestionStripState.CELL_COUNT)
+        for (candidate in suggestions) {
+            cells.add(TatarWordUtils.applyCasing(candidate, casing))
+            if (cells.size >= SuggestionStripState.CELL_COUNT) break
+        }
+        showBand(cells)
+        if (cells.size < SuggestionStripState.CELL_COUNT) {
+            requestCompanionFill(LookupKind.PREFIX, pendingPrefix)
+        }
     }
 
     /**
@@ -1376,16 +1545,22 @@ class SuggestionsController internal constructor(
     private fun applyNextWordResult(suggestions: List<String>) {
         if (suggestions.isEmpty()) {
             displayedContextWord = null
+            bandBaseCells = emptyList()
             strip.reserve()
+            requestCompanionFill(LookupKind.NEXT_WORD, pendingContextWord)
             return
         }
         displayedContextWord = pendingContextWord
         displayedSessionId = sessionId
-        strip.showSuggestions(
-            suggestions[0],
-            suggestions.getOrNull(1),
-            suggestions.getOrNull(2),
-        )
+        val cells = ArrayList<String>(SuggestionStripState.CELL_COUNT)
+        for (candidate in suggestions) {
+            cells.add(candidate)
+            if (cells.size >= SuggestionStripState.CELL_COUNT) break
+        }
+        showBand(cells)
+        if (cells.size < SuggestionStripState.CELL_COUNT) {
+            requestCompanionFill(LookupKind.NEXT_WORD, pendingContextWord)
+        }
     }
 
     /**
@@ -1444,6 +1619,10 @@ class SuggestionsController internal constructor(
         // Whatever the band was showing described the word that no longer stands there.
         displayedPrefix = null
         displayedContextWord = null
+        bandBaseCells = emptyList()
+        clearCompanionRequest()
+        bandBaseCells = emptyList()
+        clearCompanionRequest()
         armedReplacement = Replacement(
             word, replacement, separatorString(separatorCodePoint), sessionId,
         )
@@ -1523,6 +1702,8 @@ class SuggestionsController internal constructor(
                 // The field is still eligible after a commit; clear the words but keep the reserved
                 // band so accepting a suggestion does not resize the keyboard.
                 displayedPrefix = null
+                bandBaseCells = emptyList()
+                clearCompanionRequest()
                 strip.reserve()
             }
             return
@@ -1533,6 +1714,8 @@ class SuggestionsController internal constructor(
             // the editor re-derives the live context word and refuses a stale tap itself.
             if (editor.commitPredictedWord(context, suggestion)) {
                 displayedContextWord = null
+                bandBaseCells = emptyList()
+                clearCompanionRequest()
                 strip.reserve()
             }
         }
