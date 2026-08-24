@@ -43,3 +43,39 @@ format with SHA-256, and zlib-compressed.
 --------------------------------------------------------------------------------
 The dictionary data remains a separate CC BY 4.0 component; the application's
 Apache-2.0 license does not replace that data license.
+
+--------------------------------------------------------------------------------
+Conversational word frequencies -- measured and queued, NOT yet packed
+
+Two further collections were measured and turned into word-by-word acceptance
+queues (docs/DICTIONARY-RU-CONV-REVIEW.tsv, docs/DICTIONARY-TT-CONV-REVIEW.tsv).
+No word from either is inside the .tdict.zlib files above yet. They are named here
+now because both collections ask to be named by anyone who uses them, and the work
+that uses them is already done; when the words are merged, this section loses its
+"not yet" and joins the derivation recorded for each asset above.
+
+Tatoeba
+https://tatoeba.org/
+License: Creative Commons Attribution 2.0 France (CC BY 2.0 FR)
+https://creativecommons.org/licenses/by/2.0/fr/
+Terms of use: https://tatoeba.org/eng/terms_of_use
+Sentences are contributed by Tatoeba's members; CC BY 2.0 FR permits use,
+modification and redistribution on the single condition that the source is cited.
+
+OpenSubtitles, taken from the OPUS collection (OpenSubtitles v2024)
+http://www.opensubtitles.org/
+Recommended citation: P. Lison, J. Tiedemann, "OpenSubtitles2016: Extracting Large
+Parallel Corpora from Movie and TV Subtitles", LREC 2016.
+OpenSubtitles publishes NO license grant for this text -- not an unclear license, an
+absent one. What the collection does ask is a link back to opensubtitles.org from
+anything built on its data; that link is on the line above and on the app's "Data
+sources" screen. The project's operator decided on 2026-08-24 to use the data
+anyway, with the absence of a grant stated. docs/CORPUS-OS.md records the decision
+and the measurements; docs/PUBLISH-CHECKLIST.md carries it to release as a known
+risk rather than a settled question.
+
+Changes by the Tatar Keyboard project (planned, same as for the sources above):
+lines are deduplicated, tokens are normalized to NFC lowercase and filtered to the
+language alphabet, proper nouns are removed by capitalization evidence, forms seen
+fewer than three times are dropped, and only counts -- never sentences -- are kept.
+No sentence from either collection is stored in this repository or in the app.

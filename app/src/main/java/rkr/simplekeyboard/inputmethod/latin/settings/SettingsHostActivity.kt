@@ -99,7 +99,8 @@ class SettingsHostActivity : Activity() {
         LANGUAGES(R.string.keyboard_languages),
         // Title is the language display name, set dynamically in showScreen.
         LANGUAGE_DETAIL(0),
-        PERSONAL_DICTIONARY(R.string.personal_dictionary)
+        PERSONAL_DICTIONARY(R.string.personal_dictionary),
+        DATA_SOURCES(R.string.settings_screen_data_sources)
     }
 
     companion object {
@@ -276,6 +277,7 @@ class SettingsHostActivity : Activity() {
             Screen.LANGUAGES -> buildLanguagesScreen()
             Screen.LANGUAGE_DETAIL -> buildLanguageDetailScreen(detail!!)
             Screen.PERSONAL_DICTIONARY -> buildPersonalDictionaryScreen()
+            Screen.DATA_SOURCES -> buildDataSourcesScreen()
         }
         scrollView.scrollTo(0, 0)
     }
@@ -296,7 +298,46 @@ class SettingsHostActivity : Activity() {
             linkRow(R.string.settings_screen_appearance) { navigateTo(Screen.APPEARANCE) }))
         addCard(listOf(
             linkRow(R.string.privacy_policy) { openUrl(getString(R.string.privacy_policy_url)) },
-            linkRow(R.string.license) { openUrl(getString(R.string.license_url)) }))
+            linkRow(R.string.license) { openUrl(getString(R.string.license_url)) },
+            linkRow(R.string.settings_screen_data_sources) { navigateTo(Screen.DATA_SOURCES) }))
+    }
+
+    /**
+     * "Data sources": where the words in this keyboard come from, one row per collection.
+     *
+     * It exists because the collections ask for it. Leipzig and Tatoeba are CC BY, and the BY is
+     * the whole condition — naming the source is what buys the right to ship a word list derived
+     * from it. OpenSubtitles asks for one thing only, a link back to opensubtitles.org, and that
+     * link is this screen's [R.string.data_sources_opensubtitles_url] row. `NOTICE.txt` next to
+     * the assets carries the same names in full; this screen is the half a person can actually
+     * reach without unpacking an APK.
+     *
+     * The two section headers are not decoration. Only the Leipzig data is inside the app today;
+     * the conversational frequencies from Tatoeba and OpenSubtitles are measured, queued for
+     * word-by-word acceptance (`docs/DICTIONARY-*-CONV-REVIEW.tsv`) and not packed into any
+     * asset. Listing all three under one heading would claim something untrue about the shipped
+     * files, and the release that merges them has a checklist line to move the rows up.
+     */
+    private fun buildDataSourcesScreen() {
+        addCard(listOf(textRow(getString(R.string.data_sources_intro))))
+
+        addSectionHeader(getString(R.string.data_sources_in_app))
+        addCard(listOf(
+            linkRow(getString(R.string.data_sources_leipzig_title),
+                    getString(R.string.data_sources_leipzig_summary)) {
+                openUrl(getString(R.string.data_sources_leipzig_url))
+            }), spacedFromPrevious = false)
+
+        addSectionHeader(getString(R.string.data_sources_prepared))
+        addCard(listOf(
+            linkRow(getString(R.string.data_sources_tatoeba_title),
+                    getString(R.string.data_sources_tatoeba_summary)) {
+                openUrl(getString(R.string.data_sources_tatoeba_url))
+            },
+            linkRow(getString(R.string.data_sources_opensubtitles_title),
+                    getString(R.string.data_sources_opensubtitles_summary)) {
+                openUrl(getString(R.string.data_sources_opensubtitles_url))
+            }), spacedFromPrevious = false)
     }
 
     private fun buildPreferencesScreen() {
@@ -935,6 +976,16 @@ class SettingsHostActivity : Activity() {
         if (isRestricted(restrictionKey)) {
             setRowEnabled(row, false)
         }
+        return row
+    }
+
+    /** Non-interactive text cell: a paragraph inside a card, with no chevron and no tap target. */
+    private fun textRow(text: CharSequence): View {
+        val row = inflateRow(R.layout.row_link, text, null)
+        row.findViewById<View>(R.id.row_chevron).visibility = View.GONE
+        row.isClickable = false
+        row.isFocusable = false
+        row.foreground = null
         return row
     }
 

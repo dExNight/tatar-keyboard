@@ -132,4 +132,15 @@
     <string name="no_app_for_link">На устройстве нет приложения, которое открывает ссылки.</string>
     <string name="personal_dictionary_empty_ready">Пока ничего не сохранено. Набранные слова будут появляться здесь.</string>
     <string name="personal_dictionary_off_nothing_to_forget">Сохранение слов выключено, забывать нечего. Включите «Личный словарь» в настройках клавиатуры, чтобы набранные слова запоминались.</string>
+    <!-- Title of the settings row and screen that lists where the keyboard's language data comes from. -->
+    <string name="settings_screen_data_sources">Источники данных</string>
+    <!-- Opening line of the Data sources screen. -->
+    <string name="data_sources_intro">Клавиатура работает без интернета и никуда ничего не отправляет. Списки слов и подсказки следующего слова собраны из открытых собраний текстов. Вот эти собрания.</string>
+    <!-- Section header above the sources whose data is inside this version of the app. -->
+    <string name="data_sources_in_app">В этой версии</string>
+    <!-- Section header above sources whose data has been prepared but is not in the app yet. -->
+    <string name="data_sources_prepared">Подготовлено, в приложении ещё нет</string>
+    <string name="data_sources_leipzig_summary">Списки слов и таблицы подсказок, татарский и русский. CC BY 4.0.</string>
+    <string name="data_sources_tatoeba_summary">Разговорная речь: частоты слов из примеров предложений. CC BY 2.0 FR.</string>
+    <string name="data_sources_opensubtitles_summary">Разговорная речь: частоты слов из субтитров к фильмам.</string>
 </resources>

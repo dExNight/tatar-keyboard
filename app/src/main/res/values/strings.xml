@@ -247,4 +247,15 @@
     <string name="personal_dictionary_empty_ready">No saved words yet. Words you type will appear here.</string>
     <!-- Shown when a long press asks to forget a word while saved words are switched off. Names the switch, because turning it on is the only thing the person can do about it. -->
     <string name="personal_dictionary_off_nothing_to_forget">Saved words are off, so there is nothing to forget. Turn on Personal dictionary in the keyboard settings to have the words you type remembered.</string>
+    <!-- Title of the settings row and screen that lists where the keyboard's language data comes from. -->
+    <string name="settings_screen_data_sources">Data sources</string>
+    <!-- Opening line of the Data sources screen. Says the two things a person actually wants to know: nothing leaves the phone, and the words came from somewhere nameable. -->
+    <string name="data_sources_intro">The keyboard works offline and sends nothing anywhere. Its word lists and next-word suggestions are built from open collections of text. These are the collections.</string>
+    <!-- Section header above the sources whose data is inside this version of the app. -->
+    <string name="data_sources_in_app">In this version</string>
+    <!-- Section header above sources whose data has been prepared but is not in the app yet. -->
+    <string name="data_sources_prepared">Prepared, not in the app yet</string>
+    <string name="data_sources_leipzig_summary">Word lists and next-word tables, Tatar and Russian. CC BY 4.0.</string>
+    <string name="data_sources_tatoeba_summary">Everyday speech: word frequencies from example sentences. CC BY 2.0 FR.</string>
+    <string name="data_sources_opensubtitles_summary">Everyday speech: word frequencies from film subtitles.</string>
 </resources>

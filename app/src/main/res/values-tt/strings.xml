@@ -126,4 +126,15 @@
     <string name="no_app_for_link">Бу җиһазда сылтамаларны ача торган кушымта юк.</string>
     <string name="personal_dictionary_empty_ready">Әлегә бернәрсә дә сакланмаган. Сез язган сүзләр монда күренә башлар.</string>
     <string name="personal_dictionary_off_nothing_to_forget">Сүзләрне саклау сүндерелгән, онытыр нәрсә юк. Язган сүзләрегез исендә калсын өчен клавиатура көйләүләрендә «Шәхси сүзлек»не кабызыгыз.</string>
+    <!-- Title of the settings row and screen that lists where the keyboard's language data comes from. -->
+    <string name="settings_screen_data_sources">Мәгълүмат чыганаклары</string>
+    <!-- Opening line of the Data sources screen. -->
+    <string name="data_sources_intro">Клавиатура интернетсыз эшли һәм беркая да бернәрсә җибәрми. Сүзлекләр һәм киләсе сүз тәкъдимнәре ачык текст җыелмаларыннан төзелгән. Менә ул җыелмалар.</string>
+    <!-- Section header above the sources whose data is inside this version of the app. -->
+    <string name="data_sources_in_app">Бу версиядә</string>
+    <!-- Section header above sources whose data has been prepared but is not in the app yet. -->
+    <string name="data_sources_prepared">Әзерләнгән, кушымтада әле юк</string>
+    <string name="data_sources_leipzig_summary">Сүзлекләр һәм тәкъдим таблицалары, татарча һәм русча. CC BY 4.0.</string>
+    <string name="data_sources_tatoeba_summary">Сөйләм теле: мисал җөмләләрдән сүз ешлыгы. CC BY 2.0 FR.</string>
+    <string name="data_sources_opensubtitles_summary">Сөйләм теле: фильм субтитрларыннан сүз ешлыгы.</string>
 </resources>

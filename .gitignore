@@ -67,3 +67,14 @@ tat_*-sentences.txt
 # Сырые отчёты прогонов (числа переносятся в markdown вручную, сам JSON не коммитится)
 docs/*.generated.json
 .smgr/
+
+# Разговорные корпуса миссии tt-corpus (OPUS) и её тестовые артефакты.
+# Причина та же, по которой выше игнорируются tat_*-sentences.txt: это лицензионные
+# исходники, они в репозиторий не кладутся. Числа перенесены в docs/CORPUS.md,
+# скрипты замера (research/corpus/*.py) — коммитятся, данные — нет.
+research/corpus/*.txt.gz
+research/corpus/*.part
+research/corpus/out/
+research/corpus/licenses/
+research/corpus/__pycache__/
+research/corpus/chunks/
