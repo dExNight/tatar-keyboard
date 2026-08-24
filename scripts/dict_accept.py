@@ -30,6 +30,34 @@
 
 Отклонённое НЕ удаляется: оно ложится файлом рядом с принятым, с причиной отказа, и его всегда
 можно принять позже одной правкой правила.
+
+────────────────────────────────────────────────────────────────────────────────────────────
+РАСШИРЕНИЕ 1.9.1 (миссия tt-dict-widen, отчёт — docs/DICT-WIDEN.md)
+
+Оператор посмотрел сто случайных отклонённых слов, нашёл их нормальными и снял планку
+«второй независимый источник»: отклонённые тоже принимаются. Прежнее правило не удалено — оно
+считается по-прежнему и его вердикт записан в колонку `rule` у каждого принятого слова, чтобы
+происхождение каждой строки было видно и через год. Изменилось только то, что делается с
+отклонённым: раньше оно откладывалось, теперь принимается — КРОМЕ двух случаев.
+
+  1. ФОРМАЛЬНЫЕ ОБРЫВКИ. Принять буквально всё нельзя, и это измерено, а не предположено:
+     среди 8 310 отклонённых русских слов 417 (5 %) короче четырёх букв или вовсе без гласных,
+     и сидят они на самом верху по частоте — `ме` (19 092), `щрн` (9 263), `нб` (7 407),
+     `фп` (5 869), `бш` (4 541). Это обрывки распознавания субтитров: приняв всё подряд, мы
+     пустили бы в подсказки именно их, и первыми, потому что частота у них высокая.
+
+     Для РУССКОГО: обрывок — слово короче MIN_WORD_LEN[rus] букв ИЛИ без единой гласной.
+     Для ТАТАРСКОГО порог длины НЕ применяется, и это не оплошность. Тот же признак там врёт:
+     из 2 046 отклонённых он пометил бы 62, а среди них живые слова и междометия — `док`,
+     `ох`, `фу`, `упс`, `оһ`, `уһ`, `кун`, `коп`. Татарские слова короче русских, резать их по
+     длине нельзя; остаётся только признак «нет ни одной гласной» (с учётом ә, ө, ү).
+
+  2. СЛОВА, ИСКЛЮЧЁННЫЕ ОПЕРАТОРОМ ПОИМЁННО — EXCLUDED_WORDS. Сейчас там одно слово,
+     `можна`; оно проходило и старое правило, и новое, но на префиксе `можн` пара
+     `можно | можна` выглядит как ошибка клавиатуры, а не как подсказка.
+
+Список исключаемого за пределы формального мусора и EXCLUDED_WORDS не расширяется: это
+решение оператора, а не автора правила.
 """
 from __future__ import annotations
 
@@ -61,6 +89,40 @@ MAX_CAP_RATIO = 0.50
 MIN_STEM = 4
 # Сколько ДРУГИХ форм той же основы должно стоять в поставляемом словаре.
 MIN_PARADIGM_SIBLINGS = 3
+
+# ── расширение 1.9.1 ────────────────────────────────────────────────────────────────────────
+# Слова, названные оператором поимённо и не принимаемые ни при какой частоте. Список ведёт
+# оператор; правило его не пополняет.
+EXCLUDED_WORDS = frozenset({"можна"})
+
+# Минимальная длина слова, ниже которой оно считается формальным обрывком. У татарского
+# порога нет: татарские слова короче русских, и по длине среди них режутся живые.
+MIN_WORD_LEN = {"rus": 4, "tat": 1}
+
+# Гласные. Слово без единой гласной — обрывок распознавания на обоих языках.
+VOWELS = {
+    "rus": frozenset("аеёиоуыэюя"),
+    "tat": frozenset("аәеёиоөуүыэюя"),
+}
+
+
+def fragment_reason(word: str, tag: str) -> str:
+    """Почему слово — формальный обрывок. Пустая строка, если оно им не является."""
+    if len(word) < MIN_WORD_LEN[tag]:
+        return f"короче {MIN_WORD_LEN[tag]} букв ({len(word)})"
+    if not (set(word) & VOWELS[tag]):
+        return "ни одной гласной"
+    return ""
+
+
+def fragment_rule_text(tag: str) -> str:
+    """Одной строкой: что для этого языка считается формальным обрывком — в шапку файлов."""
+    vowels = "".join(sorted(VOWELS[tag]))
+    if MIN_WORD_LEN[tag] > 1:
+        return (f"короче {MIN_WORD_LEN[tag]} букв или без единой гласной "
+                f"({vowels})")
+    return (f"без единой гласной ({vowels}); порога длины у татарского нет — "
+            "по длине там режутся живые слова")
 
 # Русские словоизменительные окончания. Список плоский и намеренно избыточный: он не должен
 # быть морфологически точным, он должен позволить найти основу. Точность даёт не он, а
@@ -151,52 +213,79 @@ def paradigm_siblings(word: str, shipped: frozenset[str]) -> tuple[int, str, str
     return best, best_stem, best_ending
 
 
+def prior_verdict(row: Row, tag: str, shipped: frozenset[str]) -> tuple[bool, str, str]:
+    """Вердикт правила 1.9.0 — «второй источник плюс регистровая улика».
+
+    В 1.9.1 он уже не решает судьбу слова, но считается по-прежнему: его ответ ложится в
+    колонку `rule` принятого и в деталь расширенного, чтобы происхождение каждой строки
+    словаря читалось файлом, а не восстанавливалось по памяти.
+    """
+    if row.cap_ratio >= MAX_CAP_RATIO:
+        return False, "proper-noun-evidence", f"cap_ratio={row.cap_ratio:.2f}>={MAX_CAP_RATIO:.2f}"
+    sources = row.source_set()
+    if "OpenSubtitles" in sources and "Tatoeba" in sources:
+        return True, "two-corpora", row.sources
+    if row.word in shipped:
+        return True, "shipped-word", "уже в поставляемом словаре"
+    if tag == "rus":
+        count, stem, ending = paradigm_siblings(row.word, shipped)
+        if count >= MIN_PARADIGM_SIBLINGS:
+            return True, "shipped-paradigm", f"{stem}|{ending} +{count} форм в словаре"
+    return False, "single-source", row.sources
+
+
 def decide(rows: list[Row], tag: str, shipped: frozenset[str]):
-    """Прогнать правило. Возвращает (accepted, rejected); в каждом — (Row, причина, деталь)."""
+    """Прогнать правило. Возвращает (accepted, rejected); в каждом — (Row, причина, деталь).
+
+    Правило 1.9.1: принимается ВСЁ, кроме формальных обрывков и слов из EXCLUDED_WORDS.
+    Слово, которое прошло бы и старую планку, сохраняет её метку (`two-corpora` и прочие);
+    слово, которое старая планка отклоняла, получает метку `operator-widened` и в детали —
+    ту самую причину прежнего отказа.
+    """
     accepted, rejected = [], []
     for row in rows:
-        if row.cap_ratio >= MAX_CAP_RATIO:
-            rejected.append((row, "proper-noun-evidence",
-                             f"cap_ratio={row.cap_ratio:.2f}>={MAX_CAP_RATIO:.2f}"))
+        passed, rule, detail = prior_verdict(row, tag, shipped)
+        if row.word in EXCLUDED_WORDS:
+            rejected.append((row, "operator-excluded",
+                             f"исключено оператором поимённо (прежнее правило: {rule})"))
             continue
-        sources = row.source_set()
-        if "OpenSubtitles" in sources and "Tatoeba" in sources:
-            accepted.append((row, "two-corpora", row.sources))
+        if passed:
+            accepted.append((row, rule, detail))
             continue
-        if row.word in shipped:
-            accepted.append((row, "shipped-word", "уже в поставляемом словаре"))
+        reason = fragment_reason(row.word, tag)
+        if reason:
+            rejected.append((row, "fragment", f"{reason}; прежнее правило: {rule}"))
             continue
-        if tag == "rus":
-            count, stem, ending = paradigm_siblings(row.word, shipped)
-            if count >= MIN_PARADIGM_SIBLINGS:
-                accepted.append((row, "shipped-paradigm",
-                                 f"{stem}|{ending} +{count} форм в словаре"))
-                continue
-        rejected.append((row, "single-source", row.sources))
+        accepted.append((row, "operator-widened", f"прежнее правило: {rule} ({detail})"))
     return accepted, rejected
 
 
 PREAMBLE = """\
-# {kind} машинной приёмкой. Миссия tt-dict-accept, отчёт — docs/DICT-ACCEPT.md.
-# Ручной вычитки не было и не будет: оператор 2026-08-24 заменил её машинным правилом.
+# {kind} машинной приёмкой. Миссия tt-dict-widen, отчёт — docs/DICT-WIDEN.md.
+# Ручной вычитки не было и не будет: оператор 2026-08-24 заменил её машинным правилом, а
+# затем, посмотрев сто случайных отклонённых, снял и планку второго источника.
 #
-# ПРАВИЛО: слово принимается, если его подтверждает второй независимый источник
-# и регистровая улика не выдаёт в нём имя собственное (cap_ratio < {cap}).
+# ПРАВИЛО 1.9.1: принимается ВСЁ, кроме формальных обрывков и слов, исключённых оператором.
+#   fragment         — формальный обрывок: {frag}
+#   operator-excluded — оператор назвал слово поимённо: {excl}
+# Прежняя планка 1.9.0 больше не решает судьбу слова, но считается и записана меткой, чтобы
+# происхождение строки было видно файлом:
 #   two-corpora      — встречается и в OpenSubtitles, и в Tatoeba
 #   shipped-word     — уже стоит в поставляемом словаре (в очереди таких нет по построению)
 #   shipped-paradigm — русский: основа стоит в поставляемом словаре ещё в >= {sib} формах
-#   single-source    — подтверждения нет: один корпус и ничего больше
-#   proper-noun-evidence — >= {cap} вхождений с заглавной буквы не в начале строки
+#   operator-widened — прежняя планка отклоняла (single-source или cap_ratio >= {cap}),
+#                      принято решением оператора; прежняя причина стоит в rule_detail
 #
 # Колонки — те же, что в очереди, плюс rule и rule_detail. Отклонённые НЕ удалены: изменить
 # правило и перезапустить `python3 scripts/dict_accept.py select` — одна команда.
 """
 
 
-def write_rows(path: Path, kind: str, decided):
+def write_rows(path: Path, kind: str, decided, frag: str):
     with path.open("w", encoding="utf-8", newline="\n") as handle:
         handle.write(PREAMBLE.format(kind=kind, cap=f"{MAX_CAP_RATIO:.2f}",
-                                     sib=MIN_PARADIGM_SIBLINGS))
+                                     sib=MIN_PARADIGM_SIBLINGS, frag=frag,
+                                     excl=", ".join(sorted(EXCLUDED_WORDS))))
         handle.write("\t".join(["word", "heldout_hits", "train_freq", "train_freq_clean",
                                 "sources", "license_status", "cap_ratio", "enters_top100k",
                                 "rule", "rule_detail"]) + "\n")
@@ -235,20 +324,44 @@ def load_shipped(tag: str):
     return freqs, boundary
 
 
+# Почему `select` требует --baseline и больше не читает ассет из дерева.
+#
+# «Поставляемый словарь» — это опора двух веток правила: `shipped-word` и `shipped-paradigm`.
+# До 1.9.0 в `app/src/main/assets` лежал ассет 1.8.4, и `corpuslib.load_shipped` читал именно
+# его. После 1.9.0 там лежит уже пересобранный словарь, в котором стоят принятые слова, — и
+# тот же вызов молча даёт другой ответ: при первом прогоне 1.9.1 ветка `shipped-word`
+# сработала 2 382 раза вместо нуля, потому что «поставляемым» оказался свежий ассет.
+#
+# На состав словаря 1.9.1 это не влияет (принимается всё, кроме обрывков), но метка
+# происхождения у 2 382 строк была бы неверной, а повторный прогон давал бы третий ответ.
+# Поэтому основа называется явно и сверяется по SHA-256 — той же функцией, что и в `pack`.
+def shipped_for_rule(tag: str, baseline: Path | None) -> frozenset[str]:
+    if baseline is None:
+        freqs, _boundary = load_shipped(tag)
+        return frozenset(freqs)
+    freqs, _asset = load_baseline(tag, baseline)
+    return frozenset(freqs)
+
+
 def select(args) -> int:
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     report = {"rule": {"max_cap_ratio": MAX_CAP_RATIO, "min_stem": MIN_STEM,
                        "min_paradigm_siblings": MIN_PARADIGM_SIBLINGS,
-                       "sample_seed": SAMPLE_SEED, "sample_size": SAMPLE_SIZE},
+                       "sample_seed": SAMPLE_SEED, "sample_size": SAMPLE_SIZE,
+                       "excluded_words": sorted(EXCLUDED_WORDS),
+                       "min_word_len": MIN_WORD_LEN,
+                       "vowels": {t: "".join(sorted(v)) for t, v in VOWELS.items()}},
               "languages": {}}
+    baseline = Path(args.baseline) if args.baseline else None
+    report["rule"]["baseline_dir"] = str(baseline) if baseline else "дерево (НЕ ПИННОВАНО)"
     for tag in ("rus", "tat"):
-        shipped_freq, _boundary = load_shipped(tag)
-        shipped = frozenset(shipped_freq)
+        shipped = shipped_for_rule(tag, baseline)
         rows = read_queue(tag)
         accepted, rejected = decide(rows, tag, shipped)
         suffix = SUFFIX[tag]
-        write_rows(OUT_DIR / f"accepted-{suffix}.tsv", "ПРИНЯТО", accepted)
-        write_rows(OUT_DIR / f"rejected-{suffix}.tsv", "ОТКЛОНЕНО", rejected)
+        frag = fragment_rule_text(tag)
+        write_rows(OUT_DIR / f"accepted-{suffix}.tsv", "ПРИНЯТО", accepted, frag)
+        write_rows(OUT_DIR / f"rejected-{suffix}.tsv", "ОТКЛОНЕНО", rejected, frag)
         lang_name = "русский" if tag == "rus" else "татарский"
         write_sample(OUT_DIR / f"sample-accepted-{suffix}.txt", "ПРИНЯТЫХ", lang_name,
                      accepted, f"accepted-{suffix}.tsv")
@@ -273,6 +386,22 @@ def select(args) -> int:
             "rejected_tokens": sum(r.freq for r, _, _ in rejected),
             "accepted_heldout_hits": sum(r.heldout for r, _, _ in accepted),
             "rejected_heldout_hits": sum(r.heldout for r, _, _ in rejected),
+            # Сколько слов принято сверх прежней планки 1.9.0 и во что это обошлось.
+            "widened": sum(1 for _r, rule, _d in accepted if rule == "operator-widened"),
+            "widened_heldout_hits": sum(r.heldout for r, rule, _d in accepted
+                                        if rule == "operator-widened"),
+            "widened_entering_top100k": sum(1 for r, rule, _d in accepted
+                                            if rule == "operator-widened" and r.enters_top100k),
+            "fragments": sum(1 for _r, rule, _d in rejected if rule == "fragment"),
+            "fragment_heldout_hits": sum(r.heldout for r, rule, _d in rejected
+                                         if rule == "fragment"),
+            "fragment_top": [
+                [r.word, r.freq, d] for r, rule, d in
+                sorted((x for x in rejected if x[1] == "fragment"),
+                       key=lambda x: -x[0].freq)[:20]
+            ],
+            "excluded": [[r.word, r.freq] for r, rule, _d in rejected
+                         if rule == "operator-excluded"],
         }
     json.dump(report, sys.stdout, ensure_ascii=False, indent=2)
     print()
@@ -453,6 +582,10 @@ def main(argv=None) -> int:
     parser.add_argument("--json-out", default=None, help="куда положить те же числа файлом")
     sub = parser.add_subparsers(dest="command", required=True)
     sel = sub.add_parser("select", help="прогнать правило и записать принятое/отклонённое")
+    sel.add_argument("--baseline", required=True,
+                     help="каталог с ассетами 1.8.4 — опора веток shipped-*; SHA-256 "
+                          "сверяется точно. Читать ассет из дерева нельзя: после 1.9.0 там "
+                          "лежит уже пересобранный словарь, и метки происхождения поехали бы")
     sel.set_defaults(func=select)
     pk = sub.add_parser("pack", help="собрать ассеты из принятого")
     pk.add_argument("--baseline", required=True,

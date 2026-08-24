@@ -56,10 +56,10 @@ from typing import Iterable, Sequence, TextIO
 # These match rkr...storage.DictionaryArtifactSpec.TATAR_TOP100K_V1. The SHA-256 pins are
 # the binding gate; the entry count is a readable cross-check.
 EXPECTED_ASSET_SHA256 = (
-    "f44fc5bf1089c24481cfc68589d4d60626ac378dc6f65880b4044fe355a59267"
+    "76bd5a39bc1091e7e85279e058385321db231084c269fd0a000f7ecb59bce7ac"
 )
 EXPECTED_RAW_SHA256 = (
-    "1670e8d8a7b282fb419de506b0aaea5e8846c4c3e5ccf52ac725140fc7aa9df3"
+    "8f434ec7cfd718df31b4410e55d36cbb914d2497ec265f89db3aaf48ec625f76"
 )
 EXPECTED_ENTRY_COUNT = 100_000
 

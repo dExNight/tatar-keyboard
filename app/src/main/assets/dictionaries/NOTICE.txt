@@ -45,16 +45,25 @@ The dictionary data remains a separate CC BY 4.0 component; the application's
 Apache-2.0 license does not replace that data license.
 
 --------------------------------------------------------------------------------
-Conversational word frequencies -- PACKED since 1.9.0
+Conversational word frequencies -- PACKED since 1.9.0, WIDENED in 1.9.1
 
 Two further collections were measured, turned into word-by-word acceptance queues
 (docs/DICTIONARY-RU-CONV-REVIEW.tsv, docs/DICTIONARY-TT-CONV-REVIEW.tsv) and, on
-2026-08-24, accepted by a machine rule and packed into the two .tdict.zlib files
-above. A word was accepted only if a second independent source confirmed it and the
-capitalization evidence did not mark it a proper noun; docs/DICT-ACCEPT.md states the
-rule, the counts and what it let through and threw away. 27 134 Russian forms and 226
-Tatar forms are inside the assets and carry their conversational counts; the other
-72 866 and 99 774 entries, and every frequency in them, are still Leipzig's.
+2026-08-24, accepted and packed into the two .tdict.zlib files above.
+
+1.9.0 accepted a word only if a second independent source confirmed it and the
+capitalization evidence did not mark it a proper noun; docs/DICT-ACCEPT.md states that
+rule and its counts. The operator then read a hundred random words it had turned away,
+judged them ordinary language, and lifted the bar: 1.9.1 accepts the whole queue except
+formal fragments -- words shorter than four letters or with no vowel at all, which in
+these corpora are subtitle OCR debris -- and one word named individually. The Tatar half
+uses only the no-vowel half of that test, because Tatar words are shorter and a length
+cut removes living ones. docs/DICT-WIDEN.md states the widened rule, every count, and
+what it still leaves out.
+
+32 833 Russian forms and 303 Tatar forms are inside the assets and carry their
+conversational counts; the other 67 167 and 99 697 entries, and every frequency in them,
+are still Leipzig's.
 
 Tatoeba
 https://tatoeba.org/

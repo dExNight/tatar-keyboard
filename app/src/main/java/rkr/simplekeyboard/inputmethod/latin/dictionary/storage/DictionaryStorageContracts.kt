@@ -100,11 +100,14 @@ data class DictionaryArtifactSpec(
          * D1a, shipped since 1.1.0. The family name and the directory are FROZEN: changing either
          * makes every device that already inflated this file inflate it again.
          *
-         * Repacked 2026-08-24 for 1.9.0: 226 conversational forms accepted by the machine rule of
-         * `docs/DICT-ACCEPT.md` displaced 226 of the least frequent Leipzig forms. The 100 000
-         * entries and the family are unchanged, so the file NAME still changes — it carries the
-         * raw SHA-256 — and a device updating from 1.8.4 inflates the new file once and drops the
-         * old one through the ordinary retention path.
+         * Repacked 2026-08-24 for 1.9.1: 303 conversational forms displaced 303 of the least
+         * frequent Leipzig forms. 1.9.0 took 226 of them under the machine rule of
+         * `docs/DICT-ACCEPT.md`; the operator then read a sample of what that rule had turned
+         * away, judged it ordinary Tatar and lifted the bar, so 1.9.1 takes the whole queue bar
+         * five vowelless fragments — `docs/DICT-WIDEN.md`. The 100 000 entries and the family
+         * are unchanged, so the file NAME still changes — it carries the raw SHA-256 — and a
+         * device updating from 1.8.4 or 1.9.0 inflates the new file once and drops the old one
+         * through the ordinary retention path.
          */
         @JvmField
         val TATAR_TOP100K_V1 = DictionaryArtifactSpec(
@@ -113,12 +116,12 @@ data class DictionaryArtifactSpec(
             storageDirectoryName = "dictionaries",
             generation = 1,
             assetPath = "dictionaries/tatar_top100k_v1.tdict.zlib",
-            expectedCompressedSize = 601_143,
+            expectedCompressedSize = 601_118,
             expectedCompressedSha256 =
-                "f44fc5bf1089c24481cfc68589d4d60626ac378dc6f65880b4044fe355a59267",
-            expectedRawSize = 2_541_374,
+                "76bd5a39bc1091e7e85279e058385321db231084c269fd0a000f7ecb59bce7ac",
+            expectedRawSize = 2_541_204,
             expectedRawSha256 =
-                "1670e8d8a7b282fb419de506b0aaea5e8846c4c3e5ccf52ac725140fc7aa9df3",
+                "8f434ec7cfd718df31b4410e55d36cbb914d2497ec265f89db3aaf48ec625f76",
             expectedEntryCount = 100_000,
             bigrams = BigramArtifactSpec.TATAR_BIGRAMS_V1,
         )
@@ -128,12 +131,15 @@ data class DictionaryArtifactSpec(
          * --language rus` from three Leipzig corpora — `docs/RUSSIAN-DICTIONARY.md` records the
          * sources, the alphabet decisions and every number below.
          *
-         * Repacked 2026-08-24 for 1.9.0 by `scripts/dict_accept.py pack --write`: 27 134
-         * conversational forms accepted by the machine rule of `docs/DICT-ACCEPT.md` displaced
-         * 27 134 of the least frequent Leipzig forms. Leipzig is still the source of the other
-         * 72 866 and of every frequency in them; the accepted forms carry their conversational
-         * counts. `app/src/main/assets/dictionaries/NOTICE.txt` names the two collections those
-         * counts come from.
+         * Repacked 2026-08-24 for 1.9.1 by `scripts/dict_accept.py pack --write`: 32 833
+         * conversational forms displaced 32 833 of the least frequent Leipzig forms. 1.9.0 took
+         * 27 134 of them under the machine rule of `docs/DICT-ACCEPT.md`; the operator then read
+         * a sample of what that rule had turned away, judged it ordinary Russian and lifted the
+         * bar, so 1.9.1 takes the whole queue bar 417 formal fragments and one word the operator
+         * named — `docs/DICT-WIDEN.md`. Leipzig is still the source of the other 67 167 and of
+         * every frequency in them; the accepted forms carry their conversational counts.
+         * `app/src/main/assets/dictionaries/NOTICE.txt` names the two collections those counts
+         * come from.
          *
          * Its own family and its own directory, so the Tatar file already inflated on a device
          * updating from 1.6.1 is neither renamed, re-inflated, nor counted against this
@@ -153,12 +159,12 @@ data class DictionaryArtifactSpec(
             storageDirectoryName = "dictionaries-ru",
             generation = 1,
             assetPath = "dictionaries/russian_top100k_v1.tdict.zlib",
-            expectedCompressedSize = 639_584,
+            expectedCompressedSize = 638_758,
             expectedCompressedSha256 =
-                "91a9f7fe92688d6c976b4f44e78ad2f4039bf36648343208dfd94e4cb0954780",
-            expectedRawSize = 2_483_696,
+                "236f21eaee357e563b979e807f38d4bed4674090695a5570b35e61369483de47",
+            expectedRawSize = 2_462_128,
             expectedRawSha256 =
-                "f3d09f172bd1d6048a91f37edf47ee89f3de210b8f9af1e3ae23320b34ea0f07",
+                "60b303711fdf7b3d52bc646dc2e8ed4f8c05932d05412bc01baa467a58c9faee",
             expectedEntryCount = 100_000,
             bigrams = BigramArtifactSpec.RUSSIAN_BIGRAMS_V1,
         )

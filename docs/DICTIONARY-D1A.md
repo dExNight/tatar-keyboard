@@ -184,3 +184,38 @@ now records `review_date` 2026-08-24 on all 22 prefixes. Two of them changed can
 `исәнм` swapped the order inside its pair, and `дус` replaced `дуслыгы` with `дуслар`. The
 other twenty are byte-identical to the 2026-07-21 rows. The classification is still an
 AUTOMATED PROJECT SELF-REVIEW and still not review by a human or a native speaker.
+
+---
+
+## Repack for 1.9.1 — everything but the fragments (mission `tt-dict-widen`, 2026-08-24)
+
+The section above records the file that sat in the tree on the morning of 2026-08-24 and is
+left exactly as it was. The numbers here describe the file committed now.
+
+**What changed.** The operator read a hundred random words the 1.9.0 rule had turned away,
+judged them ordinary language and lifted the "second independent source" bar. For Tatar the
+whole acceptance queue is now in the composition except five vowelless fragments (`хмм`,
+`һмм`, `псс`, `рнк`, `тмб`); the length cut that the Russian half uses is deliberately NOT
+applied here, because Tatar words are shorter and cutting by length removes living ones — see
+`docs/DICT-WIDEN.md`. Accepted went from 1 688 to 3 729, and **303** of them entered the
+artifact, displacing the 303 least frequent Leipzig forms. The entry count is unchanged at
+exactly 100 000, and so is the frequency-sum rule.
+
+| Property | Repacked 1.9.1 (committed today) | Repack 1.9.0 | D1a 2026-07-21 | Fail-closed limit |
+|---|---:|---:|---:|---:|
+| Entries | 100,000 | 100,000 | 100,000 | exactly 100,000 |
+| Uncompressed bytes | 2541204 | 2541374 | 2542036 | 2936012 bytes (2.8 MiB) |
+| Compressed bytes | 601118 | 601143 | 600606 | 700000 bytes |
+| Uncompressed SHA-256 | `8f434ec7cfd718df31b4410e55d36cbb914d2497ec265f89db3aaf48ec625f76` | `1670e8d8…` | `798d3257…` | exact provenance match |
+| Asset SHA-256 | `76bd5a39bc1091e7e85279e058385321db231084c269fd0a000f7ecb59bce7ac` | `f44fc5bf…` | `2d98ed35…` | exact provenance match |
+
+**Attribution.** The sources are the ones 1.9.0 already carried: Tatoeba (CC BY 2.0 FR) and
+OpenSubtitles (no licence grant; used by operator decision of 2026-08-24). Leipzig is still
+the source of **99 697** of the 100 000 entries and of every written frequency in the file.
+`docs/PUBLISH-CHECKLIST.md` still carries the OpenSubtitles risk to release, and it is still
+open.
+
+**The query self-review was re-run.** All 22 Tatar prefixes produce candidates byte-identical
+to the 1.9.0 rows: the 77 extra Tatar words that entered are too rare to reach any reviewed
+prefix's top three. The classification is still an AUTOMATED PROJECT SELF-REVIEW and still not
+review by a human or a native speaker.
