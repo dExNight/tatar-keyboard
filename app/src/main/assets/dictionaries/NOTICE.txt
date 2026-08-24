@@ -45,14 +45,16 @@ The dictionary data remains a separate CC BY 4.0 component; the application's
 Apache-2.0 license does not replace that data license.
 
 --------------------------------------------------------------------------------
-Conversational word frequencies -- measured and queued, NOT yet packed
+Conversational word frequencies -- PACKED since 1.9.0
 
-Two further collections were measured and turned into word-by-word acceptance
-queues (docs/DICTIONARY-RU-CONV-REVIEW.tsv, docs/DICTIONARY-TT-CONV-REVIEW.tsv).
-No word from either is inside the .tdict.zlib files above yet. They are named here
-now because both collections ask to be named by anyone who uses them, and the work
-that uses them is already done; when the words are merged, this section loses its
-"not yet" and joins the derivation recorded for each asset above.
+Two further collections were measured, turned into word-by-word acceptance queues
+(docs/DICTIONARY-RU-CONV-REVIEW.tsv, docs/DICTIONARY-TT-CONV-REVIEW.tsv) and, on
+2026-08-24, accepted by a machine rule and packed into the two .tdict.zlib files
+above. A word was accepted only if a second independent source confirmed it and the
+capitalization evidence did not mark it a proper noun; docs/DICT-ACCEPT.md states the
+rule, the counts and what it let through and threw away. 27 134 Russian forms and 226
+Tatar forms are inside the assets and carry their conversational counts; the other
+72 866 and 99 774 entries, and every frequency in them, are still Leipzig's.
 
 Tatoeba
 https://tatoeba.org/
@@ -74,15 +76,15 @@ anyway, with the absence of a grant stated. docs/CORPUS-OS.md records the decisi
 and the measurements; docs/PUBLISH-CHECKLIST.md carries it to release as a known
 risk rather than a settled question.
 
-Changes by the Tatar Keyboard project (planned, same as for the sources above):
-lines are deduplicated, tokens are normalized to NFC lowercase and filtered to the
-language alphabet, proper nouns are removed by capitalization evidence, forms seen
-fewer than three times are dropped, and only counts are kept -- with one stated
-exception. The acceptance queues are read in portions (docs/review-batches/), and a
-word that cannot be judged by its spelling alone carries one short example sentence
-so the reviewer can judge it. Those sentences come from Tatoeba ONLY, which is what
-CC BY 2.0 FR grants in exchange for the citation above. No OpenSubtitles sentence is
-reproduced anywhere in this repository; words seen only there carry a list of their
-neighbouring words with counts instead, which is a fact about the text and not the
-text.
-No sentence from either collection is stored in this repository or in the app.
+Changes by the Tatar Keyboard project: lines are deduplicated, tokens are normalized
+to NFC lowercase and filtered to the language alphabet, proper nouns are removed by
+capitalization evidence, forms seen fewer than three times are dropped, and only
+counts are kept -- with one stated exception. The acceptance queues are also readable
+in portions (docs/review-batches/), and a word that cannot be judged by its spelling
+alone carries one short example sentence there so a reader can judge it. Those
+sentences come from Tatoeba ONLY, which is what CC BY 2.0 FR grants in exchange for
+the citation above, and they live in the repository, not in the app. No OpenSubtitles
+sentence is reproduced anywhere in this repository; words seen only there carry a list
+of their neighbouring words with counts instead, which is a fact about the text and
+not the text.
+No sentence from either collection is stored in the app.

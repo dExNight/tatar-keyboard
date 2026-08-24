@@ -21,10 +21,10 @@ DICTIONARY = ROOT / "app" / "src" / "main" / "assets" / "dictionaries" / "tatar_
 
 # Pinned numbers for the committed dictionary (rkr...DictionaryArtifactSpec.TATAR_TOP100K_V1).
 EXPECTED_ASSET_SHA256 = (
-    "2d98ed359aa11261a5042a13c5ca9459c6e365c6ab4bf0563d0e3604a7485cae"
+    "89a90e5b334fe8987f5a6c0f11fc406fd8daba05297a9f81909b6253dcf49650"
 )
 EXPECTED_RAW_SHA256 = (
-    "798d3257700c092cdf17cbe148eb0383b82eb6a2230132af417c6a1b8548f558"
+    "df5570f69cc97145cdcaefbf1bc63267710764e764ec2a795338dee0474240f2"
 )
 
 

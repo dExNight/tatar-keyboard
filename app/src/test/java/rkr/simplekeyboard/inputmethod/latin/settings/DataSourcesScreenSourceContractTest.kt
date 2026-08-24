@@ -37,9 +37,12 @@ import org.junit.Test
  *
  * 1. The screen exists and is reachable — a screen nobody can open attributes nothing.
  * 2. Every source named on it carries its link, `opensubtitles.org` in particular.
- * 3. The screen does not claim the OpenSubtitles data is inside the app while it is not. Today the
- *    words sit in acceptance queues and no packed asset contains one of them; the release that
- *    changes that has a checklist line telling it to move the rows and re-word the headers.
+ * 3. The screen says where the data actually is. Until 1.9.0 the words sat in acceptance queues and
+ *    no packed asset contained one of them, and the test held the two collections OUT of the
+ *    shipped section. On 2026-08-24 mission `tt-dict-accept` accepted 27 134 Russian and 226 Tatar
+ *    forms by machine rule and packed them, so the assertion is turned around rather than deleted:
+ *    all three collections must now stand under the shipped header, and there must be no header
+ *    left claiming anything is merely prepared. `docs/DICT-ACCEPT.md` records the rule and counts.
  */
 class DataSourcesScreenSourceContractTest {
 
@@ -59,8 +62,14 @@ class DataSourcesScreenSourceContractTest {
     private fun bodyOf(source: String, from: String, to: String) =
         source.substringAfter(from).substringBefore(to)
 
+    /**
+     * Only the body of `buildDataSourcesScreen`. The bound used to be the next KDoc block, which
+     * ran on through several later screens; that was harmless while every assertion was a
+     * `contains`, and stops being harmless the moment one of them is an `assertFalse`. The next
+     * `private fun` is the real end of the function.
+     */
     private val screenBody by lazy {
-        bodyOf(host, "private fun buildDataSourcesScreen()", "\n    /**")
+        bodyOf(host, "private fun buildDataSourcesScreen()", "\n    private fun ")
     }
 
     @Test
@@ -100,24 +109,29 @@ class DataSourcesScreenSourceContractTest {
     }
 
     /**
-     * While the conversational words are only queued, the screen has to say so. The check is
-     * deliberately two-sided: the "prepared" header must exist AND the two sources must be under
-     * it rather than under the shipped header, because listing them as shipped would be a claim
-     * about files that do not contain them.
+     * Since 1.9.0 all three collections are inside the packed dictionaries, so the screen has to
+     * say that and nothing weaker. The check stays two-sided, with both sides reversed: every
+     * source must sit under the shipped header, and the "prepared, not in the app yet" header must
+     * be gone entirely — a header that survives with nothing under it is the same false claim in
+     * a quieter form.
      */
     @Test
-    fun sources_not_yet_packed_are_not_shown_as_shipped() {
-        val shipped = bodyOf(screenBody, "R.string.data_sources_in_app", "R.string.data_sources_prepared")
-        val prepared = screenBody.substringAfter("R.string.data_sources_prepared")
-        assertTrue("Leipzig is the source that IS packed today",
-            shipped.contains("data_sources_leipzig_title"))
-        assertFalse("Tatoeba is not packed yet and must not sit under the shipped header",
-            shipped.contains("data_sources_tatoeba_title"))
-        assertFalse("OpenSubtitles is not packed yet and must not sit under the shipped header",
-            shipped.contains("data_sources_opensubtitles_title"))
-        assertTrue(prepared.contains("data_sources_tatoeba_title"))
-        assertTrue(prepared.contains("data_sources_opensubtitles_title"))
+    fun every_packed_source_is_shown_as_shipped() {
+        val shipped = screenBody.substringAfter("R.string.data_sources_in_app")
+        for (name in listOf("leipzig", "tatoeba", "opensubtitles")) {
+            assertTrue("$name is packed since 1.9.0 and must sit under the shipped header",
+                shipped.contains("data_sources_${name}_title"))
+        }
+        assertFalse("nothing is merely prepared any more; the header must be gone from the screen",
+            screenBody.contains("data_sources_prepared"))
+        for (folder in listOf("values", "values-ru", "values-tt")) {
+            assertFalse("the unused header string must be gone from $folder too",
+                File(sourceRoot(), "res/$folder/strings.xml").readText()
+                    .contains("name=\"data_sources_prepared\""))
+        }
         assertTrue("the dictionary NOTICE must agree with the screen",
+            dictionaryNotice.contains("PACKED since 1.9.0"))
+        assertFalse("and must no longer say the words are only queued",
             dictionaryNotice.contains("NOT yet packed"))
     }
 
@@ -126,7 +140,7 @@ class DataSourcesScreenSourceContractTest {
     fun the_new_strings_speak_all_three_languages() {
         val keys = listOf(
             "settings_screen_data_sources", "data_sources_intro", "data_sources_in_app",
-            "data_sources_prepared", "data_sources_leipzig_summary",
+            "data_sources_leipzig_summary",
             "data_sources_tatoeba_summary", "data_sources_opensubtitles_summary")
         for (folder in listOf("values", "values-ru", "values-tt")) {
             val text = File(sourceRoot(), "res/$folder/strings.xml").readText()

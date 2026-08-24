@@ -132,9 +132,7 @@
     <string name="data_sources_intro">Клавиатура интернетсыз эшли һәм беркая да бернәрсә җибәрми. Сүзлекләр һәм киләсе сүз тәкъдимнәре ачык текст җыелмаларыннан төзелгән. Менә ул җыелмалар.</string>
     <!-- Section header above the sources whose data is inside this version of the app. -->
     <string name="data_sources_in_app">Бу версиядә</string>
-    <!-- Section header above sources whose data has been prepared but is not in the app yet. -->
-    <string name="data_sources_prepared">Әзерләнгән, кушымтада әле юк</string>
-    <string name="data_sources_leipzig_summary">Сүзлекләр һәм тәкъдим таблицалары, татарча һәм русча. CC BY 4.0.</string>
-    <string name="data_sources_tatoeba_summary">Сөйләм теле: мисал җөмләләрдән сүз ешлыгы. CC BY 2.0 FR.</string>
-    <string name="data_sources_opensubtitles_summary">Сөйләм теле: фильм субтитрларыннан сүз ешлыгы.</string>
+    <string name="data_sources_leipzig_summary">Ике сүзлекнең күп өлеше һәм барлык тәкъдим таблицалары. CC BY 4.0.</string>
+    <string name="data_sources_tatoeba_summary">Ике сүзлектәге сөйләм сүзләре: мисал җөмләләрдән ешлык. CC BY 2.0 FR.</string>
+    <string name="data_sources_opensubtitles_summary">Ике сүзлектәге сөйләм сүзләре: фильм субтитрларыннан ешлык.</string>
 </resources>

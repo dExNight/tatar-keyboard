@@ -294,15 +294,15 @@ class E3bRecoveryCalibrationTest {
 
         // Reproducible-set identities, produced independently by
         // `python3 scripts/typo_pack.py build --edit-class {1,2,3} ...` on the committed asset.
-        private const val CLASS1_SIZE = 87_375
+        private const val CLASS1_SIZE = 87_350
         private const val CLASS1_SHA256 =
-            "6a61b48db87ac0bbff78af48ea597b3af19f81dd42ae8deaa2d4c00a6c81dfc3"
-        private const val CLASS2_SIZE = 99_659
+            "0f2953d341a9f51d7b93ce23d2f81833ed5e5499d944e4cf1fdbe78242a046b1"
+        private const val CLASS2_SIZE = 99_658
         private const val CLASS2_SHA256 =
-            "8cd5b2b89663264d4bde505dfc80b0046951218e502dae997e1545105a8ed1cb"
-        private const val CLASS3_SIZE = 99_647
+            "247035d3df0601a31bbb7a13b68630acb3ee888c5cd98f803eb450614b57ba36"
+        private const val CLASS3_SIZE = 99_646
         private const val CLASS3_SHA256 =
-            "914ae7cf66cc311ca86f49e146d511db4281dd1bf6cd70e23f7d1b69e1902197"
+            "75b46749a9fec10a9777bac43f4bd26df10fcf91745d604baf4812c633e06ba9"
 
         // Contract threshold (amendment 2026-07-27): recovery@3 after E3b >= 2.4x the measured
         // class #1 value (E3a: 7.2835%), i.e. >= 17.4804%. Fixed reference, never lowered.

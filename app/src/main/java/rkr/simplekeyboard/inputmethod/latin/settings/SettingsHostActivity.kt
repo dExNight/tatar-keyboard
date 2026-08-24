@@ -326,10 +326,7 @@ class SettingsHostActivity : Activity() {
             linkRow(getString(R.string.data_sources_leipzig_title),
                     getString(R.string.data_sources_leipzig_summary)) {
                 openUrl(getString(R.string.data_sources_leipzig_url))
-            }), spacedFromPrevious = false)
-
-        addSectionHeader(getString(R.string.data_sources_prepared))
-        addCard(listOf(
+            },
             linkRow(getString(R.string.data_sources_tatoeba_title),
                     getString(R.string.data_sources_tatoeba_summary)) {
                 openUrl(getString(R.string.data_sources_tatoeba_url))

@@ -297,41 +297,130 @@ def read_accepted(tag: str) -> dict[str, int]:
     return out
 
 
-def merged_entries(tag: str):
-    """Состав нового ассета: поставляемые частоты плюс принятые разговорные, отсечка 100 000.
+CONV_FREQ_HEAD = """\
+# Разговорная частота слов, измеренная миссией tt-dict-accept одним проходом по корпусам.
+# Одна строка — слово и число его вхождений в обучающей части разговорных корпусов ПОСЛЕ
+# фильтрации (`research/corpus/filters.py`). Ровно эта величина стоит в колонке `train_freq`
+# очереди приёмки; здесь она есть и для слов, которых в очереди нет, — для тех, что уже стоят
+# в поставляемом словаре.
+#
+# Зачем этот файл коммитится. Досье разделяет два вопроса: СОСТАВ словаря режется вторым
+# независимым источником, ЧАСТОТЫ берутся из всего корпуса целиком, включая OpenSubtitles.
+# Значит разговорную частоту надо прибавить и поставляемым словам тоже, иначе шкалы
+# расходятся: у новичка частота из 482 млн токенов субтитров, у старожила — из письменного
+# Leipzig. Первая сборка этой миссии так и ошиблась, и на префиксе «пап» тройка стала
+# `папочка|папин|папочку`. Без этого файла пересборка требовала бы 1,5 ГБ корпуса на диске.
+#
+# Строк только для слов, которые могут оказаться в ассете: поставляемый словарь плюс очередь.
+# Слова с нулевой разговорной частотой пропущены.
+# Источник: {sources}
+# Базовый ассет: {baseline_sha}
+# Пересоздаётся: python3 research/corpus/measure_accept.py <tag> out/shipped-1.8.4 <корпуса>
+"""
 
-    Слово, которого в поставляемом ассете нет, получает РОВНО свою разговорную частоту —
-    нижняя граница интервала `docs/CORPUS-OS.md`, самое осторожное из двух допущений.
-    Верхняя граница (плюс B) существует только для измерения и в ассет не идёт: она щедра
-    к новичкам и вытесняет больше поставляемых слов, чем оправдано.
-    """
+
+def conv_freq_path(tag: str) -> Path:
+    return OUT_DIR / f"conv-freq-{SUFFIX[tag]}.tsv"
+
+
+def write_conv_freq(tag: str, conv: dict[str, int], sources, baseline_sha: str) -> None:
+    OUT_DIR.mkdir(parents=True, exist_ok=True)
+    path = conv_freq_path(tag)
+    names = " ".join(Path(p).name for p in sources)
+    with path.open("w", encoding="utf-8", newline="\n") as handle:
+        handle.write(CONV_FREQ_HEAD.format(sources=names, baseline_sha=baseline_sha))
+        handle.write("word\tconv_freq\n")
+        for word in sorted(conv):
+            handle.write(f"{word}\t{conv[word]}\n")
+
+
+def read_conv_freq(tag: str) -> dict[str, int]:
+    path = conv_freq_path(tag)
+    if not path.is_file():
+        raise SystemExit(
+            f"{path} не существует. Собери его одним проходом по корпусам:\n"
+            f"  cd research/corpus && python3 measure_accept.py {tag} out/shipped-1.8.4 <корпуса>"
+        )
+    out = {}
+    with path.open(encoding="utf-8") as handle:
+        for line in handle:
+            if line.startswith("#"):
+                continue
+            fields = line.rstrip("\n").split("\t")
+            if fields[0] == "word" or not fields[0]:
+                continue
+            out[fields[0]] = int(fields[1])
+    return out
+
+
+# Ассет 1.8.4 — единственная законная основа пересборки. Пин нужен затем, чтобы `pack` нельзя
+# было натравить на уже пересобранный файл: иначе разговорная частота прибавилась бы второй раз,
+# состав поехал бы, и ошибку не увидел бы никто. Сверка точная, по SHA-256, и падает, а не
+# предупреждает. Достать основу: git show <коммит 1.8.4>:app/src/main/assets/dictionaries/<файл>
+BASELINE_SHA256 = {
+    "rus": "f4b91cef2a4e10c096997f358811b71cdb17d0a10097b03ab3b9de9324c2c48f",
+    "tat": "2d98ed359aa11261a5042a13c5ca9459c6e365c6ab4bf0563d0e3604a7485cae",
+}
+
+
+def load_baseline(tag: str, directory: Path):
+    """Поставляемый словарь 1.8.4 из явно названного каталога, с проверкой SHA-256."""
+    import hashlib
     import corpuslib as CL
-    shipped, _boundary = CL.load_shipped(tag)
+    import dictionary_coverage as cov
+    import dictionary_pack as dp
+    language = cov.language_for(tag)
+    path = directory / CL.SHIPPED[tag].name
+    asset = path.read_bytes()
+    digest = hashlib.sha256(asset).hexdigest()
+    if digest != BASELINE_SHA256[tag]:
+        raise SystemExit(
+            f"{path}: SHA-256 {digest} — это не ассет 1.8.4 ({BASELINE_SHA256[tag]}). "
+            "Пересборка поверх пересобранного прибавила бы разговорную частоту дважды.")
+    parsed = dp.validate_raw(dp.decompress_asset(asset, language), language=language)
+    return dict(zip(parsed.words, parsed.frequencies)), asset
+
+
+def merged_entries(tag: str, baseline: Path):
+    """Состав нового ассета и частоты в нём.
+
+    СОСТАВ — поставляемые слова плюс принятые, и ничего больше: отклонённое не входит ни при
+    какой частоте. ЧАСТОТА — письменная плюс разговорная, у КАЖДОГО слова состава, включая те,
+    что стояли в словаре и раньше. Это прямо записано в досье: «Частоты и биграммы берём из
+    всего корпуса… Здесь ничего не режем», и режется только состав.
+
+    Отсечка жёстко 100 000 записей: слова не добавляются, а вытесняют самые редкие.
+    """
+    shipped, _asset = load_baseline(tag, baseline)
     accepted = read_accepted(tag)
-    merged = dict(shipped)
-    for word, count in accepted.items():
-        merged[word] = (merged[word] + count) if word in shipped else count
+    conv = read_conv_freq(tag)
+    composition = set(shipped) | set(accepted)
+    merged = {word: shipped.get(word, 0) + conv.get(word, 0) for word in composition}
     top = sorted(merged.items(), key=lambda kv: (-kv[1], kv[0]))[:100_000]
     return shipped, accepted, sorted(top, key=lambda kv: kv[0])
 
 
 def pack(args) -> int:
+    import hashlib
     import dictionary_pack as dp
+    import dictionary_coverage as cov
     import corpuslib as CL
+    baseline = Path(args.baseline)
     result = {}
     for tag in ("rus", "tat"):
-        shipped, accepted, entries = merged_entries(tag)
+        language = cov.language_for(tag)
+        shipped, before = load_baseline(tag, baseline)
+        _shipped, accepted, entries = merged_entries(tag, baseline)
         raw = dp.serialize_entries(entries)
         asset = dp.compress_raw(raw)
         target = CL.SHIPPED[tag]
-        before = target.read_bytes()
-        before_raw = dp.decompress_asset(before, __import__("dictionary_coverage").language_for(tag))
+        before_raw = dp.decompress_asset(before, language)
         words = {w for w, _ in entries}
         result[tag] = {
             "asset": str(target.relative_to(ROOT)),
             "entries": len(entries),
             "accepted_offered": len(accepted),
-            "accepted_that_entered": len(words & set(accepted) - set(shipped)),
+            "accepted_that_entered": len((words & set(accepted)) - set(shipped)),
             "shipped_words_displaced": len(set(shipped) - words),
             "asset_bytes_before": len(before),
             "asset_bytes_after": len(asset),
@@ -341,12 +430,12 @@ def pack(args) -> int:
             "raw_bytes_delta": len(raw) - len(before_raw),
             "fits_compressed": len(asset) <= dp.MAX_COMPRESSED_BYTES,
             "fits_raw": len(raw) <= dp.MAX_UNCOMPRESSED_BYTES,
-            "sha256_before": __import__("hashlib").sha256(before).hexdigest(),
-            "sha256_after": __import__("hashlib").sha256(asset).hexdigest(),
-            "raw_sha256_after": __import__("hashlib").sha256(raw).hexdigest(),
+            "sha256_before": hashlib.sha256(before).hexdigest(),
+            "sha256_after": hashlib.sha256(asset).hexdigest(),
+            "raw_sha256_after": hashlib.sha256(raw).hexdigest(),
         }
         if args.write:
-            dp.validate_asset(asset, language=__import__("dictionary_coverage").language_for(tag))
+            dp.validate_asset(asset, language=language)
             target.write_bytes(asset)
             result[tag]["written"] = True
         else:
@@ -366,6 +455,8 @@ def main(argv=None) -> int:
     sel = sub.add_parser("select", help="прогнать правило и записать принятое/отклонённое")
     sel.set_defaults(func=select)
     pk = sub.add_parser("pack", help="собрать ассеты из принятого")
+    pk.add_argument("--baseline", required=True,
+                    help="каталог с ассетами 1.8.4; SHA-256 сверяется точно")
     pk.add_argument("--write", action="store_true",
                     help="записать ассеты в app/src/main/assets (без флага только измеряет)")
     pk.set_defaults(func=pack)

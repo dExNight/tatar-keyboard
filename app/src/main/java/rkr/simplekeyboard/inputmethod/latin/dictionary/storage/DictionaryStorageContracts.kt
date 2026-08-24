@@ -99,6 +99,12 @@ data class DictionaryArtifactSpec(
         /**
          * D1a, shipped since 1.1.0. The family name and the directory are FROZEN: changing either
          * makes every device that already inflated this file inflate it again.
+         *
+         * Repacked 2026-08-24 for 1.9.0: 226 conversational forms accepted by the machine rule of
+         * `docs/DICT-ACCEPT.md` displaced 226 of the least frequent Leipzig forms. The 100 000
+         * entries and the family are unchanged, so the file NAME still changes — it carries the
+         * raw SHA-256 — and a device updating from 1.8.4 inflates the new file once and drops the
+         * old one through the ordinary retention path.
          */
         @JvmField
         val TATAR_TOP100K_V1 = DictionaryArtifactSpec(
@@ -107,12 +113,12 @@ data class DictionaryArtifactSpec(
             storageDirectoryName = "dictionaries",
             generation = 1,
             assetPath = "dictionaries/tatar_top100k_v1.tdict.zlib",
-            expectedCompressedSize = 600_606,
+            expectedCompressedSize = 600_587,
             expectedCompressedSha256 =
-                "2d98ed359aa11261a5042a13c5ca9459c6e365c6ab4bf0563d0e3604a7485cae",
-            expectedRawSize = 2_542_036,
+                "89a90e5b334fe8987f5a6c0f11fc406fd8daba05297a9f81909b6253dcf49650",
+            expectedRawSize = 2_541_362,
             expectedRawSha256 =
-                "798d3257700c092cdf17cbe148eb0383b82eb6a2230132af417c6a1b8548f558",
+                "df5570f69cc97145cdcaefbf1bc63267710764e764ec2a795338dee0474240f2",
             expectedEntryCount = 100_000,
             bigrams = BigramArtifactSpec.TATAR_BIGRAMS_V1,
         )
@@ -121,6 +127,13 @@ data class DictionaryArtifactSpec(
          * The Russian top-100k, packed 2026-08-21 by `scripts/dictionary_pack.py build
          * --language rus` from three Leipzig corpora — `docs/RUSSIAN-DICTIONARY.md` records the
          * sources, the alphabet decisions and every number below.
+         *
+         * Repacked 2026-08-24 for 1.9.0 by `scripts/dict_accept.py pack --write`: 27 134
+         * conversational forms accepted by the machine rule of `docs/DICT-ACCEPT.md` displaced
+         * 27 134 of the least frequent Leipzig forms. Leipzig is still the source of the other
+         * 72 866 and of every frequency in them; the accepted forms carry their conversational
+         * counts. `app/src/main/assets/dictionaries/NOTICE.txt` names the two collections those
+         * counts come from.
          *
          * Its own family and its own directory, so the Tatar file already inflated on a device
          * updating from 1.6.1 is neither renamed, re-inflated, nor counted against this
@@ -140,12 +153,12 @@ data class DictionaryArtifactSpec(
             storageDirectoryName = "dictionaries-ru",
             generation = 1,
             assetPath = "dictionaries/russian_top100k_v1.tdict.zlib",
-            expectedCompressedSize = 606_315,
+            expectedCompressedSize = 618_609,
             expectedCompressedSha256 =
-                "f4b91cef2a4e10c096997f358811b71cdb17d0a10097b03ab3b9de9324c2c48f",
-            expectedRawSize = 2_540_622,
+                "925014cee713404c8f78ce835325965be6d65be044db5bca312c34d1fb72a4c6",
+            expectedRawSize = 2_496_628,
             expectedRawSha256 =
-                "875bc667d7e9866229df3d462b4adabc95734c433d6f0a2ac9652d224e5086b6",
+                "812a138a2749b9daebd98ef4aed8638de71a9c1588ac725c7a7635877e9857f2",
             expectedEntryCount = 100_000,
             bigrams = BigramArtifactSpec.RUSSIAN_BIGRAMS_V1,
         )

@@ -253,9 +253,7 @@
     <string name="data_sources_intro">The keyboard works offline and sends nothing anywhere. Its word lists and next-word suggestions are built from open collections of text. These are the collections.</string>
     <!-- Section header above the sources whose data is inside this version of the app. -->
     <string name="data_sources_in_app">In this version</string>
-    <!-- Section header above sources whose data has been prepared but is not in the app yet. -->
-    <string name="data_sources_prepared">Prepared, not in the app yet</string>
-    <string name="data_sources_leipzig_summary">Word lists and next-word tables, Tatar and Russian. CC BY 4.0.</string>
-    <string name="data_sources_tatoeba_summary">Everyday speech: word frequencies from example sentences. CC BY 2.0 FR.</string>
-    <string name="data_sources_opensubtitles_summary">Everyday speech: word frequencies from film subtitles.</string>
+    <string name="data_sources_leipzig_summary">Most of both word lists, and all of the next-word tables. CC BY 4.0.</string>
+    <string name="data_sources_tatoeba_summary">Everyday words in both lists: frequencies from example sentences. CC BY 2.0 FR.</string>
+    <string name="data_sources_opensubtitles_summary">Everyday words in both lists: frequencies from film subtitles.</string>
 </resources>

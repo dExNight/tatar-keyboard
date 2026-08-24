@@ -46,7 +46,7 @@ class TdictValidatorTest {
         )
 
         assertEquals(100_000, validated.entryCount)
-        assertEquals(2_542_036, validated.rawSize)
+        assertEquals(2_541_362, validated.rawSize)
     }
 
     @Test
