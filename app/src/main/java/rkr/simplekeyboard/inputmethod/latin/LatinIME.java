@@ -176,7 +176,19 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
     public final UIHandler mHandler = new UIHandler(this);
 
     public static final class UIHandler extends LeakGuardHandlerWrapper<LatinIME> {
-        private static final int MSG_UPDATE_SHIFT_STATE = 0;
+        // NO MESSAGE ID HERE MAY BE ZERO, and MSG_UPDATE_SHIFT_STATE is 3 rather than 0 for
+        // exactly that reason.
+        //
+        // {@link Handler#post(Runnable)} enqueues an ordinary Message whose {@code what} is 0 and
+        // whose {@code callback} is the runnable. {@link Handler#removeMessages(int)} matches on
+        // {@code what} ALONE and ignores the callback, so the {@code removeMessages(0)} inside
+        // postUpdateShiftState() used to delete every pending posted Runnable of this handler along
+        // with its own message. Six places post such runnables — among them the suggestion engine's
+        // result delivery (SuggestionsController's UiPoster), the emoji panel's poster and four
+        // dialogs — and postUpdateShiftState() runs at the end of every editor text-cache reload,
+        // i.e. after practically every keystroke. The result was a suggestion band that went blank
+        // and stayed blank for as long as the reload kept winning the race: see docs/SUGGEST-DIES.md.
+        private static final int MSG_UPDATE_SHIFT_STATE = 3;
         private static final int MSG_PENDING_IMS_CALLBACK = 1;
         private static final int MSG_REFRESH_SUGGESTION_BAND = 2;
         private static final int MSG_DEALLOCATE_MEMORY = 9;
