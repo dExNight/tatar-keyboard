@@ -148,3 +148,39 @@ A pristine `HEAD` export without the D1a files produced a release APK of 828278 
 The final release APK including the compressed dictionary and shipped NOTICE is
 1410455 bytes, a delta of 582177 bytes. This remains below the
 absolute 3 MiB/3,145,728-byte gate. No build file or Android source change was made.
+
+---
+
+## Repack for 1.9.0 — conversational words merged in (mission `tt-dict-accept`, 2026-08-24)
+
+Everything above records the D1a build of 2026-07-21 and is left exactly as it was: those
+numbers describe the Leipzig-only artifact, and rewriting them would erase the only record of
+what this file used to ship. This section records the repack, and the numbers here are the ones
+that describe the file committed today.
+
+**What changed.** 226 conversational Tatar forms, accepted by the machine rule of
+`docs/DICT-ACCEPT.md`, displaced the 226 least frequent Leipzig forms. The entry count is
+unchanged at exactly 100 000, and so is every other property of the format. Every word in the
+artifact — the 99 774 that were already here and the 226 that arrived — carries the sum of its
+Leipzig frequency and its conversational frequency; `docs/dict-accept/conv-freq-tt.tsv` holds
+the second half of that sum and makes the repack reproducible without the corpora.
+
+| Property | Repacked (committed today) | D1a 2026-07-21 | Fail-closed limit |
+|---|---:|---:|---:|
+| Entries | 100,000 | 100,000 | exactly 100,000 |
+| Uncompressed bytes | 2541374 | 2542036 | 2936012 bytes (2.8 MiB) |
+| Compressed bytes | 601143 | 600606 | 700000 bytes |
+| Uncompressed SHA-256 | `1670e8d8a7b282fb419de506b0aaea5e8846c4c3e5ccf52ac725140fc7aa9df3` | `798d3257…` | exact provenance match |
+| Asset SHA-256 | `f44fc5bf1089c24481cfc68589d4d60626ac378dc6f65880b4044fe355a59267` | `2d98ed35…` | exact provenance match |
+
+**Attribution.** The 226 new forms come from Tatoeba (CC BY 2.0 FR) and OpenSubtitles (no
+licence grant; used by operator decision of 2026-08-24). `NOTICE.txt` next to the asset names
+both, and `docs/PUBLISH-CHECKLIST.md` carries the OpenSubtitles risk to release. The Leipzig
+CC BY 4.0 attribution above is unaffected: Leipzig is still the source of 99 774 of the
+100 000 entries and of every written frequency in the file.
+
+**The query self-review was re-run, not carried over.** `docs/DICTIONARY-D1A-QUERY-REVIEW.tsv`
+now records `review_date` 2026-08-24 on all 22 prefixes. Two of them changed candidates:
+`исәнм` swapped the order inside its pair, and `дус` replaced `дуслыгы` with `дуслар`. The
+other twenty are byte-identical to the 2026-07-21 rows. The classification is still an
+AUTOMATED PROJECT SELF-REVIEW and still not review by a human or a native speaker.

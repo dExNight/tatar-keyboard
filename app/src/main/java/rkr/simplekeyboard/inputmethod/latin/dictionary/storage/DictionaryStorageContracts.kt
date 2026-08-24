@@ -113,12 +113,12 @@ data class DictionaryArtifactSpec(
             storageDirectoryName = "dictionaries",
             generation = 1,
             assetPath = "dictionaries/tatar_top100k_v1.tdict.zlib",
-            expectedCompressedSize = 600_587,
+            expectedCompressedSize = 601_143,
             expectedCompressedSha256 =
-                "89a90e5b334fe8987f5a6c0f11fc406fd8daba05297a9f81909b6253dcf49650",
-            expectedRawSize = 2_541_362,
+                "f44fc5bf1089c24481cfc68589d4d60626ac378dc6f65880b4044fe355a59267",
+            expectedRawSize = 2_541_374,
             expectedRawSha256 =
-                "df5570f69cc97145cdcaefbf1bc63267710764e764ec2a795338dee0474240f2",
+                "1670e8d8a7b282fb419de506b0aaea5e8846c4c3e5ccf52ac725140fc7aa9df3",
             expectedEntryCount = 100_000,
             bigrams = BigramArtifactSpec.TATAR_BIGRAMS_V1,
         )
@@ -153,12 +153,12 @@ data class DictionaryArtifactSpec(
             storageDirectoryName = "dictionaries-ru",
             generation = 1,
             assetPath = "dictionaries/russian_top100k_v1.tdict.zlib",
-            expectedCompressedSize = 618_609,
+            expectedCompressedSize = 639_584,
             expectedCompressedSha256 =
-                "925014cee713404c8f78ce835325965be6d65be044db5bca312c34d1fb72a4c6",
-            expectedRawSize = 2_496_628,
+                "91a9f7fe92688d6c976b4f44e78ad2f4039bf36648343208dfd94e4cb0954780",
+            expectedRawSize = 2_483_696,
             expectedRawSha256 =
-                "812a138a2749b9daebd98ef4aed8638de71a9c1588ac725c7a7635877e9857f2",
+                "f3d09f172bd1d6048a91f37edf47ee89f3de210b8f9af1e3ae23320b34ea0f07",
             expectedEntryCount = 100_000,
             bigrams = BigramArtifactSpec.RUSSIAN_BIGRAMS_V1,
         )

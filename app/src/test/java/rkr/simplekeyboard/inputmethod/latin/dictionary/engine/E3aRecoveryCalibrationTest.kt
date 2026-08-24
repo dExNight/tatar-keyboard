@@ -252,7 +252,7 @@ class E3aRecoveryCalibrationTest {
         // cross-implementation "same reproducible set" proof.
         private const val GENERATOR_SET_SIZE = 87_350
         private const val GENERATOR_SET_SHA256 =
-            "0f2953d341a9f51d7b93ce23d2f81833ed5e5499d944e4cf1fdbe78242a046b1"
+            "434dedcbf006e708c45eae542bbbba4ad3a89cb77c125cd212f27d48d7d72417"
 
         // Contract target and the chosen tolerance (docs/DICTIONARY-E3.md).
         private const val CONTRACT_RECOVERY_PP = 14.2

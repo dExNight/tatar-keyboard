@@ -21,10 +21,10 @@ DICTIONARY = ROOT / "app" / "src" / "main" / "assets" / "dictionaries" / "tatar_
 
 # Pinned numbers for the committed dictionary (rkr...DictionaryArtifactSpec.TATAR_TOP100K_V1).
 EXPECTED_ASSET_SHA256 = (
-    "89a90e5b334fe8987f5a6c0f11fc406fd8daba05297a9f81909b6253dcf49650"
+    "f44fc5bf1089c24481cfc68589d4d60626ac378dc6f65880b4044fe355a59267"
 )
 EXPECTED_RAW_SHA256 = (
-    "df5570f69cc97145cdcaefbf1bc63267710764e764ec2a795338dee0474240f2"
+    "1670e8d8a7b282fb419de506b0aaea5e8846c4c3e5ccf52ac725140fc7aa9df3"
 )
 
 
@@ -337,10 +337,10 @@ class CommittedInputsSmokeTest(unittest.TestCase):
     def test_real_build_matches_recorded_set_identity(self) -> None:
         typo_set, neighbor_map = pack.generate(DICTIONARY, LAYOUT_DIR)
         # Recorded in docs/DICTIONARY-E3.md and asserted identically by the Kotlin calibration test.
-        self.assertEqual(typo_set.size, 87375)
+        self.assertEqual(typo_set.size, 87350)
         self.assertEqual(
             typo_set.sha256,
-            "6a61b48db87ac0bbff78af48ea597b3af19f81dd42ae8deaa2d4c00a6c81dfc3",
+            "434dedcbf006e708c45eae542bbbba4ad3a89cb77c125cd212f27d48d7d72417",
         )
         self.assertEqual(typo_set.variant_p95, 3)
         self.assertEqual(len({frozenset((n, p)) for n, ps in neighbor_map.items() for p in ps}), 10)
@@ -458,19 +458,19 @@ class CommittedExtendedSetsSmokeTest(unittest.TestCase):
     @unittest.skipUnless(DICTIONARY.is_file(), "committed dictionary asset not available")
     def test_class1_class2_class3_recorded_identities(self) -> None:
         one, _ = pack.generate(DICTIONARY, LAYOUT_DIR, edit_class=1)
-        self.assertEqual(one.size, 87375)
+        self.assertEqual(one.size, 87350)
         self.assertEqual(
-            one.sha256, "6a61b48db87ac0bbff78af48ea597b3af19f81dd42ae8deaa2d4c00a6c81dfc3"
+            one.sha256, "434dedcbf006e708c45eae542bbbba4ad3a89cb77c125cd212f27d48d7d72417"
         )
         two, _ = pack.generate(DICTIONARY, LAYOUT_DIR, edit_class=2)
-        self.assertEqual(two.size, 99659)
+        self.assertEqual(two.size, 99658)
         self.assertEqual(
-            two.sha256, "8cd5b2b89663264d4bde505dfc80b0046951218e502dae997e1545105a8ed1cb"
+            two.sha256, "719d23afa52b73af7472627a50f8139fe0d5d093732e3b3a08e8bf724fb74ac4"
         )
         three, _ = pack.generate(DICTIONARY, LAYOUT_DIR, edit_class=3)
-        self.assertEqual(three.size, 99647)
+        self.assertEqual(three.size, 99646)
         self.assertEqual(
-            three.sha256, "914ae7cf66cc311ca86f49e146d511db4281dd1bf6cd70e23f7d1b69e1902197"
+            three.sha256, "e3dd0baa088b297c1a5c611c296c0662ede117be5e373b8e2a6f7bb6fe495fee"
         )
 
 

@@ -37,7 +37,12 @@ NOTICE = ASSET.parent / "NOTICE.txt"
 RUSSIAN_ASSET = ASSET.parent / "russian_top100k_v1.tdict.zlib"
 RUSSIAN_PROVENANCE = ROOT / "docs" / "RUSSIAN-DICTIONARY.md"
 RUSSIAN_REVIEW = ROOT / "docs" / "DICTIONARY-RU-QUERY-REVIEW.tsv"
-RUSSIAN_REVIEW_DATE = "2026-08-21"
+# Обе таблицы пересозданы 2026-08-24 миссией tt-dict-accept: словари пересобраны, и
+# тройка кандидатов на двадцати двух русских и двух татарских префиксах изменилась.
+# Даты разные у разных языков и разные у разных пересборок — поэтому они здесь, а не
+# зашиты в dictionary_pack.AUTOMATED_REVIEW_DATE, которая осталась датой первой сборки.
+RUSSIAN_REVIEW_DATE = "2026-08-24"
+TATAR_REVIEW_DATE = "2026-08-24"
 
 
 def load_module(name: str, path: Path):
@@ -437,7 +442,7 @@ class DictionaryPackTest(unittest.TestCase):
         rows = pack._audit_rows(
             parsed, pack._read_queries(FIXTURES / "manual_tatar_queries.txt"), 3
         )
-        pack._check_review(rows, REVIEW)
+        pack._check_review(rows, REVIEW, review_date=TATAR_REVIEW_DATE)
 
     def test_language_registry_alphabets_and_budgets(self) -> None:
         self.assertEqual({"tat", "rus"}, set(coverage.LANGUAGES))
