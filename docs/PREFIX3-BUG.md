@@ -265,3 +265,5 @@ the band refresh must be posted from both branches of the cache reload expected:
   `tt_prefix3` в `~/.android/avd` — чтобы не занимать эмулятор соседней миссии; он остался на
   месте и его можно удалить `avdmanager delete avd -n tt_prefix3`.
 * Живого телефона нет — **все числа и все снимки эмуляторные**.
+
+БАГ ПРЕФИКСА ЗАКРЫТ
