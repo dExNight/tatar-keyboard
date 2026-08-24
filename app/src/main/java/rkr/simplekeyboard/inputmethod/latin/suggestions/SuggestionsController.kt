@@ -643,6 +643,40 @@ class SuggestionsController internal constructor(
         }
     }
 
+    /**
+     * The cursor move that [onSelectionChanged] invalidated the band for has settled, and the
+     * editor cache behind [EditorSurface] now describes the position the cursor actually stopped at.
+     *
+     * [onSelectionChanged] does half the job: it drops the binding, blanks the band and invalidates
+     * the in-flight generation. It deliberately does NOT look anything up — the emoji panel routes
+     * through it precisely to get a band that stays empty, and at the moment it runs the text cache
+     * of an EXTERNAL move has not been refetched yet, so a lookup made there would be a lookup for
+     * the text the cursor has already left. This is the other half: the band is re-derived from the
+     * live editor state once, when that state is known to be current.
+     *
+     * Without it the band stays blank until the next keystroke, although the cursor sits at the end
+     * of a word the dictionary answers perfectly well — the very failure this method exists for.
+     * Every other boundary that unbinds the band already re-derives it in exactly this way
+     * ([onStartInput], [onSubtypeChanged], [publishEngine]); a cursor move was the one that did not.
+     *
+     * Three guards keep it from costing anything on the ordinary typing path, where it is posted
+     * after every editor cache reload:
+     *  - a band that is still BOUND to displayed candidates describes live text already;
+     *  - a lookup already issued for this session is on its way, and re-issuing it would drop the
+     *    outstanding companion request with it;
+     *  - an ineligible field, an unusable engine or an unknown cursor have nothing to derive from.
+     *
+     * UI thread only, like every other method here.
+     */
+    fun onCursorMoveSettled() {
+        if (destroyed || !eligible) return
+        if (usableEngine() == null) return
+        if (!editor.hasKnownCursor()) return
+        if (displayedPrefix != null || displayedContextWord != null) return
+        if (requestSessionId == sessionId) return
+        requestCurrentPrefix()
+    }
+
     fun onFinishInput() {
         markRunDirty()
         // The contract names this boundary explicitly: the replacement state is erased on

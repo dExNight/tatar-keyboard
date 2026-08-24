@@ -180,6 +180,7 @@ public final class RichInputConnection {
 
                 // All callbacks that need text before cursor are here
                 mLatinIME.mHandler.postUpdateShiftState();
+                mLatinIME.mHandler.postRefreshSuggestionBand();
             } else {
                 final CharSequence textBeforeCursor = mIC.getTextBeforeCursor(Constants.EDITOR_CONTENTS_CACHE_SIZE, 0);
                 if (expectedSelStart != mExpectedSelStart) {
@@ -223,6 +224,12 @@ public final class RichInputConnection {
                 } else {
                     mTextSelection = "";
                 }
+                // Posted here and not next to postUpdateShiftState above: the suggestion band is
+                // decided by the text on BOTH sides of the cursor (a letter right after it means no
+                // candidates at all), so it may only be re-derived once this whole block has made
+                // the cache current. Every early return above leaves the cache stale on purpose and
+                // deliberately does not ask for a re-derivation.
+                mLatinIME.mHandler.postRefreshSuggestionBand();
             }
         });
     }

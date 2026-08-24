@@ -178,6 +178,7 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
     public static final class UIHandler extends LeakGuardHandlerWrapper<LatinIME> {
         private static final int MSG_UPDATE_SHIFT_STATE = 0;
         private static final int MSG_PENDING_IMS_CALLBACK = 1;
+        private static final int MSG_REFRESH_SUGGESTION_BAND = 2;
         private static final int MSG_DEALLOCATE_MEMORY = 9;
 
         public UIHandler(final LatinIME ownerInstance) {
@@ -196,6 +197,9 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
                 switcher.requestUpdatingShiftState(latinIme.getCurrentAutoCapsState(),
                         latinIme.getCurrentRecapitalizeState());
                 break;
+            case MSG_REFRESH_SUGGESTION_BAND:
+                latinIme.refreshSuggestionBandAfterCursorMove();
+                break;
             case MSG_DEALLOCATE_MEMORY:
                 latinIme.deallocateMemory();
                 break;
@@ -205,6 +209,23 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         public void postUpdateShiftState() {
             removeMessages(MSG_UPDATE_SHIFT_STATE);
             sendMessage(obtainMessage(MSG_UPDATE_SHIFT_STATE));
+        }
+
+        /**
+         * Asks the suggestion band to re-derive itself once the cursor has settled and the editor
+         * text cache behind it is current again.
+         *
+         * Posted rather than called inline, from the two places that know the cache is (or is about
+         * to be) correct: the keyboard's own cursor gestures, whose
+         * {@link RichInputConnection#setSelection} keeps the cache in step as it moves, and the
+         * completion of the asynchronous cache reload that an EXTERNAL cursor move triggers. Both
+         * may fire for one and the same move, so the message coalesces: the band is re-derived at
+         * most once per looper turn, and {@link SuggestionsController#onCursorMoveSettled} is itself
+         * a no-op unless the band is genuinely left unbound.
+         */
+        public void postRefreshSuggestionBand() {
+            removeMessages(MSG_REFRESH_SUGGESTION_BAND);
+            sendMessage(obtainMessage(MSG_REFRESH_SUGGESTION_BAND));
         }
 
         public void postDeallocateMemory() {
@@ -1735,7 +1756,31 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
     private void onSuggestionsAffectingCursorMove() {
         if (mSuggestionsController != null) {
             mSuggestionsController.onSelectionChanged();
+            // Clearing the band is only half of what a cursor move needs: the cursor has stopped
+            // somewhere, and wherever that is the band must describe it. Without this the strip
+            // stays blank until the next keystroke even though the cursor sits at the end of a word
+            // the dictionary answers.
+            mHandler.postRefreshSuggestionBand();
         }
+    }
+
+    /**
+     * Re-derives the suggestion band after a cursor move has settled. Posted by
+     * {@link UIHandler#postRefreshSuggestionBand}, never called directly.
+     *
+     * The emoji panel and the emoji search route through
+     * {@link SuggestionsController#onSelectionChanged} to get a band that stays empty for as long as
+     * they are up, so neither may be re-derived out from under: while either is shown the band is
+     * left exactly as they left it.
+     */
+    private void refreshSuggestionBandAfterCursorMove() {
+        if (mSuggestionsController == null) {
+            return;
+        }
+        if (mKeyboardSwitcher.isEmojiPanelShown() || mEmojiSearchQuery != null) {
+            return;
+        }
+        mSuggestionsController.onCursorMoveSettled();
     }
 
     private boolean isShowingOptionDialog() {
