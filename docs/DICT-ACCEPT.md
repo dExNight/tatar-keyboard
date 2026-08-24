@@ -519,4 +519,4 @@ for f in tests/*/test_*.py; do python3 "$f"; done
 
 ---
 
-@@MARKER@@
+СЛОВАРЬ ПРИНЯТ И СОБРАН
