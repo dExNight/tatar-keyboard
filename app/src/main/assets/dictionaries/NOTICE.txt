@@ -77,5 +77,12 @@ risk rather than a settled question.
 Changes by the Tatar Keyboard project (planned, same as for the sources above):
 lines are deduplicated, tokens are normalized to NFC lowercase and filtered to the
 language alphabet, proper nouns are removed by capitalization evidence, forms seen
-fewer than three times are dropped, and only counts -- never sentences -- are kept.
+fewer than three times are dropped, and only counts are kept -- with one stated
+exception. The acceptance queues are read in portions (docs/review-batches/), and a
+word that cannot be judged by its spelling alone carries one short example sentence
+so the reviewer can judge it. Those sentences come from Tatoeba ONLY, which is what
+CC BY 2.0 FR grants in exchange for the citation above. No OpenSubtitles sentence is
+reproduced anywhere in this repository; words seen only there carry a list of their
+neighbouring words with counts instead, which is a fact about the text and not the
+text.
 No sentence from either collection is stored in this repository or in the app.
