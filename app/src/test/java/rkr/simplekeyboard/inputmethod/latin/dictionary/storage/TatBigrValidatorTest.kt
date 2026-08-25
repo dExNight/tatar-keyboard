@@ -42,12 +42,13 @@ class TatBigrValidatorTest {
             BigramArtifactSpec.TATAR_BIGRAMS_V1,
         )
 
-        // K = 4 since 2026-08-23 (docs/BIGRAM-ADJACENCY.md). The head count is unchanged by that
-        // drop — the same four zero-successor words are dropped at K = 4 as at K = 6 — so a 9 996
-        // here that survives a K change is the point, not a coincidence.
-        assertEquals(9_996, validated.headCount)
-        assertEquals(512_338, validated.rawSize)
-        assertEquals(39_921, validated.pairCount)
+        // K = 4 since 2026-08-23 (docs/BIGRAM-ADJACENCY.md), H = 10 132 with a thirteen-word
+        // named-head list since 2026-08-25 (docs/IMPERATIVE-HEADS.md). 10 142 = 9 996 heads of
+        // 1.9.3 + 132 the raised cutoff reaches + 13 named + 1 the rebuilt dictionary lifted;
+        // none of the 9 996 was lost, which is the property that repack was constrained by.
+        assertEquals(10_142, validated.headCount)
+        assertEquals(518_728, validated.rawSize)
+        assertEquals(40_501, validated.pairCount)
     }
 
     /**

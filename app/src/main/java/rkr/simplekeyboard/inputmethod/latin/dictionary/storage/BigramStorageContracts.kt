@@ -91,18 +91,33 @@ data class BigramArtifactSpec(
         private val FILE_LANGUAGE_TAG_PATTERN = Regex("[a-z]{2,3}")
 
         /**
-         * The tt table repacked 2026-08-23 by `scripts/bigram_asset_pack.py pack` at H = 10 000,
-         * **K = 4** — down from the K = 6 of 1.6.0…1.8.2, which stored ranks 5 and 6 that nothing
-         * ever read (`TatBigrPrefixIndex.MAX_RESULTS` is 3). Verified head-by-head on both
-         * artifacts before the swap: the head set is identical and not one of the 9 996 heads
-         * changes the three successors the strip displays, so this is 52 860 fewer bytes at
-         * byte-identical behaviour. docs/BIGRAM-ADJACENCY.md records the proof;
-         * docs/DICTIONARY-E5B.md records the original E5a choice.
+         * The tt table repacked 2026-08-25 by `scripts/bigram_asset_pack.py pack` at
+         * **H = 10 132**, K = 4, with `--extra-heads scripts/bigram_extra_heads_tat.txt`.
+         * K = 4 is unchanged since 2026-08-23 (docs/BIGRAM-ADJACENCY.md); the two numbers that
+         * moved are the cutoff and the named-head list, and each answers a different question
+         * (docs/IMPERATIVE-HEADS.md records both, with the measurement):
          *
-         * 9 996 heads, not 10 000: four top-10 000-by-frequency words never occur as the head of
+         * * **the list** makes thirteen frequent Tatar imperatives heads regardless of rank.
+         *   "кил" (come) sat at unigram rank 10 338 and predicted nothing, while "бир" (give) —
+         *   the same grammatical form, rank 5 955 — predicted "бир әле". Naming thirteen words
+         *   costs **223 compressed bytes**; raising the cutoff to reach "кайт" at 14 706 would
+         *   have cost roughly forty times that for words nobody asked for;
+         * * **the cutoff** moved from 10 000 only to keep faith with what already worked. The
+         *   dictionary was rebuilt after this table was last packed (`bfb78e93`, `01f85d24`,
+         *   `b3673752`), and repacking at 10 000 would have dropped 78 words that predict today.
+         *   All 78 sit at ranks 10 001…10 131, so 10 132 is the smallest cutoff that loses none —
+         *   derived, not chosen. It costs 2 327 compressed bytes and reaches 132 more heads.
+         *
+         * Verified head-by-head against the 1.9.3 artifact before the swap: **0 of the 9 996 old
+         * heads is missing, and 0 of them changes the three successors the strip displays.** The
+         * whole delta is additive: 10 142 heads = 9 996 + 132 (cutoff) + 13 (list) + 1 (a word
+         * the rebuilt dictionary lifted into the top 10 000 on its own).
+         *
+         * 10 142 heads, not 10 145: three words selected by frequency never occur as the head of
          * an in-vocabulary pair in mixed+web and are dropped rather than stored with an empty
-         * range (docs/DICTIONARY-E5B.md, "Dropped heads"). K does not affect that set — the same
-         * four drop at K = 4.
+         * range (docs/DICTIONARY-E5B.md, "Dropped heads") — the same `-гәнчә` converbs as before,
+         * minus `толмацкий`, which the rebuilt dictionary no longer ranks that high. Every one of
+         * the thirteen named words does get pairs; none was dropped.
          */
         @JvmField
         val TATAR_BIGRAMS_V1 = BigramArtifactSpec(
@@ -112,19 +127,19 @@ data class BigramArtifactSpec(
             subtypeId = PersonalSubtypes.TATAR_RU,
             storageDirectoryName = "bigrams",
             assetPath = "bigrams/tatar_bigrams_v1.tatbigr.zlib",
-            expectedCompressedSize = 173_568,
+            expectedCompressedSize = 175_843,
             expectedCompressedSha256 =
-                "4ed46a1ef4059040fe338426c64d5ed1c0b2a29d90b4a028e5228473d3a9fc17",
-            expectedRawSize = 512_338,
+                "f91c059937f3c9e8636b274af1f7f36bf5be887b59bc569aba26dfc1f2181893",
+            expectedRawSize = 518_728,
             expectedRawSha256 =
-                "1e61422465f89b859f48c1d578479154287aa61b9b696b5c4726814af8de1b6c",
-            expectedHeadCount = 9_996,
+                "d2345b4831291a678c76c5a09b5b0539f0a1ffd4055762d8d69e5fed852822a6",
+            expectedHeadCount = 10_142,
         )
 
         /**
          * The ru table repacked 2026-08-23 by `scripts/bigram_asset_pack.py pack --language rus`
-         * from the same three Leipzig corpora the Russian dictionary is built from, at the same
-         * H = 10 000 / **K = 4** the Tatar table now uses — `docs/RUSSIAN-BIGRAMS.md` records the
+         * from the same three Leipzig corpora the Russian dictionary is built from, at
+         * H = 10 000 / **K = 4** — `docs/RUSSIAN-BIGRAMS.md` records the
          * matrix that chose H and the original K = 6; docs/BIGRAM-ADJACENCY.md records the drop to
          * K = 4 and the head-by-head proof that none of the 10 000 heads changes its displayed
          * three successors. 47 098 fewer bytes at byte-identical behaviour.
@@ -135,6 +150,14 @@ data class BigramArtifactSpec(
          * Its own family and its own directory, so the Tatar table already inflated on a device
          * updating from 1.7.0 is neither renamed, re-inflated, nor sharing this language's lease
          * counter.
+         *
+         * **Not repacked since 2026-08-23, and its heads have drifted from the dictionary it is
+         * paired with.** The Russian dictionary was rebuilt afterwards from whole-corpus
+         * frequencies (`bfb78e93`), which reordered it far more than the Tatar one: 4 195 of
+         * these 10 000 heads are no longer in the top 10 000 by today's frequencies, and 4 195
+         * words that are do not appear here. Repacking would swap them all at once, which is a
+         * change of a different size and a different question from the Tatar imperatives, so
+         * docs/IMPERATIVE-HEADS.md records the number and leaves the table alone.
          */
         @JvmField
         val RUSSIAN_BIGRAMS_V1 = BigramArtifactSpec(

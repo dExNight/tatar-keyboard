@@ -416,6 +416,152 @@ class HeadSelectionIsIndependentOfPairEvidenceTest(unittest.TestCase):
             self.assertIn("шалтырат", pack.read_shipped_vocabulary(asset_path, pack.coverage.language_for("tat"))[0])
 
 
+class ExtraHeadsTest(unittest.TestCase):
+    """The addressable head list: the fix docs/IMPERATIVE-HEADS.md measured, pinned as behaviour.
+
+    ``HeadSelectionIsIndependentOfPairEvidenceTest`` above pins the rule that pair evidence can
+    never promote a word to a head. This class pins the ONE deliberate exception: a word named in
+    ``--extra-heads`` becomes a head whatever its unigram rank, and nothing else about the file
+    changes. Every test here fails against the packer as it stood before that option existed.
+    """
+
+    def test_a_word_below_the_cutoff_becomes_a_head_when_named(self) -> None:
+        with TemporaryDirectory() as raw_directory:
+            directory = Path(raw_directory)
+            # Frequency order IS dictionary order here: "шалтырат" ("call!") is the least
+            # frequent of the three, exactly like a real imperative sitting below H.
+            asset_path = _write_asset(directory, ["алма", "китап", "шалтырат"])
+            train = directory / "train-sentences.txt"
+            train.write_text(
+                "1\tшалтырат алма\n"
+                "2\tшалтырат алма\n"
+                "3\tшалтырат китап\n"
+                "4\tалма китап\n"
+                "5\tкитап алма\n",
+                encoding="utf-8",
+            )
+
+            without, _ = pack.run_pack([train], asset_path, 2, 4, 1)
+            self.assertNotIn("шалтырат", pack.validate_raw(without.raw).head_words)
+
+            result, report = pack.run_pack(
+                [train], asset_path, 2, 4, 1, extra_heads=["шалтырат"]
+            )
+
+            parsed = pack.validate_raw(result.raw)
+            self.assertIn("шалтырат", parsed.head_words)
+            self.assertEqual(["алма", "китап"], parsed.successes_by_head["шалтырат"])
+            # The cutoff itself did not move: the two frequency-chosen heads are still there,
+            # with the successors they had before, and the head count grew by exactly one.
+            self.assertEqual(["алма", "китап", "шалтырат"], parsed.head_words)
+            self.assertEqual(
+                pack.validate_raw(without.raw).successes_by_head["алма"],
+                parsed.successes_by_head["алма"],
+            )
+            self.assertEqual(without.head_count + 1, result.head_count)
+            self.assertEqual(["шалтырат"], report["extra_heads_promoted"])
+            self.assertEqual([], report["extra_heads_dropped_for_no_pairs"])
+
+    def test_a_named_word_the_cutoff_already_reached_is_not_packed_twice(self) -> None:
+        with TemporaryDirectory() as raw_directory:
+            directory = Path(raw_directory)
+            asset_path = _write_asset(directory, ["алма", "китап", "шалтырат"])
+            train = directory / "train-sentences.txt"
+            train.write_text("1\tалма китап\n2\tкитап алма\n", encoding="utf-8")
+
+            result, report = pack.run_pack([train], asset_path, 2, 4, 1, extra_heads=["алма"])
+
+            parsed = pack.validate_raw(result.raw)
+            self.assertEqual(["алма", "китап"], parsed.head_words)
+            self.assertEqual([], report["extra_heads_promoted"])
+
+    def test_a_named_word_with_no_pairs_is_dropped_and_named_in_the_report(self) -> None:
+        with TemporaryDirectory() as raw_directory:
+            directory = Path(raw_directory)
+            asset_path = _write_asset(directory, ["алма", "китап", "шалтырат"])
+            train = directory / "train-sentences.txt"
+            # "шалтырат" appears only as a SUCCESSOR, so as a head it has nothing to store, and
+            # the validator forbids an empty range — the generator must drop it, not emit it.
+            train.write_text("1\tалма шалтырат\n2\tкитап алма\n", encoding="utf-8")
+
+            result, report = pack.run_pack(
+                [train], asset_path, 2, 4, 1, extra_heads=["шалтырат"]
+            )
+
+            self.assertNotIn("шалтырат", pack.validate_raw(result.raw).head_words)
+            self.assertEqual(["шалтырат"], report["extra_heads_dropped_for_no_pairs"])
+
+    def test_the_list_may_not_add_a_word_the_dictionary_does_not_ship(self) -> None:
+        """The border the mission dossier draws: heads are not a dictionary.
+
+        Promoting a shipped word is a decision about suggestions. Adding an unshipped word would
+        be a decision about the word list itself, which this file must never be able to make —
+        so a word outside the shipped vocabulary stops the generation instead of being skipped.
+        """
+        with TemporaryDirectory() as raw_directory:
+            directory = Path(raw_directory)
+            asset_path = _write_asset(directory, ["алма", "китап", "шалтырат"])
+            vocabulary, _ = pack.read_shipped_vocabulary(
+                asset_path, pack.coverage.language_for("tat")
+            )
+            listing = directory / "extra.txt"
+            listing.write_text("шалтырат\nпозвони\n", encoding="utf-8")
+
+            with self.assertRaises(pack.BigramInputError) as raised:
+                pack.read_extra_heads(listing, vocabulary)
+            self.assertIn("позвони", str(raised.exception))
+
+    def test_the_list_reader_takes_comments_blanks_and_duplicates(self) -> None:
+        with TemporaryDirectory() as raw_directory:
+            directory = Path(raw_directory)
+            asset_path = _write_asset(directory, ["алма", "китап", "шалтырат"])
+            vocabulary, _ = pack.read_shipped_vocabulary(
+                asset_path, pack.coverage.language_for("tat")
+            )
+            listing = directory / "extra.txt"
+            listing.write_text(
+                "# заголовок\n\nшалтырат   # ранг 34 169\n   \nалма\nшалтырат\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                ["шалтырат", "алма"], pack.read_extra_heads(listing, vocabulary)
+            )
+
+
+class ShippedExtraHeadListTest(unittest.TestCase):
+    """The list that actually ships is data, and data can rot — so it is checked, not trusted."""
+
+    LISTING = REPOSITORY_ROOT / "scripts" / "bigram_extra_heads_tat.txt"
+    DICTIONARY = (
+        REPOSITORY_ROOT / "app" / "src" / "main" / "assets" / "dictionaries"
+        / "tatar_top100k_v1.tdict.zlib"
+    )
+
+    def test_every_named_word_is_in_the_shipped_tatar_dictionary(self) -> None:
+        vocabulary, _ = pack.read_shipped_vocabulary(
+            self.DICTIONARY, pack.coverage.language_for("tat")
+        )
+        words = pack.read_extra_heads(self.LISTING, vocabulary)
+        self.assertEqual(13, len(words))
+        for expected in ("кил", "кит"):
+            self.assertIn(expected, words)
+
+    def test_no_named_word_is_reachable_by_the_cutoff_the_asset_was_packed_with(self) -> None:
+        """If the cutoff ever grows past one of these, the line is dead weight in the file.
+
+        H = 10 132 is the number docs/IMPERATIVE-HEADS.md derives and the shipped asset was
+        packed with; a word inside it would be promoted twice over and its line here would say
+        something untrue about why it is a head.
+        """
+        vocabulary, frequencies = pack.read_shipped_vocabulary(
+            self.DICTIONARY, pack.coverage.language_for("tat")
+        )
+        by_cutoff = set(pack.select_heads(frequencies, 10_132))
+        for word in pack.read_extra_heads(self.LISTING, vocabulary):
+            self.assertNotIn(word, by_cutoff, f"{word} is already reached by the cutoff")
+
+
 class EndToEndCliTest(unittest.TestCase):
     def test_cli_pack_writes_matching_atomic_outputs_and_report(self) -> None:
         with TemporaryDirectory() as raw_directory:

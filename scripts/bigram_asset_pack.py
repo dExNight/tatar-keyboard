@@ -29,6 +29,17 @@ Two independent caps, the same ones E5a measured against, are enforced here too:
 non-zero exit; no partial asset is ever written (the whole raw image is built and validated in
 memory before either output file is touched).
 
+**Heads are chosen by unigram frequency, and a word just below the cutoff can be named
+explicitly.** ``--extra-heads FILE`` adds the words of a list to the head set whatever their
+rank, without moving the cutoff for everyone. This exists because frequent Tatar imperatives
+(the bare verb stem: "кил" — come, "кит" — go) sit just below H and therefore predicted
+nothing, while "бир" — the same grammatical form, one rank band higher — predicted "бир әле"
+(docs/BIGRAM-ADJACENCY.md, "Почему повелительные формы молчат"). Naming fourteen words costs
+the bytes of fourteen heads; raising H far enough to reach them would drag in several hundred
+words nobody asked for. A word in the list must already be in the shipped vocabulary — the list
+grants a word successors, it does not add a word to the dictionary, and the two must not be
+confused.
+
 **A head selected by frequency that ends up with zero successes in training is dropped from the
 file, not stored with an empty range.** The validator below rejects empty ranges as corruption
 (PROPOSALS.md, "E5b. Генератор, строгий валидатор" — "пустые диапазоны" is in the rejected list),
@@ -46,6 +57,7 @@ Usage:
         --train tat_mixed_2015_1M-sentences.txt tat_web_2018_1M-sentences.txt \\
         --asset app/src/main/assets/dictionaries/tatar_top100k_v1.tdict.zlib \\
         --heads 10000 --successes-per-head 6 \\
+        --extra-heads scripts/bigram_extra_heads_tat.txt \\
         --out-raw tatar_bigrams_v1.tatbigr \\
         --out-compressed tatar_bigrams_v1.tatbigr.zlib \\
         --report docs/DICTIONARY-E5B.generated.json
@@ -70,6 +82,7 @@ import dictionary_coverage as coverage  # noqa: E402
 from bigram_pack import (  # noqa: E402
     MAX_COMPRESSED_BYTES,
     MAX_RAW_BYTES,
+    BigramInputError,
     count_pairs,
     peak_rss_bytes,
     read_shipped_vocabulary,
@@ -422,6 +435,41 @@ def pack_bigram_table(
     )
 
 
+def read_extra_heads(path: Path, vocabulary: frozenset[str]) -> list[str]:
+    """Words named explicitly as heads, read from a reviewable list.
+
+    The file is one word per line; ``#`` starts a comment, so a line may carry the evidence that
+    put the word there (rank, frequency, paradigm cells, pairs) next to the word itself. Blank
+    lines are ignored.
+
+    Two rules are enforced here rather than left to the caller, because both failures would
+    otherwise be silent and both matter:
+
+    * a word absent from the SHIPPED vocabulary stops the generation. The list may only promote a
+      word the dictionary already ships; it is not a back door for adding words to the
+      dictionary, and a typo in the list must not quietly produce a table one word smaller than
+      the list claims;
+    * a duplicate is dropped rather than counted twice, so the report's head arithmetic stays
+      readable.
+    """
+    words: list[str] = []
+    seen: set[str] = set()
+    for line_number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
+        word = line.split("#", 1)[0].strip()
+        if not word:
+            continue
+        if word not in vocabulary:
+            raise BigramInputError(
+                f"{path.name}:{line_number}: {word!r} is not in the shipped vocabulary; "
+                "the extra-head list promotes shipped words, it does not add new ones"
+            )
+        if word in seen:
+            continue
+        seen.add(word)
+        words.append(word)
+    return words
+
+
 def run_pack(
     train_paths: Sequence[Path],
     asset_path: Path,
@@ -429,10 +477,18 @@ def run_pack(
     successes_per_head: int,
     shards: int,
     language: coverage.Language = coverage.DEFAULT_LANGUAGE,
+    extra_heads: Sequence[str] = (),
 ) -> tuple[PackResult, dict[str, object]]:
     started = time.monotonic()
     vocabulary, frequencies = read_shipped_vocabulary(asset_path, language)
     ordered_heads = select_heads(frequencies, heads)
+    # Appended, not merged by frequency: this list decides SET membership only, and
+    # ``pack_bigram_table`` re-sorts the kept heads into code-point order for the file. Words the
+    # cutoff already reached are not repeated — a head named twice would be packed twice and the
+    # validator would reject the file for a non-ascending head blob.
+    already_heads = set(ordered_heads)
+    promoted = [word for word in extra_heads if word not in already_heads]
+    ordered_heads = ordered_heads + promoted
     table = count_pairs(
         train_paths,
         frozenset(ordered_heads),
@@ -446,6 +502,11 @@ def run_pack(
         "language": language.tag,
         "requested_heads": heads,
         "successes_per_head": successes_per_head,
+        "extra_heads_requested": list(extra_heads),
+        "extra_heads_promoted": promoted,
+        "extra_heads_dropped_for_no_pairs": [
+            word for word in promoted if word in set(result.dropped_heads)
+        ],
         "actual_head_count": result.head_count,
         "dropped_heads": result.dropped_heads,
         "pair_count": result.pair_count,
@@ -476,6 +537,11 @@ def create_argument_parser() -> argparse.ArgumentParser:
     pack.add_argument("--heads", type=int, required=True)
     pack.add_argument("--successes-per-head", type=int, required=True)
     pack.add_argument("--shards", type=int, default=8)
+    pack.add_argument(
+        "--extra-heads",
+        type=Path,
+        help="list of words to make heads whatever their unigram rank (one per line, # comments)",
+    )
     pack.add_argument("--out-raw", required=True, type=Path)
     pack.add_argument("--out-compressed", required=True, type=Path)
     pack.add_argument("--report", type=Path)
@@ -489,13 +555,19 @@ def main(argv: Sequence[str] | None = None, stream: TextIO = sys.stdout) -> int:
     arguments = create_argument_parser().parse_args(argv)
     if arguments.shards < 1:
         raise SystemExit("shards must be positive")
+    language = coverage.language_for(arguments.language)
+    extra_heads: list[str] = []
+    if arguments.extra_heads is not None:
+        vocabulary, _frequencies = read_shipped_vocabulary(arguments.asset, language)
+        extra_heads = read_extra_heads(arguments.extra_heads, vocabulary)
     result, report = run_pack(
         arguments.train,
         arguments.asset,
         arguments.heads,
         arguments.successes_per_head,
         arguments.shards,
-        coverage.language_for(arguments.language),
+        language,
+        extra_heads,
     )
     text = json.dumps(report, ensure_ascii=False, indent=2, sort_keys=True)
     if arguments.report is not None:
