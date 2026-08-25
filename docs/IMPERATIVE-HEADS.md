@@ -384,3 +384,5 @@ python3 scripts/bigram_asset_pack.py pack \
 | K = 3 (ещё −48 709 Б) | решение оператора, не предлагается к исполнению |
 
 STATUS: done
+
+ПОВЕЛЕНИЯ В ГОЛОВАХ
