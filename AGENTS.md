@@ -14,6 +14,7 @@ namespace `rkr.simplekeyboard.inputmethod`. Ветка работы — `main`.
 | Release APK | `./gradlew assembleRelease` (подпись через `keystore.properties`; без него — unsigned) |
 | Гейт «без INTERNET + backup-whitelist» | `bash scripts/check-no-internet.sh [путь-к-apk]` (по умолчанию debug APK; два уровня: манифест + aapt2) |
 | Релизный автомат (DEV-6) | `bash scripts/release_check.sh [--quick\|--full] [путь-к-apk]` (по умолчанию свежий release APK): гейты + размер + пины ассетов + разрешения + подпись + версия + changelog + дельта к dist/, итог машинным блоком `RESULT\|…` |
+| Воспроизводимость сборки (DEV-2) | два `clean assembleRelease` обязаны давать побайтно одинаковый APK; в CI — джоба `reproducible` (`cmp` двух unsigned-прогонов). Недетерминизм был в Dependency Info Block (эфемерный ключ AGP) — отключён `dependenciesInfo { includeInApk = false }` в `app/build.gradle`; заново не включать |
 | Генерация baseline-профиля | `./gradlew :app:generateReleaseBaselineProfile` (нужен запущенный эмулятор) |
 
 Гейты обязательны после любой правки кода/ресурсов: JVM + python + lintRelease +
