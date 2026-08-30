@@ -230,8 +230,8 @@ class E3aRecoveryCalibrationTest {
     }
 
     private fun everydayPrefixes(): List<String> {
-        val review = File("docs/DICTIONARY-D1A-QUERY-REVIEW.tsv").takeIf(File::isFile)
-            ?: File("../docs/DICTIONARY-D1A-QUERY-REVIEW.tsv")
+        val review = File("docs/archive/dictionary/DICTIONARY-D1A-QUERY-REVIEW.tsv").takeIf(File::isFile)
+            ?: File("../docs/archive/dictionary/DICTIONARY-D1A-QUERY-REVIEW.tsv")
         return review.readLines(Charsets.UTF_8).drop(1)
             .filter { it.isNotBlank() }
             .map { it.split('\t')[0] }
