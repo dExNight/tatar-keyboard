@@ -185,22 +185,13 @@ class EmojiSearchView @JvmOverloads constructor(
     private val accessibilityHelper = EmojiSearchAccessibilityHelper()
 
     init {
-        val themeColors = context.theme.obtainStyledAttributes(
-            intArrayOf(
-                R.attr.emojiPanelBackgroundColor,
-                R.attr.functionalTextColor,
-                R.attr.keyPressedBackgroundColor,
-                R.attr.keyTextColor,
-                R.attr.emojiPanelFunctionalKeyColor,
-                R.attr.keyNormalBackgroundColor,
-            ),
-        )
-        val keyColor = themeColors.getColor(5, Color.LTGRAY)
-        val functionalColor = themeColors.getColor(4, keyColor)
-        backgroundPaint.color = themeColors.getColor(0, keyColor)
-        queryPaint.color = themeColors.getColor(1, Color.DKGRAY)
-        pressedPaint.color = themeColors.getColor(2, Color.GRAY)
-        resultPaint.color = themeColors.getColor(3, Color.BLACK)
+        val themeColors = context.theme.obtainStyledAttributes(R.styleable.EmojiSearchView)
+        val keyColor = themeColors.getColor(R.styleable.EmojiSearchView_keyNormalBackgroundColor, Color.LTGRAY)
+        val functionalColor = themeColors.getColor(R.styleable.EmojiSearchView_emojiPanelFunctionalKeyColor, keyColor)
+        backgroundPaint.color = themeColors.getColor(R.styleable.EmojiSearchView_emojiPanelBackgroundColor, keyColor)
+        queryPaint.color = themeColors.getColor(R.styleable.EmojiSearchView_functionalTextColor, Color.DKGRAY)
+        pressedPaint.color = themeColors.getColor(R.styleable.EmojiSearchView_keyPressedBackgroundColor, Color.GRAY)
+        resultPaint.color = themeColors.getColor(R.styleable.EmojiSearchView_keyTextColor, Color.BLACK)
         themeColors.recycle()
         pillPaint.color = withAlpha(functionalColor, PILL_ALPHA)
         messagePaint.color = withAlpha(queryPaint.color, HINT_ALPHA)

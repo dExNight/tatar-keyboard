@@ -351,25 +351,16 @@ class EmojiPanelView @JvmOverloads constructor(
     }
 
     init {
-        val themeColors = context.theme.obtainStyledAttributes(
-            intArrayOf(
-                R.attr.emojiPanelBackgroundColor,
-                R.attr.functionalTextColor,
-                R.attr.keyPressedBackgroundColor,
-                R.attr.keyTextColor,
-                R.attr.emojiPanelFunctionalKeyColor,
-                R.attr.keyNormalBackgroundColor,
-            ),
-        )
+        val themeColors = context.theme.obtainStyledAttributes(R.styleable.EmojiPanelView)
         // The sheet is the keyboard background, not the key colour: filling it with the key colour
         // made the whole panel read as one unpainted rectangle instead of as the keyboard surface.
-        val keyColor = themeColors.getColor(5, Color.LTGRAY)
-        val functionalColor = themeColors.getColor(4, keyColor)
-        backgroundPaint.color = themeColors.getColor(0, keyColor)
-        labelPaint.color = themeColors.getColor(1, Color.DKGRAY)
-        tabPaint.color = themeColors.getColor(1, Color.DKGRAY)
-        pressedPaint.color = themeColors.getColor(2, Color.GRAY)
-        emojiPaint.color = themeColors.getColor(3, Color.BLACK)
+        val keyColor = themeColors.getColor(R.styleable.EmojiPanelView_keyNormalBackgroundColor, Color.LTGRAY)
+        val functionalColor = themeColors.getColor(R.styleable.EmojiPanelView_emojiPanelFunctionalKeyColor, keyColor)
+        backgroundPaint.color = themeColors.getColor(R.styleable.EmojiPanelView_emojiPanelBackgroundColor, keyColor)
+        labelPaint.color = themeColors.getColor(R.styleable.EmojiPanelView_functionalTextColor, Color.DKGRAY)
+        tabPaint.color = themeColors.getColor(R.styleable.EmojiPanelView_functionalTextColor, Color.DKGRAY)
+        pressedPaint.color = themeColors.getColor(R.styleable.EmojiPanelView_keyPressedBackgroundColor, Color.GRAY)
+        emojiPaint.color = themeColors.getColor(R.styleable.EmojiPanelView_keyTextColor, Color.BLACK)
         functionalKeyPaint.color = functionalColor
         themeColors.recycle()
         activeTabPaint.color = withAlpha(functionalColor, ACTIVE_TAB_ALPHA + 0x7F)

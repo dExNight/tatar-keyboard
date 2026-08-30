@@ -27,7 +27,7 @@
     <string name="settings_screen_appearance">Внешний вид</string>
     <string name="settings_screen_theme">"Тема"</string>
     <string name="settings_back">Назад</string>
-    <string name="abbreviation_unit_milliseconds">"<xliff:g id="MILLISECONDS">%s</xliff:g> мс"</string>
+    <string name="abbreviation_unit_milliseconds">"<xliff:g id="MILLISECONDS">%d</xliff:g> мс"</string>
     <string name="settings_system_default">"По умолчанию"</string>
     <string name="auto_cap">"Заглавные автоматически"</string>
     <string name="auto_cap_summary">"Писать первое слово предложения с прописной буквы"</string>

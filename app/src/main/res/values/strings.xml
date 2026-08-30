@@ -39,7 +39,7 @@
     <string name="settings_back">Back</string>
 
     <!-- Units abbreviation for the duration (milliseconds) [CHAR LIMIT=10] -->
-    <string name="abbreviation_unit_milliseconds"><xliff:g id="MILLISECONDS">%s</xliff:g>ms</string>
+    <string name="abbreviation_unit_milliseconds"><xliff:g id="MILLISECONDS">%d</xliff:g>ms</string>
     <!-- The text that represents the current settings value is the system default [CHAR LIMIT=25] -->
     <string name="settings_system_default">System default</string>
 
@@ -79,7 +79,7 @@
     <!-- Title of the button to revert to the default value of the device in the settings dialog [CHAR LIMIT=15] -->
     <string name="button_default">Default</string>
 
-    <string translatable="false" name="abbreviation_unit_percent"><xliff:g id="PERCENTS">%s</xliff:g>%%</string>
+    <string translatable="false" name="abbreviation_unit_percent"><xliff:g id="PERCENTS">%d</xliff:g>%%</string>
     <string translatable="false" name="abbreviation_unit_dp"><xliff:g id="DENSITY_INDEPENDENT_PIXELS">%d</xliff:g> dp</string>
 
     <string name="prefs_keyboard_height_settings">Keyboard height</string>

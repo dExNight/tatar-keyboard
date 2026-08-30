@@ -27,7 +27,7 @@
     <string name="settings_screen_appearance">Тышкы кыяфәт</string>
     <string name="settings_screen_theme">Тема</string>
     <string name="settings_back">Артка</string>
-    <string name="abbreviation_unit_milliseconds"><xliff:g id="MILLISECONDS">%s</xliff:g> мс</string>
+    <string name="abbreviation_unit_milliseconds"><xliff:g id="MILLISECONDS">%d</xliff:g> мс</string>
     <string name="settings_system_default">Системадагыча</string>
     <string name="auto_cap">Автоматик баш хәреф</string>
     <string name="auto_cap_summary">Һәр җөмләнең беренче сүзен баш хәрефтән башлау</string>

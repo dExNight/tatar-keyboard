@@ -43,6 +43,31 @@
         <attr name="emojiPanelFunctionalKeyColor" format="color" />
     </declare-styleable>
 
+    <!-- DEV-4: theme colours for the emoji panel grid. All attrs are already declared above
+         (KeyboardTheme / SuggestionStripView); the styleable only groups them so the view can
+         read them via R.styleable instead of a hand-built int[] of attr ids. Order matches the
+         previous manual array: panel background, functional text, pressed, key text,
+         functional key, normal key. -->
+    <declare-styleable name="EmojiPanelView">
+        <attr name="emojiPanelBackgroundColor" />
+        <attr name="functionalTextColor" />
+        <attr name="keyPressedBackgroundColor" />
+        <attr name="keyTextColor" />
+        <attr name="emojiPanelFunctionalKeyColor" />
+        <attr name="keyNormalBackgroundColor" />
+    </declare-styleable>
+
+    <!-- Same theme colours as EmojiPanelView; separate styleable keeps the lint convention
+         "custom view name == styleable name". -->
+    <declare-styleable name="EmojiSearchView">
+        <attr name="emojiPanelBackgroundColor" />
+        <attr name="functionalTextColor" />
+        <attr name="keyPressedBackgroundColor" />
+        <attr name="keyTextColor" />
+        <attr name="emojiPanelFunctionalKeyColor" />
+        <attr name="keyNormalBackgroundColor" />
+    </declare-styleable>
+
     <declare-styleable name="KeyboardView">
         <!-- Background image for the key. This image needs to be a
             {@link android.graphics.drawable.StateListDrawable}, with the following possible states:

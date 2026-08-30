@@ -1,14 +1,38 @@
 <?xml version="1.0" encoding="utf-8"?>
 <lint>
-    <!-- Phase 4a: lintRelease runs with abortOnError=true against lint-baseline.xml.
-         The 18 baselined ResourceType errors (EmojiPanelView.kt:366-372,
-         EmojiSearchView.kt:198-203) are FALSE POSITIVES: both files read theme colours
-         via context.theme.obtainStyledAttributes(intArrayOf(R.attr.*)), so the
-         TypedArray.getColor() index is a plain ordinal into that manual array, not a
-         @StyleableRes — lint cannot map manually built attribute arrays. Runtime
-         behaviour is correct (verified by the phase-4a emulator smoke: emoji panel
-         renders with proper colours). A real fix would need declare-styleable blocks
-         per panel; left as baseline deliberately.
-         The 4 baselined StringFormatMatches entries (SettingsHostActivity.kt:1207,1229)
-         pass an Int to a %s string — String.format("%s", int) formats fine at runtime. -->
+    <!-- lintRelease runs with abortOnError=true against lint-baseline.xml.
+         DEV-4 (2026-08-31): the 22 former baseline ERRORS are fixed in code —
+         18x ResourceType (EmojiPanelView/EmojiSearchView now read theme colours via
+         R.styleable.EmojiPanelView / R.styleable.EmojiSearchView declared in
+         res/values/attrs.xml, same attrs and same defaults as the old manual int[])
+         and 4x StringFormatMatches (%s -> %d in abbreviation_unit_milliseconds /
+         abbreviation_unit_percent; %d renders an Int identically to %s).
+         The regenerated baseline holds 36 WARNINGS, each classified below:
+
+         Conscious design / false positive (leave):
+         - ApplySharedPref (Settings.java): commit() is deliberately synchronous for the
+           one-shot "suggestions offered" flag; apply() would change write semantics.
+         - CustomViewStyleable (KeyboardView vs Keyboard_Key styleable): upstream AOSP
+           naming; renaming the styleable would break every keyboard/theme XML.
+         - InlinedApi x3 (IME_FLAG_NO_PERSONALIZED_LEARNING): the flag is an inlined
+           constant; on API < 26 the bit is simply ignored by the system.
+         - UnusedAttribute (enableOnBackInvokedCallback): required on API 33+ to opt out
+           of predictive back; ignored below.
+         - DataExtractionRules: allowBackup="false" — backup is disabled entirely, so
+           fullBackupContent is meaningless.
+         - DiscouragedApi x4 (getIdentifier by name): locale/layout resource lookup is
+           part of the AOSP-fork design.
+         - StaticFieldLeak (KeyboardSwitcher singleton): lives exactly as long as the
+           IME process by design.
+         - InflateParams: the IME input view is inflated parentless by design.
+
+         Cosmetic / not actionable (leave):
+         - RedundantLabel x3, Overdraw x2, UseRequiresApi, UsableSpace,
+           IconLauncherShape x5 (deliberate icon design), TextFields, Autofill x2,
+           LabelFor x2, ClickableViewAccessibility x2 (legacy views),
+           UnusedResources x2 (icon_launcher_text glyph data, AppText.Button style).
+
+         Version pins (conscious):
+         - AndroidGradlePluginVersion, GradleDependency: Gradle/AGP/dependency versions
+           are pinned deliberately (reproducible build, CI wrapper sha256). -->
 </lint>

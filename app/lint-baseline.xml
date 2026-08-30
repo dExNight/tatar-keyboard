@@ -2,204 +2,6 @@
 <issues format="6" by="lint 9.2.1" type="baseline" client="gradle" dependencies="false" name="AGP (9.2.1)" variant="all" version="9.2.1">
 
     <issue
-        id="ResourceType"
-        message="Expected resource of type styleable"
-        errorLine1="        val keyColor = themeColors.getColor(5, Color.LTGRAY)"
-        errorLine2="                                            ~">
-        <location
-            file="src/main/java/rkr/simplekeyboard/inputmethod/latin/emoji/EmojiPanelView.kt"
-            line="366"
-            column="45"/>
-    </issue>
-
-    <issue
-        id="ResourceType"
-        message="Expected resource of type styleable"
-        errorLine1="        val functionalColor = themeColors.getColor(4, keyColor)"
-        errorLine2="                                                   ~">
-        <location
-            file="src/main/java/rkr/simplekeyboard/inputmethod/latin/emoji/EmojiPanelView.kt"
-            line="367"
-            column="52"/>
-    </issue>
-
-    <issue
-        id="ResourceType"
-        message="Expected resource of type styleable"
-        errorLine1="        labelPaint.color = themeColors.getColor(1, Color.DKGRAY)"
-        errorLine2="                                                ~">
-        <location
-            file="src/main/java/rkr/simplekeyboard/inputmethod/latin/emoji/EmojiPanelView.kt"
-            line="369"
-            column="49"/>
-    </issue>
-
-    <issue
-        id="ResourceType"
-        message="Expected resource of type styleable"
-        errorLine1="        labelPaint.color = themeColors.getColor(1, Color.DKGRAY)"
-        errorLine2="                                                ~">
-        <location
-            file="src/main/java/rkr/simplekeyboard/inputmethod/latin/emoji/EmojiPanelView.kt"
-            line="369"
-            column="49"/>
-    </issue>
-
-    <issue
-        id="ResourceType"
-        message="Expected resource of type styleable"
-        errorLine1="        tabPaint.color = themeColors.getColor(1, Color.DKGRAY)"
-        errorLine2="                                              ~">
-        <location
-            file="src/main/java/rkr/simplekeyboard/inputmethod/latin/emoji/EmojiPanelView.kt"
-            line="370"
-            column="47"/>
-    </issue>
-
-    <issue
-        id="ResourceType"
-        message="Expected resource of type styleable"
-        errorLine1="        tabPaint.color = themeColors.getColor(1, Color.DKGRAY)"
-        errorLine2="                                              ~">
-        <location
-            file="src/main/java/rkr/simplekeyboard/inputmethod/latin/emoji/EmojiPanelView.kt"
-            line="370"
-            column="47"/>
-    </issue>
-
-    <issue
-        id="ResourceType"
-        message="Expected resource of type styleable"
-        errorLine1="        pressedPaint.color = themeColors.getColor(2, Color.GRAY)"
-        errorLine2="                                                  ~">
-        <location
-            file="src/main/java/rkr/simplekeyboard/inputmethod/latin/emoji/EmojiPanelView.kt"
-            line="371"
-            column="51"/>
-    </issue>
-
-    <issue
-        id="ResourceType"
-        message="Expected resource of type styleable"
-        errorLine1="        pressedPaint.color = themeColors.getColor(2, Color.GRAY)"
-        errorLine2="                                                  ~">
-        <location
-            file="src/main/java/rkr/simplekeyboard/inputmethod/latin/emoji/EmojiPanelView.kt"
-            line="371"
-            column="51"/>
-    </issue>
-
-    <issue
-        id="ResourceType"
-        message="Expected resource of type styleable"
-        errorLine1="        emojiPaint.color = themeColors.getColor(3, Color.BLACK)"
-        errorLine2="                                                ~">
-        <location
-            file="src/main/java/rkr/simplekeyboard/inputmethod/latin/emoji/EmojiPanelView.kt"
-            line="372"
-            column="49"/>
-    </issue>
-
-    <issue
-        id="ResourceType"
-        message="Expected resource of type styleable"
-        errorLine1="        emojiPaint.color = themeColors.getColor(3, Color.BLACK)"
-        errorLine2="                                                ~">
-        <location
-            file="src/main/java/rkr/simplekeyboard/inputmethod/latin/emoji/EmojiPanelView.kt"
-            line="372"
-            column="49"/>
-    </issue>
-
-    <issue
-        id="ResourceType"
-        message="Expected resource of type styleable"
-        errorLine1="        val keyColor = themeColors.getColor(5, Color.LTGRAY)"
-        errorLine2="                                            ~">
-        <location
-            file="src/main/java/rkr/simplekeyboard/inputmethod/latin/emoji/EmojiSearchView.kt"
-            line="198"
-            column="45"/>
-    </issue>
-
-    <issue
-        id="ResourceType"
-        message="Expected resource of type styleable"
-        errorLine1="        val functionalColor = themeColors.getColor(4, keyColor)"
-        errorLine2="                                                   ~">
-        <location
-            file="src/main/java/rkr/simplekeyboard/inputmethod/latin/emoji/EmojiSearchView.kt"
-            line="199"
-            column="52"/>
-    </issue>
-
-    <issue
-        id="ResourceType"
-        message="Expected resource of type styleable"
-        errorLine1="        queryPaint.color = themeColors.getColor(1, Color.DKGRAY)"
-        errorLine2="                                                ~">
-        <location
-            file="src/main/java/rkr/simplekeyboard/inputmethod/latin/emoji/EmojiSearchView.kt"
-            line="201"
-            column="49"/>
-    </issue>
-
-    <issue
-        id="ResourceType"
-        message="Expected resource of type styleable"
-        errorLine1="        queryPaint.color = themeColors.getColor(1, Color.DKGRAY)"
-        errorLine2="                                                ~">
-        <location
-            file="src/main/java/rkr/simplekeyboard/inputmethod/latin/emoji/EmojiSearchView.kt"
-            line="201"
-            column="49"/>
-    </issue>
-
-    <issue
-        id="ResourceType"
-        message="Expected resource of type styleable"
-        errorLine1="        pressedPaint.color = themeColors.getColor(2, Color.GRAY)"
-        errorLine2="                                                  ~">
-        <location
-            file="src/main/java/rkr/simplekeyboard/inputmethod/latin/emoji/EmojiSearchView.kt"
-            line="202"
-            column="51"/>
-    </issue>
-
-    <issue
-        id="ResourceType"
-        message="Expected resource of type styleable"
-        errorLine1="        pressedPaint.color = themeColors.getColor(2, Color.GRAY)"
-        errorLine2="                                                  ~">
-        <location
-            file="src/main/java/rkr/simplekeyboard/inputmethod/latin/emoji/EmojiSearchView.kt"
-            line="202"
-            column="51"/>
-    </issue>
-
-    <issue
-        id="ResourceType"
-        message="Expected resource of type styleable"
-        errorLine1="        resultPaint.color = themeColors.getColor(3, Color.BLACK)"
-        errorLine2="                                                 ~">
-        <location
-            file="src/main/java/rkr/simplekeyboard/inputmethod/latin/emoji/EmojiSearchView.kt"
-            line="203"
-            column="50"/>
-    </issue>
-
-    <issue
-        id="ResourceType"
-        message="Expected resource of type styleable"
-        errorLine1="        resultPaint.color = themeColors.getColor(3, Color.BLACK)"
-        errorLine2="                                                 ~">
-        <location
-            file="src/main/java/rkr/simplekeyboard/inputmethod/latin/emoji/EmojiSearchView.kt"
-            line="203"
-            column="50"/>
-    </issue>
-
-    <issue
         id="ApplySharedPref"
         message="Consider using `apply()` instead; `commit` writes its data to persistent storage immediately, whereas `apply` will handle it in the background"
         errorLine1="        prefs.edit().putBoolean(PREF_TATAR_SUGGESTIONS_OFFER_SPENT, true).commit();"
@@ -268,6 +70,8 @@
     <issue
         id="InflateParams"
         message="Avoid passing `null` as the view root (needed to resolve layout parameters on the inflated layout&apos;s root element)"
+        url="https://www.bignerdranch.com/blog/understanding-androids-layoutinflater-inflate/"
+        urls="https://www.bignerdranch.com/blog/understanding-androids-layoutinflater-inflate/"
         errorLine1="                R.layout.input_view, null);"
         errorLine2="                                     ~~~~">
         <location
@@ -327,7 +131,7 @@
         errorLine2="                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
             file="build.gradle"
-            line="56"
+            line="73"
             column="20"/>
     </issue>
 
@@ -387,72 +191,10 @@
     </issue>
 
     <issue
-        id="StringFormatMatches"
-        message="Suspicious argument type for formatting argument #1 in `abbreviation_unit_milliseconds`: conversion is `s`, received `int` (argument #2 in method call) (Did you mean formatting character `d`, &apos;o&apos; or `x`?)"
-        errorLine1="                getString(R.string.abbreviation_unit_milliseconds, value)"
-        errorLine2="                                                                   ~~~~~">
-        <location
-            file="src/main/java/rkr/simplekeyboard/inputmethod/latin/settings/SettingsHostActivity.kt"
-            line="1207"
-            column="68"/>
-        <location
-            file="src/main/res/values-ru/strings.xml"
-            line="30"
-            column="5"
-            message="Conflicting argument declaration here"/>
-    </issue>
-
-    <issue
-        id="StringFormatMatches"
-        message="Suspicious argument type for formatting argument #1 in `abbreviation_unit_milliseconds`: conversion is `s`, received `int` (argument #2 in method call) (Did you mean formatting character `d`, &apos;o&apos; or `x`?)"
-        errorLine1="                getString(R.string.abbreviation_unit_milliseconds, value)"
-        errorLine2="                                                                   ~~~~~">
-        <location
-            file="src/main/java/rkr/simplekeyboard/inputmethod/latin/settings/SettingsHostActivity.kt"
-            line="1207"
-            column="68"/>
-        <location
-            file="src/main/res/values-tt/strings.xml"
-            line="30"
-            column="5"
-            message="Conflicting argument declaration here"/>
-    </issue>
-
-    <issue
-        id="StringFormatMatches"
-        message="Suspicious argument type for formatting argument #1 in `abbreviation_unit_milliseconds`: conversion is `s`, received `int` (argument #2 in method call) (Did you mean formatting character `d`, &apos;o&apos; or `x`?)"
-        errorLine1="                getString(R.string.abbreviation_unit_milliseconds, value)"
-        errorLine2="                                                                   ~~~~~">
-        <location
-            file="src/main/java/rkr/simplekeyboard/inputmethod/latin/settings/SettingsHostActivity.kt"
-            line="1207"
-            column="68"/>
-        <location
-            file="src/main/res/values/strings.xml"
-            line="42"
-            column="5"
-            message="Conflicting argument declaration here"/>
-    </issue>
-
-    <issue
-        id="StringFormatMatches"
-        message="Suspicious argument type for formatting argument #1 in `abbreviation_unit_percent`: conversion is `s`, received `int` (argument #2 in method call) (Did you mean formatting character `d`, &apos;o&apos; or `x`?)"
-        errorLine1="                else getString(R.string.abbreviation_unit_percent, value)"
-        errorLine2="                                                                   ~~~~~">
-        <location
-            file="src/main/java/rkr/simplekeyboard/inputmethod/latin/settings/SettingsHostActivity.kt"
-            line="1229"
-            column="68"/>
-        <location
-            file="src/main/res/values/strings.xml"
-            line="82"
-            column="5"
-            message="Conflicting argument declaration here"/>
-    </issue>
-
-    <issue
         id="DataExtractionRules"
         message="The attribute `android:dataExtractionRules` only applies for Android 12 and higher; since `minSdkVersion` is API 24 you should also set `android:fullBackupContent`"
+        url="https://developer.android.com/about/versions/12/backup-restore#xml-changes"
+        urls="https://developer.android.com/about/versions/12/backup-restore#xml-changes,https://goo.gle/DataExtractionRules"
         errorLine1="        android:dataExtractionRules=&quot;@xml/data_extraction_rules&quot;"
         errorLine2="                                     ~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
@@ -576,6 +318,8 @@
     <issue
         id="Autofill"
         message="Missing `autofillHints` attribute"
+        url="https://developer.android.com/guide/topics/text/autofill.html"
+        urls="https://developer.android.com/guide/topics/text/autofill.html"
         errorLine1="&lt;EditText xmlns:android=&quot;http://schemas.android.com/apk/res/android&quot;"
         errorLine2=" ~~~~~~~~">
         <location
@@ -587,6 +331,8 @@
     <issue
         id="Autofill"
         message="Missing `autofillHints` attribute"
+        url="https://developer.android.com/guide/topics/text/autofill.html"
+        urls="https://developer.android.com/guide/topics/text/autofill.html"
         errorLine1="            &lt;EditText"
         errorLine2="             ~~~~~~~~">
         <location
