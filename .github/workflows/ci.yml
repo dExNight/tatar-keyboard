@@ -34,8 +34,14 @@ jobs:
       - name: Run JVM unit tests
         run: ./gradlew test --console=plain
 
-      - name: Run release vital lint
-        run: ./gradlew lintVitalRelease --console=plain
+      # Build-time python packers: plain unittest, no pytest (Phase 4a).
+      - name: Run python packer tests
+        run: for f in tests/*/test_*.py; do python3 "$f" || exit 1; done
+
+      # Full release lint with baseline (Phase 4a): pre-existing findings live in
+      # app/lint-baseline.xml, any NEW lint error breaks the build.
+      - name: Run release lint
+        run: ./gradlew lintRelease --console=plain
 
       - name: Build debug APK
         run: ./gradlew assembleDebug

@@ -45,6 +45,11 @@ android {
         }
     }
     namespace 'rkr.simplekeyboard.inputmethod'
+    lint {
+        // Phase 4a: pre-existing findings are baselined; any NEW lint error fails the build.
+        baseline = file("lint-baseline.xml")
+        abortOnError true
+    }
 }
 
 dependencies {

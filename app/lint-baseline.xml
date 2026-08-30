@@ -1,0 +1,642 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<issues format="6" by="lint 9.2.1" type="baseline" client="gradle" dependencies="false" name="AGP (9.2.1)" variant="all" version="9.2.1">
+
+    <issue
+        id="ResourceType"
+        message="Expected resource of type styleable"
+        errorLine1="        val keyColor = themeColors.getColor(5, Color.LTGRAY)"
+        errorLine2="                                            ~">
+        <location
+            file="src/main/java/rkr/simplekeyboard/inputmethod/latin/emoji/EmojiPanelView.kt"
+            line="366"
+            column="45"/>
+    </issue>
+
+    <issue
+        id="ResourceType"
+        message="Expected resource of type styleable"
+        errorLine1="        val functionalColor = themeColors.getColor(4, keyColor)"
+        errorLine2="                                                   ~">
+        <location
+            file="src/main/java/rkr/simplekeyboard/inputmethod/latin/emoji/EmojiPanelView.kt"
+            line="367"
+            column="52"/>
+    </issue>
+
+    <issue
+        id="ResourceType"
+        message="Expected resource of type styleable"
+        errorLine1="        labelPaint.color = themeColors.getColor(1, Color.DKGRAY)"
+        errorLine2="                                                ~">
+        <location
+            file="src/main/java/rkr/simplekeyboard/inputmethod/latin/emoji/EmojiPanelView.kt"
+            line="369"
+            column="49"/>
+    </issue>
+
+    <issue
+        id="ResourceType"
+        message="Expected resource of type styleable"
+        errorLine1="        labelPaint.color = themeColors.getColor(1, Color.DKGRAY)"
+        errorLine2="                                                ~">
+        <location
+            file="src/main/java/rkr/simplekeyboard/inputmethod/latin/emoji/EmojiPanelView.kt"
+            line="369"
+            column="49"/>
+    </issue>
+
+    <issue
+        id="ResourceType"
+        message="Expected resource of type styleable"
+        errorLine1="        tabPaint.color = themeColors.getColor(1, Color.DKGRAY)"
+        errorLine2="                                              ~">
+        <location
+            file="src/main/java/rkr/simplekeyboard/inputmethod/latin/emoji/EmojiPanelView.kt"
+            line="370"
+            column="47"/>
+    </issue>
+
+    <issue
+        id="ResourceType"
+        message="Expected resource of type styleable"
+        errorLine1="        tabPaint.color = themeColors.getColor(1, Color.DKGRAY)"
+        errorLine2="                                              ~">
+        <location
+            file="src/main/java/rkr/simplekeyboard/inputmethod/latin/emoji/EmojiPanelView.kt"
+            line="370"
+            column="47"/>
+    </issue>
+
+    <issue
+        id="ResourceType"
+        message="Expected resource of type styleable"
+        errorLine1="        pressedPaint.color = themeColors.getColor(2, Color.GRAY)"
+        errorLine2="                                                  ~">
+        <location
+            file="src/main/java/rkr/simplekeyboard/inputmethod/latin/emoji/EmojiPanelView.kt"
+            line="371"
+            column="51"/>
+    </issue>
+
+    <issue
+        id="ResourceType"
+        message="Expected resource of type styleable"
+        errorLine1="        pressedPaint.color = themeColors.getColor(2, Color.GRAY)"
+        errorLine2="                                                  ~">
+        <location
+            file="src/main/java/rkr/simplekeyboard/inputmethod/latin/emoji/EmojiPanelView.kt"
+            line="371"
+            column="51"/>
+    </issue>
+
+    <issue
+        id="ResourceType"
+        message="Expected resource of type styleable"
+        errorLine1="        emojiPaint.color = themeColors.getColor(3, Color.BLACK)"
+        errorLine2="                                                ~">
+        <location
+            file="src/main/java/rkr/simplekeyboard/inputmethod/latin/emoji/EmojiPanelView.kt"
+            line="372"
+            column="49"/>
+    </issue>
+
+    <issue
+        id="ResourceType"
+        message="Expected resource of type styleable"
+        errorLine1="        emojiPaint.color = themeColors.getColor(3, Color.BLACK)"
+        errorLine2="                                                ~">
+        <location
+            file="src/main/java/rkr/simplekeyboard/inputmethod/latin/emoji/EmojiPanelView.kt"
+            line="372"
+            column="49"/>
+    </issue>
+
+    <issue
+        id="ResourceType"
+        message="Expected resource of type styleable"
+        errorLine1="        val keyColor = themeColors.getColor(5, Color.LTGRAY)"
+        errorLine2="                                            ~">
+        <location
+            file="src/main/java/rkr/simplekeyboard/inputmethod/latin/emoji/EmojiSearchView.kt"
+            line="198"
+            column="45"/>
+    </issue>
+
+    <issue
+        id="ResourceType"
+        message="Expected resource of type styleable"
+        errorLine1="        val functionalColor = themeColors.getColor(4, keyColor)"
+        errorLine2="                                                   ~">
+        <location
+            file="src/main/java/rkr/simplekeyboard/inputmethod/latin/emoji/EmojiSearchView.kt"
+            line="199"
+            column="52"/>
+    </issue>
+
+    <issue
+        id="ResourceType"
+        message="Expected resource of type styleable"
+        errorLine1="        queryPaint.color = themeColors.getColor(1, Color.DKGRAY)"
+        errorLine2="                                                ~">
+        <location
+            file="src/main/java/rkr/simplekeyboard/inputmethod/latin/emoji/EmojiSearchView.kt"
+            line="201"
+            column="49"/>
+    </issue>
+
+    <issue
+        id="ResourceType"
+        message="Expected resource of type styleable"
+        errorLine1="        queryPaint.color = themeColors.getColor(1, Color.DKGRAY)"
+        errorLine2="                                                ~">
+        <location
+            file="src/main/java/rkr/simplekeyboard/inputmethod/latin/emoji/EmojiSearchView.kt"
+            line="201"
+            column="49"/>
+    </issue>
+
+    <issue
+        id="ResourceType"
+        message="Expected resource of type styleable"
+        errorLine1="        pressedPaint.color = themeColors.getColor(2, Color.GRAY)"
+        errorLine2="                                                  ~">
+        <location
+            file="src/main/java/rkr/simplekeyboard/inputmethod/latin/emoji/EmojiSearchView.kt"
+            line="202"
+            column="51"/>
+    </issue>
+
+    <issue
+        id="ResourceType"
+        message="Expected resource of type styleable"
+        errorLine1="        pressedPaint.color = themeColors.getColor(2, Color.GRAY)"
+        errorLine2="                                                  ~">
+        <location
+            file="src/main/java/rkr/simplekeyboard/inputmethod/latin/emoji/EmojiSearchView.kt"
+            line="202"
+            column="51"/>
+    </issue>
+
+    <issue
+        id="ResourceType"
+        message="Expected resource of type styleable"
+        errorLine1="        resultPaint.color = themeColors.getColor(3, Color.BLACK)"
+        errorLine2="                                                 ~">
+        <location
+            file="src/main/java/rkr/simplekeyboard/inputmethod/latin/emoji/EmojiSearchView.kt"
+            line="203"
+            column="50"/>
+    </issue>
+
+    <issue
+        id="ResourceType"
+        message="Expected resource of type styleable"
+        errorLine1="        resultPaint.color = themeColors.getColor(3, Color.BLACK)"
+        errorLine2="                                                 ~">
+        <location
+            file="src/main/java/rkr/simplekeyboard/inputmethod/latin/emoji/EmojiSearchView.kt"
+            line="203"
+            column="50"/>
+    </issue>
+
+    <issue
+        id="ApplySharedPref"
+        message="Consider using `apply()` instead; `commit` writes its data to persistent storage immediately, whereas `apply` will handle it in the background"
+        errorLine1="        prefs.edit().putBoolean(PREF_TATAR_SUGGESTIONS_OFFER_SPENT, true).commit();"
+        errorLine2="                                                                          ~~~~~~~~">
+        <location
+            file="src/main/java/rkr/simplekeyboard/inputmethod/latin/settings/Settings.java"
+            line="352"
+            column="75"/>
+    </issue>
+
+    <issue
+        id="CustomViewStyleable"
+        message="By convention, the custom view (`KeyboardView`) and the declare-styleable (`Keyboard_Key`) should have the same name (various editor features rely on this convention)"
+        errorLine1="                R.styleable.Keyboard_Key, defStyle, R.style.KeyboardView);"
+        errorLine2="                ~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/rkr/simplekeyboard/inputmethod/keyboard/KeyboardView.java"
+            line="152"
+            column="17"/>
+    </issue>
+
+    <issue
+        id="InlinedApi"
+        message="Field requires API level 26 (current min is 24): `android.view.inputmethod.EditorInfo#IME_FLAG_NO_PERSONALIZED_LEARNING`"
+        errorLine1="        return 0 != (imeOptions &amp; EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING);"
+        errorLine2="                                  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/rkr/simplekeyboard/inputmethod/latin/InputAttributes.java"
+            line="140"
+            column="35"/>
+    </issue>
+
+    <issue
+        id="InlinedApi"
+        message="Field requires API level 26 (current min is 24): `android.view.inputmethod.EditorInfo#IME_FLAG_NO_PERSONALIZED_LEARNING`"
+        errorLine1="        field.imeOptions = field.imeOptions or EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING"
+        errorLine2="                                               ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/rkr/simplekeyboard/inputmethod/latin/settings/SettingsHostActivity.kt"
+            line="691"
+            column="48"/>
+    </issue>
+
+    <issue
+        id="InlinedApi"
+        message="Field requires API level 26 (current min is 24): `android.view.inputmethod.EditorInfo#IME_FLAG_NO_PERSONALIZED_LEARNING`"
+        errorLine1="        field.imeOptions = field.imeOptions or EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING"
+        errorLine2="                                               ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/rkr/simplekeyboard/inputmethod/latin/settings/SettingsHostActivity.kt"
+            line="691"
+            column="48"/>
+    </issue>
+
+    <issue
+        id="UnusedAttribute"
+        message="Attribute `enableOnBackInvokedCallback` is only used in API level 33 and higher (current min is 24)"
+        errorLine1="        android:enableOnBackInvokedCallback=&quot;false&quot;"
+        errorLine2="        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/AndroidManifest.xml"
+            line="24"
+            column="9"/>
+    </issue>
+
+    <issue
+        id="InflateParams"
+        message="Avoid passing `null` as the view root (needed to resolve layout parameters on the inflated layout&apos;s root element)"
+        errorLine1="                R.layout.input_view, null);"
+        errorLine2="                                     ~~~~">
+        <location
+            file="src/main/java/rkr/simplekeyboard/inputmethod/keyboard/KeyboardSwitcher.java"
+            line="594"
+            column="38"/>
+    </issue>
+
+    <issue
+        id="RedundantLabel"
+        message="Redundant label can be removed"
+        errorLine1="            android:label=&quot;@string/english_ime_name&quot;"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/AndroidManifest.xml"
+            line="46"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="RedundantLabel"
+        message="Redundant label can be removed"
+        errorLine1="            android:label=&quot;@string/english_ime_name&quot;"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/AndroidManifest.xml"
+            line="57"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="RedundantLabel"
+        message="Redundant label can be removed"
+        errorLine1="            android:label=&quot;@string/english_ime_name&quot;"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/AndroidManifest.xml"
+            line="63"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="AndroidGradlePluginVersion"
+        message="A newer version of Gradle than 9.6.0 is available: 9.7.1"
+        errorLine1="distributionUrl=https\://services.gradle.org/distributions/gradle-9.6.0-bin.zip"
+        errorLine2="                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="$HOME/Projects/tatar-keyboard/gradle/wrapper/gradle-wrapper.properties"
+            line="3"
+            column="17"/>
+    </issue>
+
+    <issue
+        id="GradleDependency"
+        message="A newer version of androidx.customview:customview than 1.1.0 is available: 1.2.0"
+        errorLine1="    implementation &apos;androidx.customview:customview:1.1.0&apos;"
+        errorLine2="                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="build.gradle"
+            line="56"
+            column="20"/>
+    </issue>
+
+    <issue
+        id="DiscouragedApi"
+        message="Use of this function is discouraged because resource reflection makes it harder to perform build optimizations and compile-time verification of code. It is much more efficient to retrieve resources by identifier (e.g. `R.foo.bar`) than by name (e.g. `getIdentifier(&quot;bar&quot;, &quot;foo&quot;, null)`)."
+        errorLine1="            return resources.getIdentifier(keyboardLayoutSetName, &quot;xml&quot;, packageName);"
+        errorLine2="                             ~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/rkr/simplekeyboard/inputmethod/keyboard/KeyboardLayoutSet.java"
+            line="281"
+            column="30"/>
+    </issue>
+
+    <issue
+        id="DiscouragedApi"
+        message="Use of this function is discouraged because resource reflection makes it harder to perform build optimizations and compile-time verification of code. It is much more efficient to retrieve resources by identifier (e.g. `R.foo.bar`) than by name (e.g. `getIdentifier(&quot;bar&quot;, &quot;foo&quot;, null)`)."
+        errorLine1="            final int resId = mResources.getIdentifier(name, &quot;string&quot;, mResourcePackageName);"
+        errorLine2="                                         ~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/rkr/simplekeyboard/inputmethod/keyboard/internal/KeyboardTextsSet.java"
+            line="134"
+            column="42"/>
+    </issue>
+
+    <issue
+        id="DiscouragedApi"
+        message="Use of this function is discouraged because resource reflection makes it harder to perform build optimizations and compile-time verification of code. It is much more efficient to retrieve resources by identifier (e.g. `R.foo.bar`) than by name (e.g. `getIdentifier(&quot;bar&quot;, &quot;foo&quot;, null)`)."
+        errorLine1="            final int resId = res.getIdentifier(resourceName, null, sResourcePackageName);"
+        errorLine2="                                  ~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/rkr/simplekeyboard/inputmethod/latin/utils/LocaleResourceUtils.java"
+            line="81"
+            column="35"/>
+    </issue>
+
+    <issue
+        id="DiscouragedApi"
+        message="Use of this function is discouraged because resource reflection makes it harder to perform build optimizations and compile-time verification of code. It is much more efficient to retrieve resources by identifier (e.g. `R.foo.bar`) than by name (e.g. `getIdentifier(&quot;bar&quot;, &quot;foo&quot;, null)`)."
+        errorLine1="            final int resId = res.getIdentifier(resourceName, null, sResourcePackageName);"
+        errorLine2="                                  ~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/rkr/simplekeyboard/inputmethod/latin/utils/LocaleResourceUtils.java"
+            line="89"
+            column="35"/>
+    </issue>
+
+    <issue
+        id="UseRequiresApi"
+        message="Use `@RequiresApi(Build.VERSION_CODES.S) instead of `@TargetApi` to propagate the requirement to callers of `setTextAroundCursor`"
+        errorLine1="    @TargetApi(Build.VERSION_CODES.S)"
+        errorLine2="    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/rkr/simplekeyboard/inputmethod/latin/RichInputConnection.java"
+            line="117"
+            column="5"/>
+    </issue>
+
+    <issue
+        id="StringFormatMatches"
+        message="Suspicious argument type for formatting argument #1 in `abbreviation_unit_milliseconds`: conversion is `s`, received `int` (argument #2 in method call) (Did you mean formatting character `d`, &apos;o&apos; or `x`?)"
+        errorLine1="                getString(R.string.abbreviation_unit_milliseconds, value)"
+        errorLine2="                                                                   ~~~~~">
+        <location
+            file="src/main/java/rkr/simplekeyboard/inputmethod/latin/settings/SettingsHostActivity.kt"
+            line="1207"
+            column="68"/>
+        <location
+            file="src/main/res/values-ru/strings.xml"
+            line="30"
+            column="5"
+            message="Conflicting argument declaration here"/>
+    </issue>
+
+    <issue
+        id="StringFormatMatches"
+        message="Suspicious argument type for formatting argument #1 in `abbreviation_unit_milliseconds`: conversion is `s`, received `int` (argument #2 in method call) (Did you mean formatting character `d`, &apos;o&apos; or `x`?)"
+        errorLine1="                getString(R.string.abbreviation_unit_milliseconds, value)"
+        errorLine2="                                                                   ~~~~~">
+        <location
+            file="src/main/java/rkr/simplekeyboard/inputmethod/latin/settings/SettingsHostActivity.kt"
+            line="1207"
+            column="68"/>
+        <location
+            file="src/main/res/values-tt/strings.xml"
+            line="30"
+            column="5"
+            message="Conflicting argument declaration here"/>
+    </issue>
+
+    <issue
+        id="StringFormatMatches"
+        message="Suspicious argument type for formatting argument #1 in `abbreviation_unit_milliseconds`: conversion is `s`, received `int` (argument #2 in method call) (Did you mean formatting character `d`, &apos;o&apos; or `x`?)"
+        errorLine1="                getString(R.string.abbreviation_unit_milliseconds, value)"
+        errorLine2="                                                                   ~~~~~">
+        <location
+            file="src/main/java/rkr/simplekeyboard/inputmethod/latin/settings/SettingsHostActivity.kt"
+            line="1207"
+            column="68"/>
+        <location
+            file="src/main/res/values/strings.xml"
+            line="42"
+            column="5"
+            message="Conflicting argument declaration here"/>
+    </issue>
+
+    <issue
+        id="StringFormatMatches"
+        message="Suspicious argument type for formatting argument #1 in `abbreviation_unit_percent`: conversion is `s`, received `int` (argument #2 in method call) (Did you mean formatting character `d`, &apos;o&apos; or `x`?)"
+        errorLine1="                else getString(R.string.abbreviation_unit_percent, value)"
+        errorLine2="                                                                   ~~~~~">
+        <location
+            file="src/main/java/rkr/simplekeyboard/inputmethod/latin/settings/SettingsHostActivity.kt"
+            line="1229"
+            column="68"/>
+        <location
+            file="src/main/res/values/strings.xml"
+            line="82"
+            column="5"
+            message="Conflicting argument declaration here"/>
+    </issue>
+
+    <issue
+        id="DataExtractionRules"
+        message="The attribute `android:dataExtractionRules` only applies for Android 12 and higher; since `minSdkVersion` is API 24 you should also set `android:fullBackupContent`"
+        errorLine1="        android:dataExtractionRules=&quot;@xml/data_extraction_rules&quot;"
+        errorLine2="                                     ~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/AndroidManifest.xml"
+            line="23"
+            column="38"/>
+    </issue>
+
+    <issue
+        id="StaticFieldLeak"
+        message="Do not place Android context classes in static fields (static reference to `KeyboardSwitcher` which has field `mThemeContext` pointing to `Context`); this is a memory leak"
+        errorLine1="    private static final KeyboardSwitcher sInstance = new KeyboardSwitcher();"
+        errorLine2="            ~~~~~~">
+        <location
+            file="src/main/java/rkr/simplekeyboard/inputmethod/keyboard/KeyboardSwitcher.java"
+            line="74"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="Overdraw"
+        message="Possible overdraw: Root element paints background `@color/app_screen_bg` with a theme that also paints a background (inferred theme is `@style/settingsHostTheme`)"
+        errorLine1="    android:background=&quot;@color/app_screen_bg&quot;>"
+        errorLine2="    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/settings_screen.xml"
+            line="26"
+            column="5"/>
+    </issue>
+
+    <issue
+        id="Overdraw"
+        message="Possible overdraw: Root element paints background `@color/app_screen_bg` with a theme that also paints a background (inferred theme is `@style/platformSettingsTheme`)"
+        errorLine1="    android:background=&quot;@color/app_screen_bg&quot;"
+        errorLine2="    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/setup_activity.xml"
+            line="27"
+            column="5"/>
+    </issue>
+
+    <issue
+        id="UnusedResources"
+        message="The resource `R.string.icon_launcher_text` appears to be unused"
+        errorLine1="    &lt;string translatable=&quot;false&quot; name=&quot;icon_launcher_text&quot;>&quot;m4.07,3.60q0,0.18 -0.09,0.36q-0.09,0.18 -0.26,0.30q-0.18,0.13 -0.43,0.21q-0.24,0.07 -0.58,0.07q-0.37,0 -0.66,-0.06q-0.29,-0.06 -0.60,-0.18l0,-0.52l0.03,0q0.26,0.20 0.60,0.30q0.34,0.10 0.64,0.10q0.42,0 0.65,-0.14q0.23,-0.14 0.23,-0.39q0,-0.21 -0.11,-0.31q-0.11,-0.10 -0.33,-0.15q-0.17,-0.04 -0.37,-0.07q-0.20,-0.02 -0.42,-0.07q-0.45,-0.08 -0.67,-0.30q-0.21,-0.21 -0.21,-0.56q0,-0.39 0.36,-0.65q0.36,-0.25 0.92,-0.25q0.36,0 0.66,0.06q0.30,0.06 0.53,0.15l0,0.49l-0.03,0q-0.19,-0.15 -0.51,-0.25q-0.31,-0.10 -0.65,-0.10q-0.36,0 -0.58,0.14q-0.22,0.14 -0.22,0.36q0,0.19 0.11,0.31q0.11,0.11 0.38,0.17q0.14,0.02 0.41,0.07q0.27,0.04 0.46,0.08q0.38,0.09 0.57,0.28q0.19,0.18 0.19,0.53l0,0.00l0,-0.00l-0.00,-0.00zm1.16,-1.87l-0.48,0l0,-0.41l0.48,0l0,0.41zm-0.02,2.77l-0.43,0l0,-2.38l0.43,0l0,2.38zm4.61,0l-0.43,0l0,-1.35q0,-0.15 -0.01,-0.29q-0.01,-0.14 -0.06,-0.22q-0.05,-0.09 -0.15,-0.13q-0.09,-0.04 -0.28,-0.04q-0.18,0 -0.36,0.08q-0.18,0.08 -0.36,0.21q0.00,0.04 0.01,0.11q0.00,0.06 0.00,0.12l0,1.52l-0.43,0l0,-1.35q0,-0.15 -0.01,-0.29q-0.01,-0.14 -0.06,-0.22q-0.05,-0.09 -0.15,-0.13q-0.09,-0.04 -0.28,-0.04q-0.17,0 -0.35,0.08q-0.17,0.08 -0.35,0.20l0,1.77l-0.43,0l0,-2.38l0.43,0l0,0.26q0.20,-0.15 0.40,-0.24q0.20,-0.08 0.43,-0.08q0.26,0 0.44,0.10q0.18,0.10 0.27,0.28q0.26,-0.20 0.47,-0.29q0.21,-0.09 0.46,-0.09q0.42,0 0.62,0.23q0.20,0.23 0.20,0.66l-0.00,1.54l-0.00,0.00l0.00,0.00zm3.09,-1.21q0,0.28 -0.08,0.53q-0.08,0.23 -0.25,0.40q-0.15,0.15 -0.35,0.24q-0.20,0.08 -0.43,0.08q-0.20,0 -0.36,-0.04q-0.16,-0.04 -0.32,-0.12l0,0.99l-0.43,0l0,-3.25l0.43,0l0,0.24q0.17,-0.13 0.38,-0.22q0.21,-0.09 0.46,-0.09q0.46,0 0.72,0.32q0.26,0.32 0.26,0.90l-0.00,0l0.00,-0.00zm-0.44,0.01q0,-0.43 -0.15,-0.64q-0.15,-0.21 -0.48,-0.21q-0.18,0 -0.37,0.07q-0.18,0.07 -0.36,0.19l0,1.34q0.18,0.07 0.31,0.10q0.13,0.02 0.30,0.02q0.36,0 0.56,-0.22q0.20,-0.22 0.20,-0.66l0,0.00l-0.00,0l-0.00,0.00zm1.55,1.20l-0.43,0l0,-3.31l0.43,0l0,3.31zm3.01,-1.14l-1.89,0q0,0.21 0.07,0.38q0.07,0.16 0.19,0.26q0.11,0.10 0.28,0.15q0.16,0.05 0.36,0.05q0.26,0 0.52,-0.09q0.26,-0.09 0.38,-0.19l0.02,0l0,0.43q-0.21,0.08 -0.44,0.14q-0.22,0.05 -0.47,0.05q-0.64,0 -0.99,-0.31q-0.35,-0.32 -0.35,-0.91q0,-0.58 0.34,-0.92q0.34,-0.34 0.90,-0.34q0.52,0 0.80,0.28q0.28,0.28 0.28,0.79l0.00,0.21l-0.00,0l-0.00,0.00zm-0.42,-0.30q-0.00,-0.31 -0.17,-0.48q-0.16,-0.17 -0.51,-0.17q-0.34,0 -0.55,0.18q-0.20,0.18 -0.23,0.47l1.47,0l0.00,0.00l0.00,0.00z&quot;&lt;/string>"
+        errorLine2="                                 ~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/values/icons.xml"
+            line="19"
+            column="34"/>
+    </issue>
+
+    <issue
+        id="UnusedResources"
+        message="The resource `R.style.AppText_Button` appears to be unused"
+        errorLine1="    &lt;style name=&quot;AppText.Button&quot; parent=&quot;&quot;>"
+        errorLine2="           ~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/values/styles.xml"
+            line="46"
+            column="12"/>
+    </issue>
+
+    <issue
+        id="UsableSpace"
+        message="Consider also using `StorageManager#getAllocatableBytes` and `allocateBytes` which will consider clearable cached data"
+        errorLine1="            spaceProbe = { directory -> directory.usableSpace },"
+        errorLine2="                                                  ~~~~~~~~~~~">
+        <location
+            file="src/main/java/rkr/simplekeyboard/inputmethod/latin/dictionary/personalstore/AndroidPersonalDictionaryStorage.kt"
+            line="64"
+            column="51"/>
+    </issue>
+
+    <issue
+        id="IconLauncherShape"
+        message="Launcher icons should not fill every pixel of their square region; see the design guide for details">
+        <location
+            file="src/main/res/mipmap-hdpi/ic_launcher.png"/>
+    </issue>
+
+    <issue
+        id="IconLauncherShape"
+        message="Launcher icons should not fill every pixel of their square region; see the design guide for details">
+        <location
+            file="src/main/res/mipmap-mdpi/ic_launcher.png"/>
+    </issue>
+
+    <issue
+        id="IconLauncherShape"
+        message="Launcher icons should not fill every pixel of their square region; see the design guide for details">
+        <location
+            file="src/main/res/mipmap-xhdpi/ic_launcher.png"/>
+    </issue>
+
+    <issue
+        id="IconLauncherShape"
+        message="Launcher icons should not fill every pixel of their square region; see the design guide for details">
+        <location
+            file="src/main/res/mipmap-xxhdpi/ic_launcher.png"/>
+    </issue>
+
+    <issue
+        id="IconLauncherShape"
+        message="Launcher icons should not fill every pixel of their square region; see the design guide for details">
+        <location
+            file="src/main/res/mipmap-xxxhdpi/ic_launcher.png"/>
+    </issue>
+
+    <issue
+        id="TextFields"
+        message="This text field does not specify an `inputType`"
+        errorLine1="&lt;EditText xmlns:android=&quot;http://schemas.android.com/apk/res/android&quot;"
+        errorLine2=" ~~~~~~~~">
+        <location
+            file="src/main/res/layout/row_text_input.xml"
+            line="22"
+            column="2"/>
+    </issue>
+
+    <issue
+        id="Autofill"
+        message="Missing `autofillHints` attribute"
+        errorLine1="&lt;EditText xmlns:android=&quot;http://schemas.android.com/apk/res/android&quot;"
+        errorLine2=" ~~~~~~~~">
+        <location
+            file="src/main/res/layout/row_text_input.xml"
+            line="22"
+            column="2"/>
+    </issue>
+
+    <issue
+        id="Autofill"
+        message="Missing `autofillHints` attribute"
+        errorLine1="            &lt;EditText"
+        errorLine2="             ~~~~~~~~">
+        <location
+            file="src/main/res/layout/setup_activity.xml"
+            line="188"
+            column="14"/>
+    </issue>
+
+    <issue
+        id="ClickableViewAccessibility"
+        message="Custom view `MainKeyboardView` overrides `onTouchEvent` but not `performClick`"
+        errorLine1="    public boolean onTouchEvent(final MotionEvent event) {"
+        errorLine2="                   ~~~~~~~~~~~~">
+        <location
+            file="src/main/java/rkr/simplekeyboard/inputmethod/keyboard/MainKeyboardView.java"
+            line="492"
+            column="20"/>
+    </issue>
+
+    <issue
+        id="ClickableViewAccessibility"
+        message="Custom view `MoreKeysKeyboardView` overrides `onTouchEvent` but not `performClick`"
+        errorLine1="    public boolean onTouchEvent(final MotionEvent me) {"
+        errorLine2="                   ~~~~~~~~~~~~">
+        <location
+            file="src/main/java/rkr/simplekeyboard/inputmethod/keyboard/MoreKeysKeyboardView.java"
+            line="240"
+            column="20"/>
+    </issue>
+
+    <issue
+        id="LabelFor"
+        message="Missing accessibility label: when using `android:labelFor`, you must also define an `android:text` or an `android:contentDescription`"
+        errorLine1="            android:labelFor=&quot;@+id/row_switch&quot; />"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/row_switch.xml"
+            line="50"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="LabelFor"
+        message="Missing accessibility label: provide either a view with an `android:labelFor` that references this view or provide an `android:hint`"
+        errorLine1="&lt;EditText xmlns:android=&quot;http://schemas.android.com/apk/res/android&quot;"
+        errorLine2=" ~~~~~~~~">
+        <location
+            file="src/main/res/layout/row_text_input.xml"
+            line="22"
+            column="2"/>
+    </issue>
+
+</issues>

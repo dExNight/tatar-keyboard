@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<lint>
+    <!-- Phase 4a: lintRelease runs with abortOnError=true against lint-baseline.xml.
+         The 18 baselined ResourceType errors (EmojiPanelView.kt:366-372,
+         EmojiSearchView.kt:198-203) are FALSE POSITIVES: both files read theme colours
+         via context.theme.obtainStyledAttributes(intArrayOf(R.attr.*)), so the
+         TypedArray.getColor() index is a plain ordinal into that manual array, not a
+         @StyleableRes — lint cannot map manually built attribute arrays. Runtime
+         behaviour is correct (verified by the phase-4a emulator smoke: emoji panel
+         renders with proper colours). A real fix would need declare-styleable blocks
+         per panel; left as baseline deliberately.
+         The 4 baselined StringFormatMatches entries (SettingsHostActivity.kt:1207,1229)
+         pass an Int to a %s string — String.format("%s", int) formats fine at runtime. -->
+</lint>
