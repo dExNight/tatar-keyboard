@@ -71,8 +71,6 @@ class ThreeLanguageStringsTest {
      * untranslated string turns this red instead of slipping under a wildcard.
      */
     private val untranslatedOnPurpose = setOf(
-        // "%1$s (%2$s)" — upstream's own layout label format.
-        "subtype_generic_layout",
         // Punctuation tables read by the input logic, not shown to anyone.
         "symbols_sentence_terminators", "symbols_word_separators",
     )
