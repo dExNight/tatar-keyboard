@@ -80,14 +80,54 @@ tt→ru→en→tt (через `pref_current_subtype`), подсказки — п
 Прогнан по-настоящему на tt_suggest_a14 (18 PASS, 1 SKIP — у en нет словаря)
 и на tt_prefix3 с холодным поднятием AVD.
 
-## 4. Статический анализ — довести до конца
+## 4. Статический анализ — довести до конца — ✅ выполнено 2026-08-31
 
-- Разобрать замороженное в `app/lint-baseline.xml` (22 errors + 36 warnings):
-  настоящий техдолг — `obtainStyledAttributes` через ручные массивы индексов
-  в `EmojiPanelView.kt` / `EmojiSearchView.kt` (чинится declare-styleable).
-- Подключить error-prone для 80 легаси-Java-файлов (build-time, ограничения
-  проекта не нарушает) и оценить detekt для Kotlin — с baseline, без рефакторинга
-  ради линтера.
+**Lint baseline: 22 errors + 36 warnings → 0 errors + 36 warnings.** Кодом закрыты
+все 22 ошибки: 18× ResourceType — `EmojiPanelView.kt`/`EmojiSearchView.kt` читали
+цвета темы через ручной `intArrayOf(R.attr.*)` + `getColor(ordinal)`; заменено на
+declare-styleable `EmojiPanelView`/`EmojiSearchView` в `res/values/attrs.xml`
+(названы по view — иначе lint CustomViewStyleable), те же 6 атрибутов и дефолты,
+поведение не изменилось (эмуляторный смоук: emoji-panel PASS, рендер сверен
+скриншотом). 4× StringFormatMatches — `%s`→`%d` в `abbreviation_unit_milliseconds`
+(en/ru/tt) и `abbreviation_unit_percent` (для Int вывод идентичен). Baseline
+регенерирован из свежего отчёта; каждая из 36 оставшихся warning-записей
+классифицирована в `app/lint.xml`: осознанный дизайн (ApplySharedPref — синхронный
+commit; InlinedApi ×3; DiscouragedApi ×4 — getIdentifier часть дизайна форка;
+StaticFieldLeak — синглтон на время жизни IME; InflateParams; DataExtractionRules
+при `allowBackup=false`; UnusedAttribute для API 33+), косметика (RedundantLabel ×3,
+Overdraw ×2, accessibility-подсказки легаси-вьюх ×7, UnusedResources ×2,
+IconLauncherShape ×5 — дизайн иконки, UsableSpace, UseRequiresApi, TextFields),
+пины версий (AndroidGradlePluginVersion, GradleDependency).
+
+**error-prone подключён (build-time, ноль runtime-зависимостей).** Плагин
+net.ltgt.errorprone 4.3.0 + `error_prone_core:2.42.0` — последняя версия,
+запускающаяся на JDK 17 (с 2.43.0 минимум JDK 21; локально и в CI temurin 17).
+Грабля: под AGP плагин инертен by design (его README) — `error_prone_core` добавлен
+в `annotationProcessor`/`testAnnotationProcessor`/`androidTestAnnotationProcessor`
+(прямая установка `options.annotationProcessorPath` перезаписывается AGP и даёт
+`-proc:none`), включение — per-task `options.errorprone` в `app/build.gradle`.
+`allErrorsAsWarnings=true`: легаси-наследие не роняет сборку. Находки: 126
+предупреждений, 15 типов (63 уникальных с учётом debug+release). Починен один
+подтверждённый баг: FormatString в `KeyboardId.toString()` — 15 аргументов на
+14 конверсий, имя темы терялось (debug-вывод). Остальное — отчёт с оценкой:
+ReferenceEquality ×13 — identity-сравнения Key/Typeface, корректно;
+NarrowCalculation ×2 (`MainKeyboardView.java:641,644` — int-деление в float,
+потеря ≤ 0.5 px; фикс меняет рендеринг — оставлено сознательно);
+NonOverridingEquals/DuplicateBranches/EmptyCatch — осознанные; MutablePublicArray
+×2 — публичное API наследия; EffectivelyPrivate ×35, MissingOverride,
+MissingSummary, InvalidParam, InlineTrivialConstant, NonApiType ×2, UnusedMethod ×2,
+StringSplitter ×2 (разделители `:`/`;` — regex-инертны) — стиль/косметика.
+Воспроизводимость не пострадала: два clean assembleRelease побайтно одинаковы,
+в APK ноль error-prone артефактов.
+
+**detekt — вердикт: НЕ подключать.** Одноразовый CLI-прогон (1.23.8, дефолтный
+конфиг) по Kotlin-слою: 462 взвешенных находки, из них 217 MagicNumber и
+88 ReturnCount — шум против идиом проекта (hex-константы отрисовки, guard-clause
+стиль). Осмысленные категории — SwallowedException ×19 и TooGenericExceptionCaught
+×18 — это задокументированный fail-closed дизайн хранилищ (покрыт тестами).
+Сигнал/шум плохой, подключение с baseline дало бы нулевой текущий выигрыш при
+постоянном налоге на сборку и конфиг; CLI-прогон можно повторить вручную
+(`detekt-cli-*-all.jar` с Maven Central) при желании пересмотреть.
 
 ## 5. AGENTS.md (дешевле всех, польза сразу)
 

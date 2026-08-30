@@ -11,7 +11,8 @@ namespace `rkr.simplekeyboard.inputmethod`. Ветка работы — `main`.
 | JVM-тесты (976 шт.) | `./gradlew test` (для честного прогона — `--rerun-tasks`) |
 | Python-тесты конвейера (281 шт.) | `for f in tests/*/test_*.py; do python3 "$f" \|\| exit 1; done` — pytest НЕ используется, это чистый unittest |
 | Эмуляторный смоук (DEV-3) | `bash scripts/emulator-smoke.sh [--avd tt_suggest_a14] [--apk путь] [--no-boot] [--outdir build/emulator-smoke/]` — поднять AVD → установить APK → выбрать IME → сценарий (набор tt/ru/en, подсказки, эмодзи-панель, crash-буфер) → строки `RESULT\|PASS/FAIL/SKIP`, свидетельства (скриншоты, дампы) в outdir. Координаты клавиш откалиброваны под 1080×2280; пиксельная дельта полосы подсказок требует ImageMagick на хосте (без него — SKIP) |
-| Линт | `./gradlew lintRelease` (baseline `app/lint-baseline.xml`, `abortOnError=true`) |
+| Линт | `./gradlew lintRelease` (baseline `app/lint-baseline.xml` — после DEV-4: 0 errors, 36 осознанных warnings, классификация в `app/lint.xml`; `abortOnError=true`) |
+| error-prone (DEV-4) | встроен в компиляцию Java (плагин net.ltgt.errorprone 4.3.0 + error_prone_core 2.42.0 — последняя на JDK 17; build-time, в APK не попадает). Все находки — warnings (`allErrorsAsWarnings`), сборку не роняют; новые стоит разбирать по мере появления в выводе `compile*JavaWithJavac` |
 | Release APK | `./gradlew assembleRelease` (подпись через `keystore.properties`; без него — unsigned) |
 | Гейт «без INTERNET + backup-whitelist» | `bash scripts/check-no-internet.sh [путь-к-apk]` (по умолчанию debug APK; два уровня: манифест + aapt2) |
 | Релизный автомат (DEV-6) | `bash scripts/release_check.sh [--quick\|--full] [путь-к-apk]` (по умолчанию свежий release APK): гейты + размер + пины ассетов + разрешения + подпись + версия + changelog + дельта к dist/, итог машинным блоком `RESULT\|…` |
