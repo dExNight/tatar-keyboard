@@ -355,3 +355,110 @@ LXX-стилей и lxx-цветов в arsc нет, живые `*_lxx`-ресу
 
 Все гейты зелёные на каждом шаге, 6 содержательных коммитов + 1 фикс пинов,
 `git status` чист. Наружу не ушло ничего.
+
+## Фаза 3б. Срез локалей
+
+Дата: 2026-08-30. Ветка `main`, без push. Решение оператора: локали приложения
+и список раскладок срезаются до tt/ru/en. Гейты прогонялись перед каждым
+коммитом; эмуляторный прогон — на AVD `tt_suggest_a14` (Android 14).
+
+### Цепочка сабтипов до среза (разведка)
+
+- `SubtypeLocaleUtils.java` — единственный реестр: 82 локальные константы,
+  `sSupportedLocales` (73 записи) и `SubtypeBuilder.getSubtypes()` (switch,
+  ~40 веток). Потребители: `SettingsHostActivity.buildLanguagesScreen`
+  (список «Add language»), `RichInputMethodManager` (дефолт fresh-install
+  tt+ru+en), `SubtypePreferenceUtils` (миграция префов, east_slavic→russian).
+- `KeyboardTextsTable.java` — сгенерированная таблица moreKeys: 70 массивов
+  `TEXTS_<locale>` + регистрация в `LOCALES_AND_TEXTS`; lookup с fallback
+  language→DEFAULT. Татарской таблицы нет — tt всегда жил на DEFAULT +
+  инлайн-moreKeys из `rows_tatar.xml`.
+- Имена локалей: `locale_exception_keys`/`locale_displayed_in_root_locale`
+  (donottranslate.xml) → getIdentifier в `LocaleResourceUtils`;
+  `locale_name_*` в strings.xml.
+- Layout-XML резолвятся по имени (`KeyboardLayoutSet.getXmlId`,
+  getIdentifier) → `res/raw/keep.xml` не тронут.
+
+### Что удалено (числа)
+
+| Слой | Было | Стало |
+|---|---|---|
+| `SubtypeLocaleUtils`: локали в `sSupportedLocales` | 73 | 3 (tt_RU, ru, en_US) |
+| LOCALE_*-константы / case-ветки switch | 82 / ~40 | 3 / 3 |
+| LAYOUT_*-константы | 44 | 24 (3 активных + `east_slavic` для миграции префов + 20, на которые ещё ссылается switch в `InputLogic` — мёртвые ветки оставлены осознанно) |
+| `KeyboardTextsTable.java` | 234 812 Б, 70 массивов | 31 208 Б, 3 массива (DEFAULT, en, ru); файл сгенерированный — **правлен руками**, помечено комментарием |
+| Layout-XML (keyboard_layout_set_/kbd_/rows_/rowkeys_/row_/key_/keystyle_) | 368 basename'ов в res/xml{,-land,-sw600dp,-sw600dp-land} | 119; удалено **287 файлов** (1,4 МБ исходников) |
+| `res/values-XX/` локали | 84 каталога | 9: values, values-ru, values-tt + land/night/sw600dp{,-land}/sw768dp{,-land}; удалено **75 каталогов** (81 файл: 75 strings.xml + 6 переопределений пунктуации), 668 КБ |
+| Строки в base | — | −12: `locale_name_{en_GB,es_US,hi_ZZ,sr_ZZ}`, `subtype_{traditional,compact,bds,q,f,akkhor,ergol,hcesar}`; `subtype_generic_layout` помечен `translatable="false"`; exception-массивы в donottranslate.xml срезаны до en_US+tt_RU; values-ru/tt синхронно (−7 строк каждый) |
+| `app/build.gradle` | resConfigs отсутствовал | `resConfigs "tt", "ru", "en"` — режет и переводы androidx.customview |
+
+Достижимость layout-XML проверена построением графа включений `@xml/` из 12
+оставшихся наборов (tatar, russian + 9 predefined generic для en_US) плюс все
+ссылки из values/, манифеста и `R.xml.*` в коде: `kbd_more_keys_keyboard_template`
+(атрибут темы) и общие symbols/phone/number на месте.
+
+### Миграция пользовательских префов
+
+Записи удалённых сабтипов в `pref_enabled_subtypes` отваливаются мягко:
+`getSubtype()` возвращает null → запись пропускается, недостающие дефолты
+(tt/ru/en) дозаполняются (`SubtypeList.reload`), преф переписывается.
+Проверено на эмуляторе: преф `ru:russian;tt_RU:tatar;en_US:qwerty` пережил
+срез без изменений.
+
+### Гейты
+
+| Гейт | Результат |
+|---|---|
+| `./gradlew test` | **973 / 0 failures / 0 errors** (перед каждым коммитом) |
+| `./gradlew assembleRelease` | OK, подписан тем же ключом |
+| `lintRelease` | 22 errors / 36 warnings; **MissingTranslation 155 → 0** (последняя — `subtype_generic_layout`, закрыта `translatable="false"`); StringFormatMatches 39 → 4; оставшиеся 22 (ResourceType 18 + StringFormatMatches 4) предсуществующие — baseline в фазе 4 |
+| `scripts/check-no-internet.sh` | оба режима (debug + release) зелёные |
+| python-тесты (7 файлов) | **181 OK** (1 предсуществующий skip в emoji_pack) |
+
+Тесты под новый состав: `ThreeLanguageStringsTest` — из пин-списка
+осознанно-непереведённых убраны удалённые ключи, докстринг приведён к трём
+локалям; логика проверок не менялась. Других тестов, зависящих от состава
+локалей/раскладок, grep не нашёл.
+
+### Эмуляторный прогон (AVD tt_suggest_a14, debug APK)
+
+Google Messages, поле сообщения (как в миссии tt-suggest-dies):
+
+- цикл глобусом ru→tt→en→ru→tt — работает (MRU-ротация: после набора текста
+  порядок пересобирается, это штатное поведение форка);
+- татарская раскладка: пятый ряд Ә Ө Ү Җ Ң Һ на месте;
+- подсказки: tt «Мин» → «Минем · Министры · Министрлыгы», ru «При» →
+  «Привет · Придётся · Пришёл»;
+- длинный тап а → ә (в поле «Ә», подсказки «Әлеге · Әле · Әмма»);
+- эмодзи-панель открывается (длинный тап запятой), recents/поиск/категории;
+- экран «Keyboard languages»: ровно Татарча / Russian / English (US),
+  диалог «Add language» пуст (добавить нечего);
+- `logcat -b crash` пуст, FATAL/AndroidRuntime-крэшей нет.
+
+Свидетельства: `docs/restructure/evidence/3b-01…08` (7 PNG + текстовый дамп
+экрана языков — сам экран под FLAG_SECURE, `SettingsHostActivity.kt:166–173`,
+скриншот чёрный by design).
+
+### Размеры
+
+| Метрика | Базовая линия 1.9.4 | После 3а | После 3б |
+|---|---|---|---|
+| Release APK (подписан) | 2 538 949 Б | 2 526 324 Б | **2 130 746 Б** (−395 578 к 3а, −408 203 к базе, −16,1 %) |
+| Файлов в APK | 548 | 537 | **250** |
+| `resources.arsc` | 309 272 Б | — | **93 024 Б** (конфигурации только tt/ru + системные — `aapt2 dump configurations`) |
+| `classes.dex` | 406 768 Б | — | **384 724 Б** (уехала KeyboardTextsTable и ветки switch) |
+
+Запас до инварианта 3 МиБ: 33,6 %.
+
+### Отклонения и пометки
+
+- `KeyboardTextsTable.java` — сгенерированный файл, срезан руками (помечено в
+  комментарии у `LOCALES_AND_TEXTS`); `TEXTS_sah` не нёс generated-комментария
+  и удалён отдельной правкой.
+- 6 локальных переопределений пунктуации (bn, el, fr, fr-CA, hi, hy) удалены
+  вместе с каталогами — пунктуация теперь везде из base, что соответствует
+  составу tt/ru/en.
+- `LAYOUT_*`-константы комплексных письменностей оставлены: switch в
+  `InputLogic` на них ссылается; ветки мертвы, удаление — отдельная гигиена.
+- Пример в `select_language_description` (managed config) приведён к новому
+  составу: `tt_RU:tatar;ru:russian;en_US:qwerty`.
