@@ -182,7 +182,7 @@ public final class KeyboardId {
 
     @Override
     public String toString() {
-        return String.format(Locale.ROOT, "[%s %s:%s %dx%d +%d %s %s%s%s%s%s%s %s]",
+        return String.format(Locale.ROOT, "[%s %s:%s %dx%d +%d %s %s%s%s%s%s%s %s %s]",
                 elementIdToName(mElementId),
                 mSubtype.getLocale(),
                 mSubtype.getKeyboardLayoutSet(),
