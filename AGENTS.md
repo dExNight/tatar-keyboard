@@ -9,7 +9,8 @@ namespace `rkr.simplekeyboard.inputmethod`. Ветка работы — `main`.
 | Действие | Команда |
 |---|---|
 | JVM-тесты (976 шт.) | `./gradlew test` (для честного прогона — `--rerun-tasks`) |
-| Python-тесты конвейера (181 шт.) | `for f in tests/*/test_*.py; do python3 "$f" \|\| exit 1; done` — pytest НЕ используется, это чистый unittest |
+| Python-тесты конвейера (281 шт.) | `for f in tests/*/test_*.py; do python3 "$f" \|\| exit 1; done` — pytest НЕ используется, это чистый unittest |
+| Эмуляторный смоук (DEV-3) | `bash scripts/emulator-smoke.sh [--avd tt_suggest_a14] [--apk путь] [--no-boot] [--outdir build/emulator-smoke/]` — поднять AVD → установить APK → выбрать IME → сценарий (набор tt/ru/en, подсказки, эмодзи-панель, crash-буфер) → строки `RESULT\|PASS/FAIL/SKIP`, свидетельства (скриншоты, дампы) в outdir. Координаты клавиш откалиброваны под 1080×2280; пиксельная дельта полосы подсказок требует ImageMagick на хосте (без него — SKIP) |
 | Линт | `./gradlew lintRelease` (baseline `app/lint-baseline.xml`, `abortOnError=true`) |
 | Release APK | `./gradlew assembleRelease` (подпись через `keystore.properties`; без него — unsigned) |
 | Гейт «без INTERNET + backup-whitelist» | `bash scripts/check-no-internet.sh [путь-к-apk]` (по умолчанию debug APK; два уровня: манифест + aapt2) |

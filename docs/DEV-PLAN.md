@@ -5,7 +5,7 @@ Scope: только процесс разработки, кодогенерац�
 корпуса, замеры на железе и публикация — вне этого плана.
 
 Каждый пункт — самостоятельная миссия в стиле проекта (отчёт `docs/archive/missions/…`,
-гейты: 976 JVM + 181 python + lintRelease с baseline + check-no-internet).
+гейты: 976 JVM + 281 python + lintRelease с baseline + check-no-internet).
 
 ## 1. Оркестратор конвейера ассетов (приоритет 1) — ✅ выполнено 2026-08-31
 
@@ -46,13 +46,39 @@ APK — SHA-256 `bf6225e5d6f50397250b79d1c2bac9cd6bd3f732982b5a8b9cc1b2aec09eae7
 `.github/workflows/ci.yml` — два чистых прогона без build-cache, сравнение
 unsigned-APK побайтно (`cmp`).
 
-## 3. Пробелы в покрытии тестами
+## 3. Пробелы в покрытии тестами — ✅ выполнено 2026-08-31
 
 - Python-тесты для `emoji_search_pack.py`, `emoji_skin_pack.py`, `dict_accept.py`,
   `dict_accept_check.py` — сейчас без покрытия, хотя `dict_accept` пишет в ассеты.
 - Единый `scripts/emulator-smoke.sh`: поднять AVD → установить APK → сценарий
   (клавиатура, подсказки tt/ru, эмодзи, ландшафт) → свидетельства. Сейчас это
   разрозненные ручные band.py/coldstart.sh из `.smgr/`.
+
+**Сделано.** Три новых набора на синтетических фикстурах + живом дереве:
+`tests/emoji_search_pack/` (32: формат `seq TAB ru-имя TAB keywords`, снятие
+U+FE0F при lookup, derived только заполняет пробелы, покрытие-пол 0.99,
+guardrails 262 144 Б/1400 строк, fail-closed коды 2/4, детерминизм, живой
+ассет против живой панели), `tests/emoji_skin_pack/` (23: формат
+`seq TAB prefix TAB suffix`, тон ЗАМЕНЯЕТ U+FE0F, двухтональные записи не
+предлагаются, все пять тонов обязаны быть fully-qualified, guardrails
+8192 Б/400 строк + sanity-диапазон баз), `tests/dict_accept/` (29: правило
+1.9.1 на синтетике — обрывки, `можна`, тат. без порога длины, ветки
+two-corpora/shipped-word/shipped-paradigm, select/pack на крошечном baseline
+с перепиненным SHA-256, fail-closed на неверном SHA baseline, живой прогон
+`dict_accept_check` против ассетов и baseline 1.8.4). Итого python-тестов:
+197 → 281.
+
+`scripts/emulator-smoke.sh` (флаги `--avd/--apk/--no-boot/--outdir`): поднимает
+AVD (-no-window, свой serial узнаёт как новый в `adb devices`), ставит APK
+(пакет из aapt2 — debug несёт суффикс `.debug`), включает IME полным id, пишет
+преф подсказок через run-as ДО старта процесса (force-stop → ime set после,
+грабля 4б), SetupActivity, тап по try-it полю из свежего дампа, набор
+«мин»/«при»/«hi» реальными тапами с проверкой текста поля, сабтипы глобусом
+tt→ru→en→tt (через `pref_current_subtype`), подсказки — пиксельной дельтой
+полосы (ImageMagick; окно IME uiautomator не видит), эмодзи-панель — коммитом
+эмодзи в поле, crash-буфер пуст. Итог `RESULT|…`, FAIL = ненулевой выход.
+Прогнан по-настоящему на tt_suggest_a14 (18 PASS, 1 SKIP — у en нет словаря)
+и на tt_prefix3 с холодным поднятием AVD.
 
 ## 4. Статический анализ — довести до конца
 
