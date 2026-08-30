@@ -24,6 +24,12 @@
 
 package rkr.simplekeyboard.inputmethod.keyboard.internal;
 
+// ВНИМАНИЕ: файл исторически генерировался инструментом форка (make-KeyboardTextsTable),
+// сам генератор в репозиторий не попал и утерян. С 2026-08-30 (срез локалей до tt/ru/en,
+// docs/RESTRUCTURE.md фаза 3б) файл правится ВРУЧНУЮ: остались таблицы DEFAULT, en, ru.
+// При добавлении локали: новый массив TEXTS_<locale>, запись в sLocaleToTextsTableMap,
+// регистрация в SubtypeLocaleUtils — синхронно.
+
 import java.util.HashMap;
 import java.util.Locale;
 
