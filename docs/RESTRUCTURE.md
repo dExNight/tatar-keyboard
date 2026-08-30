@@ -462,3 +462,80 @@ Google Messages, поле сообщения (как в миссии tt-suggest-
   `InputLogic` на них ссылается; ветки мертвы, удаление — отдельная гигиена.
 - Пример в `select_language_description` (managed config) приведён к новому
   составу: `tt_RU:tatar;ru:russian;en_US:qwerty`.
+
+## Фаза 4а. Оптимизация: hot-path, R8-шринк, CI-усиление, дожим размера
+
+Дата: 2026-08-30. Ветка `main`, без push. 4 содержательных коммита.
+
+### Таблица изменений
+
+| Изменение | Файлы | Эффект |
+|---|---|---|
+| Hot-path: переиспользуемый буфер ширин вместо `new float[len]` на каждый показ превью клавиши | `KeyPreviewView.java` (поле `mTextWidthsBuffer`, package-private хелперы `ensureWidthsCapacity`/`sumWidths`), новый `KeyPreviewViewTextWidthsTest.kt` (+3 JVM-теста) | Ноль аллокаций в steady-state показа превью; гонки нет (вьюшка на UI-потоке). Тест фиксирует контракт: суммируются только свежие `count` записей, стейл-хвост длинного буфера не попадает в результат |
+| R8 optimized resource shrinking | `gradle.properties`: удалён `android.r8.optimizedResourceShrinking=false`, включён `android.nonFinalResIds=true` (обязательное требование оптимизированного шринкера) | Единый граф достижимости код+ресурсы; APK −400 Б |
+| CI: python-пакеры | `.github/workflows/ci.yml`: шаг `for f in tests/*/test_*.py; do python3 "$f"` | 181 тест в CI (чистый unittest, без pytest) |
+| CI: полный lint вместо vital | `app/build.gradle`: `lint { baseline = file("lint-baseline.xml"); abortOnError true }`; `app/lint-baseline.xml` (22 предсуществующие ошибки закоммичены); `app/lint.xml` с пояснением; ci.yml: `lintRelease` вместо `lintVitalRelease` | `lintRelease` зелёный; новая lint-ошибка ломает сборку (проверено зондом ResourceType в EmojiPanelView.kt: lint exit=1, зонд откачен) |
+| Дожим PNG | 15 mipmap-иконок пережаты zopfli (re-deflate того же фильтрованного потока, numiterations=50; venv в /tmp, системно ничего не ставилось) | 138 586 → 125 966 Б исходников; пиксели побайтово идентичны (PIL RGBA-сверка каждого файла) |
+| Исключение `**/*.kotlin_builtins` | `app/build.gradle` packagingOptions | Метаданные компилятора kotlin-stdlib, в рантайме не нужны (kotlin-reflect в приложении нет): −46,7 КБ распакованных |
+
+### Размеры APK
+
+| Точка | Размер |
+|---|---|
+| После фазы 3б | 2 130 746 Б |
+| После R8-шринка | 2 130 346 Б (−400) |
+| После PNG + kotlin_builtins | **2 110 476 Б** (−20 270 к фазе, −428 473 к базе 1.9.4, −16,9 %) |
+
+Запас до инварианта 3 МиБ: 35,2 %.
+
+### Lint-статус
+
+- `lintRelease` с baseline: **зелёный** (22 errors + 36 warnings отфильтрованы baseline, новых нет).
+- Вердикт по ResourceType (18 ошибок, EmojiPanelView.kt:366–372, EmojiSearchView.kt:198–203):
+  **false positive**. Код читает цвета темы через
+  `context.theme.obtainStyledAttributes(intArrayOf(R.attr.*))` — индекс в
+  `TypedArray.getColor()` это порядковый номер в ручном массиве атрибутов, а не
+  `@StyleableRes`; lint такие массивы не сопоставляет. Рантайм корректен
+  (эмодзи-панель рисуется с правильными цветами — смоук 4а). Оставлены в baseline,
+  пояснение в `app/lint.xml`. Настоящий фикс (declare-styleable на панель) — отдельная гигиена.
+- StringFormatMatches (4, SettingsHostActivity.kt:1207,1229): Int передаётся в `%s` —
+  `String.format("%s", int)` отрабатывает корректно; оставлены в baseline.
+- Пометка: `lintVitalRelease` внутри `assembleRelease` печатает informational
+  «58 entries listed in baseline but not found» — vital-вариант не содержит
+  baseline-категорий; на результат не влияет.
+
+### Эмуляторный смоук (AVD tt_suggest_a14, release APK 2 110 476 Б)
+
+Google Messages, поле сообщения:
+
+- татарская раскладка поднимается, пятый ряд Ә Ө Ү Җ Ң Һ на месте
+  (getIdentifier-резолвы раскладок целы под оптимизированным шринком);
+- «Мин» → подсказки «Министры · Минем · Министрлыгы»;
+- эмодзи-панель открывается (длинный тап запятой): категории, поиск, recents;
+- `logcat -b crash` пуст после всех прогонов.
+
+Свидетельства: `docs/restructure/evidence/4a-01-tt-layout.png`,
+`4a-02-suggestions-min.png`, `4a-03-emoji-panel.png`.
+
+### Гейты
+
+| Гейт | Результат |
+|---|---|
+| `./gradlew test` | **976 / 0 failures / 0 errors** (973 + 3 новых) |
+| `./gradlew assembleRelease` | OK, 2 110 476 Б, подписан тем же ключом |
+| `./gradlew lintRelease` | зелёный с baseline |
+| `scripts/check-no-internet.sh` | оба режима (debug + release APK) зелёные |
+| python-тесты (7 файлов) | **181 OK** (1 предсуществующий skip в emoji_pack) |
+
+### Отклонения и пометки
+
+- R8-флаг **удалён, не возвращён**: единственное препятствие (требование
+  nonFinalResIds) снято конфигом, компиляция и смоук чистые.
+- `res/raw/keep.xml` не тронут.
+- usage.txt/resources.txt после всех правок: нового мусора нет (top usage.txt —
+  вычищенные androidx.annotation); `assets/**/NOTICE.txt` (9,7 КБ) оставлены
+  осознанно — лицензионные уведомления словарей/эмодзи.
+- PNG-дожим касался только res/ (иконки лончера); `icons/`, `metadata/` в APK
+  не попадают и не трогались. zopfli/optipng системно отсутствовали —
+  использован pip-пакет zopfli в venv `/tmp/pngvenv`, скрипт `/tmp/pngsqueeze.py`
+  (в репозиторий не вносился).
