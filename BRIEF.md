@@ -14,7 +14,7 @@
 - **Язык**: новый код на Kotlin через interop, Java-базу форка не конвертировать массово.
 - **UI**: один кастомный View с отрисовкой на Canvas. Запрещены: Jetpack Compose в IME-процессе, Flutter/RN, deprecated KeyboardView (новый код на нём). Compose допустим только в Activity настроек.
 - **Без NDK/C++**, без сторонних зависимостей, без разрешения INTERNET (CI-проверка обязательна).
-- **SDK**: minSdk 24–26 (уточнить перед релизом), targetSdk/compileSdk 36.
+- **SDK**: minSdk 24–26 (уточнить перед релизом), targetSdk/compileSdk 36. *(Актуально на 1.9.5, 2026-08-30: minSdk 24, targetSdk/compileSdk 37.)*
 - **IME**: InputMethodService, directBootAware, onEvaluateFullscreenMode()=false; три subtype: tt_RU, ru, en_US; переключение клавишей-глобусом.
 - В MVP не использовать composing-текст — коммитить символы сразу; удаление через deleteSurroundingText по кодпоинтам.
 
