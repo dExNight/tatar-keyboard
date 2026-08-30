@@ -26,8 +26,8 @@ import org.junit.Test
  * three may quietly lose a sentence.
  *
  * This project ships its OWN strings in exactly three locales — `values` (English), `values-ru` and
- * `values-tt`. The other eighty locale folders come from Simple Keyboard upstream and carry only
- * upstream's own forty-odd strings; nothing here asks anything of them.
+ * `values-tt`. Since phase 3b (2026-08-30) those are the only folders: the eighty locale folders
+ * inherited from Simple Keyboard upstream were deleted together with the layouts they served.
  *
  * The gap this was written for was real: `tatar_autocorrect` and `tatar_autocorrect_summary` existed
  * in English and in Tatar and were missing in Russian, so the Autocorrect row on a Russian phone
@@ -66,18 +66,13 @@ class ThreeLanguageStringsTest {
     /**
      * Keys English carries that the two translated folders deliberately do not.
      *
-     * Every one of them is inherited from upstream and is either a proper name, a machine-readable
-     * config value, or a locale name written in its own script — none of the eighty upstream locale
-     * folders translates them either. Kept as an explicit list rather than a pattern, so adding a
-     * genuinely new untranslated string turns this red instead of slipping under a wildcard.
+     * Every one of them is either a machine-readable config value or upstream's own layout label
+     * format. Kept as an explicit list rather than a pattern, so adding a genuinely new
+     * untranslated string turns this red instead of slipping under a wildcard.
      */
     private val untranslatedOnPurpose = setOf(
-        // Keyboard layout names: proper nouns.
-        "subtype_q", "subtype_f", "subtype_bds", "subtype_hcesar", "subtype_akkhor", "subtype_ergol",
         // "%1$s (%2$s)" — upstream's own layout label format.
         "subtype_generic_layout",
-        // Locale names written in their own script.
-        "locale_name_in_root_locale_hi_ZZ", "locale_name_in_root_locale_sr_ZZ",
         // Punctuation tables read by the input logic, not shown to anyone.
         "symbols_sentence_terminators", "symbols_word_separators",
     )
