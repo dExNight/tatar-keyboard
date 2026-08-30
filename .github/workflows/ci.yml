@@ -69,3 +69,32 @@ jobs:
         with:
           name: app-debug
           path: app/build/outputs/apk/debug/app-debug.apk
+
+  # DEV-2: reproducible build gate. Two full clean rebuilds of the same tree must
+  # produce byte-identical APKs. CI has no keystore.properties, so both APKs are
+  # unsigned and compared whole (locally the signed APK is reproducible too after
+  # the Dependency Info Block was dropped — see app/build.gradle).
+  reproducible:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Restore gradle-wrapper.jar
+        run: |
+          curl -fsSL -o gradle/wrapper/gradle-wrapper.jar \
+            https://raw.githubusercontent.com/gradle/gradle/v9.6.0/gradle/wrapper/gradle-wrapper.jar
+          echo "497c8c2a7e5031f6aa847f88104aa80a93532ec32ee17bdb8d1d2f67a194a9c7  gradle/wrapper/gradle-wrapper.jar" | sha256sum -c -
+      - name: Build release APK (run 1)
+        run: ./gradlew clean assembleRelease --no-build-cache
+      - name: Stash APK 1
+        run: cp app/build/outputs/apk/release/app-release-unsigned.apk /tmp/repro-1.apk
+      - name: Build release APK (run 2)
+        run: ./gradlew clean assembleRelease --no-build-cache
+      - name: Compare SHA-256
+        run: |
+          sha256sum /tmp/repro-1.apk app/build/outputs/apk/release/app-release-unsigned.apk
+          cmp /tmp/repro-1.apk app/build/outputs/apk/release/app-release-unsigned.apk
