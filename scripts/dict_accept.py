@@ -1,4 +1,4 @@
-"""Машинная приёмка слов из очередей `docs/DICTIONARY-*-CONV-REVIEW.tsv`.
+"""Машинная приёмка слов из очередей `docs/archive/dictionary/DICTIONARY-*-CONV-REVIEW.tsv`.
 
 Ручная вычитка 39 176 слов не состоится — оператор сказал это прямо. Планку ставит машина,
 человек смотрит два образца по сто слов. Правило одно и умещается в одну фразу:
@@ -72,10 +72,10 @@ sys.path.insert(0, str(ROOT / "scripts"))
 sys.path.insert(0, str(ROOT / "research/corpus"))
 
 QUEUE = {
-    "rus": ROOT / "docs/DICTIONARY-RU-CONV-REVIEW.tsv",
-    "tat": ROOT / "docs/DICTIONARY-TT-CONV-REVIEW.tsv",
+    "rus": ROOT / "docs/archive/dictionary/DICTIONARY-RU-CONV-REVIEW.tsv",
+    "tat": ROOT / "docs/archive/dictionary/DICTIONARY-TT-CONV-REVIEW.tsv",
 }
-OUT_DIR = ROOT / "docs/dict-accept"
+OUT_DIR = ROOT / "docs/archive/dictionary/dict-accept"
 SUFFIX = {"rus": "ru", "tat": "tt"}
 
 # Доля заглавных вне начала строки, при которой слово перестаёт считаться обычным.
@@ -302,7 +302,7 @@ SAMPLE_HEAD = """\
 # порядок оставлен как выпал, а не отсортирован по частоте: сортировка показала бы верхушку,
 # а вопрос стоит про всё множество.
 # Формат: слово <TAB> вхождений в обучающей части разговорных корпусов <TAB> правило.
-# Весь список — docs/dict-accept/{file}
+# Весь список — docs/archive/dictionary/dict-accept/{file}
 """
 
 SAMPLE_SEED = 20260824
@@ -412,7 +412,7 @@ def select(args) -> int:
 
 
 def read_accepted(tag: str) -> dict[str, int]:
-    """{слово: train_freq} из docs/dict-accept/accepted-*.tsv."""
+    """{слово: train_freq} из docs/archive/dictionary/dict-accept/accepted-*.tsv."""
     path = OUT_DIR / f"accepted-{SUFFIX[tag]}.tsv"
     out = {}
     with path.open(encoding="utf-8") as handle:
