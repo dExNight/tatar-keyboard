@@ -105,13 +105,29 @@ public class KeyPreviewView extends TextView {
         sNoScaleXTextSet.clear();
     }
 
-    private static float getTextWidth(final String text, final TextPaint paint) {
+    // Reused scratch buffer for getTextWidths(): this ran on every key preview show and
+    // allocated a new float[] each time. The view lives on the UI thread, so a single
+    // growing buffer is race-free.
+    private float[] mTextWidthsBuffer = new float[0];
+
+    private float getTextWidth(final String text, final TextPaint paint) {
         if (TextUtils.isEmpty(text)) {
             return 0.0f;
         }
         final int len = text.length();
-        final float[] widths = new float[len];
-        final int count = paint.getTextWidths(text, 0, len, widths);
+        mTextWidthsBuffer = ensureWidthsCapacity(mTextWidthsBuffer, len);
+        final int count = paint.getTextWidths(text, 0, len, mTextWidthsBuffer);
+        return sumWidths(mTextWidthsBuffer, count);
+    }
+
+    // Package-private for JVM tests (android.graphics.TextPaint is not available there).
+    static float[] ensureWidthsCapacity(final float[] buffer, final int len) {
+        return buffer.length >= len ? buffer : new float[len];
+    }
+
+    // Only the first count entries are valid: the buffer may be longer than the last
+    // measured text, so stale tail entries must never be summed.
+    static float sumWidths(final float[] widths, final int count) {
         float width = 0;
         for (int i = 0; i < count; i++) {
             width += widths[i];
