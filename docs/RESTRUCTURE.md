@@ -539,3 +539,168 @@ Google Messages, поле сообщения:
   не попадают и не трогались. zopfli/optipng системно отсутствовали —
   использован pip-пакет zopfli в venv `/tmp/pngvenv`, скрипт `/tmp/pngsqueeze.py`
   (в репозиторий не вносился).
+
+## Фаза 4б. Baseline Profile
+
+Дата: 2026-08-30. Ветка `main`, без push. 3 коммита (модуль генерации, профиль,
+этот журнал).
+
+### Подход
+
+Стандартная схема AGP 9.x, заработала на AGP 9.2.1 / Gradle 9.6.0 с первой
+подобранной комбинацией версий (стабильные, не альфы):
+
+- новый dev-only модуль `:baselineprofile` (плагины `com.android.test` +
+  `androidx.baselineprofile` 1.4.1, зависимости `benchmark-macro-junit4:1.4.1`,
+  `uiautomator:2.3.0`, `test.ext:junit:1.2.1`) — в APK не попадает ничего,
+  единственный продукт модуля — сгенерированный профиль;
+- в `:app` применён плагин `androidx.baselineprofile` (classpath
+  `androidx.benchmark:benchmark-baseline-profile-gradle-plugin:1.4.1` в корневом
+  buildscript) и добавлена зависимость `baselineProfile project(':baselineprofile')`
+  — чистая проводка, без артефактов в APK;
+- генерация на подключённом AVD (`useConnectedDevices = true`, GMD не нужен):
+  `./gradlew :app:generateReleaseBaselineProfile`;
+- `androidx.profileinstaller` **не добавляется** — runtime-зависимостей в
+  приложении по-прежнему ноль (трейдофф разобран ниже).
+
+### Сценарий CUJ (ImeBaselineProfileGenerator)
+
+CUJ для IME — не launcher-activity, а старт процесса клавиатуры системой по
+фокусу в поле. Каждая итерация: холодный kill процесса → `ime enable`/`ime set`
+→ старт `SetupActivity` (в ней есть try-it EditText, появляющийся когда наш IME
+выбран) → тап по полю → ожидание клавиатуры → набор «сәлам» реальными тапами
+по клавишам татарской раскладки → длинный тап запятой → эмодзи-панель → back,
+home. Координаты клавиш откалиброваны скриншотом на AVD tt_suggest_a14
+(1080×2280) и хранятся в генераторе как доли экрана; верифицировано, что пять
+тапов коммитят ровно «сәлам», а длинный тап открывает панель.
+
+Три грабли, найденные по дороге (важны для будущих прогонов):
+
+1. **`org.tatarkeyboard.ime/.latin.LatinIME` для `ime enable/set` не работает.**
+   Относительное имя компонента резолвится против *applicationId*, а не
+   source-namespace: настоящий id —
+   `org.tatarkeyboard.ime/rkr.simplekeyboard.inputmethod.latin.LatinIME`
+   (то, что показывает `dumpsys input_method` в `mCurMethodId`). С коротким id
+   команда молча отвечает «Unknown input method», а `executeShellCommand` в
+   uiautomator ошибку не бросает — поэтому генератор теперь верифицирует выбор
+   через `settings get secure default_input_method`.
+2. **Kill в Macrobenchmark — это force-stop, а force-stop выбранного IME
+   сбрасывает `default_input_method`** (проверено эмпирически: после
+   «Force-stopping process» настройка улетает на GBoard). Поэтому `ime set`
+   делается строго ПОСЛЕ `killProcess()`, а не до.
+3. **`compileSdk` внутри `defaultConfig` несовместим с baselineprofile-плагином**
+   (AGP 9.2.1 падает «project ':app' does not specify compileSdk» при его
+   применении). `compileSdk 37` вынесен на уровень `android {}` — на выходной
+   APK не влияет (проверено: дельта релизного APK равна ровно размеру профиля).
+
+Отдельная находка про замеры: `coldstart.sh` требует `adb root` — `kill -9`
+чужого процесса от shell-пользователя на userdebug-образе API 34 отклоняется
+(«Operation not permitted»). В прошлых аудитах root на AVD, видимо, уже был
+включён; в самом скрипте это не отражено.
+
+### Сгенерированный профиль
+
+- `app/src/main/baseline-prof.txt` — 1552 правила (с шапкой-комментарием:
+  генератор, дата, сценарий, команда; `#`-комментарии R8 пережёвывает — сборка
+  и маппинг чистые). `app/src/main/startup-prof.txt` — startup-профиль для
+  DEX layout (AGP 8.3+, у нас включён).
+- Генерация шла против необфусцированного `nonMinifiedRelease`; при сборке
+  релиза R8 переписал правила под обфусцированные имена
+  (`app/build/intermediates/r8_art_profile/release/minifyReleaseWithR8/baseline-prof.txt`,
+  662 правила после свёртки инлайнинга).
+- Покрытие hot-path (по текстовому профилю): `LatinIME.onCreate`/`onCreateInputView`,
+  парсинг раскладки (`KeyboardLayoutSet$Builder.parse*`, `KeySpecParser`),
+  отрисовка (`MainKeyboardView` — 37 правил, `PointerTracker` — 61), подсказки
+  (`SuggestionsController`, пакет `dictionary` — 50, включая `BigramStorage`),
+  эмодзи-панель (`emoji/EmojiPanelView` — 33).
+- В релизном APK: `assets/dexopt/baseline.prof` (883 Б, бинарный, версия 010) и
+  `assets/dexopt/baseline.profm` (169 Б). Проверено `unzip -l` + чтением на
+  устройстве (`profman --create-profile-from` из переписанного R8 текста даёт
+  валидный reference-профиль).
+
+### Когда профиль реально применяется (трейдофф без profileinstaller)
+
+Зафиксировано эмпирически на AVD API 34, и это формулировка для будущих
+читателей:
+
+- **`adb install` профиль НЕ применяет.** После установки `ref/primary.prof`
+  пуст, dexopt идёт с `--compiler-filter=verify` (artd: «Merge skipped because
+  there are no existing profiles»), статус пакета `[status=verify]
+  [reason=install]`. Это и есть цена отказа от profileinstaller на
+  sideload-канале: локальная установка профиль молча игнорирует.
+- Профиль применяется, когда его доставляет в reference-профиль кто-то другой:
+  установка из Google Play (install-time dexopt с профилем) либо
+  profileinstaller при первом запуске. Проверено руками: профиль, положенный в
+  `/data/misc/profiles/ref/org.tatarkeyboard.ime/primary.prof` +
+  `cmd package compile -m speed-profile -f` → статус `[status=speed-profile]`,
+  появляется `base.art` (69 КБ AOT-кода; при verify его нет). ART читает наш
+  профиль корректно — проблема только в доставке при sideload.
+- Профиль оставлен в APK осознанно: для Play-канала и будущих механизмов он
+  работает, стоит 1 299 Б, вреда на sideload не приносит.
+
+### Замеры до/после (холодный старт до первого кадра клавиатуры)
+
+Метод прежний (`docs/archive/bigrams/imperative-heads/evidence/coldstart.sh`,
+поле 22 `/proc/<pid>/stat` → первый FrameCompleted), тот же AVD tt_suggest_a14,
+та же сессия, Google Messages compose; 20 попыток, 15 удачных в обоих прогонах.
+«До» — текущий релиз без профиля (verify). «После» — релиз с профилем,
+скомпилированный speed-profile (состояние, эквивалентное установке из Play).
+Сырые числа: `docs/restructure/evidence/coldstart-4b-before.txt` и
+`coldstart-4b-after.txt`.
+
+| | До (без профиля) | После (speed-profile) | инвариант |
+|---|---:|---:|---:|
+| медиана, мс | 125,0 | 127,3 | < 400 |
+| среднее | 124,4 | 132,8 | |
+| минимум | 104,8 | 100,7 | |
+| худший | 138,7 | 165,2 | |
+
+**Эффект на эмуляторе не измерим**: разброс между попытками того же порядка,
+что и разница медиан; хвост «после» даже тяжелее. База в 126,3 мс (1.9.4) уже
+была далека от инварианта 400 мс, а эмулятор ≠ железо (JIT/AOT-картина на
+x86_64-хосте другая). Профиль оставлен: вреда нет, на железе и при
+Play-установке он работает как задумано.
+
+### Размер APK
+
+| Точка | Размер |
+|---|---|
+| После фазы 4а | 2 110 476 Б |
+| С baseline-профилем | **2 111 775 Б** (+1 299 Б) |
+
+Дельта = baseline.prof (883) + baseline.profm (169) + zip-выравнивание.
+Запас до инварианта 3 МиБ: 35,1 %.
+
+### Гейты
+
+| Гейт | Результат |
+|---|---|
+| `./gradlew test` | **976 / 0 failures / 0 errors** |
+| `./gradlew assembleRelease` | OK, 2 111 775 Б, подписан тем же ключом |
+| `./gradlew lintRelease` | зелёный с baseline |
+| `scripts/check-no-internet.sh` | оба режима (debug + release APK) зелёные |
+| python-тесты (7 файлов) | **181 OK** (1 предсуществующий skip в emoji_pack) |
+
+### Эмуляторный смоук (финальный release APK, tt_suggest_a14)
+
+- клавиатура поднимается в Messages, татарская раскладка с пятым рядом;
+- «Мин» → подсказки «Министры · Минем · Министрлыгы» (кадр совпадает с
+  4a-02-свидетельством);
+- эмодзи-панель открывается (длинный тап запятой): recents, поиск, категории;
+- `logcat -b crash` пуст, FATAL/AndroidRuntime нет.
+
+Свидетельства: `docs/restructure/evidence/4b-01-suggestions-min.png`,
+`4b-02-emoji-panel.png`.
+
+### Найденное по дороге (не регрессия, зафиксировано)
+
+При смоуке подсказки сначала не показывались: connected-тест генератора
+деинсталлирует приложение в конце прогона, и повторный `install -r` оказался
+ЧИСТОЙ установкой — данные (распакованные словари, префы) стёрлись. А на
+чистой установке подсказки **выключены по умолчанию**
+(`PREF_TATAR_SUGGESTIONS`, default `false`, `Settings.java:310`; есть
+одноразовый оффер `PREF_TATAR_SUGGESTIONS_OFFER_SPENT`). После включения префа
+словари распаковались штатно (имена с пинами SHA-256 совпали с аудитом 1.9.4)
+и полоса заработала. Поведение соответствует продуктовому решению (подсказки —
+opt-in), регрессии нет; но стоит помнить: смоук подсказок на свежих данных
+требует включения настройки.
