@@ -13,6 +13,7 @@ namespace `rkr.simplekeyboard.inputmethod`. Ветка работы — `main`.
 | Линт | `./gradlew lintRelease` (baseline `app/lint-baseline.xml`, `abortOnError=true`) |
 | Release APK | `./gradlew assembleRelease` (подпись через `keystore.properties`; без него — unsigned) |
 | Гейт «без INTERNET + backup-whitelist» | `bash scripts/check-no-internet.sh [путь-к-apk]` (по умолчанию debug APK; два уровня: манифест + aapt2) |
+| Релизный автомат (DEV-6) | `bash scripts/release_check.sh [--quick\|--full] [путь-к-apk]` (по умолчанию свежий release APK): гейты + размер + пины ассетов + разрешения + подпись + версия + changelog + дельта к dist/, итог машинным блоком `RESULT\|…` |
 | Генерация baseline-профиля | `./gradlew :app:generateReleaseBaselineProfile` (нужен запущенный эмулятор) |
 
 Гейты обязательны после любой правки кода/ресурсов: JVM + python + lintRelease +
