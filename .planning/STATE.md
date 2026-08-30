@@ -18,6 +18,9 @@ current_phase_name: Производительность и релиз
 
 # State: Tatar Keyboard
 
+> **Устарел 2026-08-30**: GSD-фазы закрыты на v1.0, дальше проект ведётся
+> миссиями `.smgr/`. Содержимое ниже — историческая запись, не обновляется.
+
 ## Current Position
 
 Phase: Milestone --milestone complete
