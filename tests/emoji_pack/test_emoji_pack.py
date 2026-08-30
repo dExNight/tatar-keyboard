@@ -18,7 +18,7 @@ FIXTURES = Path(__file__).resolve().parent / "fixtures"
 PACK_SCRIPT = ROOT / "scripts" / "emoji_pack.py"
 ASSET = ROOT / "app" / "src" / "main" / "assets" / "emoji" / "emoji_set_v1.txt"
 NOTICE = ASSET.parent / "NOTICE.txt"
-DOCS = ROOT / "docs" / "DICTIONARY-E2.md"
+DOCS = ROOT / "docs" / "archive" / "emoji" / "DICTIONARY-E2.md"
 
 # The Unicode input is deliberately not committed; the orchestrator provides it.
 INPUT = Path(os.environ.get("EMOJI_TEST_TXT", "/tmp/emoji-test-15.1.txt"))

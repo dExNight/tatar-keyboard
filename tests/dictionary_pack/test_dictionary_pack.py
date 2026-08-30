@@ -31,12 +31,12 @@ ASSET = (
     / "dictionaries"
     / "tatar_top100k_v1.tdict.zlib"
 )
-PROVENANCE = ROOT / "docs" / "DICTIONARY-D1A.md"
-REVIEW = ROOT / "docs" / "DICTIONARY-D1A-QUERY-REVIEW.tsv"
+PROVENANCE = ROOT / "docs" / "archive" / "dictionary" / "DICTIONARY-D1A.md"
+REVIEW = ROOT / "docs" / "archive" / "dictionary" / "DICTIONARY-D1A-QUERY-REVIEW.tsv"
 NOTICE = ASSET.parent / "NOTICE.txt"
 RUSSIAN_ASSET = ASSET.parent / "russian_top100k_v1.tdict.zlib"
-RUSSIAN_PROVENANCE = ROOT / "docs" / "RUSSIAN-DICTIONARY.md"
-RUSSIAN_REVIEW = ROOT / "docs" / "DICTIONARY-RU-QUERY-REVIEW.tsv"
+RUSSIAN_PROVENANCE = ROOT / "docs" / "archive" / "dictionary" / "RUSSIAN-DICTIONARY.md"
+RUSSIAN_REVIEW = ROOT / "docs" / "archive" / "dictionary" / "DICTIONARY-RU-QUERY-REVIEW.tsv"
 # Обе таблицы пересозданы 2026-08-24 миссией tt-dict-accept: словари пересобраны, и
 # тройка кандидатов на двадцати двух русских и двух татарских префиксах изменилась.
 # Даты разные у разных языков и разные у разных пересборок — поэтому они здесь, а не
