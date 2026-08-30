@@ -1,0 +1,701 @@
+#!/usr/bin/env python3
+"""Единый вход пересборки ассетов: словари → таблицы биграмм → пины → проверка.
+
+Исторический источник багов, который этот скрипт закрывает: пересборка словаря и
+перепаковка таблиц биграмм были двумя независимыми ручными командами, и вторая половина
+дважды забывалась — татарская таблица разошлась со словарём на 78 голов (закрыто в 1.9.4,
+`docs/archive/bigrams/IMPERATIVE-HEADS.md`), русская — на 4 195 (открыто, число записано
+там же и в KDoc `BigramArtifactSpec.RUSSIAN_BIGRAMS_V1`). Здесь это ОДНА команда, и забыть
+вторую половину невозможно:
+
+    python3 scripts/rebuild_assets.py --baseline <каталог с ассетами 1.8.4>
+
+делает по порядку:
+
+  1. пересборку ОБОИХ словарей через существующий entry point
+     `scripts/dict_accept.py pack --write` (состав = ассет 1.8.4 + принятое приёмкой,
+     частоты = Leipzig + разговорные из `docs/archive/dictionary/dict-accept/conv-freq-*`;
+     SHA-256 основы сверяется самим dict_accept, поверх пересобранного не соберётся);
+  2. перепаковку ОБЕИХ таблиц биграмм через `scripts/bigram_asset_pack.py pack` с
+     параметрами последних поставленных упаковок: татарская H = 10 132, K = 4,
+     `--extra-heads scripts/bigram_extra_heads_tat.txt`; русская H = 10 000, K = 4
+     (`docs/archive/bigrams/IMPERATIVE-HEADS.md` и `RUSSIAN-BIGRAMS.md`);
+  3. пересчёт и атомарную запись пинов (размеры и SHA-256 сжатого и сырого, число
+     записей/голов) в `DictionaryStorageContracts.kt` и `BigramStorageContracts.kt`;
+  4. ту же проверку согласованности, что и `--check`.
+
+Входы пересборки, которых в репозитории нет (и быть не должно — лицензии):
+
+  * `--baseline` — каталог с двумя ассетами 1.8.4. Достаются из git:
+      git show 4ca191a7:app/src/main/assets/dictionaries/russian_top100k_v1.tdict.zlib > ...
+      git show 4ca191a7:app/src/main/assets/dictionaries/tatar_top100k_v1.tdict.zlib > ...
+  * `--corpus-dir` (по умолчанию `~/corpora-leipzig`) — Leipzig `*-sentences.txt`:
+    tat_mixed_2015_1M, tat_web_2018_1M, rus_news_2022_1M, rus_news_2019_1M,
+    rus_wikipedia_2021_1M. Нужны только таблицам биграмм; словарям корпус не нужен
+    (разговорные частоты закоммичены в conv-freq-*.tsv ровно для этого).
+
+Режим проверки (ничего не пересобирает, корпуса и baseline не нужны):
+
+    python3 scripts/rebuild_assets.py --check [--allow-known-drift [ФАЙЛ]]
+
+Сверяет каждый ассет с пинами в контрактах (пины ЧИТАЮТСЯ из Kotlin-файлов, а не
+дублируются здесь) и каждую таблицу биграмм — с её словарём: головы обязаны быть
+подмножеством словаря, а расхождение набора голов с сегодняшним топ-H по частоте считается
+числом в обе стороны. Преемники сознательно НЕ проверяются: таблица хранит свои строки
+сама, и преемник вне словаря — задокументированное состояние (`docs/archive/dictionary/
+DICT-WIDEN.md`: 313 русских преемников), а не расхождение.
+
+Известное расхождение голов фиксируется файлом `scripts/known_asset_drift.json` и
+принимается только под `--allow-known-drift`, и только при ТОЧНОМ совпадении чисел:
+расхождение, которое стало больше или меньше известного (в том числе исчезло — запись
+устарела и должна быть убрана), проваливает проверку. Так CI с `--allow-known-drift`
+зелёный на сегодняшнем дереве и красный на любом НОВОМ расхождении.
+
+Коды выхода: 0 — всё согласовано (с учётом разрешённого известного расхождения);
+1 — расхождение; 2 — входы или окружение (нет файлов, упал шаг пересборки, контракт
+не разобрался). Только stdlib; записи атомарны (temp + replace), как у соседних скриптов.
+"""
+
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import os
+import re
+import subprocess
+import sys
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Sequence, TextIO
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "scripts"))
+
+import bigram_asset_pack  # noqa: E402
+import dictionary_coverage as coverage  # noqa: E402
+import dictionary_pack  # noqa: E402
+from bigram_pack import select_heads  # noqa: E402
+
+STORAGE_DIR = Path("app/src/main/java/rkr/simplekeyboard/inputmethod/latin/dictionary/storage")
+DICT_CONTRACT = STORAGE_DIR / "DictionaryStorageContracts.kt"
+BIGRAM_CONTRACT = STORAGE_DIR / "BigramStorageContracts.kt"
+
+DEFAULT_KNOWN_DRIFT = Path("scripts/known_asset_drift.json")
+DEFAULT_CORPUS_DIR = Path.home() / "corpora-leipzig"
+DEFAULT_WORK_DIR = Path("build/rebuild_assets")
+
+
+@dataclass(frozen=True)
+class DictionaryAsset:
+    tag: str  # тег dictionary_coverage: "tat" / "rus"
+    spec: str  # имя константы в DictionaryStorageContracts.kt
+    asset: str  # путь относительно корня репозитория
+
+
+@dataclass(frozen=True)
+class BigramAsset:
+    tag: str
+    spec: str  # имя константы в BigramStorageContracts.kt
+    asset: str
+    dictionary: str  # tag словаря, с которым таблица поставляется
+    heads: int
+    successes_per_head: int
+    extra_heads: str | None  # путь относительно корня, если есть
+    train: tuple[str, ...]  # имена *-sentences.txt в каталоге корпусов
+
+
+DICTIONARIES = (
+    DictionaryAsset(
+        tag="tat",
+        spec="TATAR_TOP100K_V1",
+        asset="app/src/main/assets/dictionaries/tatar_top100k_v1.tdict.zlib",
+    ),
+    DictionaryAsset(
+        tag="rus",
+        spec="RUSSIAN_TOP100K_V1",
+        asset="app/src/main/assets/dictionaries/russian_top100k_v1.tdict.zlib",
+    ),
+)
+
+# Параметры — ровно те, что записаны в отчётах последних упаковок и в KDoc констант:
+# татарская — docs/archive/bigrams/IMPERATIVE-HEADS.md (H = 10 132 выведен из словаря,
+# 13 повелений списком), русская — docs/archive/bigrams/RUSSIAN-BIGRAMS.md плюс
+# BIGRAM-ADJACENCY.md (K: 6 → 4). Меняются только вместе с решением о перевыборе,
+# и тогда же правится этот файл.
+BIGRAMS = (
+    BigramAsset(
+        tag="tat",
+        spec="TATAR_BIGRAMS_V1",
+        asset="app/src/main/assets/bigrams/tatar_bigrams_v1.tatbigr.zlib",
+        dictionary="tat",
+        heads=10_132,
+        successes_per_head=4,
+        extra_heads="scripts/bigram_extra_heads_tat.txt",
+        train=("tat_mixed_2015_1M-sentences.txt", "tat_web_2018_1M-sentences.txt"),
+    ),
+    BigramAsset(
+        tag="rus",
+        spec="RUSSIAN_BIGRAMS_V1",
+        asset="app/src/main/assets/bigrams/russian_bigrams_v1.tatbigr.zlib",
+        dictionary="rus",
+        heads=10_000,
+        successes_per_head=4,
+        extra_heads=None,
+        train=(
+            "rus_news_2022_1M-sentences.txt",
+            "rus_news_2019_1M-sentences.txt",
+            "rus_wikipedia_2021_1M-sentences.txt",
+        ),
+    ),
+)
+
+
+# --- пины: чтение и запись Kotlin-контрактов ------------------------------------------------
+
+
+@dataclass(frozen=True)
+class Pins:
+    """Пять чисел, которыми контракт пинит ассет. count — записей словаря или голов."""
+
+    compressed_size: int
+    compressed_sha256: str
+    raw_size: int
+    raw_sha256: str
+    count: int
+
+
+class ContractError(ValueError):
+    """Контракт не разобрался: структура Kotlin-файла отъехала от ожидаемой."""
+
+
+def _spec_block(text: str, spec: str, kind: str) -> tuple[int, int]:
+    """Позиции [start, end) тела `val <spec> = <kind>(...)` в тексте контракта.
+
+    Блок кончается строкой закрывающей скобки на отступе объявления (8 пробелов) —
+    так записаны все четыре спецификации. Не нашлось ровно одного блока — это не
+    «пустой пин», а сломанное предположение о файле, и правильный ответ — упасть.
+    """
+    matches = list(
+        re.finditer(rf"val {spec} = {kind}\(.*?\n        \)", text, re.DOTALL)
+    )
+    if len(matches) != 1:
+        raise ContractError(f"{spec}: ожидался ровно один блок {kind}, найдено {len(matches)}")
+    return matches[0].start(), matches[0].end()
+
+
+def _read_number(block: str, field: str) -> int:
+    match = re.search(rf"{field} = ([\d_]+),", block)
+    if match is None:
+        raise ContractError(f"поле {field} не найдено в блоке спецификации")
+    return int(match.group(1).replace("_", ""))
+
+
+def _read_sha(block: str, field: str) -> str:
+    match = re.search(rf'{field} =\s*"([0-9a-f]{{64}})"', block)
+    if match is None:
+        raise ContractError(f"поле {field} не найдено в блоке спецификации")
+    return match.group(1)
+
+
+def read_pins(contract_path: Path, spec: str, kind: str, count_field: str) -> Pins:
+    text = contract_path.read_text(encoding="utf-8")
+    start, end = _spec_block(text, spec, kind)
+    block = text[start:end]
+    return Pins(
+        compressed_size=_read_number(block, "expectedCompressedSize"),
+        compressed_sha256=_read_sha(block, "expectedCompressedSha256"),
+        raw_size=_read_number(block, "expectedRawSize"),
+        raw_sha256=_read_sha(block, "expectedRawSha256"),
+        count=_read_number(block, count_field),
+    )
+
+
+def _replace_number(block: str, field: str, value: int) -> str:
+    block, count = re.subn(
+        rf"({field} = )[\d_]+(,)", rf"\g<1>{value:_}\g<2>", block, count=1
+    )
+    if count != 1:
+        raise ContractError(f"поле {field} не заменено в блоке спецификации")
+    return block
+
+
+def _replace_sha(block: str, field: str, value: str) -> str:
+    # Между `=` и строкой хеша в файле перевод строки с отступом; \s* в первой группе
+    # сохраняет как есть — перестраивается только сам литерал.
+    block, count = re.subn(
+        rf'({field} =\s*)"[0-9a-f]{{64}}"(,)', rf'\g<1>"{value}"\g<2>', block, count=1
+    )
+    if count != 1:
+        raise ContractError(f"поле {field} не заменено в блоке спецификации")
+    return block
+
+
+def _atomic_write_text(path: Path, text: str) -> None:
+    temp = path.with_suffix(path.suffix + ".tmp")
+    temp.write_text(text, encoding="utf-8", newline="\n")
+    os.replace(temp, path)
+
+
+def write_pins(
+    contract_path: Path,
+    updates: dict[str, Pins],
+    kind: str,
+    count_field: str,
+) -> None:
+    """Переписывает пины в блоках `updates` одним атомарным проходом.
+
+    После записи файл перечитывается, и каждый блок обязан вернуть ровно те значения,
+    которые писались, — «записал и поверил» здесь не считается записью.
+    """
+    text = contract_path.read_text(encoding="utf-8")
+    for spec, pins in updates.items():
+        start, end = _spec_block(text, spec, kind)
+        block = text[start:end]
+        block = _replace_number(block, "expectedCompressedSize", pins.compressed_size)
+        block = _replace_sha(block, "expectedCompressedSha256", pins.compressed_sha256)
+        block = _replace_number(block, "expectedRawSize", pins.raw_size)
+        block = _replace_sha(block, "expectedRawSha256", pins.raw_sha256)
+        block = _replace_number(block, count_field, pins.count)
+        text = text[:start] + block + text[end:]
+    _atomic_write_text(contract_path, text)
+    for spec, pins in updates.items():
+        if read_pins(contract_path, spec, kind, count_field) != pins:
+            raise ContractError(f"{spec}: после записи пины не совпали с записанными")
+
+
+# --- измерение ассетов ----------------------------------------------------------------------
+
+
+def measure_dictionary(asset_path: Path, tag: str) -> Pins:
+    language = coverage.language_for(tag)
+    asset = asset_path.read_bytes()
+    parsed = dictionary_pack.validate_asset(asset, language=language)
+    raw = parsed.raw
+    return Pins(
+        compressed_size=len(asset),
+        compressed_sha256=hashlib.sha256(asset).hexdigest(),
+        raw_size=len(raw),
+        raw_sha256=hashlib.sha256(raw).hexdigest(),
+        count=parsed.entry_count,
+    )
+
+
+def measure_bigram(asset_path: Path) -> Pins:
+    asset = asset_path.read_bytes()
+    raw = bigram_asset_pack.decompress(asset)
+    parsed = bigram_asset_pack.validate_raw(raw)
+    return Pins(
+        compressed_size=len(asset),
+        compressed_sha256=hashlib.sha256(asset).hexdigest(),
+        raw_size=len(raw),
+        raw_sha256=hashlib.sha256(raw).hexdigest(),
+        count=len(parsed.head_words),
+    )
+
+
+# --- проверка согласованности ---------------------------------------------------------------
+
+@dataclass(frozen=True)
+class Drift:
+    """Расхождение голов таблицы со словарём, числом в обе стороны.
+
+    missing — слова сегодняшнего топа-H (плюс extra-heads), которых в таблице нет.
+    Легитимный остаток — головы без единой пары в обучении: упаковщик их выбрасывает,
+    а `--check` без корпуса отличить их от настоящего расхождения не может, поэтому
+    судьбу ненулевых чисел решает только known_asset_drift.json, записанный человеком.
+    unexpected — головы таблицы вне сегодняшнего топа-H и вне списка extra-heads.
+    outside — головы, которых нет в словаре вообще: это не дрейф, а поломка,
+    и никакой allowlist её не разрешает.
+    """
+
+    missing: int
+    unexpected: int
+    outside: int
+    missing_examples: tuple[str, ...]
+    unexpected_examples: tuple[str, ...]
+    outside_examples: tuple[str, ...]
+
+
+def bigram_drift(
+    table_path: Path,
+    dictionary_path: Path,
+    language: coverage.Language,
+    heads: int,
+    extra_heads: Sequence[str],
+) -> Drift:
+    vocabulary, frequencies = bigram_asset_pack.read_shipped_vocabulary(
+        dictionary_path, language
+    )
+    parsed = bigram_asset_pack.validate_raw(
+        bigram_asset_pack.decompress(table_path.read_bytes())
+    )
+    actual = set(parsed.head_words)
+    expected = set(select_heads(frequencies, heads)) | set(extra_heads)
+    missing = sorted(expected - actual)
+    unexpected = sorted(actual - expected)
+    outside = sorted(actual - vocabulary)
+    return Drift(
+        missing=len(missing),
+        unexpected=len(unexpected),
+        outside=len(outside),
+        missing_examples=tuple(missing[:10]),
+        unexpected_examples=tuple(unexpected[:10]),
+        outside_examples=tuple(outside[:10]),
+    )
+
+
+def _pin_problems(measured: Pins, pinned: Pins) -> list[str]:
+    problems = []
+    for field in ("compressed_size", "compressed_sha256", "raw_size", "raw_sha256", "count"):
+        actual, expected = getattr(measured, field), getattr(pinned, field)
+        if actual != expected:
+            problems.append(f"{field}: в контракте {expected}, в ассете {actual}")
+    return problems
+
+
+def load_known_drift(path: Path) -> dict[str, dict[str, object]]:
+    data = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(data, dict):
+        raise SystemExit(f"{path}: ожидался JSON-объект наверху")
+    for key, entry in data.items():
+        if not isinstance(entry, dict) or not {
+            "missing_top_heads",
+            "unexpected_heads",
+            "reason",
+        } <= set(entry):
+            raise SystemExit(
+                f"{path}: запись {key!r} обязана содержать missing_top_heads, "
+                "unexpected_heads и reason"
+            )
+    return data
+
+
+def run_check(
+    root: Path,
+    known_drift_path: Path | None,
+    stream: TextIO = sys.stdout,
+) -> int:
+    """Сверка ассетов с пинами и словарями. Ничего не пишет и не пересобирает."""
+    dict_contract = root / DICT_CONTRACT
+    bigram_contract = root / BIGRAM_CONTRACT
+    for path in (dict_contract, bigram_contract):
+        if not path.is_file():
+            print(f"error: нет файла контракта {path}", file=sys.stderr)
+            return 2
+
+    known: dict[str, dict[str, object]] = {}
+    if known_drift_path is not None:
+        if not known_drift_path.is_file():
+            print(f"error: нет файла известных расхождений {known_drift_path}", file=sys.stderr)
+            return 2
+        known = load_known_drift(known_drift_path)
+
+    report: dict[str, object] = {"dictionaries": {}, "bigrams": {}}
+    failed = False
+
+    for dictionary in DICTIONARIES:
+        asset_path = root / dictionary.asset
+        entry: dict[str, object] = {"asset": dictionary.asset, "spec": dictionary.spec}
+        if not asset_path.is_file():
+            entry["verdict"] = "missing"
+            failed = True
+        else:
+            pinned = read_pins(
+                dict_contract, dictionary.spec, "DictionaryArtifactSpec", "expectedEntryCount"
+            )
+            try:
+                problems = _pin_problems(
+                    measure_dictionary(asset_path, dictionary.tag), pinned
+                )
+            except Exception as error:  # битый ассет — это вердикт проверки, а не краш
+                problems = [f"ассет не читается: {error}"]
+            entry["verdict"] = "mismatch" if problems else "ok"
+            entry["problems"] = problems
+            failed = failed or bool(problems)
+        report["dictionaries"][dictionary.tag] = entry  # type: ignore[index]
+
+    used_drift_keys: set[str] = set()
+    for bigram in BIGRAMS:
+        asset_path = root / bigram.asset
+        asset_key = str(Path(bigram.asset).relative_to("app/src/main/assets"))
+        entry: dict[str, object] = {"asset": bigram.asset, "spec": bigram.spec}
+        dictionary_path = root / next(
+            d.asset for d in DICTIONARIES if d.tag == bigram.dictionary
+        )
+        known_entry = known.get(asset_key)
+        if known_entry is not None:
+            used_drift_keys.add(asset_key)
+        if not asset_path.is_file() or not dictionary_path.is_file():
+            entry["verdict"] = "missing"
+            failed = True
+        else:
+            pinned = read_pins(
+                bigram_contract, bigram.spec, "BigramArtifactSpec", "expectedHeadCount"
+            )
+            try:
+                problems = _pin_problems(measure_bigram(asset_path), pinned)
+                extra: list[str] = []
+                if bigram.extra_heads is not None:
+                    extra = bigram_asset_pack.read_extra_heads(
+                        root / bigram.extra_heads,
+                        bigram_asset_pack.read_shipped_vocabulary(
+                            dictionary_path, coverage.language_for(bigram.dictionary)
+                        )[0],
+                    )
+                drift = bigram_drift(
+                    asset_path,
+                    dictionary_path,
+                    coverage.language_for(bigram.dictionary),
+                    bigram.heads,
+                    extra,
+                )
+            except Exception as error:  # битый ассет — вердикт проверки, а не краш
+                entry["verdict"] = "mismatch"
+                entry["problems"] = [f"ассет не читается: {error}"]
+                failed = True
+                report["bigrams"][bigram.tag] = entry  # type: ignore[index]
+                continue
+            entry["drift"] = {
+                "missing_top_heads": drift.missing,
+                "unexpected_heads": drift.unexpected,
+                "heads_outside_dictionary": drift.outside,
+                "missing_examples": list(drift.missing_examples),
+                "unexpected_examples": list(drift.unexpected_examples),
+            }
+            if drift.outside:
+                problems.append(
+                    f"{drift.outside} голов вне словаря: "
+                    + ", ".join(drift.outside_examples)
+                )
+            entry["problems"] = problems
+            failed = failed or bool(problems)
+
+            if drift.missing == 0 and drift.unexpected == 0:
+                if known_entry is not None:
+                    entry["verdict"] = "stale-known-drift"
+                    entry["problems"] = problems + [
+                        "расхождения больше нет — запись в known_asset_drift.json "
+                        "устарела, уберите её"
+                    ]
+                    failed = True
+                else:
+                    entry["verdict"] = "ok" if not problems else "mismatch"
+            elif known_entry is not None and known_entry[
+                "missing_top_heads"
+            ] == drift.missing and known_entry["unexpected_heads"] == drift.unexpected:
+                entry["verdict"] = "known-drift"
+                entry["known_drift_reason"] = known_entry["reason"]
+            else:
+                entry["verdict"] = "drift"
+                hint = (
+                    "не совпадает с known_asset_drift.json"
+                    if known_entry is not None
+                    else "нет записи в known_asset_drift.json"
+                    if known_drift_path is not None
+                    else "перезапустите с --allow-known-drift, если расхождение известно"
+                )
+                entry["problems"] = problems + [
+                    f"головы разошлись со словарём: нет в таблице {drift.missing}, "
+                    f"лишних {drift.unexpected} ({hint})"
+                ]
+                failed = True
+        report["bigrams"][bigram.tag] = entry  # type: ignore[index]
+
+    for key in sorted(set(known) - used_drift_keys):
+        # Запись про ассет, которого больше нет в реестре, — тоже устаревшая.
+        print(f"error: {known_drift_path}: запись {key!r} не относится ни к одному ассету",
+              file=sys.stderr)
+        failed = True
+
+    report["ok"] = not failed
+    report["known_drift_file"] = str(known_drift_path) if known_drift_path else None
+    json.dump(report, stream, ensure_ascii=False, indent=2, sort_keys=True)
+    stream.write("\n")
+
+    for section in ("dictionaries", "bigrams"):
+        for tag, entry in sorted(report[section].items()):  # type: ignore[union-attr]
+            line = f"{section}/{tag}: {entry['verdict']}"
+            if entry["verdict"] == "known-drift":
+                drift = entry["drift"]
+                line += (f" (нет в таблице {drift['missing_top_heads']}, "
+                         f"лишних {drift['unexpected_heads']})")
+            print(line, file=sys.stderr)
+    return 1 if failed else 0
+
+
+# --- пересборка -----------------------------------------------------------------------------
+
+
+def bigram_pack_argv(root: Path, corpus_dir: Path, work_dir: Path, bigram: BigramAsset) -> list[str]:
+    """Командная строка перепаковки одной таблицы — отдельной функцией, чтобы тест её видел."""
+    argv = [
+        sys.executable,
+        str(root / "scripts/bigram_asset_pack.py"),
+        "pack",
+        "--train",
+        *[str(corpus_dir / name) for name in bigram.train],
+        "--asset",
+        str(root / next(d.asset for d in DICTIONARIES if d.tag == bigram.dictionary)),
+        "--heads",
+        str(bigram.heads),
+        "--successes-per-head",
+        str(bigram.successes_per_head),
+        "--out-raw",
+        str(work_dir / Path(bigram.asset).name.removesuffix(".zlib")),
+        "--out-compressed",
+        str(root / bigram.asset),
+        "--report",
+        str(work_dir / f"{bigram.tag}-pack.generated.json"),
+        "--language",
+        bigram.tag,
+    ]
+    if bigram.extra_heads is not None:
+        argv += ["--extra-heads", str(root / bigram.extra_heads)]
+    return argv
+
+
+def _run_step(argv: list[str], cwd: Path) -> None:
+    print("+ " + " ".join(argv[1:]), file=sys.stderr)
+    completed = subprocess.run(argv, cwd=cwd, check=False)
+    if completed.returncode != 0:
+        raise SystemExit(f"шаг пересборки упал с кодом {completed.returncode}: {argv[1]}")
+
+
+def run_rebuild(
+    root: Path,
+    baseline: Path,
+    corpus_dir: Path,
+    work_dir: Path,
+    known_drift_path: Path | None,
+    stream: TextIO = sys.stdout,
+) -> int:
+    # Сначала собираются ВСЕ недостающие входы: падать на третьем часу работы из-за
+    # файла, которого не было с самого начала, недопустимо.
+    missing = []
+    for name in ("tatar_top100k_v1.tdict.zlib", "russian_top100k_v1.tdict.zlib"):
+        if not (baseline / name).is_file():
+            missing.append(str(baseline / name))
+    for bigram in BIGRAMS:
+        for name in bigram.train:
+            if not (corpus_dir / name).is_file():
+                missing.append(str(corpus_dir / name))
+        if bigram.extra_heads is not None and not (root / bigram.extra_heads).is_file():
+            missing.append(str(root / bigram.extra_heads))
+    if missing:
+        print("error: не хватает входов пересборки:", file=sys.stderr)
+        for path in missing:
+            print(f"  {path}", file=sys.stderr)
+        print("происхождение входов — в docstring скрипта", file=sys.stderr)
+        return 2
+
+    work_dir.mkdir(parents=True, exist_ok=True)
+
+    # 1. Оба словаря. dict_accept сам сверяет baseline по SHA-256 и падает, если ему
+    # подсунули уже пересобранный ассет.
+    _run_step(
+        [
+            sys.executable,
+            str(root / "scripts/dict_accept.py"),
+            "--json-out",
+            str(work_dir / "dict-accept-pack.json"),
+            "pack",
+            "--baseline",
+            str(baseline),
+            "--write",
+        ],
+        cwd=root,
+    )
+
+    # 2. Обе таблицы биграмм — от свежих словарей шага 1.
+    for bigram in BIGRAMS:
+        _run_step(bigram_pack_argv(root, corpus_dir, work_dir, bigram), cwd=root)
+
+    # 3. Пины всех четырёх ассетов, одной операцией на файл контракта.
+    dict_updates = {
+        d.spec: measure_dictionary(root / d.asset, d.tag) for d in DICTIONARIES
+    }
+    write_pins(
+        root / DICT_CONTRACT, dict_updates, "DictionaryArtifactSpec", "expectedEntryCount"
+    )
+    bigram_updates = {b.spec: measure_bigram(root / b.asset) for b in BIGRAMS}
+    write_pins(
+        root / BIGRAM_CONTRACT, bigram_updates, "BigramArtifactSpec", "expectedHeadCount"
+    )
+    print("пины переписаны в обоих контрактах", file=sys.stderr)
+
+    # 4. Проверка результата той же процедурой, что работает в --check.
+    result = run_check(root, known_drift_path, stream)
+    print(
+        "дальше руками: прогнать гейты (JVM + python + lintRelease + check-no-internet), "
+        "обновить scripts/known_asset_drift.json, если расхождение голов изменилось, "
+        "и пересобрать наборы опечаток (scripts/typo_pack.py, см. DICT-WIDEN «Воспроизведение»)",
+        file=sys.stderr,
+    )
+    return result
+
+
+def create_argument_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument(
+        "--check",
+        action="store_true",
+        help="только проверка согласованности: ничего не пересобирает и не пишет",
+    )
+    parser.add_argument(
+        "--allow-known-drift",
+        nargs="?",
+        const=str(DEFAULT_KNOWN_DRIFT),
+        default=None,
+        metavar="ФАЙЛ",
+        help="принять расхождения голов, ТОЧНО совпадающие с файлом известных "
+        "(по умолчанию %(const)s); другое число или устаревшая запись — провал",
+    )
+    parser.add_argument(
+        "--baseline",
+        type=Path,
+        help="каталог с ассетами 1.8.4 — обязателен для пересборки",
+    )
+    parser.add_argument(
+        "--corpus-dir",
+        type=Path,
+        default=DEFAULT_CORPUS_DIR,
+        help="каталог с Leipzig *-sentences.txt (по умолчанию %(default)s)",
+    )
+    parser.add_argument(
+        "--work-dir",
+        type=Path,
+        default=None,
+        help="куда класть сырые таблицы и отчёты (по умолчанию <root>/build/rebuild_assets)",
+    )
+    parser.add_argument(
+        "--root",
+        type=Path,
+        default=ROOT,
+        help="корень дерева (по умолчанию — репозиторий скрипта; для тестов)",
+    )
+    return parser
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    args = create_argument_parser().parse_args(argv)
+    root = args.root
+    known_drift = (
+        Path(args.allow_known_drift)
+        if args.allow_known_drift is not None
+        else None
+    )
+    if known_drift is not None and not known_drift.is_absolute():
+        known_drift = root / known_drift
+    if args.check:
+        return run_check(root, known_drift)
+    if args.baseline is None:
+        print("error: для пересборки нужен --baseline (или запустите --check)",
+              file=sys.stderr)
+        return 2
+    work_dir = args.work_dir if args.work_dir is not None else root / DEFAULT_WORK_DIR
+    return run_rebuild(root, args.baseline, args.corpus_dir, work_dir, known_drift)
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
