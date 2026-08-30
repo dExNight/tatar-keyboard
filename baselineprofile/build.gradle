@@ -1,0 +1,39 @@
+// Phase 4b: Baseline Profile generator module (dev-only).
+// Runs BaselineProfileRule against :app on a connected device/emulator and produces
+// app/src/main/generated/baselineProfiles/baseline-prof.txt, which is then promoted
+// to app/src/main/baseline-prof.txt (packaged by AGP into assets/dexopt/baseline.prof).
+// Nothing from this module is compiled into or packaged with the app.
+plugins {
+    id 'com.android.test'
+    id 'androidx.baselineprofile'
+}
+
+android {
+    namespace 'org.tatarkeyboard.baselineprofile'
+    compileSdk 37
+    defaultConfig {
+        // minSdk of the *test* APK; generation runs on the API 34 emulator.
+        minSdkVersion 28
+        targetSdkVersion 37
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+    }
+    // Point to the app module, the module that we're generating the Baseline Profile for.
+    targetProjectPath ':app'
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+baselineProfile {
+    // Connected device (booted AVD, API 34 >= 33) instead of a Gradle-managed device:
+    // no system-image download needed, and the measurement AVD stays the same one
+    // used for all previous cold-start runs (tt_suggest_a14).
+    useConnectedDevices = true
+}
+
+dependencies {
+    implementation 'androidx.benchmark:benchmark-macro-junit4:1.4.1'
+    implementation 'androidx.test.uiautomator:uiautomator:2.3.0'
+    implementation 'androidx.test.ext:junit:1.2.1'
+}

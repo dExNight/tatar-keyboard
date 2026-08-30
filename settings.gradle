@@ -1,4 +1,14 @@
+pluginManagement {
+    repositories {
+        gradlePluginPortal()
+        google()
+        mavenCentral()
+    }
+}
 plugins {
     id 'org.gradle.toolchains.foojay-resolver-convention' version '1.0.0'
 }
 include ':app'
+// Phase 4b: dev-only generator module (Macrobenchmark). Never packaged into the APK;
+// the only runtime-visible artifact it produces is app/src/main/baseline-prof.txt.
+include ':baselineprofile'
