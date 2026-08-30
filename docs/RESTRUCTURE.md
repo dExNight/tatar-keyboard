@@ -278,3 +278,80 @@ FileNotFoundError). Скрипты завершённых миссий (`scripts
 - Вынести `tatar-keyboard-release.jks` из корня репозитория за пределы каталога
   проекта (файл не трекнут, но лежит рядом с `.gitignore`д-каталогами — риск
   случайной утечки при ручных операциях с архивами/скриншотами).
+
+## Фаза 3а. Очистка мёртвого кода и ресурсов
+
+Дата: 2026-08-30. Ветка `main`, без push. Каждое логическое удаление — отдельным
+коммитом; гейты (`./gradlew test`, `./gradlew assembleRelease`,
+`scripts/check-no-internet.sh` на свежем release APK) прогонялись перед каждым
+коммитом. Срез локалей (tt/ru/en) — отдельная фаза 3б, здесь не трогался.
+
+### Удалено → доказательство → эффект
+
+| Удалено | Доказательство (повторный grep перед удалением) | Эффект |
+|---|---|---|
+| 6 файлов `values/themes-lxx-*.xml` (30 стилей) | `grep -rn LXX app/src/main` → вне кластера только комментарий в `KeyboardTheme.java:44` и enum-строки в `attrs.xml` | −6 файлов; LXX-стили исчезли из arsc (aapt2: `KeyboardTheme.LXX_*` нет) |
+| 40 lxx-цветов: 24 в `values/colors.xml` + 8 в `values-night/colors.xml` + файлы `values-v31/colors.xml` и `values-night-v31/colors.xml` целиком (содержали только lxx) | grep по каждому из 24 имён по всему `app/src` → ссылки только из themes-lxx и друг от друга | −4 файла-носителя, цвета вымыты из arsc |
+| 10 drawable: `btn_keyboard_*` (8), `keyboard_key_feedback_background`, `keyboard_popup_panel_background` | grep по каждому имени → вне themes-lxx только совпадения в комментариях ios_*-drawable | −10 файлов |
+| `dimen/button_corner_radius_lxx` | grep → ссылки только из удаляемых drawable кластера | — |
+| `drawable/ic_add_circle.xml`, `drawable/ic_delete.xml` | grep → 0 ссылок; R8 их уже выкидывал (фаза 1) | гигиена исходников |
+| string `english_ime_settings` | grep → только определение в `strings-appname.xml` | — |
+| `KotlinInteropCheck.kt` + вызов и импорт в `LatinIME.java` | `log()` целиком за `if (DebugFlags.DEBUG_ENABLED=false)`; класс в `usage.txt` | мёртвый код убран из исходников |
+| `DebugFlags.java` + 5 точек использования (`LatinIME` ×3, `PointerTracker` ×2) | константа `DEBUG_ENABLED=false`: ветка `throw NPE` никогда не выполнялась, debug-логирование мёртво; `PointerTracker.DEBUG_MODE = DEBUG_EVENT` — семантика не изменилась | мёртвый код убран |
+| `PersonalDictionaryReader.kt` → перенесён из main в `app/src/test` (тот же пакет), снят `@Keep` | grep: из main не используется никем, только 4 тестовых файла; `@Keep` удерживал класс в release APK (seeds.txt) | класс исчез из dex (проверено: 0 вхождений в classes.dex и seeds.txt) |
+| `android:fullBackupContent` + `res/xml/backup_rules.xml` | при `allowBackup="false"` Auto Backup не исполняется никогда → legacy-редакция мертва | −1 файл, −1 атрибут манифеста |
+| `proguard-rules.pro`: шаблонные комментарии + `-keep class rkr.simplekeyboard.inputmethod.R` | рефлексии на R нет; проверено полной clean release-сборкой + всеми тестами | файл сокращён до осмысленной шапки |
+
+НЕ тронуто (подтверждено живым): `anim/key_preview_dismiss_lxx.xml`,
+`dimen config_key_preview_*_lxx`, 6 фракций `config_key_*_ratio_lxx` (используются
+темой Tatar — присутствуют в arsc, это ожидаемо), `values/strings-action-keys.xml`,
+enum-строки LXX в `attrs.xml` и константы `THEME_ID_*` (находка h: документация
+занятого диапазона id).
+
+### Отклонения от задания
+
+1. **`data_extraction_rules.xml` СОХРАНЁН** — находка (i) аудита в этой части
+   опровергнута по факту: на API 31+ `allowBackup="false"` закрывает только
+   облачный бэкап, но НЕ device-to-device перенос; D2D закрывает именно секция
+   `<device-transfer>` (задокументировано в самом файле и в E2b-3,
+   `docs/archive/emoji/DICTIONARY-E2.md:235–238`). Удаление silently открыло бы
+   перенос пользовательских словарей на новое устройство. Удалена только
+   legacy-редакция `fullBackupContent`/`backup_rules.xml`.
+2. **Каскад правок**: `scripts/check-no-internet.sh` адаптирован (уровень 2:
+   `allowBackup=false` + наличие dataExtractionRules с whitelist-проверкой обеих
+   секций + отсутствие fullBackupContent считается ошибкой; заодно починен
+   `set -e`/`pipefail`-выход на отсутствующем атрибуте);
+   `BackupWhitelistSourceContractTest` — проверки legacy-редакции заменены на
+   ассерт её отсутствия (−1 тест: 973); KDoc `SettingsHostActivity` обновлён.
+3. **Пункты 4 и 5 задания (KotlinInteropCheck + DebugFlags) — одним коммитом**:
+   удаление DebugFlags зависит от удаления KotlinInteropCheck (его единственный
+   клиент); правки в `LatinIME.java` пересекаются построчно.
+4. **Предсуществующая поломка, найденная гейтом**: 5 JVM-тестов падали ещё до
+   правок фазы 3а — фаза 2 перенесла `docs/DICTIONARY-D1A-QUERY-REVIEW.tsv` в
+   `docs/archive/dictionary/`, но обновила только python-пины. Починено отдельным
+   коммитом `b260da09` (3 файла тестов).
+
+### Замеры
+
+| Метрика | До (базовая линия) | После фазы 3а |
+|---|---|---|
+| Release APK (подписан) | 2 538 949 Б | **2 526 324 Б** (−12 625 Б, −0,50 %) |
+| Файлов в APK | 548 | 537 |
+| JVM-тесты | 974 / 0 failures | 973 / 0 failures (−1 вместе с legacy backup-редакцией) |
+| `lintRelease` | 212 errors / 102 warnings | 212 errors / **36 warnings** |
+
+Lint: errors без изменений (MissingTranslation 155 — уйдут в фазе 3б;
+StringFormatMatches 39, ResourceType 18). Warnings: UnusedResources 70 → **2**;
+новые 2 предупреждения — `DataExtractionRules` (шаблонный совет вернуть
+fullBackupContent; осознанно не применён — см. отклонение 1) и `GradleDependency`
+(customview 1.1.0 → 1.2.0; не связан с правками, решение — фаза 4).
+
+Проверка артефакта: `unzip -l` — 0 совпадений по `lxx|btn_keyboard|backup_rules|
+ic_add_circle|ic_delete|PersonalDictionaryReader`; `aapt2 dump resources` —
+LXX-стилей и lxx-цветов в arsc нет, живые `*_lxx`-ресурсы темы Tatar на месте;
+`PersonalDictionaryReader` отсутствует в classes.dex и seeds.txt.
+
+### ГОТОВО
+
+Все гейты зелёные на каждом шаге, 6 содержательных коммитов + 1 фикс пинов,
+`git status` чист. Наружу не ушло ничего.
