@@ -48,6 +48,15 @@ android {
         }
     }
     namespace 'rkr.simplekeyboard.inputmethod'
+    // DEV-2: reproducible build (F-Droid). The Dependency Info Block (signing-block
+    // id 0x504b4453) is signed by AGP with an ephemeral per-build key, so two builds
+    // of the same tree differed byte-wise inside the APK Signing Block even though
+    // all 244 zip entries and the v2 signature were identical. The block carries
+    // dependency metadata for Play and serves no purpose here — drop it.
+    dependenciesInfo {
+        includeInApk = false
+        includeInBundle = false
+    }
     packagingOptions {
         // Phase 4a: kotlin-stdlib metadata for the compiler's built-ins; unused at runtime
         // (no kotlin-reflect in the app), ~42 KB inside the APK otherwise.
