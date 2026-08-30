@@ -16,7 +16,6 @@
 
 package rkr.simplekeyboard.inputmethod.latin.dictionary.personal
 
-import androidx.annotation.Keep
 import java.io.File
 
 /**
@@ -27,8 +26,10 @@ import java.io.File
  * unexpected error all yield [PersonalDictionary.EMPTY] rather than an exception escaping to the
  * caller. Nothing is logged and no error path carries the user's word or the file path — the
  * corrupt file is simply treated as an empty personal dictionary, and its removal is E4a-2.
+ *
+ * Lives in the test sourceset: production code never reads a `.tpers` back (writing and in-memory
+ * use go through the personal store), only the personal-dictionary tests do.
  */
-@Keep
 class PersonalDictionaryReader(private val validator: TpersValidator = TpersValidator()) {
     /**
      * Reads the personal dictionary for [subtypeId] from [file], or [PersonalDictionary.EMPTY] on
