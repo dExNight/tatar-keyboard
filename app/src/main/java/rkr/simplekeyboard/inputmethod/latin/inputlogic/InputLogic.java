@@ -577,9 +577,24 @@ public final class InputLogic {
                         && TatarWordUtils.needsAutoSpace(mConnection.getCachedTextAfterCursor())
                         ? replacement + AUTO_SPACE : replacement;
         mConnection.beginBatchEdit();
-        mConnection.deleteTextBeforeCursor(expectedPrefix.length());
-        mConnection.commitText(textToCommit, 1);
+        // beginBatchEdit() is what refreshes the connection from the framework, so this is the
+        // earliest the question can be asked. "No connection" means the editor went away between
+        // the band being painted and the tap. The edit below would still RUN in that state —
+        // RichInputConnection updates its own text cache before it checks the connection — and this
+        // method would then return true over an edit that reached no editor at all: the caller
+        // unbinds the candidates and clears the band for text that does not exist, and every later
+        // decision taken from the cache (the trailing word, the letter after the cursor, the suffix
+        // an undo matches) is taken from fiction. Nothing is touched instead, and false is the
+        // truth. The batch is still closed on this path, exactly once, like on the other one.
+        final boolean connected = mConnection.isConnected();
+        if (connected) {
+            mConnection.deleteTextBeforeCursor(expectedPrefix.length());
+            mConnection.commitText(textToCommit, 1);
+        }
         mConnection.endBatchEdit();
+        if (!connected) {
+            return false;
+        }
         // A space this code inserted must not arm the double-space-to-period gesture: the next
         // real space press has to behave like a first one, exactly as it does after a typed
         // letter. Leaving mLastSpaceDownTime armed would turn "сүзләр " + space into "сүзләр. "
@@ -628,6 +643,79 @@ public final class InputLogic {
         mConnection.deleteTextBeforeCursor(inserted.length());
         mConnection.commitText(typedForm + separator, 1);
         mConnection.endBatchEdit();
+        mJustDoubleSpaced = false;
+        mLastSpaceDownTime = 0;
+        return true;
+    }
+
+    /**
+     * Commits a predicted next word (E5d): the THIRD insertion path of the frozen text contract, and
+     * a SEPARATE method rather than a branch inside {@link #replaceTrailingWord} — NEXT_WORD deletes
+     * NOTHING (PROPOSALS.md, "Контракт текста" amendment, 2026-08-17, "Отдельный путь коммита"),
+     * while every path through {@link #replaceTrailingWord} always deletes {@code expectedPrefix}
+     * first; a shared method conditioned on "delete or not" would be one method doing two different
+     * jobs behind one signature, exactly the shape the frozen contract's "one commit path per kind of
+     * result" rule exists to prevent.
+     *
+     * <p>Re-checks, all against the LIVE cache: collapsed selection, no letter right after the cursor
+     * (the same two checks {@link #replaceTrailingWord} makes), an EMPTY trailing word (NEXT_WORD is
+     * only ever requested when the prefix is empty, so a non-empty one here means the user typed
+     * something after the request was built, and the tap is stale), and the live context word —
+     * re-extracted by the exact algorithm that built the request — matching {@code
+     * expectedContextWord}. Deletes zero characters; inserts {@code suggestion} with the same
+     * auto-space rule an accepted suggestion uses.
+     *
+     * @param expectedContextWord the context word the prediction was computed for.
+     * @param suggestion the predicted word to insert.
+     * @return {@code true} if the word was committed, {@code false} otherwise (no edit).
+     */
+    public boolean commitPredictedWord(final String expectedContextWord, final String suggestion) {
+        if (TextUtils.isEmpty(expectedContextWord) || TextUtils.isEmpty(suggestion)) {
+            return false;
+        }
+        if (mConnection.hasSelection()) {
+            return false;
+        }
+        if (TatarWordUtils.startsWithWordCharacter(mConnection.getCachedTextAfterCursor())) {
+            // Same list as replaceTrailingWord: the contract adds checks to it, it removes none.
+            return false;
+        }
+        if (!TatarWordUtils.extractTrailingWord(mConnection.getCachedTextBeforeCursor()).isEmpty()) {
+            // The prefix is no longer empty: the user typed something after the request was built,
+            // and NEXT_WORD only ever applies to an empty prefix. Stale tap; do not edit.
+            return false;
+        }
+        final String liveContext =
+                TatarWordUtils.extractNextWordContext(mConnection.getCachedTextBeforeCursor());
+        if (!expectedContextWord.equals(liveContext)) {
+            // Stale tap: the context word no longer matches. Do not edit.
+            return false;
+        }
+        // The space rides along inside the SAME commitText, exactly like the other two paths.
+        final String textToCommit =
+                TatarWordUtils.needsAutoSpace(mConnection.getCachedTextAfterCursor())
+                        ? suggestion + AUTO_SPACE : suggestion;
+        mConnection.beginBatchEdit();
+        // beginBatchEdit() is what refreshes the connection from the framework, so this is the
+        // earliest the question can be asked. "No connection" means the editor went away between
+        // the band being painted and the tap. The edit below would still RUN in that state —
+        // RichInputConnection updates its own text cache before it checks the connection — and this
+        // method would then return true over an edit that reached no editor at all: the caller
+        // unbinds the candidates and clears the band for text that does not exist, and every later
+        // decision taken from the cache (the trailing word, the letter after the cursor, the suffix
+        // an undo matches) is taken from fiction. Nothing is touched instead, and false is the
+        // truth. The batch is still closed on this path, exactly once, like on the other one.
+        final boolean connected = mConnection.isConnected();
+        if (connected) {
+            mConnection.commitText(textToCommit, 1);
+        }
+        mConnection.endBatchEdit();
+        if (!connected) {
+            return false;
+        }
+        // Same reasoning as replaceTrailingWord: a space this code inserted must not arm the
+        // double-space-to-period gesture, and a pending revert no longer describes the text before
+        // the cursor after this edit.
         mJustDoubleSpaced = false;
         mLastSpaceDownTime = 0;
         return true;

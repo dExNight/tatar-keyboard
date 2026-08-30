@@ -62,20 +62,20 @@
     <string name="pref_enable_ime_switch_summary">Тел төймәсе башка төймәсар кушымталарына да күчерә</string>
     <string name="show_number_row">Аерым саннар рәтен күрсәтү</string>
     <string name="show_emoji_key">Эмодзи төймәсен күрсәтү</string>
-    <string name="show_emoji_key_summary">Буш урын янындагы эмодзи панелен ачучы төймә</string>
+    <string name="show_emoji_key_summary">Эмодзи панелен ача: буш урын янындагы аерым төймә белән яки тел алмаштыру төймәсе күрсәтелгәндә өтергә озак басу белән</string>
     <string name="space_swipe">Буш урын белән курсорны күчерү</string>
     <string name="space_swipe_summary">Курсорны күчерү өчен бармагыгызны буш урын төймәсе буйлап шудырыгыз</string>
     <string name="delete_swipe">Шудырып бетерү</string>
     <string name="delete_swipe_summary">Күбрәк текст бетерү өчен бармагыгызны бетерү төймәсе буйлап шудырыгыз</string>
-    <string name="tatar_suggestions">Татарча сүз тәкъдимнәре</string>
-    <string name="tatar_suggestions_summary">Язган вакытта төймәсар өстендә татарча сүз тәкъдимнәрен күрсәтү</string>
-    <string name="tatar_suggestions_offer_title">Татарча тәкъдимнәрне кабызыргамы?</string>
-    <string name="tatar_suggestions_offer_message">Язган вакытта төймәсар өстендә татарча сүз тәкъдимнәре күренә ала. Сүзлек сезнең җиһазыгызда саклана, интернет кулланылмый.</string>
+    <string name="tatar_suggestions">Сүз тәкъдимнәре</string>
+    <string name="tatar_suggestions_summary">Язган вакытта төймәсар өстендә тәкъдим ителгән һәм фаразланган сүзләрне күрсәтү — татарча һәм русча</string>
+    <string name="tatar_suggestions_offer_title">Сүз тәкъдимнәрен кабызыргамы?</string>
+    <string name="tatar_suggestions_offer_message">Язган вакытта төймәсар өстендә тәкъдим ителгән һәм фаразланган татарча һәм русча сүзләр күренә ала. Сүзлекләр сезнең җиһазыгызда саклана, интернет кулланылмый.</string>
     <string name="tatar_suggestions_offer_enable">Кабызу</string>
     <string name="tatar_suggestions_offer_dismiss">Хәзер түгел</string>
-    <string name="tatar_suggestions_unavailable">Татарча тәкъдимнәрне хәзер кабызып булмады. Соңрак кабат карап карагыз.</string>
-    <string name="tatar_autocorrect">Татарча сүзләрне төзәтү</string>
-    <string name="tatar_autocorrect_summary">Буш урын яки тыныш билгесе язгач, хаталы татарча сүзне төзәтә. Язганыгызны кире кайтару өчен шундук бетерү төймәсенә басыгыз.</string>
+    <string name="tatar_suggestions_unavailable">Сүз тәкъдимнәрен хәзер кабызып булмады. Соңрак кабат карап карагыз.</string>
+    <string name="tatar_autocorrect">Сүзләрне төзәтү</string>
+    <string name="tatar_autocorrect_summary">Буш урын яки тыныш билгесе язгач, хаталы сүзне төзәтә. Язганыгызны кире кайтару өчен шундук бетерү төймәсенә басыгыз.</string>
     <string name="personal_dictionary">Шәхси сүзлек</string>
     <string name="personal_dictionary_summary">Сез язган сүзләрне исендә калдырып, соңыннан тәкъдим итә. Алар бары тик шушы җиһазда саклана. Сүндерү тупланганны бетерми — аларны «Шәхси сүзлек» экранында бетерергә мөмкин.</string>
     <string name="personal_dictionary_screen">Сакланган сүзләр</string>
@@ -92,6 +92,23 @@
     <string name="personal_dictionary_empty">Әлегә бернәрсә дә сакланмаган. Шәхси сүзлек кабызылгач, сез язган сүзләр монда күренә башлар.</string>
     <string name="personal_dictionary_no_matches">Бернәрсә дә табылмады.</string>
     <string name="personal_dictionary_shown_of_total">%2$d сүзнең %1$d се күрсәтелә. Исемлекне кыскарту өчен эзләүдән файдаланыгыз.</string>
+    <string name="personal_dictionary_save_failed">Сүзне сакларга булмады. Кабат карап карагыз.</string>
+    <string name="personal_dictionary_delete_failed">Сүзне бетерергә булмады. Ул сүзлектә калды.</string>
+    <string name="personal_dictionary_erase_failed">Барысын да бетерергә булмады. Сакланган сүзләрнең бер өлеше җиһазда калды.</string>
+    <string name="personal_dictionary_unreadable">Сакланган сүзләрне укырга булмады, шуңа күрә исемлек буш. Аларның күчермәсе сакланды \u2014 укыла торганнарын кире кайтару өчен «Сакланган сүзләр» экранын ачыгыз.</string>
+    <string name="personal_dictionary_quarantine_title">Укып булмаган сүзләр</string>
+    <plurals name="personal_dictionary_quarantine_partial">
+        <item quantity="other">%1$d сүзне кире кайтарып була. Күчермәнең калган өлеше зыян күргән, аны торгызып булмый.</item>
+    </plurals>
+    <plurals name="personal_dictionary_quarantine_whole">
+        <item quantity="other">%1$d сүзне кире кайтарып була.</item>
+    </plurals>
+    <string name="personal_dictionary_quarantine_none">Бер сүзне дә кире кайтарып булмый. Күчермә һаман шушы җиһазда саклана.</string>
+    <string name="personal_dictionary_quarantine_restore">Сүзләрне кире кайтару</string>
+    <string name="personal_dictionary_quarantine_discard">Күчермәне бетерү</string>
+    <string name="personal_dictionary_quarantine_discard_confirm">Укып булмаган сүзләрнең күчермәсен бетерергәме? Моны кире кайтарып булмый.</string>
+    <string name="personal_dictionary_quarantine_restore_failed">Сүзләрне кире кайтарып булмады. Алар бары тик күчермәдә калды.</string>
+    <string name="personal_dictionary_quarantine_discard_failed">Күчермәне бетереп булмады. Ул шушы җиһазда калды.</string>
     <string name="clear_recent_emoji">Соңгы эмодзиләрне чистарту</string>
     <string name="clear_recent_emoji_confirm">Бу җиһазда сакланган барлык соңгы эмодзиләрне бетерергәме? Бу гамәлне кире кайтарып булмый.</string>
     <string name="clear_recent_emoji_action">Чистарту</string>
@@ -104,4 +121,18 @@
     <string name="change_keyboard">Төймәсарны алыштыру</string>
     <string name="privacy_policy">Хосусыйлык сәясәте</string>
     <string name="license">Лицензия</string>
+    <string name="personal_dictionary_not_saved">Бу сүз җыелма сүзлектән. Клавиатура сездән отып алган сүзләрне генә онытырга мөмкин.</string>
+    <string name="emoji_unavailable">Эмодзи хәзер юк. Клавиатураны яңадан җибәрү ярдәм итәргә мөмкин.</string>
+    <string name="no_app_for_link">Бу җиһазда сылтамаларны ача торган кушымта юк.</string>
+    <string name="personal_dictionary_empty_ready">Әлегә бернәрсә дә сакланмаган. Сез язган сүзләр монда күренә башлар.</string>
+    <string name="personal_dictionary_off_nothing_to_forget">Сүзләрне саклау сүндерелгән, онытыр нәрсә юк. Язган сүзләрегез исендә калсын өчен клавиатура көйләүләрендә «Шәхси сүзлек»не кабызыгыз.</string>
+    <!-- Title of the settings row and screen that lists where the keyboard's language data comes from. -->
+    <string name="settings_screen_data_sources">Мәгълүмат чыганаклары</string>
+    <!-- Opening line of the Data sources screen. -->
+    <string name="data_sources_intro">Клавиатура интернетсыз эшли һәм беркая да бернәрсә җибәрми. Сүзлекләр һәм киләсе сүз тәкъдимнәре ачык текст җыелмаларыннан төзелгән. Менә ул җыелмалар.</string>
+    <!-- Section header above the sources whose data is inside this version of the app. -->
+    <string name="data_sources_in_app">Бу версиядә</string>
+    <string name="data_sources_leipzig_summary">Ике сүзлекнең күп өлеше һәм барлык тәкъдим таблицалары. CC BY 4.0.</string>
+    <string name="data_sources_tatoeba_summary">Ике сүзлектәге сөйләм сүзләре: мисал җөмләләрдән ешлык. CC BY 2.0 FR.</string>
+    <string name="data_sources_opensubtitles_summary">Ике сүзлектәге сөйләм сүзләре: фильм субтитрларыннан ешлык.</string>
 </resources>

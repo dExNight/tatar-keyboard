@@ -1,0 +1,23 @@
+# ОТКЛОНЕНО машинной приёмкой. Миссия tt-dict-widen, отчёт — docs/DICT-WIDEN.md.
+# Ручной вычитки не было и не будет: оператор 2026-08-24 заменил её машинным правилом, а
+# затем, посмотрев сто случайных отклонённых, снял и планку второго источника.
+#
+# ПРАВИЛО 1.9.1: принимается ВСЁ, кроме формальных обрывков и слов, исключённых оператором.
+#   fragment         — формальный обрывок: без единой гласной (аеиоуыэюяёүәө); порога длины у татарского нет — по длине там режутся живые слова
+#   operator-excluded — оператор назвал слово поимённо: можна
+# Прежняя планка 1.9.0 больше не решает судьбу слова, но считается и записана меткой, чтобы
+# происхождение строки было видно файлом:
+#   two-corpora      — встречается и в OpenSubtitles, и в Tatoeba
+#   shipped-word     — уже стоит в поставляемом словаре (в очереди таких нет по построению)
+#   shipped-paradigm — русский: основа стоит в поставляемом словаре ещё в >= 3 формах
+#   operator-widened — прежняя планка отклоняла (single-source или cap_ratio >= 0.50),
+#                      принято решением оператора; прежняя причина стоит в rule_detail
+#
+# Колонки — те же, что в очереди, плюс rule и rule_detail. Отклонённые НЕ удалены: изменить
+# правило и перезапустить `python3 scripts/dict_accept.py select` — одна команда.
+word	heldout_hits	train_freq	train_freq_clean	sources	license_status	cap_ratio	enters_top100k	rule	rule_detail
+хмм	1	10	0	OpenSubtitles	risk-accepted:no-grant	0.00	no	fragment	ни одной гласной; прежнее правило: single-source
+һмм	0	4	0	OpenSubtitles	risk-accepted:no-grant	0.00	no	fragment	ни одной гласной; прежнее правило: single-source
+псс	0	3	0	OpenSubtitles	risk-accepted:no-grant	0.00	no	fragment	ни одной гласной; прежнее правило: single-source
+рнк	0	3	0	OpenSubtitles	risk-accepted:no-grant	1.00	no	fragment	ни одной гласной; прежнее правило: proper-noun-evidence
+тмб	0	3	0	OpenSubtitles	risk-accepted:no-grant	1.00	no	fragment	ни одной гласной; прежнее правило: proper-noun-evidence

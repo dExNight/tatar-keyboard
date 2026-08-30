@@ -35,6 +35,12 @@
         <attr name="popupPanelBackgroundColor" format="color" />
         <attr name="keyPressedBackgroundColor" format="color" />
         <attr name="keyNormalBackgroundColor" format="color" />
+        <!-- Emoji panel: the sheet behind the grid. This is the keyboard background, not a key
+             colour, so the panel reads as the same surface the keys sit on. -->
+        <attr name="emojiPanelBackgroundColor" format="color" />
+        <!-- Emoji panel: fill of the two functional keys ("АБВ" and delete) on the bottom bar,
+             matching the functional keys of the letter keyboard. -->
+        <attr name="emojiPanelFunctionalKeyColor" format="color" />
     </declare-styleable>
 
     <declare-styleable name="KeyboardView">
@@ -74,6 +80,9 @@
         <attr name="keyHysteresisDistance" format="dimension" />
         <!-- Key detection hysteresis distance for shift/symbols sliding input. -->
         <attr name="keyHysteresisDistanceForSlidingModifier" format="dimension" />
+        <!-- How far a pointer that went down on a modifier key (shift, ?123) must travel from its
+             touch-down point before it is allowed to leave that key. -->
+        <attr name="slidingModifierSlop" format="dimension" />
         <!-- Touch noise threshold time in millisecond -->
         <attr name="touchNoiseThresholdTime" format="integer" />
         <!-- Touch noise threshold distance in millimeter -->

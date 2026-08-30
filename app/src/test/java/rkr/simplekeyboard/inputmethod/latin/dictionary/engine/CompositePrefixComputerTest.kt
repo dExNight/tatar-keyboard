@@ -182,4 +182,83 @@ class CompositePrefixComputerTest {
         )
         assertTrue(result.size <= CompositePrefixComputer.CELL_COUNT)
     }
+
+    // --- E5c: NEXT_WORD side, two-stage readiness ------------------------------------------------
+
+    @Test
+    fun predictReturnsEmptyBeforeABigramSourceIsAttached() {
+        val computer = CompositePrefixComputer(FakePrimary(emptyList(), 0), PersonalCandidateSource.EMPTY)
+
+        assertTrue(computer.predict(prefix("өй")).isEmpty())
+    }
+
+    @Test
+    fun predictDelegatesToTheAttachedBigramSourceAfterAttachment() {
+        val computer = CompositePrefixComputer(FakePrimary(emptyList(), 0), PersonalCandidateSource.EMPTY)
+        var receivedContext: String? = null
+        computer.attachBigramSource(
+            NextWordComputer { context ->
+                receivedContext = context.decodeUtf8()
+                listOf("йорт", "бакча")
+            },
+        )
+
+        val result = computer.predict(prefix("өй"))
+
+        assertEquals(listOf("йорт", "бакча"), result)
+        assertEquals("өй", receivedContext)
+    }
+
+    @Test
+    fun predictNeverTouchesThePrimaryOrPersonalSources() {
+        // E5 has no personal bigrams and no fuzzy pass for NEXT_WORD (PROPOSALS.md, "E5c. Один
+        // вычислитель, один токен") — predict must be a pure pass-through to the bigram source.
+        var primaryCalls = 0
+        val primary = object : ClassifiedPrefixComputer {
+            override val lastExactCount: Int = 0
+            override fun lookup(normalizedPrefixUtf8: ImmutableUtf8Prefix): List<String> {
+                primaryCalls++
+                return emptyList()
+            }
+        }
+        var personalCalls = 0
+        val personal = object : PersonalCandidateSource {
+            override fun candidatesFor(normalizedPrefix: String): List<PersonalCandidate> {
+                personalCalls++
+                return emptyList()
+            }
+
+            override fun isEmpty(): Boolean = false
+        }
+        val computer = CompositePrefixComputer(primary, personal)
+        computer.attachBigramSource(NextWordComputer { listOf("йорт") })
+
+        computer.predict(prefix("өй"))
+
+        assertEquals(0, primaryCalls)
+        assertEquals(0, personalCalls)
+    }
+
+    @Test
+    fun predictionsIgnorePersonalDictionaryEntirely() {
+        // E5d, "Контракт текста" amendment, пункт 3: "Личных биграмм в E5 нет ... таблица биграмм
+        // не знает о личном словаре". The call-count proof above (E5c) shows predict() never even
+        // reaches the personal source; this is the same property demonstrated by RESULT instead —
+        // a personal candidate that would plausibly interfere (the same word the bigram source
+        // returns, or a word for the same head) never appears in or reorders the prediction list.
+        val personalWithAMatchingWord = object : PersonalCandidateSource {
+            override fun candidatesFor(normalizedPrefix: String): List<PersonalCandidate> =
+                listOf(PersonalCandidate("йорт", "йорт"))
+
+            override fun isEmpty(): Boolean = false
+        }
+        val computer = CompositePrefixComputer(FakePrimary(emptyList(), 0), personalWithAMatchingWord)
+        computer.attachBigramSource(NextWordComputer { listOf("бакча", "капка") })
+
+        val result = computer.predict(prefix("өй"))
+
+        // Exactly the bigram source's own list, in its own order — the personal word never joins,
+        // precedes, or reorders it.
+        assertEquals(listOf("бакча", "капка"), result)
+    }
 }

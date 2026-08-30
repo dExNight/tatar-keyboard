@@ -49,7 +49,7 @@ import rkr.simplekeyboard.inputmethod.latin.dictionary.personal.PersonalCandidat
 internal class CompositePrefixComputer(
     private val primary: ClassifiedPrefixComputer,
     private val personal: PersonalCandidateSource,
-) : PrefixComputer, KeyNeighborSink {
+) : PrefixComputer, KeyNeighborSink, NextWordComputer {
 
     /**
      * The D3 verdict as it leaves the engine: the primary's, minus every word the user has saved
@@ -64,6 +64,34 @@ internal class CompositePrefixComputer(
     fun clearAutocorrectAdvice() {
         lastAutocorrectAdvice = null
     }
+
+    /**
+     * E5c two-stage readiness (PROPOSALS.md, "E5c. Готовность вычислителя двухступенчатая"): the
+     * bigram table is not open yet when this computer is constructed and handed to
+     * [LatestOnlyPrefixEngine] — publishing the engine must not wait for it. [attachBigramSource]
+     * lets a LATER, independent background step wire it in without ever constructing a second
+     * request, token, executor, or computer. Written from whatever thread finishes that later
+     * preparation, read from the engine's single serialized worker thread inside [predict] — the
+     * same cross-thread handoff shape as [lastAutocorrectAdvice], `@Volatile` in the other
+     * direction.
+     */
+    @Volatile
+    private var bigramSource: NextWordComputer? = null
+
+    fun attachBigramSource(source: NextWordComputer) {
+        bigramSource = source
+    }
+
+    /**
+     * NEXT_WORD read side. There is no personal-dictionary or E3 fuzzy involvement here — E5 has
+     * no personal bigrams (PROPOSALS.md, "E5c. Один вычислитель, один токен") — so this is a
+     * direct pass-through to whatever bigram source is currently attached, or an empty list before
+     * attachment / after a corrupted or missing table failed to open. Either way this is the exact
+     * "0 predictions, no effect on prefix suggestions or ordinary input" shape the contract
+     * requires for a bigram table that is absent or fails validation.
+     */
+    override fun predict(normalizedContextWordUtf8: ImmutableUtf8Prefix): List<String> =
+        bigramSource?.predict(normalizedContextWordUtf8) ?: emptyList()
 
     override fun updateKeyNeighbors(table: KeyNeighborTable?) {
         (primary as? KeyNeighborSink)?.updateKeyNeighbors(table)

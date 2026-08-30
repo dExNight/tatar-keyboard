@@ -87,7 +87,7 @@ class PersonalLearningGatesTest {
             .substringBefore("// The key-neighbor table")
         assertTrue("eligibility — which already carries the field, the subtype, " +
             "IME_FLAG_NO_PERSONALIZED_LEARNING and the null-editorInfo case",
-            predicate.contains("isTatarSuggestionsEligible()"))
+            predicate.contains("isSuggestionsEligible()"))
         assertTrue("the personal dictionary setting",
             predicate.contains("Settings.readPersonalDictionaryEnabled(mDevicePrefs)"))
         assertTrue("the device has been unlocked at least once",
@@ -105,7 +105,7 @@ class PersonalLearningGatesTest {
 
     @Test
     fun eligibilityItselfCarriesTheNoPersonalizedLearningFlagAndTheNullEditorInfoCase() {
-        val eligibility = ime.substringAfter("private boolean isTatarSuggestionsEligible(final boolean")
+        val eligibility = ime.substringAfter("private boolean isSuggestionsEligible(final boolean")
             .substringBefore("}")
         assertTrue(eligibility.contains("!settingsValues.mInputAttributes.mNoPersonalizedLearning"))
         // With editorInfo == null the input class is not TYPE_CLASS_TEXT, so mShouldShowSuggestions

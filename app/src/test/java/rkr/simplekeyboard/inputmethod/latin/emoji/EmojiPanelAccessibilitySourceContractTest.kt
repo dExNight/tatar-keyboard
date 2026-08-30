@@ -73,12 +73,18 @@ class EmojiPanelAccessibilitySourceContractTest {
         val body = panel.substringAfter("override fun getVisibleVirtualViews(")
             .substringBefore("override fun onPopulateNodeForHost(")
         // Built from the SAME hit-test geometry the grid draws with, not a second geometry.
-        assertTrue(body.contains("state.firstVisibleRow()"))
-        assertTrue(body.contains("state.lastVisibleRow()"))
+        // While the skin-tone popup is up the tree is exactly its variants and nothing else.
+        assertTrue(body.contains("state.isPopupOpen()"))
+        assertTrue(body.contains("virtualViewIds.add(POPUP_ID_BASE + variant)"))
+        assertTrue(body.contains("state.firstVisibleSection()"))
+        assertTrue(body.contains("state.lastVisibleSection()"))
+        assertTrue(body.contains("state.firstVisibleRowOf(section)"))
+        assertTrue(body.contains("state.lastVisibleRowOf(section)"))
         assertTrue(body.contains("state.columnCount()"))
-        assertTrue(body.contains("state.entryCount()"))
+        assertTrue(body.contains("state.sectionEntryCount(section)"))
         assertTrue(body.contains("state.tabCount()"))
-        // The two functional keys are always present.
+        // The search pill and the two functional keys are always present.
+        assertTrue(body.contains("virtualViewIds.add(SEARCH_ID)"))
         assertTrue(body.contains("virtualViewIds.add(BACK_ID)"))
         assertTrue(body.contains("virtualViewIds.add(DELETE_ID)"))
         // getVirtualViewAt reuses the pure hit-test, no second geometry.
@@ -98,7 +104,7 @@ class EmojiPanelAccessibilitySourceContractTest {
     @Test
     fun tabsAndTwoFunctionalKeysGetLocalizedDescriptions() {
         // Tabs -> localized category names; the two functional keys reuse existing localized keys.
-        assertTrue(panel.contains("categoryContentDescription("))
+        assertTrue(panel.contains("categoryTitle("))
         assertTrue(panel.contains("R.string.spoken_emoji_category_recent"))
         assertTrue(panel.contains("R.string.spoken_emoji_category_smileys"))
         assertTrue(panel.contains("R.string.spoken_description_to_alpha"))

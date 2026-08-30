@@ -1,0 +1,25 @@
+# Freely selected everyday Russian prefixes for the automated project self-review of the
+# Russian top-100k asset. Chosen before the dictionary was built, from ordinary messaging
+# vocabulary (greetings, time, family, work, city life) rather than from the corpus itself.
+прив
+здрав
+спас
+пожал
+сегод
+завтр
+котор
+работ
+город
+дом
+чело
+дет
+мам
+пап
+друг
+хоро
+плох
+дела
+врем
+дене
+можн
+нужн

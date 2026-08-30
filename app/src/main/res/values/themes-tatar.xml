@@ -30,6 +30,8 @@
         <item name="popupPanelBackgroundColor">@color/ios_keyboard_background_secondary</item>
         <item name="keyPressedBackgroundColor">@color/ios_key_normal_pressed</item>
         <item name="keyNormalBackgroundColor">@color/ios_key_normal</item>
+        <item name="emojiPanelBackgroundColor">@color/ios_keyboard_background</item>
+        <item name="emojiPanelFunctionalKeyColor">@color/ios_key_functional</item>
     </style>
     <style
         name="Keyboard.Tatar"

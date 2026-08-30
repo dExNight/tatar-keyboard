@@ -64,7 +64,13 @@ internal object DictionaryTestFixtures {
         expectedRawSize: Long = raw.size.toLong(),
         maxCompressedSize: Long = 700_000,
         maxRawSize: Long = 2_936_012,
+        family: String = "tatar_top100k",
+        languageTag: String = "tt_RU",
+        storageDirectoryName: String = "dictionaries",
     ) = DictionaryArtifactSpec(
+        family = family,
+        languageTag = languageTag,
+        storageDirectoryName = storageDirectoryName,
         generation = generation,
         assetPath = "fixture-$generation.zlib",
         expectedCompressedSize = minOf(compressed.size.toLong(), maxCompressedSize),

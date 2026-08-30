@@ -27,6 +27,9 @@ class DictionaryEnginePrivacyTest {
             TdictPrefixIndex::class.java,
             LatestOnlyPrefixEngine::class.java,
             MappedDictionaryEngine::class.java,
+            // E5c: TatBigrPrefixIndex is the schema-2 read side, the direct analogue of
+            // TdictPrefixIndex — same package, same reflection scan.
+            TatBigrPrefixIndex::class.java,
         ).flatMap { type -> type.declaredMethods.map { it.name } }
         assertTrue(publicMethods.none { it.contains("log", ignoreCase = true) })
         assertTrue(publicMethods.none { it.contains("commit", ignoreCase = true) })

@@ -221,6 +221,135 @@ class SuggestionStripSourceContractTest {
         assertTrue(commitBody.contains("mLastSpaceDownTime = 0"))
     }
 
+    // --- E5d: commitPredictedWord ("Контракт текста" amendment, 2026-08-17, пункт 4) ------------
+
+    @Test
+    fun commitChosenSuggestionIsByteForByteUnchangedByThisPhase() {
+        // commitChosenSuggestion's own body is a single delegating line; asserting it verbatim is a
+        // full "unchanged" proof for the method itself, not just a partial one — there is no more of
+        // it to diverge. replaceTrailingWord's shared body is proven unchanged separately by
+        // acceptedSuggestionCarriesItsAutoSpaceInsideTheSameCommit above, unaffected by
+        // commitPredictedWord living outside that slice (see the next test).
+        val inputLogic = File(
+            sourceRoot(),
+            "java/rkr/simplekeyboard/inputmethod/latin/inputlogic/InputLogic.java",
+        ).readText()
+        val commitChosenSuggestionBody = inputLogic
+            .substringAfter("public boolean commitChosenSuggestion(final String expectedPrefix, final String suggestion) {")
+            .substringBefore("}")
+            .trim()
+        assertEquals(
+            "return replaceTrailingWord(expectedPrefix, suggestion, true /* withAutoSpace */);",
+            commitChosenSuggestionBody,
+        )
+    }
+
+    @Test
+    fun commitPredictedWordDeletesExactlyZeroCharacters() {
+        val inputLogic = File(
+            sourceRoot(),
+            "java/rkr/simplekeyboard/inputmethod/latin/inputlogic/InputLogic.java",
+        ).readText()
+        val commitBody = inputLogic.substringAfter("public boolean commitPredictedWord(")
+            .substringBefore("/** Allocation-free suffix test over the cached text")
+        // NEXT_WORD never trails an existing prefix to remove — the whole point of the third
+        // insertion path (PROPOSALS.md, "Контракт текста" amendment, "Отдельный путь коммита") —
+        // so this method must never call a delete of any kind.
+        assertFalse(commitBody.contains("deleteTextBeforeCursor"))
+        assertFalse(commitBody.contains("deleteSurroundingText"))
+    }
+
+    @Test
+    fun commitPredictedWordInsertsWithAutoSpaceInOneCommitText() {
+        val inputLogic = File(
+            sourceRoot(),
+            "java/rkr/simplekeyboard/inputmethod/latin/inputlogic/InputLogic.java",
+        ).readText()
+        val commitBody = inputLogic.substringAfter("public boolean commitPredictedWord(")
+            .substringBefore("/** Allocation-free suffix test over the cached text")
+        assertEquals(1, "mConnection\\.commitText\\(".toRegex().findAll(commitBody).count())
+        assertTrue(commitBody.contains("suggestion + AUTO_SPACE"))
+        assertTrue(
+            commitBody.contains(
+                "TatarWordUtils.needsAutoSpace(mConnection.getCachedTextAfterCursor())",
+            ),
+        )
+        assertTrue(
+            commitBody.indexOf("beginBatchEdit")
+                in 0 until commitBody.indexOf("mConnection.commitText"),
+        )
+        assertTrue(commitBody.contains("mJustDoubleSpaced = false"))
+        assertTrue(commitBody.contains("mLastSpaceDownTime = 0"))
+    }
+
+    @Test
+    fun commitPredictedWordRequiresCollapsedSelectionNoLetterAfterCursorEmptyTailAndLiveContextMatch() {
+        val inputLogic = File(
+            sourceRoot(),
+            "java/rkr/simplekeyboard/inputmethod/latin/inputlogic/InputLogic.java",
+        ).readText()
+        val commitBody = inputLogic.substringAfter("public boolean commitPredictedWord(")
+            .substringBefore("/** Allocation-free suffix test over the cached text")
+        // Collapsed selection — the same check replaceTrailingWord makes.
+        assertTrue(commitBody.contains("mConnection.hasSelection()"))
+        // No letter right after the cursor — the same check replaceTrailingWord makes.
+        assertTrue(
+            commitBody.contains(
+                "TatarWordUtils.startsWithWordCharacter(mConnection.getCachedTextAfterCursor())",
+            ),
+        )
+        // An EMPTY trailing word, not a matching non-empty prefix like replaceTrailingWord checks —
+        // NEXT_WORD only ever applies when the prefix is empty.
+        assertTrue(
+            commitBody.contains(
+                "TatarWordUtils.extractTrailingWord(mConnection.getCachedTextBeforeCursor()).isEmpty()",
+            ),
+        )
+        // The live context word, re-extracted by the exact same algorithm the request was built
+        // with, matching expectedContextWord.
+        assertTrue(
+            commitBody.contains(
+                "TatarWordUtils.extractNextWordContext(mConnection.getCachedTextBeforeCursor())",
+            ),
+        )
+        assertTrue(commitBody.contains("expectedContextWord.equals(liveContext)"))
+    }
+
+    @Test
+    fun noSeparateNextWordPredictionToggleExistsAnywhere() {
+        // PROPOSALS.md, "E5d. Отдельного тумблера предсказаний НЕТ": prediction is governed by the
+        // existing PREF_TATAR_SUGGESTIONS, not by a new PREF_NEXT_WORD_PREDICTION key, reader,
+        // SettingsValues field, switchRow string, or translation — the same logic E4 already applied
+        // to reject two personal-dictionary toggles.
+        val settingsRoot = File(sourceRoot(), "java/rkr/simplekeyboard/inputmethod/latin/settings")
+        val settings = File(settingsRoot, "Settings.java").readText()
+        val settingsValues = File(settingsRoot, "SettingsValues.java").readText()
+        val settingsHostActivity = File(settingsRoot, "SettingsHostActivity.kt").readText()
+        val stringsEn = File(sourceRoot(), "res/values/strings.xml").readText()
+        val stringsTt = File(sourceRoot(), "res/values-tt/strings.xml").readText()
+
+        val forbiddenNeedles = listOf(
+            "PREF_NEXT_WORD_PREDICTION",
+            "next_word_prediction",
+            "pref_next_word_prediction",
+        )
+        val sources = mapOf(
+            "Settings.java" to settings,
+            "SettingsValues.java" to settingsValues,
+            "SettingsHostActivity.kt" to settingsHostActivity,
+            "values/strings.xml" to stringsEn,
+            "values-tt/strings.xml" to stringsTt,
+        )
+        for ((fileName, text) in sources) {
+            for (needle in forbiddenNeedles) {
+                assertFalse(
+                    "$fileName must not mention a separate prediction toggle ($needle)",
+                    text.contains(needle),
+                )
+            }
+        }
+    }
+
     @Test
     fun successfulTapRefreshesTheShiftStateLikeTypedInputDoes() {
         val latinIme = File(

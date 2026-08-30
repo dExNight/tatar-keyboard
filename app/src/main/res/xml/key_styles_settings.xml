@@ -30,6 +30,23 @@
                 latin:backgroundType="functional" />
         </case>
         <!-- clobberSettingsKey="false" -->
+        <!-- With the language switch key on the bottom row there is no room left for a dedicated
+             emoji key (see key_space_5kw.xml), so the emoji panel lives on this key's long press.
+             It goes first in additionalMoreKeys because the first more key is the one laid out
+             under the finger: a long press and release opens the panel with no sliding, and paste
+             and settings stay one slide away. The hint glyph is what makes it discoverable — a
+             long press nobody can see is worse than the key it replaced. -->
+        <case
+            latin:languageSwitchKeyEnabled="true"
+            latin:showEmojiKey="true"
+            >
+            <key-style
+                latin:styleName="settingsMoreKeysStyle"
+                latin:keyHintLabel="&#x263A;&#xFE0E;"
+                latin:keyLabelFlags="hasPopupHint"
+                latin:additionalMoreKeys="!icon/emoji_key|!code/key_emoji,!text/keyspec_settings"
+                latin:backgroundType="functional" />
+        </case>
         <default>
             <key-style
                 latin:styleName="settingsMoreKeysStyle"

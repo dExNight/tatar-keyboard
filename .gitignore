@@ -8,6 +8,7 @@ local.properties
 
 # Built application files
 *.apk
+*.aab
 *.ap_
 output.json
 output-metadata.json
@@ -37,6 +38,7 @@ proguard/
 # Python tooling caches
 __pycache__/
 *.py[cod]
+.pytest_cache/
 
 # Android Studio Navigation editor temp files
 .navigation/
@@ -62,3 +64,26 @@ dist/
 
 tat_*.tar.gz
 tat_*-words.txt
+tat_*-sentences.txt
+
+# Сырые отчёты прогонов (числа переносятся в markdown вручную, сам JSON не коммитится)
+docs/*.generated.json
+# Уточнение 2026-08-30: три JSON в docs/lang-priority/*.generated.json закоммичены
+# осознанно — это пины-свидетельства миссии lang-priority, на них ссылается отчёт.
+# Паттерн выше покрывает только верхний уровень docs/ и остаётся в силе.
+# Уточнение 2026-08-30 (фаза 2): верхнеуровневые JSON переехали в архив вместе с
+# отчётами — покрываем и новое место (трекнутые пины lang-priority оно не затрагивает:
+# .gitignore на уже отслеживаемые файлы не действует).
+docs/archive/bigrams/*.generated.json
+.smgr/
+
+# Разговорные корпуса миссии tt-corpus (OPUS) и её тестовые артефакты.
+# Причина та же, по которой выше игнорируются tat_*-sentences.txt: это лицензионные
+# исходники, они в репозиторий не кладутся. Числа перенесены в docs/CORPUS.md,
+# скрипты замера (research/corpus/*.py) — коммитятся, данные — нет.
+research/corpus/*.txt.gz
+research/corpus/*.part
+research/corpus/out/
+research/corpus/licenses/
+research/corpus/__pycache__/
+research/corpus/chunks/

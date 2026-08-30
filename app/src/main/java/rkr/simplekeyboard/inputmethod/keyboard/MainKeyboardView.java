@@ -131,8 +131,10 @@ public final class MainKeyboardView extends KeyboardView implements MoreKeysPane
                 R.styleable.MainKeyboardView_keyHysteresisDistance, 0.0f);
         final float keyHysteresisDistanceForSlidingModifier = mainKeyboardViewAttr.getDimension(
                 R.styleable.MainKeyboardView_keyHysteresisDistanceForSlidingModifier, 0.0f);
-        mKeyDetector = new KeyDetector(
-                keyHysteresisDistance, keyHysteresisDistanceForSlidingModifier);
+        final float slidingModifierSlop = mainKeyboardViewAttr.getDimension(
+                R.styleable.MainKeyboardView_slidingModifierSlop, 0.0f);
+        mKeyDetector = new KeyDetector(keyHysteresisDistance,
+                keyHysteresisDistanceForSlidingModifier, slidingModifierSlop);
 
         PointerTracker.init(mainKeyboardViewAttr, mTimerHandler, this /* DrawingProxy */);
 

@@ -17,11 +17,13 @@
 package rkr.simplekeyboard.inputmethod.latin.suggestions
 
 import rkr.simplekeyboard.inputmethod.latin.dictionary.engine.AutocorrectAdvice
+import rkr.simplekeyboard.inputmethod.latin.dictionary.engine.LookupKind
 import rkr.simplekeyboard.inputmethod.latin.dictionary.engine.LookupToken
 import rkr.simplekeyboard.inputmethod.latin.dictionary.engine.KeyNeighborTable
 import rkr.simplekeyboard.inputmethod.latin.dictionary.engine.MappedDictionaryEngine
 import rkr.simplekeyboard.inputmethod.latin.dictionary.engine.ResultHandoff
 import rkr.simplekeyboard.inputmethod.latin.dictionary.personal.PersonalCandidateSource
+import rkr.simplekeyboard.inputmethod.latin.dictionary.storage.PublishedBigramTableCatalog
 import rkr.simplekeyboard.inputmethod.latin.dictionary.storage.PublishedDictionaryCatalog
 import java.util.concurrent.TimeUnit
 
@@ -32,9 +34,13 @@ import java.util.concurrent.TimeUnit
  * marshaling to the UI thread and for re-checking [EngineHandle.isCurrent] before applying, exactly
  * as the underlying engine's [ResultHandoff] contract requires. [token] is opaque; hand it straight
  * back to [EngineHandle.isCurrent].
+ *
+ * [kind] is E5d's addition: the owner of state (the controller) must know which kind of result it
+ * holds to choose the right commit path and the right display rule (NEXT_WORD skips the casing
+ * re-application PREFIX needs) — PROPOSALS.md, "E5c. Вид запроса" / "Контракт текста" amendment.
  */
 fun interface ResultCallback {
-    fun onResult(token: Any, suggestions: List<String>)
+    fun onResult(token: Any, suggestions: List<String>, kind: LookupKind)
 }
 
 /**
@@ -47,6 +53,21 @@ fun interface ResultCallback {
 interface EngineHandle {
     /** Enqueues a lookup. Returns an opaque token, or null if the request was rejected. */
     fun request(editorSessionId: Long, subtypeId: String, prefixUtf8: ByteArray): Any?
+
+    /**
+     * E5c NEXT_WORD sibling of [request] — same underlying engine, token and executor, a
+     * different kind (PROPOSALS.md, "E5c. Вид запроса"). Default null so a fake handle written
+     * before E5c keeps compiling and simply never predicts a next word.
+     */
+    fun requestNextWord(editorSessionId: Long, subtypeId: String, contextWordUtf8: ByteArray): Any? = null
+
+    /**
+     * E5c two-stage readiness: wires a bigram source into an ALREADY-published handle. Call off
+     * the UI thread — this performs mmap I/O. Returns false (and leaves [requestNextWord]
+     * answering empty) if the table is unavailable or invalid; default false so a fake handle
+     * written before E5c keeps compiling.
+     */
+    fun attachBigramSource(catalog: PublishedBigramTableCatalog): Boolean = false
 
     /** True only if [token] identifies the newest still-active request on this handle. */
     fun isCurrent(token: Any): Boolean
@@ -88,6 +109,12 @@ class MappedEngineHandle private constructor(
     override fun request(editorSessionId: Long, subtypeId: String, prefixUtf8: ByteArray): Any? =
         engine.request(editorSessionId, subtypeId, prefixUtf8)
 
+    override fun requestNextWord(editorSessionId: Long, subtypeId: String, contextWordUtf8: ByteArray): Any? =
+        engine.requestNextWord(editorSessionId, subtypeId, contextWordUtf8)
+
+    override fun attachBigramSource(catalog: PublishedBigramTableCatalog): Boolean =
+        engine.attachBigramSource(catalog)
+
     override fun isCurrent(token: Any): Boolean =
         token is LookupToken && engine.isCurrent(token)
 
@@ -119,7 +146,7 @@ class MappedEngineHandle private constructor(
             personalCandidates: PersonalCandidateSource = PersonalCandidateSource.EMPTY,
         ): MappedEngineHandle? {
             val handoff = ResultHandoff { result ->
-                callback.onResult(result.token, result.suggestions)
+                callback.onResult(result.token, result.suggestions, result.kind)
             }
             val engine = MappedDictionaryEngine.start(
                 catalog, handoff, personalCandidates = personalCandidates,

@@ -137,13 +137,6 @@ public final class Constants {
         }
     }
 
-    /**
-     * Screen metrics (a.k.a. Device form factor) constants of
-     * {@link rkr.simplekeyboard.inputmethod.R.integer#config_screen_metrics}.
-     */
-    public static final int SCREEN_METRICS_LARGE_TABLET = 2;
-    public static final int SCREEN_METRICS_SMALL_TABLET = 3;
-
     private Constants() {
         // This utility class is not publicly instantiable.
     }

@@ -1,7 +1,9 @@
 package rkr.simplekeyboard.inputmethod.latin.dictionary.engine
 
 import rkr.simplekeyboard.inputmethod.latin.dictionary.personal.PersonalCandidateSource
+import rkr.simplekeyboard.inputmethod.latin.dictionary.storage.BigramTableLease
 import rkr.simplekeyboard.inputmethod.latin.dictionary.storage.DictionaryFileLease
+import rkr.simplekeyboard.inputmethod.latin.dictionary.storage.PublishedBigramTableCatalog
 import rkr.simplekeyboard.inputmethod.latin.dictionary.storage.PublishedDictionaryCatalog
 import java.io.File
 import java.io.FileInputStream
@@ -35,12 +37,76 @@ class MappedDictionaryEngine private constructor(
     val identity: DictionaryIdentity,
     private val engine: LatestOnlyPrefixEngine,
     private val computer: CompositePrefixComputer,
+    private val resources: Resources,
 ) {
     fun request(
         editorSessionId: Long,
         subtypeId: String,
         normalizedPrefixUtf8: ByteArray,
     ): LookupToken? = engine.request(editorSessionId, subtypeId, normalizedPrefixUtf8)
+
+    /** E5c NEXT_WORD sibling of [request] — same engine, same token/executor, different kind. */
+    fun requestNextWord(
+        editorSessionId: Long,
+        subtypeId: String,
+        normalizedContextWordUtf8: ByteArray,
+    ): LookupToken? = engine.requestNextWord(editorSessionId, subtypeId, normalizedContextWordUtf8)
+
+    /**
+     * E5c two-stage readiness (PROPOSALS.md, "E5c. Готовность вычислителя двухступенчатая"):
+     * acquires, maps and opens the bigram table, then wires it into the ALREADY-published
+     * composite computer. Call off the UI thread — this performs the same class of I/O
+     * [start] does. Returns false without side effects on this engine if the table is
+     * unavailable, corrupted, or the engine was destroyed in the meantime (racing
+     * [destroy] loses cleanly: whichever of the two reaches [Resources] first wins, and the
+     * loser's lease is closed without ever being exposed to a lookup). A failure here leaves
+     * [CompositePrefixComputer.predict] returning an empty list — 0 predictions, no effect on
+     * prefix suggestions or ordinary input, exactly the fail-closed shape the contract requires
+     * for a missing or invalid bigram file.
+     */
+    fun attachBigramSource(
+        catalog: PublishedBigramTableCatalog,
+        mapper: DictionaryMapper = FILE_MAPPER,
+    ): Boolean {
+        val lease = try {
+            catalog.acquireLatestForActivation()
+        } catch (_: Throwable) {
+            null
+        } ?: return false
+        var mapped: ByteBuffer? = null
+        return try {
+            val table = lease.table
+            val bigramIdentity = BigramTableIdentity(
+                table.generation, table.fileLanguageTag, table.schemaId, table.formatVersion, table.rawSha256,
+            )
+            mapped = mapper.mapReadOnly(table.file, table.rawSize)
+            val index = TatBigrPrefixIndex.open(
+                mapped, bigramIdentity, table.headCount, table.rawSize,
+            ) ?: throw IllegalArgumentException("validated bigram layout mismatch")
+            if (!resources.attachBigram(lease, catalog, mapped, index)) {
+                // The engine was destroyed while this was in flight: attachBigram left the lease
+                // for us to close, exactly like the failure path below — do not publish a source
+                // into a computer whose engine will never look anything up again.
+                throw AttachRacedDestroy()
+            }
+            computer.attachBigramSource(index)
+            true
+        } catch (_: Throwable) {
+            mapped = null
+            try {
+                lease.close()
+            } catch (_: Throwable) {
+                // Ownership was consumed; a failing release still must not escape this call.
+            } finally {
+                try {
+                    catalog.cleanupReleasedVersions()
+                } catch (_: Throwable) {
+                    // Fail closed without logging paths or typed text.
+                }
+            }
+            false
+        }
+    }
 
     /**
      * The D3 verdict of the newest completed lookup, or null when nothing may be replaced.
@@ -71,13 +137,61 @@ class MappedDictionaryEngine private constructor(
     val suppressedStaleResultCount: Long
         get() = engine.suppressedStaleResultCount
 
+    /** Internal-only control-flow signal — never surfaces past [attachBigramSource]'s own catch. */
+    private class AttachRacedDestroy : Exception()
+
+    /**
+     * Owns the dictionary lease/mapping from construction, and — after a successful
+     * [attachBigram] — the bigram lease/mapping too. Both are released together, exactly once,
+     * by [release]; [attachBigram] and [release] share [lock] so a racing [attachBigramSource]
+     * and [destroy] resolve cleanly instead of leaking a lease or double-closing one.
+     */
     private class Resources(
         private var lease: DictionaryFileLease?,
         private val catalog: PublishedDictionaryCatalog,
         var mappedBuffer: ByteBuffer?,
         var index: TdictPrefixIndex?,
     ) {
+        private val lock = Any()
+        private var released = false
+        private var bigramLease: BigramTableLease? = null
+        private var bigramCatalog: PublishedBigramTableCatalog? = null
+        var bigramMappedBuffer: ByteBuffer? = null
+            private set
+        var bigramIndex: TatBigrPrefixIndex? = null
+            private set
+
+        /** False (and the passed-in [lease] is left for the CALLER to close) once already released. */
+        fun attachBigram(
+            lease: BigramTableLease,
+            catalog: PublishedBigramTableCatalog,
+            mapped: ByteBuffer,
+            index: TatBigrPrefixIndex,
+        ): Boolean = synchronized(lock) {
+            if (released) return@synchronized false
+            // Attach happens once per engine lifetime in E5c; replacing rather than accumulating
+            // keeps that true even if a future phase calls this more than once.
+            bigramLease?.let { stale -> try { stale.close() } catch (_: Throwable) {} }
+            bigramLease = lease
+            bigramCatalog = catalog
+            bigramMappedBuffer = mapped
+            bigramIndex = index
+            true
+        }
+
         fun release() {
+            val heldBigramLease: BigramTableLease?
+            val heldBigramCatalog: PublishedBigramTableCatalog?
+            synchronized(lock) {
+                if (released) return
+                released = true
+                heldBigramLease = bigramLease
+                heldBigramCatalog = bigramCatalog
+                bigramLease = null
+                bigramCatalog = null
+                bigramMappedBuffer = null
+                bigramIndex = null
+            }
             index = null
             mappedBuffer = null
             val heldLease = lease
@@ -91,6 +205,17 @@ class MappedDictionaryEngine private constructor(
                     catalog.cleanupReleasedVersions()
                 } catch (_: Throwable) {
                     // Cleanup is best-effort and cannot affect ordinary input.
+                }
+                try {
+                    heldBigramLease?.close()
+                } catch (_: Throwable) {
+                    // Same fail-closed posture as the dictionary lease above.
+                } finally {
+                    try {
+                        heldBigramCatalog?.cleanupReleasedVersions()
+                    } catch (_: Throwable) {
+                        // Best-effort, same as the dictionary catalog cleanup.
+                    }
                 }
             }
         }
@@ -168,7 +293,7 @@ class MappedDictionaryEngine private constructor(
                     resultHandoff,
                     resources::release,
                 )
-                return MappedDictionaryEngine(identity, engine, computer)
+                return MappedDictionaryEngine(identity, engine, computer, resources)
             } catch (_: Throwable) {
                 mapped = null
                 try {

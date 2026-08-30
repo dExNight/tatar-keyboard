@@ -28,3 +28,56 @@ UTF-8 text asset. The original emoji-test.txt is not redistributed in this
 repository; only this derived list of emoji sequences is shipped. The emoji
 data remains subject to the Unicode Terms of Use referenced above; the
 application's Apache-2.0 license does not replace those terms.
+
+---
+
+The emoji-search index app/src/main/assets/emoji/emoji_search_v1.txt is derived
+from the Unicode CLDR annotation data, release 44: common/annotations/ru.xml,
+common/annotations/en.xml, common/annotationsDerived/ru.xml and
+common/annotationsDerived/en.xml.
+
+Attribution and terms, quoted verbatim from the header of the source files:
+
+  Copyright © 1991-2023 Unicode, Inc.
+  For terms of use, see http://www.unicode.org/copyright.html
+  SPDX-License-Identifier: Unicode-DFS-2016
+  CLDR data files are interpreted according to the LDML specification
+  (http://unicode.org/reports/tr35/)
+
+Source data: Unicode CLDR 44 emoji annotations (Russian and English)
+Documentation and usage: https://cldr.unicode.org
+Terms of use (Unicode License / Unicode Terms of Use):
+  https://www.unicode.org/copyright.html
+
+Changes by the Tatar Keyboard project: the annotation files were decoded, their
+pinned SHA-256s verified, and for every sequence already present in
+emoji_set_v1.txt the Russian short name and keywords, followed by the English
+ones, were collected, lowercased, de-duplicated and written as one tab-separated
+line per sequence in the panel asset's own order. Sequences absent from the
+panel asset are not indexed, so the search can never offer an emoji the panel
+cannot draw. The original CLDR files are not redistributed in this repository;
+only this derived index is shipped. The CLDR data remains subject to the Unicode
+Terms of Use referenced above; the application's Apache-2.0 license does not
+replace those terms.
+
+Tatar (tt) is deliberately absent from the index: CLDR 44 ships eight
+punctuation annotations for Tatar and no emoji annotations at all, so no Tatar
+emoji keywords can be derived from this source.
+
+---
+
+The skin-tone table app/src/main/assets/emoji/emoji_skin_v1.txt is derived from
+the same Unicode emoji keyboard/display test data file emoji-test.txt for
+UTS #51, Emoji Version 15.1, that emoji_set_v1.txt comes from; the attribution
+and terms quoted above for that file apply to it unchanged.
+
+Changes by the Tatar Keyboard project: for every sequence already present in
+emoji_set_v1.txt, the fully-qualified records carrying exactly one skin-tone
+modifier (U+1F3FB..U+1F3FF) were used to record whether that sequence accepts a
+tone and which prefix and suffix a modifier slots between. Records carrying two
+modifiers describe a pair of bases rather than one and were skipped. Each of the
+five composed forms was verified to be a fully-qualified record of the input
+before the base was written. No toned sequence was added to emoji_set_v1.txt
+itself: the grid still shows one neutral cell per emoji and the five tones are
+offered on a long press. The original emoji-test.txt is not redistributed in
+this repository.

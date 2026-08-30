@@ -23,6 +23,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import rkr.simplekeyboard.inputmethod.latin.dictionary.engine.KeyNeighborTable
+import rkr.simplekeyboard.inputmethod.latin.dictionary.engine.LookupKind
 
 /**
  * «Стёрто значит стёрто» (E4b, раздел «Контракт личного словаря»).
@@ -123,7 +124,7 @@ class PersonalDictionaryErasureTest {
         editor.word = "гүз"
         controller.onTextChanged()
         val token = engine.requested.size.toLong()
-        callback!!.onResult(token, listOf("Гүзәл", "гүзәллек"))
+        callback!!.onResult(token, listOf("Гүзәл", "гүзәллек"), LookupKind.PREFIX)
         assertTrue("the personal word is on the strip before erasure",
             strip.events.any { it == "show:Гүзәл" })
 
@@ -160,7 +161,7 @@ class PersonalDictionaryErasureTest {
 
         controller.onPersonalDictionaryErased()
         val eventsAfterErasure = strip.events.size
-        callback!!.onResult(staleToken, listOf("Гүзәл"))
+        callback!!.onResult(staleToken, listOf("Гүзәл"), LookupKind.PREFIX)
 
         assertEquals("a result computed before the erasure must not repaint the strip",
             eventsAfterErasure, strip.events.size)
@@ -174,9 +175,14 @@ class PersonalDictionaryErasureTest {
         val controller = File(sourceRoot(),
             "java/rkr/simplekeyboard/inputmethod/latin/settings/PersonalDictionaryScreenController.kt")
             .readText()
+        // The signature grew a completion callback (mission tt-personal-dict, finding A2): the
+        // screen may not repaint or claim success before the erasure has actually run. What this
+        // test guards — one call, every subtype it is given — is unchanged.
         assertTrue("erase-all iterates every subtype it is given",
-            controller.contains("fun eraseAll(subtypeIds: List<String>)"))
-        assertTrue(controller.contains("for (subtypeId in subtypeIds)"))
+            controller.contains("fun eraseAll(subtypeIds: List<String>,"))
+        assertTrue("the list it loops over is derived from ALL of them",
+            controller.contains("val targets = subtypeIds.filter"))
+        assertTrue(controller.contains("for (subtypeId in targets)"))
         assertTrue("and it notifies the IME so the band unbinds",
             controller.contains("PersonalDictionaries.notifyErased()"))
 

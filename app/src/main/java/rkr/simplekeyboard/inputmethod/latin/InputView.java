@@ -26,6 +26,8 @@ import android.widget.FrameLayout;
 
 import rkr.simplekeyboard.inputmethod.R;
 import rkr.simplekeyboard.inputmethod.latin.emoji.EmojiPanelView;
+import rkr.simplekeyboard.inputmethod.latin.emoji.EmojiSearchIndex;
+import rkr.simplekeyboard.inputmethod.latin.emoji.EmojiSearchView;
 import rkr.simplekeyboard.inputmethod.latin.emoji.EmojiSetSnapshot;
 import rkr.simplekeyboard.inputmethod.latin.suggestions.SuggestionStripView;
 
@@ -33,7 +35,16 @@ public final class InputView extends FrameLayout {
     private final Rect mTemporaryBounds = new Rect();
     private SuggestionStripView mSuggestionStripView;
     private EmojiPanelView mEmojiPanelView;
+    private EmojiSearchView mEmojiSearchView;
     private Runnable mInsetsChangedListener;
+
+    /**
+     * Set while the emoji panel hid a visible suggestion strip, so {@link #hideEmojiPanel()} puts
+     * back exactly what was there. The strip has nothing to show while the panel is open and its
+     * reserved band was simply empty; the height it frees is handed to the panel instead, so the
+     * total keyboard height — and the content top inset — does not change when the panel opens.
+     */
+    private boolean mStripHiddenByEmojiPanel;
 
     public InputView(final Context context, final AttributeSet attrs) {
         super(context, attrs, 0);
@@ -84,6 +95,87 @@ public final class InputView extends FrameLayout {
         return mEmojiPanelView;
     }
 
+    /** Creates the emoji search bands on first use. Merely inflating the keyboard never creates them. */
+    public EmojiSearchView getOrCreateEmojiSearchView() {
+        if (mEmojiSearchView != null) {
+            return mEmojiSearchView;
+        }
+        final View stub = findViewById(R.id.emoji_search_stub);
+        if (!(stub instanceof ViewStub)) {
+            return null;
+        }
+        final View inflated = ((ViewStub) stub).inflate();
+        if (!(inflated instanceof EmojiSearchView)) {
+            return null;
+        }
+        mEmojiSearchView = (EmojiSearchView) inflated;
+        return mEmojiSearchView;
+    }
+
+    public EmojiSearchView getEmojiSearchView() {
+        return mEmojiSearchView;
+    }
+
+    /**
+     * Enters the emoji search: the panel steps aside and the two search bands take the suggestion
+     * strip's place above the letter keyboard, which the caller makes visible again. The panel keeps
+     * its bound snapshot and its scroll position, so {@link #leaveEmojiSearch()} puts back exactly
+     * the grid the user left.
+     */
+    public EmojiSearchView enterEmojiSearch(final EmojiSearchIndex index) {
+        final EmojiSearchView search = getOrCreateEmojiSearchView();
+        if (search == null) {
+            return null;
+        }
+        boolean changed = false;
+        if (mEmojiPanelView != null && mEmojiPanelView.getVisibility() != GONE) {
+            mEmojiPanelView.setVisibility(GONE);
+            changed = true;
+        }
+        if (mSuggestionStripView != null && mSuggestionStripView.getVisibility() == VISIBLE) {
+            mSuggestionStripView.setVisibility(GONE);
+            mStripHiddenByEmojiPanel = true;
+            changed = true;
+        }
+        search.setIndex(index);
+        if (search.getVisibility() != VISIBLE) {
+            search.setVisibility(VISIBLE);
+            changed = true;
+        }
+        if (changed) {
+            notifyInsetsChanged();
+        }
+        return search;
+    }
+
+    /** Leaves the emoji search and shows the panel again, still holding its snapshot and scroll. */
+    public void leaveEmojiSearch() {
+        boolean changed = false;
+        if (mEmojiSearchView != null && mEmojiSearchView.getVisibility() != GONE) {
+            mEmojiSearchView.setVisibility(GONE);
+            changed = true;
+        }
+        if (mEmojiPanelView != null && mEmojiPanelView.getVisibility() != VISIBLE) {
+            mEmojiPanelView.setVisibility(VISIBLE);
+            changed = true;
+        }
+        if (changed) {
+            notifyInsetsChanged();
+        }
+    }
+
+    /** Hides the search bands without showing the panel; used when the search is abandoned. */
+    public void hideEmojiSearch() {
+        if (mEmojiSearchView != null && mEmojiSearchView.getVisibility() != GONE) {
+            mEmojiSearchView.setVisibility(GONE);
+            notifyInsetsChanged();
+        }
+    }
+
+    private boolean isEmojiSearchShowing() {
+        return mEmojiSearchView != null && mEmojiSearchView.getVisibility() == VISIBLE;
+    }
+
     /**
      * Shows the emoji panel sized to the current keyboard height, so that the content top inset is
      * identical whether the keyboard or the panel is visible. The caller hides the
@@ -96,7 +188,18 @@ public final class InputView extends FrameLayout {
         if (panel == null) {
             return null;
         }
-        panel.setPanelHeightPx(keyboardHeightPx);
+        int panelHeightPx = keyboardHeightPx;
+        if (mSuggestionStripView != null && mSuggestionStripView.getVisibility() == VISIBLE) {
+            // Take the strip's measured height before hiding it, so the panel grows by exactly
+            // what the strip gave up and the keyboard keeps its height.
+            final int stripHeight = mSuggestionStripView.getHeight();
+            mSuggestionStripView.setVisibility(GONE);
+            mStripHiddenByEmojiPanel = true;
+            if (stripHeight > 0) {
+                panelHeightPx += stripHeight;
+            }
+        }
+        panel.setPanelHeightPx(panelHeightPx);
         panel.setSnapshot(snapshot);
         if (panel.getVisibility() != VISIBLE) {
             panel.setVisibility(VISIBLE);
@@ -105,15 +208,28 @@ public final class InputView extends FrameLayout {
         return panel;
     }
 
-    /** Hides the emoji panel without creating it. */
+    /** Hides the emoji panel without creating it, restoring any strip the panel hid. */
     public void hideEmojiPanel() {
-        if (mEmojiPanelView == null) {
-            return;
+        boolean changed = false;
+        if (mStripHiddenByEmojiPanel) {
+            mStripHiddenByEmojiPanel = false;
+            if (mSuggestionStripView != null) {
+                mSuggestionStripView.setVisibility(VISIBLE);
+                changed = true;
+            }
         }
-        if (mEmojiPanelView.getVisibility() != GONE) {
+        if (mEmojiPanelView != null && mEmojiPanelView.getVisibility() != GONE) {
             mEmojiPanelView.setVisibility(GONE);
+            changed = true;
+        }
+        if (changed) {
             notifyInsetsChanged();
         }
+    }
+
+    private boolean isEmojiPanelShowing() {
+        return (mEmojiPanelView != null && mEmojiPanelView.getVisibility() == VISIBLE)
+                || isEmojiSearchShowing();
     }
 
     /** Shows the fixed-height strip, including the valid visible zero-results state. */
@@ -124,6 +240,14 @@ public final class InputView extends FrameLayout {
             return null;
         }
         strip.setSuggestions(first, second, third);
+        if (isEmojiPanelShowing()) {
+            // The panel owns the surface: keep the strip down and remember that it wanted to be
+            // up, so hideEmojiPanel() restores it. Without this a new input session started while
+            // the panel is open (a different field, a selection change) puts the empty band back
+            // over the panel.
+            mStripHiddenByEmojiPanel = true;
+            return strip;
+        }
         if (strip.getVisibility() != VISIBLE) {
             strip.setVisibility(VISIBLE);
             notifyInsetsChanged();
@@ -142,6 +266,10 @@ public final class InputView extends FrameLayout {
             return null;
         }
         strip.clearSuggestions();
+        if (isEmojiPanelShowing()) {
+            mStripHiddenByEmojiPanel = true;
+            return strip;
+        }
         if (strip.getVisibility() != VISIBLE) {
             strip.setVisibility(VISIBLE);
             notifyInsetsChanged();
@@ -172,6 +300,9 @@ public final class InputView extends FrameLayout {
         }
         if (mEmojiPanelView != null) {
             mEmojiPanelView.release();
+        }
+        if (mEmojiSearchView != null) {
+            mEmojiSearchView.release();
         }
         mInsetsChangedListener = null;
     }
@@ -212,6 +343,14 @@ public final class InputView extends FrameLayout {
                 && panel.getWidth() > 0 && panel.getHeight() > 0) {
             mTemporaryBounds.set(0, 0, panel.getWidth(), panel.getHeight());
             offsetDescendantRectToMyCoords(panel, mTemporaryBounds);
+            outBounds.union(mTemporaryBounds);
+        }
+
+        final EmojiSearchView search = mEmojiSearchView;
+        if (search != null && search.isShown() && search.isLaidOut()
+                && search.getWidth() > 0 && search.getHeight() > 0) {
+            mTemporaryBounds.set(0, 0, search.getWidth(), search.getHeight());
+            offsetDescendantRectToMyCoords(search, mTemporaryBounds);
             outBounds.union(mTemporaryBounds);
         }
         return true;

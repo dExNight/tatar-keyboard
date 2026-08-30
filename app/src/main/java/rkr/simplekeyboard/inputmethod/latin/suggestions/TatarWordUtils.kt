@@ -81,6 +81,45 @@ object TatarWordUtils {
     }
 
     /**
+     * E5d NEXT_WORD context extraction (PROPOSALS.md, "Контракт текста" amendment, 2026-08-17,
+     * пункт 1): the word immediately before a trailing run of one-or-more U+0020, or "" if there is
+     * no such run right at the cursor.
+     *
+     * The separator is deliberately narrower than [isWordCharacter]'s complement: it is EXACTLY one
+     * or more U+0020 and nothing else. A newline, tab, NBSP, or any punctuation right before the
+     * cursor yields "" — not because those characters cannot end a word, but because the contract
+     * reserves NEXT_WORD for the plain "finished a word, pressed space" moment and deliberately
+     * excludes sentence starts and positions right after punctuation (no start-of-sentence table
+     * exists, and this exclusion doubles as the thing that keeps NEXT_WORD out of the
+     * auto-capitalization codepath). This function IS that exclusion: it is a side effect of the
+     * separator rule, not a second check layered on top of it.
+     *
+     * The word itself is [extractTrailingWord] of the text before the separator run — the exact same
+     * word-boundary algorithm PREFIX mode uses, so "context word" and "prefix" agree on what a word
+     * is. Both the separator run and the word must fit inside [textBeforeCursor] without touching its
+     * start: if either reaches index 0, the true word may have been cut off by the caller's cache
+     * limit ([rkr.simplekeyboard.inputmethod.latin.common.Constants.EDITOR_CONTENTS_CACHE_SIZE],
+     * 1024 characters) rather than genuinely starting there, and "" is returned because a possibly
+     * truncated context word cannot be trusted for a lookup — this function has no way to tell a
+     * truncated cache from a genuinely short field, so it treats both the same, conservatively.
+     */
+    @JvmStatic
+    fun extractNextWordContext(textBeforeCursor: CharSequence?): String {
+        if (textBeforeCursor == null) return ""
+        val length = textBeforeCursor.length
+        var separatorStart = length
+        while (separatorStart > 0 && textBeforeCursor[separatorStart - 1] == ' ') {
+            separatorStart--
+        }
+        if (separatorStart == length) return "" // no trailing space run at all
+        if (separatorStart == 0) return "" // the separator itself reaches the cache boundary
+        val word = extractTrailingWord(textBeforeCursor.subSequence(0, separatorStart))
+        if (word.isEmpty()) return ""
+        if (separatorStart - word.length == 0) return "" // the word itself reaches the cache boundary
+        return word
+    }
+
+    /**
      * True when the text before the cursor ends in a word that holds at least [minLetters] letters,
      * ignoring whatever non-word characters trail it.
      *

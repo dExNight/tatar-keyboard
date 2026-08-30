@@ -17,6 +17,11 @@ written in PROPOSALS.md ("## E5"), not a convenient approximation:
   list and the unigram frequencies, so nothing can drift from the shipped artifact in silence;
 * training is ``tat_mixed`` + ``tat_web``; ``tat_news`` is held out in full.
 
+Multilingual since 2026-08-21 (`docs/RUSSIAN-BIGRAMS.md`): ``--language`` picks the alphabet the
+tokenizer and the shipped-vocabulary read apply, and every entry point defaults to Tatar, so a
+caller written before this ran behaves exactly as it did — same tokens, same filtering, same
+bytes.
+
 Two independent caps are enforced by the generator itself, not only by the phase acceptance:
 compressed <= 250 000 B and raw <= 1 048 576 B per language. The raw cap binds first and is what
 limits the matrix.
@@ -46,6 +51,7 @@ from typing import Iterable, Iterator, Sequence, TextIO
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+import dictionary_coverage as coverage  # noqa: E402
 from dictionary_coverage import normalize_word  # noqa: E402
 from dictionary_pack import decompress_asset, validate_raw  # noqa: E402
 
@@ -178,16 +184,23 @@ def iter_sentences(path: Path) -> Iterator[str]:
             yield parse_sentence_row(line, path.name, line_number)
 
 
-def normalized_tokens(sentence: str) -> list[str | None]:
+def normalized_tokens(
+    sentence: str, alphabet: frozenset[str] = coverage.TATAR_ALPHABET
+) -> list[str | None]:
     """Tokens of one sentence, with ``None`` wherever ``normalize_word`` rejected the token.
 
     The ``None`` is the whole point: it is what breaks adjacency. Cleaning "сүз," down to "сүз"
     is NOT done — ``normalize_word`` rejects a token whole, which systematically loses the last
     word of every clause, and that bias is recorded in the report instead of being papered over.
+
+    ``alphabet`` is the language's own; it defaults to Tatar so callers older than the second
+    language keep their exact behaviour. It matters for more than tidiness: Tatar's alphabet is a
+    strict superset of Russian's, so tokenizing Russian text with it would let a stray Tatar
+    letter through as a token instead of breaking adjacency there.
     """
     result: list[str | None] = []
     for raw_token in sentence.split():
-        normalized, _reason = normalize_word(raw_token)
+        normalized, _reason = normalize_word(raw_token, alphabet)
         result.append(normalized)
     return result
 
@@ -206,9 +219,11 @@ def iter_pairs(tokens: Sequence[str | None], vocabulary: frozenset[str]) -> Iter
         yield head, success
 
 
-def read_shipped_vocabulary(asset_path: Path) -> tuple[frozenset[str], dict[str, int]]:
+def read_shipped_vocabulary(
+    asset_path: Path, language: coverage.Language = coverage.DEFAULT_LANGUAGE
+) -> tuple[frozenset[str], dict[str, int]]:
     """The word list AND the unigram frequencies, both from the shipped artifact."""
-    parsed = validate_raw(decompress_asset(asset_path.read_bytes()))
+    parsed = validate_raw(decompress_asset(asset_path.read_bytes()), language=language)
     frequencies = {word: frequency for word, frequency in zip(parsed.words, parsed.frequencies)}
     return frozenset(parsed.words), frequencies
 
@@ -225,6 +240,7 @@ def count_pairs(
     vocabulary: frozenset[str],
     shards: int,
     stats: list[CorpusStats],
+    alphabet: frozenset[str] = coverage.TATAR_ALPHABET,
 ) -> dict[str, list[tuple[str, int]]]:
     """Count pairs for every head, one shard of heads per pass over the corpora.
 
@@ -239,7 +255,7 @@ def count_pairs(
             corpus = next((entry for entry in stats if entry.path == str(path)), None)
             first_pass = shard == 0
             for sentence in iter_sentences(path):
-                tokens = normalized_tokens(sentence)
+                tokens = normalized_tokens(sentence, alphabet)
                 if corpus is not None and first_pass:
                     corpus.sentences += 1
                     corpus.tokens += len(tokens)
@@ -333,6 +349,7 @@ def evaluate(
     head_rank: dict[str, int],
     configurations: Sequence[Configuration],
     stats: list[CorpusStats],
+    alphabet: frozenset[str] = coverage.TATAR_ALPHABET,
 ) -> None:
     """One pass over the held-out corpus, all seven configurations tallied at once.
 
@@ -346,7 +363,7 @@ def evaluate(
     for path in holdout_paths:
         corpus = next((entry for entry in stats if entry.path == str(path)), None)
         for sentence in iter_sentences(path):
-            tokens = normalized_tokens(sentence)
+            tokens = normalized_tokens(sentence, alphabet)
             if corpus is not None:
                 corpus.sentences += 1
                 corpus.tokens += len(tokens)
@@ -412,9 +429,10 @@ def run_matrix(
     holdout_paths: Sequence[Path],
     asset_path: Path,
     shards: int,
+    language: coverage.Language = coverage.DEFAULT_LANGUAGE,
 ) -> dict[str, object]:
     started = time.monotonic()
-    vocabulary, frequencies = read_shipped_vocabulary(asset_path)
+    vocabulary, frequencies = read_shipped_vocabulary(asset_path, language)
     stats = [
         CorpusStats(path=str(path), sha256=sha256_of(path))
         for path in list(train_paths) + list(holdout_paths)
@@ -423,7 +441,9 @@ def run_matrix(
     largest_heads = max(HEAD_COUNTS)
     ordered_heads = select_heads(frequencies, largest_heads)
     head_rank = {word: position for position, word in enumerate(ordered_heads)}
-    table = count_pairs(train_paths, frozenset(ordered_heads), vocabulary, shards, stats)
+    table = count_pairs(
+        train_paths, frozenset(ordered_heads), vocabulary, shards, stats, language.alphabet
+    )
 
     configurations = matrix_configurations()
     for configuration in configurations:
@@ -440,9 +460,18 @@ def run_matrix(
             configuration.compressed_bytes <= MAX_COMPRESSED_BYTES
         )
 
-    evaluate(holdout_paths, vocabulary, table, head_rank, configurations, stats)
+    evaluate(
+        holdout_paths,
+        vocabulary,
+        table,
+        head_rank,
+        configurations,
+        stats,
+        language.alphabet,
+    )
 
     return {
+        "language": language.tag,
         "corpora": [entry.to_dict() for entry in stats],
         "configurations": [configuration.to_dict() for configuration in configurations],
         "caps": {
@@ -464,6 +493,9 @@ def create_argument_parser() -> argparse.ArgumentParser:
     matrix.add_argument("--asset", required=True, type=Path)
     matrix.add_argument("--shards", type=int, default=8)
     matrix.add_argument("--report", type=Path)
+    matrix.add_argument(
+        "--language", default=coverage.DEFAULT_LANGUAGE.tag, choices=sorted(coverage.LANGUAGES)
+    )
     return parser
 
 
@@ -472,7 +504,11 @@ def main(argv: Sequence[str] | None = None, stream: TextIO = sys.stdout) -> int:
     if arguments.shards < 1:
         raise SystemExit("shards must be positive")
     report = run_matrix(
-        arguments.train, arguments.holdout, arguments.asset, arguments.shards
+        arguments.train,
+        arguments.holdout,
+        arguments.asset,
+        arguments.shards,
+        coverage.language_for(arguments.language),
     )
     text = json.dumps(report, ensure_ascii=False, indent=2, sort_keys=True)
     if arguments.report is not None:

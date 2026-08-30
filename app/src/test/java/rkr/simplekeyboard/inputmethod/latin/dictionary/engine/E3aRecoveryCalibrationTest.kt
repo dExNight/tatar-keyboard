@@ -250,9 +250,9 @@ class E3aRecoveryCalibrationTest {
         // Independently produced by `python3 scripts/typo_pack.py build ...` on the same committed
         // asset (see docs/DICTIONARY-E3.md). The equality of these with the JVM-built set is the
         // cross-implementation "same reproducible set" proof.
-        private const val GENERATOR_SET_SIZE = 87_375
+        private const val GENERATOR_SET_SIZE = 87_360
         private const val GENERATOR_SET_SHA256 =
-            "6a61b48db87ac0bbff78af48ea597b3af19f81dd42ae8deaa2d4c00a6c81dfc3"
+            "da186d8e494a64636eec622b2a68be0efe45157b037fdcf2a1a6bb53a22b19e4"
 
         // Contract target and the chosen tolerance (docs/DICTIONARY-E3.md).
         private const val CONTRACT_RECOVERY_PP = 14.2

@@ -1,9 +1,9 @@
-Tatar top-100k dictionary data notice
+Dictionary data notice
 
-This dictionary is derived from the Leipzig Corpora Collection downloadable
-Tatar text corpora tat_mixed_2015_1M, tat_news_2015_1M, and tat_web_2018_1M.
+Both shipped dictionaries are derived from downloadable text corpora in the Leipzig
+Corpora Collection.
 
-Source catalogue: https://wortschatz.uni-leipzig.de/en/download/tat
+Source catalogue: https://wortschatz.uni-leipzig.de/en/download
 Terms: https://wortschatz.uni-leipzig.de/en/usage
 License: Creative Commons Attribution 4.0 International (CC BY 4.0)
 https://creativecommons.org/licenses/by/4.0/
@@ -13,10 +13,87 @@ D. Goldhahn, T. Eckart, U. Quasthoff, "Building Large Monolingual
 Dictionaries at the Leipzig Corpora Collection: From 100 to 200 Languages",
 LREC 2012.
 
+--------------------------------------------------------------------------------
+tatar_top100k_v1.tdict.zlib
+
+Derived from the Tatar corpora tat_mixed_2015_1M, tat_news_2015_1M, and
+tat_web_2018_1M.
+Catalogue page: https://wortschatz.uni-leipzig.de/en/download/tat
+
 Changes by the Tatar Keyboard project: the three word-frequency lists were
 decoded, validated, normalized to NFC lowercase, filtered to the modern Tatar
 Cyrillic alphabet and a 64-code-point limit, merged with summed frequencies,
 ranked, cut to 100,000 forms, lexically reordered, packed into a versioned
-binary format with SHA-256, and zlib-compressed. The dictionary data remains a
-separate CC BY 4.0 component; the application's Apache-2.0 license does not
-replace that data license.
+binary format with SHA-256, and zlib-compressed.
+
+--------------------------------------------------------------------------------
+russian_top100k_v1.tdict.zlib
+
+Derived from the Russian corpora rus_news_2022_1M, rus_news_2019_1M, and
+rus_wikipedia_2021_1M.
+Catalogue page: https://wortschatz.uni-leipzig.de/en/download/Russian
+
+Changes by the Tatar Keyboard project: the three word-frequency lists were
+decoded, validated, normalized to NFC lowercase, filtered to the 33-letter
+Russian alphabet (with "e" and "yo" kept apart, and hyphenated and Latin forms
+excluded) and a 64-code-point limit, merged with summed frequencies, ranked, cut
+to 100,000 forms, lexically reordered, packed into the same versioned binary
+format with SHA-256, and zlib-compressed.
+
+--------------------------------------------------------------------------------
+The dictionary data remains a separate CC BY 4.0 component; the application's
+Apache-2.0 license does not replace that data license.
+
+--------------------------------------------------------------------------------
+Conversational word frequencies -- PACKED since 1.9.0, WIDENED in 1.9.1
+
+Two further collections were measured, turned into word-by-word acceptance queues
+(docs/DICTIONARY-RU-CONV-REVIEW.tsv, docs/DICTIONARY-TT-CONV-REVIEW.tsv) and, on
+2026-08-24, accepted and packed into the two .tdict.zlib files above.
+
+1.9.0 accepted a word only if a second independent source confirmed it and the
+capitalization evidence did not mark it a proper noun; docs/DICT-ACCEPT.md states that
+rule and its counts. The operator then read a hundred random words it had turned away,
+judged them ordinary language, and lifted the bar: 1.9.1 accepts the whole queue except
+formal fragments -- words shorter than four letters or with no vowel at all, which in
+these corpora are subtitle OCR debris -- and one word named individually. The Tatar half
+uses only the no-vowel half of that test, because Tatar words are shorter and a length
+cut removes living ones. docs/DICT-WIDEN.md states the widened rule, every count, and
+what it still leaves out.
+
+32 833 Russian forms and 303 Tatar forms are inside the assets and carry their
+conversational counts; the other 67 167 and 99 697 entries, and every frequency in them,
+are still Leipzig's.
+
+Tatoeba
+https://tatoeba.org/
+License: Creative Commons Attribution 2.0 France (CC BY 2.0 FR)
+https://creativecommons.org/licenses/by/2.0/fr/
+Terms of use: https://tatoeba.org/eng/terms_of_use
+Sentences are contributed by Tatoeba's members; CC BY 2.0 FR permits use,
+modification and redistribution on the single condition that the source is cited.
+
+OpenSubtitles, taken from the OPUS collection (OpenSubtitles v2024)
+http://www.opensubtitles.org/
+Recommended citation: P. Lison, J. Tiedemann, "OpenSubtitles2016: Extracting Large
+Parallel Corpora from Movie and TV Subtitles", LREC 2016.
+OpenSubtitles publishes NO license grant for this text -- not an unclear license, an
+absent one. What the collection does ask is a link back to opensubtitles.org from
+anything built on its data; that link is on the line above and on the app's "Data
+sources" screen. The project's operator decided on 2026-08-24 to use the data
+anyway, with the absence of a grant stated. docs/CORPUS-OS.md records the decision
+and the measurements; docs/PUBLISH-CHECKLIST.md carries it to release as a known
+risk rather than a settled question.
+
+Changes by the Tatar Keyboard project: lines are deduplicated, tokens are normalized
+to NFC lowercase and filtered to the language alphabet, proper nouns are removed by
+capitalization evidence, forms seen fewer than three times are dropped, and only
+counts are kept -- with one stated exception. The acceptance queues are also readable
+in portions (docs/review-batches/), and a word that cannot be judged by its spelling
+alone carries one short example sentence there so a reader can judge it. Those
+sentences come from Tatoeba ONLY, which is what CC BY 2.0 FR grants in exchange for
+the citation above, and they live in the repository, not in the app. No OpenSubtitles
+sentence is reproduced anywhere in this repository; words seen only there carry a list
+of their neighbouring words with counts instead, which is a fact about the text and
+not the text.
+No sentence from either collection is stored in the app.

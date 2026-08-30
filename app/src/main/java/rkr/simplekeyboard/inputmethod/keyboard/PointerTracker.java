@@ -27,7 +27,6 @@ import android.view.MotionEvent;
 import java.util.ArrayList;
 
 import rkr.simplekeyboard.inputmethod.R;
-import rkr.simplekeyboard.inputmethod.keyboard.internal.BogusMoveEventDetector;
 import rkr.simplekeyboard.inputmethod.keyboard.internal.DrawingProxy;
 import rkr.simplekeyboard.inputmethod.keyboard.internal.PointerTrackerQueue;
 import rkr.simplekeyboard.inputmethod.keyboard.internal.TimerProxy;
@@ -84,7 +83,6 @@ public final class PointerTracker implements PointerTrackerQueue.Element {
     // when new {@link Keyboard} is set by {@link #setKeyDetector(KeyDetector)}.
     private KeyDetector mKeyDetector = new KeyDetector();
     private Keyboard mKeyboard;
-    private final BogusMoveEventDetector mBogusMoveEventDetector = new BogusMoveEventDetector();
 
     // The position and time at which first down event occurred.
     private int[] mDownCoordinates = CoordinateUtils.newInstance();
@@ -124,14 +122,15 @@ public final class PointerTracker implements PointerTrackerQueue.Element {
     // true if dragging finger is allowed.
     private boolean mIsAllowedDraggingFinger;
 
+    // true if this pointer went down on a modifier key (shift or the alpha/symbol switch key).
+    // Such a pointer may not leave that key until it has travelled the sliding-modifier slop from
+    // its touch-down point; see {@link #isMajorEnoughMoveToBeOnNewKey}.
+    private boolean mIsDownOnModifierKey;
+
     // TODO: Add PointerTrackerFactory singleton and move some class static methods into it.
     public static void init(final TypedArray mainKeyboardViewAttr, final TimerProxy timerProxy,
             final DrawingProxy drawingProxy) {
         sParams = new PointerTrackerParams(mainKeyboardViewAttr);
-
-        final Resources res = mainKeyboardViewAttr.getResources();
-        BogusMoveEventDetector.init(res);
-
         sTimerProxy = timerProxy;
         sDrawingProxy = drawingProxy;
     }
@@ -282,14 +281,9 @@ public final class PointerTracker implements PointerTrackerQueue.Element {
         mKeyboard = keyboard;
         // Mark that keyboard layout has been changed.
         mKeyboardLayoutHasBeenChanged = true;
-        final int keyPaddedWidth = mKeyboard.mMostCommonKeyWidth
-                + Math.round(mKeyboard.mHorizontalGap);
-        final int keyPaddedHeight = mKeyboard.mMostCommonKeyHeight
-                + Math.round(mKeyboard.mVerticalGap);
         // Keep {@link #mCurrentKey} that comes from previous keyboard. The key preview of
         // {@link #mCurrentKey} will be dismissed by {@setReleasedKeyGraphics(Key)} via
         // {@link onMoveEventInternal(int,int,long)} or {@link #onUpEventInternal(int,int,long)}.
-        mBogusMoveEventDetector.setKeyboardGeometry(keyPaddedWidth, keyPaddedHeight);
     }
 
     @Override
@@ -382,7 +376,6 @@ public final class PointerTracker implements PointerTrackerQueue.Element {
 
     private Key onDownKey(final int x, final int y) {
         CoordinateUtils.set(mDownCoordinates, x, y);
-        mBogusMoveEventDetector.onDownKey();
         return onMoveToNewKey(onMoveKeyInternal(x, y), x, y);
     }
 
@@ -391,7 +384,6 @@ public final class PointerTracker implements PointerTrackerQueue.Element {
     }
 
     private Key onMoveKeyInternal(final int x, final int y) {
-        mBogusMoveEventDetector.onMoveKey(getDistance(x, y, mLastX, mLastY));
         mLastX = x;
         mLastY = y;
         return mKeyDetector.detectHitKey(x, y);
@@ -472,7 +464,6 @@ public final class PointerTracker implements PointerTrackerQueue.Element {
         }
 
         final Key key = getKeyOn(x, y);
-        mBogusMoveEventDetector.onActualDownEvent(x, y);
         if (key != null && key.isModifier()) {
             // Before processing a down event of modifier key, all pointers already being
             // tracked should be released.
@@ -499,8 +490,9 @@ public final class PointerTracker implements PointerTrackerQueue.Element {
         // enabled by configuration, 2) this pointer starts dragging from modifier key, or 3) this
         // pointer's KeyDetector always allows key selection by dragging finger, such as
         // {@link MoreKeysKeyboard}.
+        mIsDownOnModifierKey = key != null && key.isModifier();
         mIsAllowedDraggingFinger = sParams.mKeySelectionByDraggingFinger
-                || (key != null && key.isModifier())
+                || mIsDownOnModifierKey
                 || mKeyDetector.alwaysAllowsKeySelectionByDraggingFinger();
         mKeyboardLayoutHasBeenChanged = false;
         mIsTrackingForActionDisabled = false;
@@ -509,8 +501,19 @@ public final class PointerTracker implements PointerTrackerQueue.Element {
             // This onPress call may have changed keyboard layout. Those cases are detected at
             // {@link #setKeyboard}. In those cases, we should update key according to the new
             // keyboard layout.
+            final Keyboard keyboardOnPress = mKeyboard;
             if (callListenerOnPressAndCheckKeyboardLayoutChange(key, 0 /* repeatCount */)) {
-                key = onDownKey(x, y);
+                // The keyboard view is bottom aligned, so a keyboard of a different height moves
+                // the origin of the touch coordinates. The Tatar alphabet keyboard carries an
+                // extra row for ә ө ү җ ң һ and is one row taller than the symbols keyboard
+                // (728px against 667px on a 440dpi phone), so the instant ?123 is pressed every
+                // touch coordinate that follows is shifted by 61px. Re-detect the key -- and
+                // record the touch-down point -- in the new keyboard's space, otherwise the move
+                // events that follow are measured against a point a whole row away. Upstream
+                // AOSP never meets this: there both keyboards have four rows.
+                final int verticalShift = keyboardOnPress == null || mKeyboard == null ? 0
+                        : mKeyboard.mOccupiedHeight - keyboardOnPress.mOccupiedHeight;
+                key = onDownKey(x, y + verticalShift);
             }
 
             startRepeatKey(key);
@@ -823,6 +826,18 @@ public final class PointerTracker implements PointerTrackerQueue.Element {
         if (curKey == null /* && newKey != null */) {
             return true;
         }
+        // A press that went down on a modifier key must travel a real distance from its
+        // touch-down point before it is allowed to leave that key. The hysteresis below is
+        // measured from the key edge, so without this gate a press landing near the edge of
+        // ?123 or shift leaves the key after 5dp of movement -- less than the platform's own
+        // 8dp touch slop -- which arms the momentary layout switch and springs it back on
+        // release. Measuring from the touch-down point instead makes the edge of the key as
+        // reliable as its centre. See docs/SYMBOL-KEY-EDGE-FIX.md.
+        if (mIsDownOnModifierKey && !mIsInDraggingFinger
+                && !mKeyDetector.isBeyondSlidingModifierSlop(CoordinateUtils.x(mDownCoordinates),
+                        CoordinateUtils.y(mDownCoordinates), x, y)) {
+            return false;
+        }
         // Here curKey points to the different key from newKey.
         final int keyHysteresisDistanceSquared = mKeyDetector.getKeyHysteresisDistanceSquared(
                 mIsInSlidingKeyInput);
@@ -833,19 +848,6 @@ public final class PointerTracker implements PointerTrackerQueue.Element {
                         / (mKeyboard.mMostCommonKeyWidth + mKeyboard.mHorizontalGap);
                 Log.d(TAG, String.format("[%d] isMajorEnoughMoveToBeOnNewKey:"
                         +" %.2f key width from key edge", mPointerId, distanceToEdgeRatio));
-            }
-            return true;
-        }
-        if (!mIsAllowedDraggingFinger && mBogusMoveEventDetector.hasTraveledLongDistance(x, y)) {
-            if (DEBUG_MODE) {
-                final float keyDiagonal = (float)Math.hypot(
-                        mKeyboard.mMostCommonKeyWidth + mKeyboard.mHorizontalGap,
-                        mKeyboard.mMostCommonKeyHeight + mKeyboard.mVerticalGap);
-                final float lengthFromDownRatio =
-                        mBogusMoveEventDetector.getAccumulatedDistanceFromDownKey() / keyDiagonal;
-                Log.d(TAG, String.format("[%d] isMajorEnoughMoveToBeOnNewKey:"
-                        + " %.2f key diagonal from virtual down point",
-                        mPointerId, lengthFromDownRatio));
             }
             return true;
         }

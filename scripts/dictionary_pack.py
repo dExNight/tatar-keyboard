@@ -1,8 +1,12 @@
 #!/usr/bin/env python3
-"""Build, validate, evaluate, and audit the D1a Tatar dictionary asset.
+"""Build, validate, evaluate, and audit a packed Cyrillic dictionary asset.
 
 The tool uses only the Python standard library. Parsing, normalization, alphabet,
 length, frequency ranking, and tie-breaking come from dictionary_coverage.py.
+
+One binary format serves every language: the language decides only which alphabet the
+corpus rows are filtered by and which size budget the result must fit. ``--language tat``
+is the default and reproduces the D1a Tatar asset byte for byte.
 """
 
 from __future__ import annotations
@@ -36,6 +40,11 @@ HEADER_SIZE = 72
 CHECKSUM_OFFSET = 40
 CHECKSUM_SIZE = 32
 MAX_U32 = 0xFFFF_FFFF
+# ONE budget for the format, the same for every language. The Russian top-100k measured
+# 606,315 / 2,540,622 bytes against these caps — within a hundred kilobytes of the Tatar one,
+# because Russian words are barely longer (8.9 vs 8.7 code points on average). A per-language
+# budget was considered and dropped: a second, laxer number would only ever be an invitation to
+# ship a bigger artifact without noticing, and there is nothing to buy with it.
 MAX_COMPRESSED_BYTES = 700_000
 MAX_UNCOMPRESSED_BYTES = 2_936_012
 DEFAULT_COUNT = 100_000
@@ -101,17 +110,25 @@ class BuiltDictionary:
     boundary_frequency: int
 
 
-def _read_frequencies(paths: Sequence[Path]) -> CheckedFrequencyCounter:
+def _read_frequencies(
+    paths: Sequence[Path], language: coverage.Language = coverage.DEFAULT_LANGUAGE
+) -> CheckedFrequencyCounter:
     if not paths:
         raise DictionaryInputError("at least one Leipzig input is required")
     frequencies = CheckedFrequencyCounter()
     for path in paths:
         with path.open("r", encoding="utf-8-sig", newline="") as stream:
             coverage.read_source(
-                stream, str(path), frequencies, skip_malformed=False
+                stream,
+                str(path),
+                frequencies,
+                skip_malformed=False,
+                alphabet=language.alphabet,
             )
     if not frequencies:
-        raise DictionaryInputError("inputs contain no usable Tatar words")
+        raise DictionaryInputError(
+            f"inputs contain no usable {language.display} words"
+        )
     return frequencies
 
 
@@ -145,7 +162,10 @@ def _checksum_with_zeroed_digest(raw: bytes) -> bytes:
     return hashlib.sha256(digest_input).digest()
 
 
-def serialize_entries(entries: Sequence[tuple[str, int]]) -> bytes:
+def serialize_entries(
+    entries: Sequence[tuple[str, int]],
+    language: coverage.Language = coverage.DEFAULT_LANGUAGE,
+) -> bytes:
     if not entries:
         raise DictionaryInputError("cannot serialize an empty dictionary")
 
@@ -154,7 +174,7 @@ def serialize_entries(entries: Sequence[tuple[str, int]]) -> bytes:
     frequencies: list[int] = []
     previous_word: str | None = None
     for word, frequency in entries:
-        normalized, reason = coverage.normalize_word(word)
+        normalized, reason = coverage.normalize_word(word, language.alphabet)
         if reason is not None or normalized != word:
             raise DictionaryInputError(f"word is not canonical: {word!r}")
         if previous_word is not None:
@@ -220,26 +240,29 @@ def compress_raw(raw: bytes) -> bytes:
     return compressor.compress(raw) + compressor.flush(zlib.Z_FINISH)
 
 
-def decompress_asset(asset: bytes) -> bytes:
-    if len(asset) > MAX_COMPRESSED_BYTES:
+def decompress_asset(
+    asset: bytes, language: coverage.Language = coverage.DEFAULT_LANGUAGE
+) -> bytes:
+    max_compressed, max_uncompressed = MAX_COMPRESSED_BYTES, MAX_UNCOMPRESSED_BYTES
+    if len(asset) > max_compressed:
         raise DictionaryBudgetError(
-            f"compressed asset is {len(asset)} bytes; limit is {MAX_COMPRESSED_BYTES}"
+            f"compressed asset is {len(asset)} bytes; limit is {max_compressed}"
         )
     decompressor = zlib.decompressobj(wbits=COMPRESSION_WBITS)
     try:
-        raw = decompressor.decompress(asset, MAX_UNCOMPRESSED_BYTES + 1)
-        if len(raw) > MAX_UNCOMPRESSED_BYTES or decompressor.unconsumed_tail:
+        raw = decompressor.decompress(asset, max_uncompressed + 1)
+        if len(raw) > max_uncompressed or decompressor.unconsumed_tail:
             raise DictionaryBudgetError(
-                f"uncompressed dictionary exceeds {MAX_UNCOMPRESSED_BYTES} bytes"
+                f"uncompressed dictionary exceeds {max_uncompressed} bytes"
             )
-        remaining = MAX_UNCOMPRESSED_BYTES + 1 - len(raw)
+        remaining = max_uncompressed + 1 - len(raw)
         raw += decompressor.flush(remaining)
     except zlib.error as error:
         raise DictionaryFormatError(f"invalid zlib stream: {error}") from error
-    if len(raw) > MAX_UNCOMPRESSED_BYTES:
+    if len(raw) > max_uncompressed:
         raise DictionaryBudgetError(
             f"uncompressed dictionary is {len(raw)} bytes; "
-            f"limit is {MAX_UNCOMPRESSED_BYTES}"
+            f"limit is {max_uncompressed}"
         )
     if not decompressor.eof:
         raise DictionaryFormatError("truncated zlib stream")
@@ -250,11 +273,16 @@ def decompress_asset(asset: bytes) -> bytes:
     return raw
 
 
-def validate_raw(raw: bytes, expected_count: int | None = None) -> ParsedDictionary:
-    if len(raw) > MAX_UNCOMPRESSED_BYTES:
+def validate_raw(
+    raw: bytes,
+    expected_count: int | None = None,
+    language: coverage.Language = coverage.DEFAULT_LANGUAGE,
+) -> ParsedDictionary:
+    max_uncompressed = MAX_UNCOMPRESSED_BYTES
+    if len(raw) > max_uncompressed:
         raise DictionaryBudgetError(
             f"uncompressed dictionary is {len(raw)} bytes; "
-            f"limit is {MAX_UNCOMPRESSED_BYTES}"
+            f"limit is {max_uncompressed}"
         )
     if len(raw) < HEADER_SIZE:
         raise DictionaryFormatError("raw dictionary is shorter than its header")
@@ -340,7 +368,7 @@ def validate_raw(raw: bytes, expected_count: int | None = None) -> ParsedDiction
             word = encoded.decode("utf-8", errors="strict")
         except UnicodeDecodeError as error:
             raise DictionaryFormatError(f"word {index} is not valid UTF-8") from error
-        normalized, reason = coverage.normalize_word(word)
+        normalized, reason = coverage.normalize_word(word, language.alphabet)
         if reason is not None:
             raise DictionaryFormatError(f"word {index} is invalid: {reason}")
         if normalized != word:
@@ -366,22 +394,28 @@ def validate_raw(raw: bytes, expected_count: int | None = None) -> ParsedDiction
 
 
 def validate_asset(
-    asset: bytes, expected_count: int | None = None
+    asset: bytes,
+    expected_count: int | None = None,
+    language: coverage.Language = coverage.DEFAULT_LANGUAGE,
 ) -> ParsedDictionary:
-    return validate_raw(decompress_asset(asset), expected_count)
+    return validate_raw(decompress_asset(asset, language), expected_count, language)
 
 
-def build_dictionary(paths: Sequence[Path], count: int) -> BuiltDictionary:
-    frequencies = _read_frequencies(paths)
+def build_dictionary(
+    paths: Sequence[Path],
+    count: int,
+    language: coverage.Language = coverage.DEFAULT_LANGUAGE,
+) -> BuiltDictionary:
+    frequencies = _read_frequencies(paths, language)
     entries, boundary_frequency = select_entries(frequencies, count)
-    raw = serialize_entries(entries)
-    parsed = validate_raw(raw, expected_count=count)
+    raw = serialize_entries(entries, language)
+    parsed = validate_raw(raw, expected_count=count, language=language)
     asset = compress_raw(raw)
     if len(asset) > MAX_COMPRESSED_BYTES:
         raise DictionaryBudgetError(
             f"compressed asset is {len(asset)} bytes; limit is {MAX_COMPRESSED_BYTES}"
         )
-    reparsed = validate_asset(asset, expected_count=count)
+    reparsed = validate_asset(asset, expected_count=count, language=language)
     if reparsed.raw != raw:
         raise DictionaryFormatError("zlib round trip changed the raw dictionary")
     return BuiltDictionary(raw, asset, parsed, boundary_frequency)
@@ -433,14 +467,15 @@ def build_coverage_report(
     held_out_path: Path,
     cutoffs: Sequence[int],
     comparison: tuple[int, int] = (100_000, 150_000),
+    language: coverage.Language = coverage.DEFAULT_LANGUAGE,
 ) -> dict[str, object]:
-    training = _read_frequencies(training_paths)
+    training = _read_frequencies(training_paths, language)
     ranked = coverage.sorted_entries(training)
     if max(cutoffs) > len(ranked):
         raise DictionaryInputError(
             f"largest cutoff {max(cutoffs)} exceeds {len(ranked)} training words"
         )
-    held_out = _read_frequencies([held_out_path])
+    held_out = _read_frequencies([held_out_path], language)
     held_out_tokens = sum(held_out.values())
     rows: list[dict[str, object]] = []
     by_cutoff: dict[int, float] = {}
@@ -473,15 +508,19 @@ def build_coverage_report(
         "cutoffs": rows,
         "held_out_accepted_tokens": held_out_tokens,
         "held_out_unique_words": len(held_out),
+        "language": language.tag,
         "schema_version": 1,
         "training_unique_words": len(ranked),
     }
 
 
 def prefix_candidates(
-    dictionary: ParsedDictionary, prefix: str, top: int
+    dictionary: ParsedDictionary,
+    prefix: str,
+    top: int,
+    language: coverage.Language = coverage.DEFAULT_LANGUAGE,
 ) -> list[tuple[str, int]]:
-    normalized, reason = coverage.normalize_word(prefix)
+    normalized, reason = coverage.normalize_word(prefix, language.alphabet)
     if reason is not None or normalized != prefix:
         raise DictionaryInputError(f"query is not canonical: {prefix!r}")
     if top <= 0:
@@ -498,7 +537,9 @@ def prefix_candidates(
     return matches[:top]
 
 
-def _read_queries(path: Path) -> list[str]:
+def _read_queries(
+    path: Path, language: coverage.Language = coverage.DEFAULT_LANGUAGE
+) -> list[str]:
     queries: list[str] = []
     seen: set[str] = set()
     with path.open("r", encoding="utf-8", newline="") as stream:
@@ -506,7 +547,7 @@ def _read_queries(path: Path) -> list[str]:
             query = line.strip()
             if not query or query.startswith("#"):
                 continue
-            normalized, reason = coverage.normalize_word(query)
+            normalized, reason = coverage.normalize_word(query, language.alphabet)
             if reason is not None or normalized != query:
                 raise DictionaryInputError(
                     f"{path}:{line_number}: query is not canonical"
@@ -521,20 +562,29 @@ def _read_queries(path: Path) -> list[str]:
 
 
 def _audit_rows(
-    dictionary: ParsedDictionary, queries: Iterable[str], top: int
+    dictionary: ParsedDictionary,
+    queries: Iterable[str],
+    top: int,
+    language: coverage.Language = coverage.DEFAULT_LANGUAGE,
 ) -> list[dict[str, str]]:
     return [
         {
             "prefix": query,
             "candidates": "|".join(
-                word for word, _ in prefix_candidates(dictionary, query, top)
+                word
+                for word, _ in prefix_candidates(dictionary, query, top, language)
             ),
         }
         for query in queries
     ]
 
 
-def _check_review(rows: Sequence[dict[str, str]], review_path: Path) -> None:
+def _check_review(
+    rows: Sequence[dict[str, str]],
+    review_path: Path,
+    reviewer: str = AUTOMATED_REVIEWER,
+    review_date: str = AUTOMATED_REVIEW_DATE,
+) -> None:
     with review_path.open("r", encoding="utf-8", newline="") as stream:
         reader = csv.DictReader(stream, delimiter="\t")
         expected_fields = [
@@ -556,9 +606,9 @@ def _check_review(rows: Sequence[dict[str, str]], review_path: Path) -> None:
             raise DictionaryQualityError(f"review candidates changed for {prefix!r}")
         if recorded["classification"] != "pass":
             raise DictionaryQualityError(f"query review failed closed for {prefix!r}")
-        if recorded["reviewer"] != AUTOMATED_REVIEWER:
+        if recorded["reviewer"] != reviewer:
             raise DictionaryQualityError(f"unexpected reviewer for {prefix!r}")
-        if recorded["review_date"] != AUTOMATED_REVIEW_DATE:
+        if recorded["review_date"] != review_date:
             raise DictionaryQualityError(f"unexpected review date for {prefix!r}")
         if not recorded["note"].strip():
             raise DictionaryQualityError(f"missing review rationale for {prefix!r}")
@@ -591,11 +641,20 @@ def create_argument_parser() -> argparse.ArgumentParser:
     parser.add_argument("--version", action="version", version=GENERATOR_VERSION)
     commands = parser.add_subparsers(dest="command", required=True)
 
+    def add_language(command: argparse.ArgumentParser) -> None:
+        command.add_argument(
+            "--language",
+            choices=sorted(coverage.LANGUAGES),
+            default=coverage.DEFAULT_LANGUAGE.tag,
+            help="alphabet and size budget to use (default: tat)",
+        )
+
     build = commands.add_parser("build", help="build raw and zlib dictionary outputs")
     build.add_argument("inputs", nargs="+", type=Path)
     build.add_argument("--count", type=_positive_int, default=DEFAULT_COUNT)
     build.add_argument("--raw-output", type=Path, required=True)
     build.add_argument("--asset-output", type=Path, required=True)
+    add_language(build)
 
     validate = commands.add_parser("validate", help="strictly validate a dictionary")
     source = validate.add_mutually_exclusive_group(required=True)
@@ -603,6 +662,7 @@ def create_argument_parser() -> argparse.ArgumentParser:
     source.add_argument("--asset", type=Path)
     validate.add_argument("--expected-count", type=_positive_int)
     validate.add_argument("--raw-output", type=Path)
+    add_language(validate)
 
     report = commands.add_parser("coverage", help="run held-out cutoff comparison")
     report.add_argument("--train", action="append", required=True, type=Path)
@@ -611,12 +671,16 @@ def create_argument_parser() -> argparse.ArgumentParser:
         "--cutoffs", type=coverage.parse_cutoffs, default=DEFAULT_CUTOFFS
     )
     report.add_argument("--max-gap-pp", type=_nonnegative_float, required=True)
+    add_language(report)
 
     audit = commands.add_parser("query-audit", help="audit recorded prefix candidates")
     audit.add_argument("--asset", required=True, type=Path)
     audit.add_argument("--queries", required=True, type=Path)
     audit.add_argument("--review", type=Path)
     audit.add_argument("--top", type=_positive_int, default=3)
+    audit.add_argument("--reviewer", default=AUTOMATED_REVIEWER)
+    audit.add_argument("--review-date", default=AUTOMATED_REVIEW_DATE)
+    add_language(audit)
     return parser
 
 
@@ -627,35 +691,41 @@ def _print_json(value: object, stream: TextIO = sys.stdout) -> None:
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = create_argument_parser().parse_args(argv)
+    language = coverage.language_for(args.language)
     try:
         if args.command == "build":
-            built = build_dictionary(args.inputs, args.count)
+            built = build_dictionary(args.inputs, args.count, language)
             _write_outputs(args.raw_output, built.raw, args.asset_output, built.asset)
             result = summary(built.asset, built.parsed)
             result["boundary_frequency"] = built.boundary_frequency
+            result["language"] = language.tag
             _print_json(result)
         elif args.command == "validate":
             if args.raw is not None:
                 raw = args.raw.read_bytes()
-                parsed = validate_raw(raw, args.expected_count)
+                parsed = validate_raw(raw, args.expected_count, language)
                 result = {
                     "entry_count": parsed.entry_count,
                     "format_version": FORMAT_VERSION,
+                    "language": language.tag,
                     "raw_sha256": hashlib.sha256(raw).hexdigest(),
                     "schema_id": SCHEMA_ID,
                     "uncompressed_bytes": len(raw),
                 }
             else:
                 asset = args.asset.read_bytes()
-                parsed = validate_asset(asset, args.expected_count)
+                parsed = validate_asset(asset, args.expected_count, language)
                 raw = parsed.raw
                 result = summary(asset, parsed)
+                result["language"] = language.tag
             if args.raw_output is not None:
                 staged = _stage_file(args.raw_output, raw)
                 os.replace(staged, args.raw_output)
             _print_json(result)
         elif args.command == "coverage":
-            result = build_coverage_report(args.train, args.held_out, args.cutoffs)
+            result = build_coverage_report(
+                args.train, args.held_out, args.cutoffs, language=language
+            )
             if result["coverage_gap_pp"] > args.max_gap_pp:
                 raise DictionaryQualityError(
                     f"100k trails 150k by {result['coverage_gap_pp']:.6f} pp; "
@@ -663,10 +733,15 @@ def main(argv: Sequence[str] | None = None) -> int:
                 )
             _print_json(result)
         elif args.command == "query-audit":
-            dictionary = validate_asset(args.asset.read_bytes())
-            rows = _audit_rows(dictionary, _read_queries(args.queries), args.top)
+            dictionary = validate_asset(args.asset.read_bytes(), language=language)
+            rows = _audit_rows(
+                dictionary,
+                _read_queries(args.queries, language),
+                args.top,
+                language,
+            )
             if args.review is not None:
-                _check_review(rows, args.review)
+                _check_review(rows, args.review, args.reviewer, args.review_date)
             writer = csv.DictWriter(
                 sys.stdout,
                 fieldnames=["prefix", "candidates"],

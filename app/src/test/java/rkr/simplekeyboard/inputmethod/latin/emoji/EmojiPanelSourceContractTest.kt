@@ -112,10 +112,14 @@ class EmojiPanelSourceContractTest {
     @Test
     fun onDrawPaintsOnlyTheVisibleGridRows() {
         val drawBody = onDrawBody()
-        assertTrue(drawBody.contains("firstVisibleRow"))
-        assertTrue(drawBody.contains("lastVisibleRow"))
-        // The loop is bounded by the visible-row range, not by the whole entry count.
-        assertTrue(drawBody.contains("row in firstRow..lastRow"))
+        // The content is walked section by section, and inside a section row by row, both bounded
+        // by the visible range rather than by the whole entry count.
+        assertTrue(drawBody.contains("state.firstVisibleSection()"))
+        assertTrue(drawBody.contains("state.lastVisibleSection()"))
+        assertTrue(drawBody.contains("state.firstVisibleRowOf(section)"))
+        assertTrue(drawBody.contains("state.lastVisibleRowOf(section)"))
+        assertTrue(drawBody.contains("section in firstSection..lastSection"))
+        assertTrue(drawBody.contains("while (row <= lastRow)"))
     }
 
     // --- Exactly two functional keys, no space, no Enter ---------------------------------------

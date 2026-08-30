@@ -20,12 +20,19 @@ import android.content.Context
 import android.os.Handler
 import rkr.simplekeyboard.inputmethod.latin.dictionary.engine.AutocorrectPolicy
 import rkr.simplekeyboard.inputmethod.latin.dictionary.engine.KeyNeighborTable
+import rkr.simplekeyboard.inputmethod.latin.dictionary.engine.LookupKind
 import rkr.simplekeyboard.inputmethod.latin.dictionary.personal.PersonalSubtypes
+import rkr.simplekeyboard.inputmethod.latin.dictionary.storage.AndroidBigramStorageFactory
 import rkr.simplekeyboard.inputmethod.latin.dictionary.storage.AndroidDictionaryStorageFactory
+import rkr.simplekeyboard.inputmethod.latin.dictionary.storage.BigramPreparationResult
+import rkr.simplekeyboard.inputmethod.latin.dictionary.storage.BigramStorageController
+import rkr.simplekeyboard.inputmethod.latin.dictionary.storage.DictionaryArtifactSpec
 import rkr.simplekeyboard.inputmethod.latin.dictionary.storage.DictionaryStorageController
 import rkr.simplekeyboard.inputmethod.latin.dictionary.personal.WordCompletionSink
 import rkr.simplekeyboard.inputmethod.latin.dictionary.storage.PreparationResult
+import rkr.simplekeyboard.inputmethod.latin.dictionary.storage.PublishedBigramTableCatalog
 import rkr.simplekeyboard.inputmethod.latin.dictionary.storage.PublishedDictionaryCatalog
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 
@@ -82,6 +89,28 @@ interface EditorSurface {
      * replacement left there. Defaults to false, like [replaceTypedWord].
      */
     fun revertTypedWord(insertedForm: String, separator: String, typedForm: String): Boolean = false
+
+    /**
+     * E5d NEXT_WORD context extraction from the live cache (PROPOSALS.md, "Контракт текста"
+     * amendment, 2026-08-17): the word immediately before a trailing run of one-or-more U+0020 right
+     * at the cursor, or "" if there is none. Defaults to "" so an editor surface written before E5d
+     * keeps compiling and NEXT_WORD simply never fires.
+     */
+    fun cachedNextWordContext(): String = ""
+
+    /**
+     * The THIRD insertion path of the frozen text contract (E5d): commits a predicted next word.
+     * Unlike [commitSuggestion] and [replaceTypedWord], this one deletes NOTHING — NEXT_WORD only
+     * ever fires on an empty prefix, so there is nothing trailing to remove; it only inserts, with
+     * the same auto-space rule an accepted suggestion uses.
+     *
+     * Re-checked against the live cache: collapsed selection, no letter right after the cursor (the
+     * same two checks the other two paths make), an EMPTY trailing word (a non-empty one means the
+     * user typed something after the request was built — the tap is stale), and the live context
+     * word re-extracted by [cachedNextWordContext]'s own algorithm matching [expectedContextWord]
+     * exactly. Defaults to false, like [replaceTypedWord] and [revertTypedWord].
+     */
+    fun commitPredictedWord(expectedContextWord: String, suggestion: String): Boolean = false
 }
 
 /**
@@ -139,11 +168,73 @@ private class DeviceProtectedDictionaryPreparation(
     override fun catalog(): PublishedDictionaryCatalog = storage
 
     companion object {
-        /** Returns null if the store cannot be built at all, leaving the caller fail-closed. */
-        fun create(context: Context, executor: ExecutorService): DictionaryPreparation? = try {
-            DeviceProtectedDictionaryPreparation(
-                AndroidDictionaryStorageFactory.create(context, executor),
-            )
+        /**
+         * Storage for the dictionary of [subtypeId], or null when that subtype ships none (every
+         * layout but the two that do) or the store cannot be built at all — both leave the caller
+         * fail-closed with no engine and a hidden strip.
+         */
+        fun create(
+            context: Context,
+            executor: ExecutorService,
+            subtypeId: String,
+        ): DictionaryPreparation? = try {
+            val artifact = DictionaryArtifactSpec.forSubtype(subtypeId)
+            if (artifact == null) {
+                null
+            } else {
+                DeviceProtectedDictionaryPreparation(
+                    AndroidDictionaryStorageFactory.create(context, executor, artifact),
+                )
+            }
+        } catch (_: Throwable) {
+            null
+        }
+    }
+}
+
+/**
+ * E5c two-stage readiness: lazily created bigram-table storage, the exact same shape as
+ * [DictionaryPreparation] for the exact same reason (a user who never turns suggestions on never
+ * pays disk space or background work for the bigram table either) — kept a SEPARATE interface
+ * rather than folding into [DictionaryPreparation] because the two artifacts already don't share
+ * a spec, validator or store (`docs/DICTIONARY-E5B.md`), and merging their controller seams here
+ * would just recreate that coupling one layer up.
+ */
+interface BigramPreparation {
+    fun prepare(onResult: (BigramPreparationResult) -> Unit)
+    fun catalog(): PublishedBigramTableCatalog
+}
+
+/** Production [BigramPreparation] over the device-protected bigram-table store. */
+private class DeviceProtectedBigramPreparation(
+    private val storage: BigramStorageController,
+) : BigramPreparation {
+    override fun prepare(onResult: (BigramPreparationResult) -> Unit) = storage.prepare(onResult)
+
+    override fun catalog(): PublishedBigramTableCatalog = storage
+
+    companion object {
+        /**
+         * Storage for the next-word table of [subtypeId], or null when that subtype ships none —
+         * asked of the SAME registry [DeviceProtectedDictionaryPreparation.create] asks for the
+         * dictionary, so the two can never end up on different languages. A language present in
+         * the registry with no table, and a subtype absent from it entirely, both land here as
+         * null and leave NEXT_WORD answering an empty list: the exact fail-closed shape a missing
+         * table already had, with no effect on prefix suggestions or ordinary input.
+         */
+        fun create(
+            context: Context,
+            executor: ExecutorService,
+            subtypeId: String,
+        ): BigramPreparation? = try {
+            val artifact = DictionaryArtifactSpec.bigramsForSubtype(subtypeId)
+            if (artifact == null) {
+                null
+            } else {
+                DeviceProtectedBigramPreparation(
+                    AndroidBigramStorageFactory.create(context, executor, artifact),
+                )
+            }
         } catch (_: Throwable) {
             null
         }
@@ -183,10 +274,15 @@ class SuggestionsController internal constructor(
     private val strip: StripSurface,
     private val editor: EditorSurface,
     private val uiPoster: UiPoster,
-    private val engineFactory: (ResultCallback) -> EngineHandle?,
+    private val engineFactory: (String, ResultCallback) -> EngineHandle?,
     private val executorFactory: () -> ExecutorService?,
-    private val preparationFactory: (ExecutorService) -> DictionaryPreparation?,
+    private val preparationFactory: (ExecutorService, String) -> DictionaryPreparation?,
     initialDictionaryReady: Boolean,
+    // E5c: trailing default so every existing internal test constructor below (there is no
+    // bigram table in any of their fakes) needs no change at all — only the production
+    // constructor passes real wiring.
+    private val bigramPreparationFactory: (ExecutorService, String) -> BigramPreparation? =
+        { _, _ -> null },
 ) {
     /** Production entry point (frozen contract). */
     constructor(
@@ -194,15 +290,20 @@ class SuggestionsController internal constructor(
         strip: StripSurface,
         editor: EditorSurface,
         uiHandler: Handler,
-        engineFactory: (ResultCallback) -> EngineHandle?,
+        engineFactory: (String, ResultCallback) -> EngineHandle?,
     ) : this(
         strip,
         editor,
         UiPoster { runnable -> uiHandler.post(runnable) },
         engineFactory,
         { Executors.newSingleThreadExecutor() },
-        { executor -> DeviceProtectedDictionaryPreparation.create(context, executor) },
+        { executor, subtypeId ->
+            DeviceProtectedDictionaryPreparation.create(context, executor, subtypeId)
+        },
         false,
+        { executor, subtypeId ->
+            DeviceProtectedBigramPreparation.create(context, executor, subtypeId)
+        },
     )
 
     /** Test entry point: injects a synchronous poster + executor and pre-marks the dictionary. */
@@ -230,26 +331,86 @@ class SuggestionsController internal constructor(
         strip,
         editor,
         uiPoster,
-        engineFactory,
+        { _, callback -> engineFactory(callback) },
         { backgroundExecutor },
-        { null },
+        { _, _ -> null },
         dictionaryReady,
     )
 
     private var executor: ExecutorService? = null
 
     /**
-     * Storage seam, created on the first preparation request. Written on the UI thread and read off
-     * it by the production engine factory through [engineCatalog], hence volatile.
+     * Everything that belongs to ONE language: its storage seams, its readiness, its engine and
+     * the bookkeeping of its preparation and release.
+     *
+     * Slots are what makes switching layouts free. Both dictionaries are separate artifacts in
+     * separate device-protected directories with separate leases, so the engine of a language the
+     * user leaves is simply idled ([EngineHandle.finishInput]) and kept warm — it is NOT torn down.
+     * A teardown blocks the UI thread for up to 240 ms ([destroyHandle]) and its release is
+     * deliberately deferred to a lifecycle boundary, so tearing down on every press of the globe
+     * key would either stall the keystroke or leave the user with no suggestions until they left
+     * the field. Warm slots cost one idle worker thread and one read-only mapping each; the
+     * mapping is file-backed, so its pages are evictable and only the ones actually touched by a
+     * lookup are resident.
      */
-    @Volatile
-    private var preparation: DictionaryPreparation? = null
+    private inner class LanguageSlot(val subtypeId: String) {
+        /** Storage seam, created on this language's first preparation request. */
+        @Volatile
+        var preparation: DictionaryPreparation? = null
 
-    @Volatile
-    private var dictionaryReady: Boolean = initialDictionaryReady
+        /** E5c two-stage readiness: same lazy-seam shape as [preparation], for the bigram table. */
+        @Volatile
+        var bigramPreparation: BigramPreparation? = null
 
-    private var engine: EngineHandle? = null
-    private var starting: Boolean = false
+        @Volatile
+        var dictionaryReady: Boolean = false
+
+        var engine: EngineHandle? = null
+        var starting: Boolean = false
+
+        // Lifecycle of the "preparation requested" flag, in one place because nothing below it
+        // de-duplicates: it is set the moment preparation is requested, it is NEVER cleared after a
+        // Published result (readiness survives every later transition of the setting and the engine
+        // is restarted from the already published file), and it is cleared ONLY when the last known
+        // result was Unavailable and a fresh OFF -> ON transition of the setting has been observed.
+        var preparationRequested: Boolean = false
+        var lastPreparationUnavailable: Boolean = false
+
+        // Provenance of the outstanding request, so an Unavailable result can tell the two callers
+        // of requestPreparationIfNeeded apart. Only a request made because the user turned the
+        // setting on is reported to [dictionaryUnavailableListener].
+        var preparationRequestedByExplicitEnable: Boolean = false
+
+        // Set when the setting goes ON -> OFF. The blocking engine teardown is deferred to the next
+        // lifecycle boundary instead of running inside the settings handler, where it would hold
+        // the UI thread for up to 240 ms on the very keystroke that flipped the setting.
+        var releasePending: Boolean = false
+
+        // True once a deferred release has been attempted at a boundary and refused. The attempt is
+        // not free of consequences: the engine has already been told to stop and rejects every
+        // later lookup, so it is no longer a correct mapping and the setting coming back on may no
+        // longer cancel its release. Without this the cancellation would strand a permanently dead
+        // engine — nothing would release it and nothing would replace it — and the user would see
+        // an empty band for the rest of the process.
+        var releaseAttemptFailed: Boolean = false
+    }
+
+    /**
+     * One slot per language, created on first need and kept for the controller's lifetime.
+     *
+     * Concurrent because the production engine factory reads it from the background executor
+     * through [engineCatalog] while the UI thread may be inserting the slot of a language the user
+     * has just switched to.
+     */
+    private val slots = ConcurrentHashMap<String, LanguageSlot>()
+
+    /**
+     * The subtype whose dictionary is currently selected, or null when the active subtype ships
+     * none. This is the ONE place the choice of dictionary is made; everything downstream —
+     * storage directory, engine, personal store, lookup key — follows from it.
+     */
+    private var activeLanguage: String? = DEFAULT_LANGUAGE
+
     private var eligible: Boolean = false
     private var destroyed: Boolean = false
 
@@ -258,34 +419,35 @@ class SuggestionsController internal constructor(
     // disables the fuzzy pass; the strip and its exact suggestions are unaffected either way.
     private var keyNeighbors: KeyNeighborTable? = null
 
-    // Lifecycle of the "preparation requested" flag, in one place because nothing below it
-    // de-duplicates: it is set the moment preparation is requested, it is NEVER cleared after a
-    // Published result (readiness survives every later transition of the setting and the engine is
-    // restarted from the already published file), and it is cleared ONLY when the last known result
-    // was Unavailable and a fresh OFF -> ON transition of the setting has been observed.
-    private var preparationRequested: Boolean = false
-    private var lastPreparationUnavailable: Boolean = false
-
-    // Provenance of the outstanding request, so an Unavailable result can tell the two callers of
-    // requestPreparationIfNeeded apart. Only a request made because the user turned the setting on
-    // is reported to [dictionaryUnavailableListener].
-    private var preparationRequestedByExplicitEnable: Boolean = false
-
     /** Set by LatinIME; see [DictionaryUnavailableListener]. */
     var dictionaryUnavailableListener: DictionaryUnavailableListener? = null
 
-    // Set when the setting goes ON -> OFF. The blocking engine teardown is deferred to the next
-    // lifecycle boundary instead of running inside the settings handler, where it would hold the UI
-    // thread for up to 240 ms on the very keystroke that flipped the setting.
-    private var releasePending: Boolean = false
+    init {
+        // The frozen test entry points seed readiness without naming a language; they mean the one
+        // that was the only one for the app's first five releases.
+        if (initialDictionaryReady) slotFor(DEFAULT_LANGUAGE).dictionaryReady = true
+    }
 
-    // True once a deferred release has been attempted at a boundary and refused. The attempt is not
-    // free of consequences: the engine has already been told to stop and rejects every later lookup,
-    // so it is no longer a correct mapping and the setting coming back on may no longer cancel its
-    // release. Without this the cancellation would strand a permanently dead engine — nothing would
-    // release it and nothing would replace it — and the user would see an empty band for the rest of
-    // the process.
-    private var releaseAttemptFailed: Boolean = false
+    /** The slot of [subtypeId], created on first mention. Creating one costs no I/O. */
+    private fun slotFor(subtypeId: String): LanguageSlot =
+        slots.getOrPut(subtypeId) { LanguageSlot(subtypeId) }
+
+    /** The slot of the active language, or null when the active subtype ships no dictionary. */
+    private fun activeSlot(): LanguageSlot? = activeLanguage?.let(::slotFor)
+
+    /**
+     * Points the controller at [subtypeId]'s dictionary, idling whatever engine the language being
+     * left still holds.
+     *
+     * Idling, not destroying: see [LanguageSlot]. The caller has already bumped the session, so
+     * nothing in flight for the old language can repaint the strip.
+     */
+    private fun setActiveLanguage(subtypeId: String?) {
+        val resolved = subtypeId?.takeIf { DictionaryArtifactSpec.forSubtype(it) != null }
+        if (resolved == activeLanguage) return
+        activeSlot()?.engine?.finishInput()
+        activeLanguage = resolved
+    }
 
     // Monotonic edit-session counter. Bumped on every lifecycle boundary so results computed for an
     // older editor state are dropped even if the engine's own generation check would still pass.
@@ -301,6 +463,32 @@ class SuggestionsController internal constructor(
     // mutable [pendingPrefix], so a stale candidate can never commit against a newer prefix.
     private var displayedPrefix: String? = null
     private var displayedSessionId: Long = NO_SESSION
+
+    // --- E5d NEXT_WORD state, the exact same shape as pendingPrefix/displayedPrefix above, for the
+    // other kind of query. At most one of displayedPrefix/displayedContextWord is ever non-null at a
+    // time (PROPOSALS.md, "Контракт текста" amendment, "Сосуществование") — enforced by clearing the
+    // other one every time either request path runs, not assumed.
+    private var pendingContextWord: String = ""
+    private var displayedContextWord: String? = null
+
+    // --- Правило приоритета языков (docs/LANG-PRIORITY.md). The layout the user chose with their
+    // own hand owns the band; the other language may only fill the cells that language left empty,
+    // and only from the end.
+    //
+    // [bandBaseCells] is what is on the strip right now, in strip order and already re-cased — the
+    // exact strings handed to [StripSurface.showSuggestions]. The companion's candidates are
+    // APPENDED to this list and never mixed into it, which is what makes "no cell the current
+    // language occupies ever changes" true by construction rather than by review.
+    private var bandBaseCells: List<String> = emptyList()
+
+    // The one outstanding companion lookup, or null when there is none. The kind and the exact text
+    // it was made for are kept here so a result that arrives after the user has typed on is dropped
+    // by comparing against them, never by trusting the engine's own currency check alone: the
+    // companion engine is not asked again on every keystroke, so its newest token can be an old
+    // word's.
+    private var companionSlot: LanguageSlot? = null
+    private var companionKind: LookupKind? = null
+    private var companionQuery: String = ""
 
     // --- E4c clean-run state. Nothing here is persisted and nothing leaves this object except one
     // completed word handed to [completionSink]; with the default sink that is a no-op.
@@ -370,10 +558,14 @@ class SuggestionsController internal constructor(
      */
     fun updateKeyNeighbors(table: KeyNeighborTable?) {
         keyNeighbors = table
-        engine?.updateKeyNeighbors(table)
+        // Only the active language's engine is ever asked anything, and LatinIME rebuilds the table
+        // from the live layout on every subtype change, so a warm engine of another language keeps
+        // the table of its own layout until it becomes active again and is handed a fresh one.
+        activeSlot()?.engine?.updateKeyNeighbors(table)
     }
 
-    fun onStartInput(eligible: Boolean) {
+    @JvmOverloads
+    fun onStartInput(eligible: Boolean, subtypeId: String? = DEFAULT_LANGUAGE) {
         markRunDirty()
         // A new field is one of the six events that make an undo impossible.
         clearRevertState()
@@ -382,10 +574,14 @@ class SuggestionsController internal constructor(
         runPendingRelease()
         sessionId++
         displayedPrefix = null
-        this.eligible = eligible
-        if (!eligible) {
+        displayedContextWord = null
+        bandBaseCells = emptyList()
+        clearCompanionRequest()
+        setActiveLanguage(subtypeId)
+        this.eligible = eligible && activeLanguage != null
+        if (!this.eligible) {
             strip.hideSuggestions()
-            engine?.finishInput()
+            activeSlot()?.engine?.finishInput()
             return
         }
         // Eligibility alone is not enough to expose the band: while the dictionary is preparing
@@ -406,11 +602,11 @@ class SuggestionsController internal constructor(
         // before maybeStartEngine() so a cold engine that publishes inline still requests exactly
         // once from publishEngine().
         maybeStartEngine()
-        if (
-            engineWasReady &&
-            editor.hasKnownCursor() &&
-            editor.cachedWordBeforeCursor().isNotEmpty()
-        ) {
+        // E5d: no longer gated on a non-empty prefix — requestCurrentPrefix() falls through to
+        // NEXT_WORD on an empty one, and re-requesting on this boundary is what lets switching
+        // fields show a prediction without an extra keystroke, the same reason this call exists
+        // for PREFIX at all.
+        if (engineWasReady && editor.hasKnownCursor()) {
             requestCurrentPrefix()
         }
     }
@@ -429,10 +625,13 @@ class SuggestionsController internal constructor(
         markRunDirty()
         clearRevertState()
         sessionId++
-        engine?.finishInput()
+        activeSlot()?.engine?.finishInput()
         // Any in-flight request is invalidated and whatever was shown is no longer bound to the
         // live editor state, so drop the displayed binding immediately.
         displayedPrefix = null
+        displayedContextWord = null
+        bandBaseCells = emptyList()
+        clearCompanionRequest()
         // Keep the reserved band only after an engine has actually published. Eligibility while
         // the dictionary is preparing/unavailable remains fail-closed at GONE/0dp.
         if (eligible) {
@@ -442,6 +641,40 @@ class SuggestionsController internal constructor(
                 strip.reserve()
             }
         }
+    }
+
+    /**
+     * The cursor move that [onSelectionChanged] invalidated the band for has settled, and the
+     * editor cache behind [EditorSurface] now describes the position the cursor actually stopped at.
+     *
+     * [onSelectionChanged] does half the job: it drops the binding, blanks the band and invalidates
+     * the in-flight generation. It deliberately does NOT look anything up — the emoji panel routes
+     * through it precisely to get a band that stays empty, and at the moment it runs the text cache
+     * of an EXTERNAL move has not been refetched yet, so a lookup made there would be a lookup for
+     * the text the cursor has already left. This is the other half: the band is re-derived from the
+     * live editor state once, when that state is known to be current.
+     *
+     * Without it the band stays blank until the next keystroke, although the cursor sits at the end
+     * of a word the dictionary answers perfectly well — the very failure this method exists for.
+     * Every other boundary that unbinds the band already re-derives it in exactly this way
+     * ([onStartInput], [onSubtypeChanged], [publishEngine]); a cursor move was the one that did not.
+     *
+     * Three guards keep it from costing anything on the ordinary typing path, where it is posted
+     * after every editor cache reload:
+     *  - a band that is still BOUND to displayed candidates describes live text already;
+     *  - a lookup already issued for this session is on its way, and re-issuing it would drop the
+     *    outstanding companion request with it;
+     *  - an ineligible field, an unusable engine or an unknown cursor have nothing to derive from.
+     *
+     * UI thread only, like every other method here.
+     */
+    fun onCursorMoveSettled() {
+        if (destroyed || !eligible) return
+        if (usableEngine() == null) return
+        if (!editor.hasKnownCursor()) return
+        if (displayedPrefix != null || displayedContextWord != null) return
+        if (requestSessionId == sessionId) return
+        requestCurrentPrefix()
     }
 
     fun onFinishInput() {
@@ -454,24 +687,43 @@ class SuggestionsController internal constructor(
         completionSink.onInputFinished()
         sessionId++
         displayedPrefix = null
+        displayedContextWord = null
+        bandBaseCells = emptyList()
+        clearCompanionRequest()
         // Close eligibility before hiding/finishing. A readiness notification queued behind this
         // lifecycle boundary must not start or publish an engine for the finished editor session.
         eligible = false
         strip.hideSuggestions()
-        engine?.finishInput()
+        activeSlot()?.engine?.finishInput()
         // The other lifecycle boundary at which a deferred release may run.
         runPendingRelease()
     }
 
-    fun onSubtypeChanged(eligible: Boolean) {
+    /**
+     * The active subtype changed. [subtypeId] is the NEW subtype's identifier, and it — not the
+     * boolean — is what selects the dictionary: switching between the Tatar and the Russian layout
+     * switches which of the two shipped dictionaries answers the next keystroke.
+     *
+     * The boolean-only overload is the monolingual shorthand every caller written before the second
+     * dictionary used: it means "still the Tatar subtype, eligibility recomputed".
+     */
+    @JvmOverloads
+    fun onSubtypeChanged(eligible: Boolean, subtypeId: String? = DEFAULT_LANGUAGE) {
         markRunDirty()
         // A subtype change is one of the six events that make an undo impossible.
         clearRevertState()
         sessionId++
-        engine?.finishInput()
+        // Idles the engine of the language being left; setActiveLanguage does the same for a real
+        // language change, and doing it here as well keeps a same-language subtype change (a
+        // different layout for the same dictionary) behaving exactly as it always did.
+        activeSlot()?.engine?.finishInput()
         displayedPrefix = null
-        this.eligible = eligible
-        if (eligible) {
+        displayedContextWord = null
+        bandBaseCells = emptyList()
+        clearCompanionRequest()
+        setActiveLanguage(subtypeId)
+        this.eligible = eligible && activeLanguage != null
+        if (this.eligible) {
             val engineWasReady = usableEngine() != null
             if (engineWasReady) {
                 strip.reserve()
@@ -493,11 +745,8 @@ class SuggestionsController internal constructor(
             // when a cold engine publishes synchronously.
             requestPreparationIfNeeded()
             maybeStartEngine()
-            if (
-                engineWasReady &&
-                editor.hasKnownCursor() &&
-                editor.cachedWordBeforeCursor().isNotEmpty()
-            ) {
+            // E5d: see the comment on the identical gate in onStartInput().
+            if (engineWasReady && editor.hasKnownCursor()) {
                 requestCurrentPrefix()
             }
         } else {
@@ -523,8 +772,11 @@ class SuggestionsController internal constructor(
         if (destroyed) return
         clearRevertState()
         sessionId++
-        engine?.finishInput()
+        activeSlot()?.engine?.finishInput()
         displayedPrefix = null
+        displayedContextWord = null
+        bandBaseCells = emptyList()
+        clearCompanionRequest()
         displayedSessionId = NO_SESSION
         if (eligible) strip.reserve() else strip.hideSuggestions()
     }
@@ -547,12 +799,21 @@ class SuggestionsController internal constructor(
         sessionId++
         eligible = false
         displayedPrefix = null
+        displayedContextWord = null
+        bandBaseCells = emptyList()
+        clearCompanionRequest()
         requestSessionId = NO_SESSION
         strip.hideSuggestions()
-        engine?.finishInput()
-        // Unconditional: a start that is still in flight publishes a live handle even now (see
-        // publishEngine's ineligible branch), and that handle must be released at the boundary too.
-        releasePending = true
+        // The setting is global, so EVERY language stops, not just the active one: a warm engine of
+        // a language the user is not typing in right now still holds a lease and a mapping, and the
+        // user turned the whole feature off.
+        for (slot in slots.values) {
+            slot.engine?.finishInput()
+            // Unconditional: a start that is still in flight publishes a live handle even now (see
+            // publishEngine's ineligible branch), and that handle must be released at the boundary
+            // too.
+            slot.releasePending = true
+        }
     }
 
     /**
@@ -563,25 +824,32 @@ class SuggestionsController internal constructor(
      *
      * @param eligible freshly recomputed by LatinIME for the current field and subtype.
      */
-    fun onSuggestionsSettingEnabled(eligible: Boolean) {
+    @JvmOverloads
+    fun onSuggestionsSettingEnabled(eligible: Boolean, subtypeId: String? = DEFAULT_LANGUAGE) {
         if (destroyed) return
         clearRevertState()
-        // The setting came back before the deferred release ran: the live engine is still the right
-        // mapping, so the release is cancelled instead of being performed and immediately undone.
-        // Only a release that has not been ATTEMPTED yet may be cancelled: a refused attempt has
-        // already stopped the engine for good (it rejects every later lookup), so that one stays
-        // scheduled and the next boundary retries it, after which a fresh engine is started.
-        if (!releaseAttemptFailed) {
-            releasePending = false
+        // Mirrors onSuggestionsSettingDisabled: the setting is global, so every language it stopped
+        // is un-stopped here.
+        for (slot in slots.values) {
+            // The setting came back before the deferred release ran: the live engine is still the
+            // right mapping, so the release is cancelled instead of being performed and immediately
+            // undone. Only a release that has not been ATTEMPTED yet may be cancelled: a refused
+            // attempt has already stopped the engine for good (it rejects every later lookup), so
+            // that one stays scheduled and the next boundary retries it, after which a fresh engine
+            // is started.
+            if (!slot.releaseAttemptFailed) {
+                slot.releasePending = false
+            }
+            if (slot.lastPreparationUnavailable) {
+                // The single reset point of the requested flag: the last attempt ended Unavailable
+                // and a new OFF -> ON transition has now been observed.
+                slot.preparationRequested = false
+                slot.lastPreparationUnavailable = false
+            }
         }
-        if (lastPreparationUnavailable) {
-            // The single reset point of the requested flag: the last attempt ended Unavailable and
-            // a new OFF -> ON transition has now been observed.
-            preparationRequested = false
-            lastPreparationUnavailable = false
-        }
-        this.eligible = eligible
-        if (!eligible) {
+        setActiveLanguage(subtypeId)
+        this.eligible = eligible && activeLanguage != null
+        if (!this.eligible) {
             // The setting is on, but this field or subtype does not qualify. Nothing may become
             // visible, yet the observed transition still requests preparation so the dictionary is
             // there by the time a Tatar field is opened.
@@ -604,11 +872,11 @@ class SuggestionsController internal constructor(
         // Same shape as onStartInput(): capture readiness first so a cold engine that publishes
         // inline requests the current prefix exactly once, from publishEngine().
         maybeStartEngine()
-        if (
-            engineWasReady &&
-            editor.hasKnownCursor() &&
-            editor.cachedWordBeforeCursor().isNotEmpty()
-        ) {
+        // E5d: no longer gated on a non-empty prefix — requestCurrentPrefix() falls through to
+        // NEXT_WORD on an empty one, and re-requesting on this boundary is what lets switching
+        // fields show a prediction without an extra keystroke, the same reason this call exists
+        // for PREFIX at all.
+        if (engineWasReady && editor.hasKnownCursor()) {
             requestCurrentPrefix()
         }
     }
@@ -619,11 +887,16 @@ class SuggestionsController internal constructor(
         destroyed = true
         clearRevertState()
         displayedPrefix = null
-        val handle = engine
-        if (handle != null && destroyHandle(handle)) {
-            // Only drop the reference once the lease is actually released; a still-leaked lease
-            // stays recoverable rather than being made permanently unreachable.
-            engine = null
+        displayedContextWord = null
+        bandBaseCells = emptyList()
+        clearCompanionRequest()
+        for (slot in slots.values) {
+            val handle = slot.engine ?: continue
+            if (destroyHandle(handle)) {
+                // Only drop the reference once the lease is actually released; a still-leaked lease
+                // stays recoverable rather than being made permanently unreachable.
+                slot.engine = null
+            }
         }
         executor?.shutdownNow()
         executor = null
@@ -634,7 +907,8 @@ class SuggestionsController internal constructor(
      * created the storage controller; the factory then produces no engine at all and the strip
      * stays GONE, which is the intended fail-closed behaviour rather than an error.
      */
-    fun engineCatalog(): PublishedDictionaryCatalog? = preparation?.catalog()
+    fun engineCatalog(subtypeId: String): PublishedDictionaryCatalog? =
+        slots[subtypeId]?.preparation?.catalog()
 
     /**
      * Test seam: drives the exact dictionary-ready path the production prepare callback drives
@@ -642,17 +916,21 @@ class SuggestionsController internal constructor(
      * readiness deterministically without a real storage controller.
      */
     internal fun signalDictionaryReadyForTest() {
-        uiPoster.post { onDictionaryReady() }
+        val slot = activeSlot() ?: slotFor(DEFAULT_LANGUAGE)
+        uiPoster.post { onDictionaryReady(slot) }
     }
 
     /**
      * Handles the dictionary becoming ready. Always runs on the UI owner. A late notification that
      * arrives after [onDestroy] or [onFinishInput] starts nothing and requests nothing.
      */
-    private fun onDictionaryReady() {
+    private fun onDictionaryReady(slot: LanguageSlot) {
         if (destroyed) return
-        dictionaryReady = true
-        maybeStartEngine()
+        slot.dictionaryReady = true
+        // A dictionary that finished inflating for a language the user has already switched away
+        // from is remembered, not acted on: its engine starts the moment that language is active
+        // again.
+        if (slot === activeSlot()) maybeStartEngine()
     }
 
     /**
@@ -662,17 +940,30 @@ class SuggestionsController internal constructor(
      * one.
      */
     private fun requestPreparationIfNeeded(explicitEnable: Boolean = false) {
-        if (destroyed || preparationRequested) return
+        if (destroyed) return
+        val slot = activeSlot() ?: return
+        if (slot.preparationRequested) {
+            // The request is already in flight, but its PROVENANCE can still be upgraded, and must
+            // be. A preparation started implicitly by opening a field takes hundreds of milliseconds
+            // (unpacking and validating the artifact); the user who sees no band in that window goes
+            // to the settings and flips the switch OFF -> ON, which lands here. Dropping the explicit
+            // enable on the floor meant the Unavailable result that followed was attributed to the
+            // implicit request and reported to nobody — the switch looked like it simply did nothing,
+            // the one outcome DictionaryUnavailableListener exists to prevent. Upgrade only: an
+            // implicit call never downgrades an explicit request that is already outstanding.
+            if (explicitEnable) slot.preparationRequestedByExplicitEnable = true
+            return
+        }
         // A dictionary that is already published is never prepared again: readiness outlives every
         // later transition of the setting.
-        if (dictionaryReady) return
-        val active = dictionaryPreparation() ?: return
-        preparationRequested = true
-        preparationRequestedByExplicitEnable = explicitEnable
+        if (slot.dictionaryReady) return
+        val active = dictionaryPreparation(slot) ?: return
+        slot.preparationRequested = true
+        slot.preparationRequestedByExplicitEnable = explicitEnable
         active.prepare { result ->
             // The callback runs on the background executor. Marshal onto the serialized UI owner
             // before touching any controller state.
-            uiPoster.post { onPreparationResult(result) }
+            uiPoster.post { onPreparationResult(slot, result) }
         }
     }
 
@@ -685,18 +976,18 @@ class SuggestionsController internal constructor(
      * with one exception — a request the user made themselves gets the one-shot message of
      * [DictionaryUnavailableListener].
      */
-    private fun onPreparationResult(result: PreparationResult) {
+    private fun onPreparationResult(slot: LanguageSlot, result: PreparationResult) {
         if (destroyed) return
         when (result) {
             is PreparationResult.Published -> {
-                lastPreparationUnavailable = false
+                slot.lastPreparationUnavailable = false
                 // Start the engine (and look up whatever is already typed) so a field opened before
                 // the dictionary finished preparing still gets suggestions this session.
-                onDictionaryReady()
+                onDictionaryReady(slot)
             }
             is PreparationResult.Unavailable -> {
-                lastPreparationUnavailable = true
-                if (preparationRequestedByExplicitEnable) {
+                slot.lastPreparationUnavailable = true
+                if (slot.preparationRequestedByExplicitEnable) {
                     dictionaryUnavailableListener?.onDictionaryUnavailableAfterExplicitEnable()
                 }
             }
@@ -704,16 +995,57 @@ class SuggestionsController internal constructor(
     }
 
     /** Lazily built storage seam; null means fail-closed, with no dictionary and no engine. */
-    private fun dictionaryPreparation(): DictionaryPreparation? {
-        preparation?.let { return it }
+    private fun dictionaryPreparation(slot: LanguageSlot): DictionaryPreparation? {
+        slot.preparation?.let { return it }
         val backgroundExecutor = backgroundExecutor() ?: return null
         val created = try {
-            preparationFactory(backgroundExecutor)
+            preparationFactory(backgroundExecutor, slot.subtypeId)
         } catch (_: Throwable) {
             null
         } ?: return null
-        preparation = created
+        slot.preparation = created
         return created
+    }
+
+    /** E5c two-stage readiness: [dictionaryPreparation]'s exact shape, for the bigram table. */
+    private fun bigramPreparationSeam(slot: LanguageSlot): BigramPreparation? {
+        slot.bigramPreparation?.let { return it }
+        val backgroundExecutor = backgroundExecutor() ?: return null
+        val created = try {
+            bigramPreparationFactory(backgroundExecutor, slot.subtypeId)
+        } catch (_: Throwable) {
+            null
+        } ?: return null
+        slot.bigramPreparation = created
+        return created
+    }
+
+    /**
+     * PROPOSALS.md, "E5c. Готовность вычислителя двухступенчатая": called from [publishEngine]
+     * strictly AFTER the dictionary engine has already been assigned, reserved and (if a prefix
+     * was already typed) looked up — never on the path that gets there. Preparing and attaching
+     * the bigram table both happen on the background executor and touch no UI-visible state of
+     * their own: unlike [onDictionaryReady], there is nothing here for the strip to reflect —
+     * [CompositePrefixComputer.predict] simply starts answering once attached, and a NEXT_WORD
+     * lookup is only ever triggered by E5d's own context-driven request, not by this completing.
+     * A missing, corrupted, or not-yet-published table leaves [handle] answering NEXT_WORD with
+     * an empty list, exactly like before this ran — no failure path reaches the UI thread.
+     */
+    private fun maybeAttachBigramSource(slot: LanguageSlot, handle: EngineHandle) {
+        val preparation = bigramPreparationSeam(slot) ?: return
+        try {
+            preparation.prepare { result ->
+                // Runs on the background executor, exactly like requestPreparationIfNeeded's own
+                // callback — attachBigramSource performs the same class of blocking I/O and must
+                // stay off the UI thread, so this is NOT re-marshaled through uiPoster.
+                if (result is BigramPreparationResult.Published) {
+                    handle.attachBigramSource(preparation.catalog())
+                }
+            }
+        } catch (_: Throwable) {
+            // Best-effort: NEXT_WORD simply keeps answering empty, exactly like a corrupted or
+            // missing table would.
+        }
     }
 
     /**
@@ -733,32 +1065,34 @@ class SuggestionsController internal constructor(
     }
 
     private fun maybeStartEngine() {
-        if (engine != null || starting || !dictionaryReady || !eligible) return
+        if (!eligible) return
+        val slot = activeSlot() ?: return
+        if (slot.engine != null || slot.starting || !slot.dictionaryReady) return
         // A lease that has not been released yet still belongs to this controller: never map a
         // second dictionary on top of it. The retry happens at the next lifecycle boundary.
-        if (releasePending) return
+        if (slot.releasePending) return
         val backgroundExecutor = backgroundExecutor() ?: return
-        starting = true
-        val callback = ResultCallback { token, suggestions ->
-            uiPoster.post { applyResult(token, suggestions) }
+        slot.starting = true
+        val callback = ResultCallback { token, suggestions, kind ->
+            uiPoster.post { applyResult(slot, token, suggestions, kind) }
         }
         val factory = engineFactory
         try {
             backgroundExecutor.execute {
                 val handle = try {
-                    factory(callback)
+                    factory(slot.subtypeId, callback)
                 } catch (_: Throwable) {
                     null
                 }
-                uiPoster.post { publishEngine(handle) }
+                uiPoster.post { publishEngine(slot, handle) }
             }
         } catch (_: Throwable) {
-            starting = false
+            slot.starting = false
         }
     }
 
-    private fun publishEngine(handle: EngineHandle?) {
-        starting = false
+    private fun publishEngine(slot: LanguageSlot, handle: EngineHandle?) {
+        slot.starting = false
         if (destroyed) {
             // onDestroy already ran; this start is racing a torn-down controller. Release the
             // freshly acquired lease instead of assigning it, and never expose it as the engine.
@@ -769,13 +1103,28 @@ class SuggestionsController internal constructor(
         }
         if (handle == null) {
             // Engine creation failed: do not reserve an empty band for an unavailable dictionary.
+            if (slot !== activeSlot()) return
             displayedPrefix = null
+            displayedContextWord = null
             if (eligible) {
                 strip.hideSuggestions()
             }
             return
         }
-        engine = handle
+        slot.engine = handle
+        // E5c two-stage readiness: started AFTER the engine is already assigned, never before —
+        // this is what makes it true that the bigram table cannot delay publication. Kicked off
+        // regardless of `eligible` below: the engine stays warm across an ineligible editor, and
+        // attaching costs nothing the UI can observe either way.
+        maybeAttachBigramSource(slot, handle)
+        if (slot !== activeSlot()) {
+            // The user switched language while this engine was starting. Keep it — warm and idle —
+            // for the moment they switch back, and leave the strip to whatever the language they
+            // are actually typing in is doing. Its key-neighbor table is pushed when it becomes
+            // active, because the live layout is the other language's right now.
+            handle.finishInput()
+            return
+        }
         // Hand the freshly started engine the current key-neighbor table so its fuzzy pass is armed
         // without waiting for the next layout change. Null is a valid value (fuzzy pass disabled).
         handle.updateKeyNeighbors(keyNeighbors)
@@ -788,7 +1137,8 @@ class SuggestionsController internal constructor(
         // eligible band. Look up whatever the user has already typed without waiting for another
         // keystroke; an empty/unknown prefix leaves the now-available band reserved with 0 results.
         strip.reserve()
-        if (editor.hasKnownCursor() && editor.cachedWordBeforeCursor().isNotEmpty()) {
+        // E5d: see the comment on the identical gate in onStartInput().
+        if (editor.hasKnownCursor()) {
             requestCurrentPrefix()
         }
     }
@@ -807,22 +1157,24 @@ class SuggestionsController internal constructor(
      * asked to stop and would be kept alive as a permanently mute engine.
      */
     private fun runPendingRelease() {
-        if (!releasePending) return
-        val handle = engine
-        if (handle == null) {
-            // Nothing was ever started, or it is already gone: the request is satisfied.
-            releasePending = false
-            releaseAttemptFailed = false
-            return
-        }
-        if (destroyHandle(handle)) {
-            engine = null
-            releasePending = false
-            releaseAttemptFailed = false
-        } else {
-            // Remember the refusal: from here on the setting coming back on no longer cancels this
-            // release, because the handle it would keep can no longer serve a single lookup.
-            releaseAttemptFailed = true
+        for (slot in slots.values) {
+            if (!slot.releasePending) continue
+            val handle = slot.engine
+            if (handle == null) {
+                // Nothing was ever started, or it is already gone: the request is satisfied.
+                slot.releasePending = false
+                slot.releaseAttemptFailed = false
+                continue
+            }
+            if (destroyHandle(handle)) {
+                slot.engine = null
+                slot.releasePending = false
+                slot.releaseAttemptFailed = false
+            } else {
+                // Remember the refusal: from here on the setting coming back on no longer cancels
+                // this release, because the handle it would keep can no longer serve a lookup.
+                slot.releaseAttemptFailed = true
+            }
         }
     }
 
@@ -835,7 +1187,10 @@ class SuggestionsController internal constructor(
      * the handle rejects every request from then on and a reserved band would stay empty forever.
      * The reference itself is kept so the release can be retried at the next boundary.
      */
-    private fun usableEngine(): EngineHandle? = if (releasePending) null else engine
+    private fun usableEngine(): EngineHandle? {
+        val slot = activeSlot() ?: return null
+        return if (slot.releasePending) null else slot.engine
+    }
 
     /**
      * Bounded engine teardown: one quick attempt, then a single longer bounded retry so a lease
@@ -854,10 +1209,127 @@ class SuggestionsController internal constructor(
      * arrives. Reused verbatim by [onTextChanged] and by [publishEngine] right after a successful
      * engine publish.
      *
-     * It is also where the frozen text contract's two "0 results" states are enforced, both
-     * BEFORE the engine is asked anything: a cursor sitting inside a word, and a prefix in mixed
-     * capitalization.
+     * It is also where the frozen text contract's "0 results" states are enforced, all BEFORE the
+     * engine is asked anything: a cursor sitting inside a word (shared by both PREFIX and NEXT_WORD),
+     * and a prefix in mixed capitalization (PREFIX only — NEXT_WORD does not check the context word's
+     * casing at all, PROPOSALS.md, "Контракт текста" amendment, "Регистр предсказаний").
+     *
+     * E5d: an EMPTY prefix no longer unconditionally clears the band. It falls through to
+     * [requestNextWordContext], which is where NEXT_WORD's own "0 results" state (no context word
+     * available) is enforced — "Сосуществование" in the same amendment: a non-empty prefix always
+     * means PREFIX-only, an empty one means NEXT_WORD-only or nothing, never both in the same band.
      */
+    /**
+     * The language that may fill the cells the active one leaves empty, or null when there is none.
+     *
+     * "May" is deliberately narrow: the slot must already hold a live engine. A language whose
+     * dictionary was never prepared is NOT prepared for this, and a cold engine is NOT started for
+     * it — starting one costs an mmap and a worker thread on the input path, and the cold-start
+     * invariant is not something a tail cell is worth. The shipped languages are read off
+     * [DictionaryArtifactSpec.ALL] in its own order, so which language answers is fixed by the
+     * registry rather than by iteration order of the slot map.
+     */
+    private fun companionSlotForFill(): LanguageSlot? {
+        val active = activeLanguage ?: return null
+        for (spec in DictionaryArtifactSpec.ALL) {
+            if (spec.languageTag == active) continue
+            val slot = slots[spec.languageTag] ?: continue
+            if (slot.releasePending) continue
+            if (slot.engine != null) return slot
+        }
+        return null
+    }
+
+    /**
+     * Asks the companion language for [query], but only after the active language has already
+     * answered and left a cell empty.
+     *
+     * Deliberately lazy. The active language fills all three cells for about nine keystrokes in ten
+     * (docs/LANG-PRIORITY.md, "Цена"), so asking both engines on every press would pay twice for
+     * nothing nine times out of ten; and because this runs only AFTER the active result was applied,
+     * the first cell reaches the screen at exactly the moment it does today.
+     */
+    private fun requestCompanionFill(kind: LookupKind, query: String) {
+        clearCompanionRequest()
+        if (query.isEmpty()) return
+        val slot = companionSlotForFill() ?: return
+        val engine = slot.engine ?: return
+        val bytes = TatarWordUtils.toLookupBytes(TatarWordUtils.normalizeForLookup(query))
+        val token = when (kind) {
+            LookupKind.PREFIX -> engine.request(sessionId, slot.subtypeId, bytes)
+            LookupKind.NEXT_WORD -> engine.requestNextWord(sessionId, slot.subtypeId, bytes)
+        }
+        if (token == null) return
+        companionSlot = slot
+        companionKind = kind
+        companionQuery = query
+    }
+
+    /** Forgets the outstanding companion lookup; a result for it can no longer reach the band. */
+    private fun clearCompanionRequest() {
+        companionSlot = null
+        companionKind = null
+        companionQuery = ""
+    }
+
+    /**
+     * Appends the companion language's candidates to the cells the active language left empty.
+     *
+     * Every guard here fails towards leaving the band exactly as the active language painted it.
+     * The three that carry the rule itself: the result must belong to the ONE outstanding companion
+     * lookup, the text it was made for must still be the text under the cursor, and the base cells
+     * are copied first, so no candidate of the active language can be displaced or reordered.
+     */
+    private fun applyCompanionResult(
+        slot: LanguageSlot,
+        token: Any,
+        suggestions: List<String>,
+        kind: LookupKind,
+    ) {
+        if (!eligible) return
+        if (slot !== companionSlot || kind != companionKind) return
+        if (sessionId != requestSessionId) return
+        if (slot.releasePending) return
+        val engine = slot.engine ?: return
+        if (!engine.isCurrent(token)) return
+        val query = companionQuery
+        val live = when (kind) {
+            LookupKind.PREFIX -> pendingPrefix
+            LookupKind.NEXT_WORD -> pendingContextWord
+        }
+        if (live != query) return
+        clearCompanionRequest()
+        if (suggestions.isEmpty()) return
+        val base = bandBaseCells
+        if (base.size >= SuggestionStripState.CELL_COUNT) return
+        // PREFIX re-applies the typed capitalization to every cell it shows, so the companion's
+        // candidates get exactly the same treatment; NEXT_WORD applies none, to either language.
+        val casing = if (kind == LookupKind.PREFIX) TatarWordUtils.classifyCasing(query) else null
+        val cells = ArrayList<String>(SuggestionStripState.CELL_COUNT)
+        cells.addAll(base)
+        for (candidate in suggestions) {
+            val shown = if (casing == null) candidate else TatarWordUtils.applyCasing(candidate, casing)
+            // A word both languages offer occupies ONE cell, and it is the one the active language
+            // already gave it.
+            if (cells.contains(shown)) continue
+            cells.add(shown)
+            if (cells.size >= SuggestionStripState.CELL_COUNT) break
+        }
+        if (cells.size == base.size) return
+        when (kind) {
+            LookupKind.PREFIX -> displayedPrefix = query
+            LookupKind.NEXT_WORD -> displayedContextWord = query
+        }
+        displayedSessionId = sessionId
+        showBand(cells)
+    }
+
+    /** The single call into the strip that paints words, and the only writer of [bandBaseCells]. */
+    private fun showBand(cells: List<String>) {
+        bandBaseCells = cells
+        strip.showSuggestions(cells[0], cells.getOrNull(1), cells.getOrNull(2))
+    }
+
     private fun requestCurrentPrefix() {
         if (!eligible) return
         val activeEngine = usableEngine()
@@ -865,6 +1337,9 @@ class SuggestionsController internal constructor(
             // Text events can arrive while preparation/start is still in flight. Do not expose the
             // band until publishEngine() establishes that the dictionary is actually available.
             displayedPrefix = null
+            displayedContextWord = null
+            bandBaseCells = emptyList()
+            clearCompanionRequest()
             strip.hideSuggestions()
             return
         }
@@ -872,16 +1347,21 @@ class SuggestionsController internal constructor(
             clearToReservedBand()
             return
         }
-        val word = editor.cachedWordBeforeCursor()
-        if (word.isEmpty()) {
+        // Cursor inside a word: the contract clears the results instead of offering a replacement
+        // that would be spliced into the middle of the user's text ("ки|тап" + "т" must not become
+        // "китапларtап"). Checked before either path below so the engine is never even asked, and
+        // checked ONCE — moved ahead of the prefix/context branch below (it used to run only on the
+        // PREFIX path) because "Контракт текста" amendment пункт 2 requires it to gate NEXT_WORD too:
+        // "При selection или букве... сразу после курсора правило действует без изменений — NEXT_WORD
+        // запрос не строится вообще". Neither check depended on the other's outcome, so this reorders
+        // without changing PREFIX behaviour at all.
+        if (editor.hasLetterAfterCursor()) {
             clearToReservedBand()
             return
         }
-        // Cursor inside a word: the contract clears the results instead of offering a replacement
-        // that would be spliced into the middle of the user's text ("ки|тап" + "т" must not become
-        // "китапларtап"). Checked before the lookup so the engine is never even asked.
-        if (editor.hasLetterAfterCursor()) {
-            clearToReservedBand()
+        val word = editor.cachedWordBeforeCursor()
+        if (word.isEmpty()) {
+            requestNextWordContext(activeEngine)
             return
         }
         // Mixed capitalization has no defined display form in the frozen contract, which requires
@@ -893,17 +1373,87 @@ class SuggestionsController internal constructor(
         }
         // Prefix changed relative to what is on screen: invalidate the displayed candidates NOW so
         // a tap arriving before the new result can never commit the old candidate against the new
-        // prefix.
+        // prefix. [unbindPaintedBand] takes the words off the strip in the same breath — see its
+        // own comment for why unbinding alone is not enough.
         if (word != displayedPrefix) {
             displayedPrefix = null
+            unbindPaintedBand()
         }
+        // A non-empty prefix is unconditionally PREFIX mode: drop whatever NEXT_WORD state might
+        // still be bound from a moment ago, so the two kinds never coexist in the band.
+        if (displayedContextWord != null) {
+            displayedContextWord = null
+            unbindPaintedBand()
+        }
+        // A fresh lookup of the active language supersedes whatever the companion was asked
+        // before it: the answer is about a word the user has already typed past.
+        clearCompanionRequest()
         pendingPrefix = word
         requestSessionId = sessionId
         val prefixBytes = TatarWordUtils.toLookupBytes(TatarWordUtils.normalizeForLookup(word))
-        val token = activeEngine.request(sessionId, SUBTYPE_ID, prefixBytes)
+        val token = activeEngine.request(sessionId, activeLanguage ?: return, prefixBytes)
         if (token == null) {
             clearToReservedBand()
         }
+    }
+
+    /**
+     * E5d NEXT_WORD request path, the sibling [requestCurrentPrefix] falls through to on an empty
+     * prefix. Mirrors its PREFIX counterpart's shape exactly (change detection, session stamping,
+     * clear-on-null-token) but has no casing gate — "Контракт текста" amendment, "Регистр
+     * предсказаний": a mixed-case context word does not suppress a prediction, because nothing about
+     * its casing is ever carried into the shown/inserted form.
+     */
+    private fun requestNextWordContext(activeEngine: EngineHandle) {
+        val context = editor.cachedNextWordContext()
+        if (context.isEmpty()) {
+            clearToReservedBand()
+            return
+        }
+        if (context != displayedContextWord) {
+            displayedContextWord = null
+            unbindPaintedBand()
+        }
+        // A NEXT_WORD request is unconditionally not PREFIX mode: drop whatever prefix candidates
+        // might still be bound (there should not be any, since this path only runs on an empty
+        // prefix, but the invariant is enforced here rather than assumed).
+        if (displayedPrefix != null) {
+            displayedPrefix = null
+            unbindPaintedBand()
+        }
+        clearCompanionRequest()
+        pendingContextWord = context
+        requestSessionId = sessionId
+        val contextBytes = TatarWordUtils.toLookupBytes(TatarWordUtils.normalizeForLookup(context))
+        val token = activeEngine.requestNextWord(sessionId, activeLanguage ?: return, contextBytes)
+        if (token == null) {
+            clearToReservedBand()
+        }
+    }
+
+    /**
+     * Takes off the strip whatever it is still painting, once the candidates behind it have been
+     * unbound. Keeps the reserved height, so the keyboard does not resize.
+     *
+     * The invariant this exists for is the one the user relies on and the only one they can check:
+     * **what the strip is painting is tappable.** Unbinding alone does not hold it. [onTap] reads
+     * [displayedPrefix]/[displayedContextWord] and returns without committing when both are null,
+     * so between the unbind and the arrival of the fresh result every word still on the strip is a
+     * button that does nothing and says nothing — the exact shape of failure this keyboard treats
+     * as a defect even where the code is formally right.
+     *
+     * Costs one repaint per keystroke that changes the prefix, and only when words were actually
+     * painted: `bandBaseCells` empty means the strip is already blank and nothing is touched. The
+     * blank lasts one engine round trip, which the caller has just dispatched (see
+     * docs/FINAL-POLISH.md for the measured length of that window).
+     *
+     * Deliberately does NOT touch [requestSessionId] — unlike [clearToReservedBand], the callers
+     * here are about to issue a lookup and the result of that lookup must be allowed to land.
+     */
+    private fun unbindPaintedBand() {
+        if (bandBaseCells.isEmpty()) return
+        bandBaseCells = emptyList()
+        strip.reserve()
     }
 
     /**
@@ -915,6 +1465,9 @@ class SuggestionsController internal constructor(
      */
     private fun clearToReservedBand() {
         displayedPrefix = null
+        displayedContextWord = null
+        bandBaseCells = emptyList()
+        clearCompanionRequest()
         requestSessionId = NO_SESSION
         strip.reserve()
     }
@@ -976,11 +1529,35 @@ class SuggestionsController internal constructor(
         runEmptyResultPrefixLength = NO_EMPTY_RESULT
     }
 
-    private fun applyResult(token: Any, suggestions: List<String>) {
+    private fun applyResult(
+        slot: LanguageSlot,
+        token: Any,
+        suggestions: List<String>,
+        kind: LookupKind,
+    ) {
         if (!eligible) return
+        // A result computed by the engine of a language the user has left may never repaint the
+        // band ON ITS OWN. The session check below already covers it (every language change bumps
+        // the session), and the engine's own token carries the dictionary identity, but the owner of
+        // the state says so itself rather than relying on either.
+        //
+        // The ONE thing such a result may do is fill cells the active language left empty, and only
+        // when this controller asked it to — that path is [applyCompanionResult] and it never
+        // touches a cell the active language occupies.
+        if (slot !== activeSlot()) {
+            applyCompanionResult(slot, token, suggestions, kind)
+            return
+        }
         if (sessionId != requestSessionId) return
         val activeEngine = usableEngine() ?: return
         if (!activeEngine.isCurrent(token)) return
+        when (kind) {
+            LookupKind.PREFIX -> applyPrefixResult(suggestions)
+            LookupKind.NEXT_WORD -> applyNextWordResult(suggestions)
+        }
+    }
+
+    private fun applyPrefixResult(suggestions: List<String>) {
         if (suggestions.isEmpty()) {
             // The observation the E4c filter is built on: nothing in the dictionary continues this
             // prefix, so no longer word starting with it can be in the dictionary either.
@@ -998,7 +1575,11 @@ class SuggestionsController internal constructor(
                 }
             }
             displayedPrefix = null
+            bandBaseCells = emptyList()
             strip.reserve()
+            // Nothing of the active language is displaced by an empty band, so the companion may
+            // fill it from the first cell — that is the one case where its candidate leads.
+            requestCompanionFill(LookupKind.PREFIX, pendingPrefix)
             return
         }
         // The result passed the session and engine currency guards, so pendingPrefix is exactly the
@@ -1010,11 +1591,42 @@ class SuggestionsController internal constructor(
         // the prefix this result was computed for, never from the live editor state, and the strip
         // hands the very same string back on tap, so the displayed and the inserted form match.
         val casing = TatarWordUtils.classifyCasing(pendingPrefix)
-        strip.showSuggestions(
-            TatarWordUtils.applyCasing(suggestions[0], casing),
-            suggestions.getOrNull(1)?.let { TatarWordUtils.applyCasing(it, casing) },
-            suggestions.getOrNull(2)?.let { TatarWordUtils.applyCasing(it, casing) },
-        )
+        val cells = ArrayList<String>(SuggestionStripState.CELL_COUNT)
+        for (candidate in suggestions) {
+            cells.add(TatarWordUtils.applyCasing(candidate, casing))
+            if (cells.size >= SuggestionStripState.CELL_COUNT) break
+        }
+        showBand(cells)
+        if (cells.size < SuggestionStripState.CELL_COUNT) {
+            requestCompanionFill(LookupKind.PREFIX, pendingPrefix)
+        }
+    }
+
+    /**
+     * E5d NEXT_WORD counterpart of [applyPrefixResult]. No E4c learning (that filter is about
+     * PROPER prefixes of a growing word; NEXT_WORD only ever fires on an empty prefix, so there is no
+     * prefix growth to observe) and no casing re-application — "Контракт текста" amendment, "Регистр
+     * предсказаний": predictions are shown and inserted exactly as the bigram table stores them.
+     */
+    private fun applyNextWordResult(suggestions: List<String>) {
+        if (suggestions.isEmpty()) {
+            displayedContextWord = null
+            bandBaseCells = emptyList()
+            strip.reserve()
+            requestCompanionFill(LookupKind.NEXT_WORD, pendingContextWord)
+            return
+        }
+        displayedContextWord = pendingContextWord
+        displayedSessionId = sessionId
+        val cells = ArrayList<String>(SuggestionStripState.CELL_COUNT)
+        for (candidate in suggestions) {
+            cells.add(candidate)
+            if (cells.size >= SuggestionStripState.CELL_COUNT) break
+        }
+        showBand(cells)
+        if (cells.size < SuggestionStripState.CELL_COUNT) {
+            requestCompanionFill(LookupKind.NEXT_WORD, pendingContextWord)
+        }
     }
 
     /**
@@ -1072,6 +1684,9 @@ class SuggestionsController internal constructor(
         markRunDirty()
         // Whatever the band was showing described the word that no longer stands there.
         displayedPrefix = null
+        displayedContextWord = null
+        bandBaseCells = emptyList()
+        clearCompanionRequest()
         armedReplacement = Replacement(
             word, replacement, separatorString(separatorCodePoint), sessionId,
         )
@@ -1133,28 +1748,54 @@ class SuggestionsController internal constructor(
         markRunDirty()
         // A tap is one of the six events that close the undo window.
         clearRevertState()
-        val prefix = displayedPrefix
-        if (prefix == null || displayedSessionId != sessionId) {
+        if (displayedSessionId != sessionId) {
             // Nothing bound to the current session is displayed (e.g. the text changed and the old
             // candidates were invalidated): a tap must be a no-op and must never commit.
             return
         }
-        // Commit against the DISPLAYED prefix, not the mutable pendingPrefix. The editor's own
-        // stale-tap guard (re-reads live cache, requires collapsed selection and live trailing word
-        // == expectedPrefix, deletes by code points) is the second line of defense.
-        if (editor.commitSuggestion(prefix, suggestion)) {
-            // The field is still eligible after a commit; clear the words but keep the reserved
-            // band so accepting a suggestion does not resize the keyboard.
-            displayedPrefix = null
-            strip.reserve()
+        // Exactly one of these is ever non-null (PROPOSALS.md, "Контракт текста" amendment,
+        // "Сосуществование") — the owner of state reads the kind off what is actually bound, not off
+        // the tapped string's content, which is the same rule E5c's engine-level guarantee exists
+        // for, one layer up.
+        val prefix = displayedPrefix
+        if (prefix != null) {
+            // Commit against the DISPLAYED prefix, not the mutable pendingPrefix. The editor's own
+            // stale-tap guard (re-reads live cache, requires collapsed selection and live trailing
+            // word == expectedPrefix, deletes by code points) is the second line of defense.
+            if (editor.commitSuggestion(prefix, suggestion)) {
+                // The field is still eligible after a commit; clear the words but keep the reserved
+                // band so accepting a suggestion does not resize the keyboard.
+                displayedPrefix = null
+                bandBaseCells = emptyList()
+                clearCompanionRequest()
+                strip.reserve()
+            }
+            return
+        }
+        val context = displayedContextWord
+        if (context != null) {
+            // Same second line of defense as the PREFIX path, through the E5d commit path instead:
+            // the editor re-derives the live context word and refuses a stale tap itself.
+            if (editor.commitPredictedWord(context, suggestion)) {
+                displayedContextWord = null
+                bandBaseCells = emptyList()
+                clearCompanionRequest()
+                strip.reserve()
+            }
         }
     }
 
     companion object {
-        // The active-subtype identifier the engine is asked to key its lookup by. Reads the single
-        // source of truth (PersonalSubtypes.TATAR_RU) so the request key can never drift from
-        // LatinIME.isTatarSuggestionsEligible(), which reads the same constant.
-        private const val SUBTYPE_ID = PersonalSubtypes.TATAR_RU
+        /**
+         * The language a call that names none means.
+         *
+         * The app shipped monolingual for five releases and its whole test suite drives the
+         * controller through the boolean-only overloads; those mean the language that used to be
+         * the only one. Reads the single source of truth (`PersonalSubtypes.TATAR_RU`) so the
+         * request key can never drift from `LatinIME.isSuggestionsEligible()`, which reads the same
+         * constant.
+         */
+        internal const val DEFAULT_LANGUAGE = PersonalSubtypes.TATAR_RU
         private const val DESTROY_TIMEOUT_MS = 60L
 
         // Sentinel for "no request is outstanding". [sessionId] starts at 0 and only ever grows,

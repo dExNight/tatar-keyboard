@@ -48,7 +48,12 @@ internal object AndroidPersonalDictionaryStorage {
     /** The single directory this seam owns, inside the base context's `noBackupFilesDir`. */
     const val PERSONAL_DIRECTORY_NAME = "personal"
 
-    fun create(context: Context, subtypeId: String, executor: Executor): PersonalDictionaryStore {
+    fun create(
+        context: Context,
+        subtypeId: String,
+        executor: Executor,
+        quarantineNotice: PersonalQuarantineNotice? = null,
+    ): PersonalDictionaryStore {
         val appContext = context.applicationContext
         val userManager = appContext.getSystemService(UserManager::class.java)
         return PersonalDictionaryStore(
@@ -60,6 +65,7 @@ internal object AndroidPersonalDictionaryStorage {
             clock = { System.currentTimeMillis() },
             executor = executor,
             unlockGate = { userManager?.isUserUnlocked ?: false },
+            quarantineNotice = quarantineNotice,
         )
     }
 }

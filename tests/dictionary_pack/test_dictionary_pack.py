@@ -34,6 +34,15 @@ ASSET = (
 PROVENANCE = ROOT / "docs" / "DICTIONARY-D1A.md"
 REVIEW = ROOT / "docs" / "DICTIONARY-D1A-QUERY-REVIEW.tsv"
 NOTICE = ASSET.parent / "NOTICE.txt"
+RUSSIAN_ASSET = ASSET.parent / "russian_top100k_v1.tdict.zlib"
+RUSSIAN_PROVENANCE = ROOT / "docs" / "RUSSIAN-DICTIONARY.md"
+RUSSIAN_REVIEW = ROOT / "docs" / "DICTIONARY-RU-QUERY-REVIEW.tsv"
+# Обе таблицы пересозданы 2026-08-24 миссией tt-dict-accept: словари пересобраны, и
+# тройка кандидатов на двадцати двух русских и двух татарских префиксах изменилась.
+# Даты разные у разных языков и разные у разных пересборок — поэтому они здесь, а не
+# зашиты в dictionary_pack.AUTOMATED_REVIEW_DATE, которая осталась датой первой сборки.
+RUSSIAN_REVIEW_DATE = "2026-08-24"
+TATAR_REVIEW_DATE = "2026-08-24"
 
 
 def load_module(name: str, path: Path):
@@ -433,14 +442,117 @@ class DictionaryPackTest(unittest.TestCase):
         rows = pack._audit_rows(
             parsed, pack._read_queries(FIXTURES / "manual_tatar_queries.txt"), 3
         )
-        pack._check_review(rows, REVIEW)
+        pack._check_review(rows, REVIEW, review_date=TATAR_REVIEW_DATE)
+
+    def test_language_registry_alphabets_and_budgets(self) -> None:
+        self.assertEqual({"tat", "rus"}, set(coverage.LANGUAGES))
+        self.assertIs(coverage.DEFAULT_LANGUAGE, coverage.TATAR)
+        # The Russian alphabet is the 33 letters and nothing else; Tatar's is exactly those plus
+        # its own six, which is why the Kotlin validator's Tatar set accepts Russian words too.
+        self.assertEqual(33, len(coverage.RUSSIAN_ALPHABET))
+        self.assertTrue(coverage.RUSSIAN_ALPHABET < coverage.TATAR_ALPHABET)
+        self.assertEqual(
+            frozenset("әөүҗңһ"), coverage.TATAR_ALPHABET - coverage.RUSSIAN_ALPHABET
+        )
+        # One budget for the format, not one per language.
+        self.assertEqual(700_000, pack.MAX_COMPRESSED_BYTES)
+        self.assertEqual(2_936_012, pack.MAX_UNCOMPRESSED_BYTES)
+        self.assertFalse(hasattr(pack, "LANGUAGE_BUDGETS"))
+
+    def test_russian_alphabet_filters_tatar_letters_hyphens_and_latin(self) -> None:
+        alphabet = coverage.RUSSIAN_ALPHABET
+        self.assertEqual(("ещё", None), coverage.normalize_word("Ещё", alphabet))
+        # «ё» is a letter of its own: it is NOT folded into «е» at any stage.
+        self.assertEqual(("ещё", None), coverage.normalize_word("ЕЩЁ", alphabet))
+        self.assertNotEqual("еще", coverage.normalize_word("ещё", alphabet)[0])
+        for rejected in ("из-за", "әпә", "latin", "по-русски", "covid"):
+            self.assertEqual(
+                (None, "outside_alphabet"),
+                coverage.normalize_word(rejected, alphabet),
+                rejected,
+            )
+        # The Tatar default is untouched, filtering reason included.
+        self.assertEqual((None, "outside_tatar_alphabet"), coverage.normalize_word("latin"))
+        self.assertEqual(("әпә", None), coverage.normalize_word("ӘПӘ"))
+
+    def test_russian_build_round_trips_through_the_same_binary_format(self) -> None:
+        entries = [("дом", 9), ("ещё", 5), ("работа", 3)]
+        raw = pack.serialize_entries(entries, coverage.RUSSIAN)
+        asset = pack.compress_raw(raw)
+        parsed = pack.validate_asset(asset, expected_count=3, language=coverage.RUSSIAN)
+        self.assertEqual(("дом", "ещё", "работа"), parsed.words)
+        # Same schema and magic as the Tatar asset: one format, two languages.
+        self.assertEqual(pack.MAGIC, raw[:8])
+        # A Russian word list also validates under the Tatar alphabet, because that alphabet is a
+        # superset — which is what lets the shipped Kotlin validator stay exactly as it is.
+        self.assertEqual(3, pack.validate_raw(raw, 3).entry_count)
+        # A Tatar word list does NOT validate as Russian: the guard is real in the other direction.
+        tatar_raw = pack.serialize_entries([("әпә", 4)])
+        with self.assertRaises(pack.DictionaryFormatError):
+            pack.validate_raw(tatar_raw, 1, coverage.RUSSIAN)
+
+    def test_committed_russian_asset_provenance_notice_and_review(self) -> None:
+        asset = RUSSIAN_ASSET.read_bytes()
+        parsed = pack.validate_asset(
+            asset, expected_count=100_000, language=coverage.RUSSIAN
+        )
+        asset_sha = hashlib.sha256(asset).hexdigest()
+        raw_sha = hashlib.sha256(parsed.raw).hexdigest()
+        provenance = RUSSIAN_PROVENANCE.read_text(encoding="utf-8")
+        notice = NOTICE.read_text(encoding="utf-8")
+        # The prose groups thousands with spaces, so compare against a space-stripped copy.
+        digits_only = provenance.replace(" ", "").replace("\u00a0", "")
+        # Every number the Kotlin spec pins is also written down where a human can check it.
+        self.assertIn(asset_sha, provenance)
+        self.assertIn(raw_sha, provenance)
+        self.assertIn(str(len(asset)), digits_only)
+        self.assertIn(str(len(parsed.raw)), digits_only)
+        self.assertIn("CC BY 4.0", provenance)
+        self.assertIn("russian_top100k_v1.tdict.zlib", notice)
+        self.assertIn("rus_news_2022_1M", notice)
+        rows = pack._audit_rows(
+            parsed,
+            pack._read_queries(
+                FIXTURES / "manual_russian_queries.txt", coverage.RUSSIAN
+            ),
+            3,
+            coverage.RUSSIAN,
+        )
+        pack._check_review(
+            rows, RUSSIAN_REVIEW, review_date=RUSSIAN_REVIEW_DATE
+        )
+
+    def test_the_kotlin_spec_pins_exactly_the_committed_russian_bytes(self) -> None:
+        spec = (
+            ROOT
+            / "app/src/main/java/rkr/simplekeyboard/inputmethod/latin"
+            / "dictionary/storage/DictionaryStorageContracts.kt"
+        ).read_text(encoding="utf-8")
+        asset = RUSSIAN_ASSET.read_bytes()
+        parsed = pack.validate_asset(
+            asset, expected_count=100_000, language=coverage.RUSSIAN
+        )
+        self.assertIn(hashlib.sha256(asset).hexdigest(), spec)
+        self.assertIn(hashlib.sha256(parsed.raw).hexdigest(), spec)
+        self.assertIn(f"expectedCompressedSize = {len(asset):_}".replace("_", "_"), spec)
+        self.assertIn(f"{len(parsed.raw):,}".replace(",", "_"), spec)
+        # The Tatar family name and directory are frozen: a device updating from 1.6.1 must find
+        # the file it already inflated exactly where it left it.
+        self.assertIn('family = "tatar_top100k"', spec)
+        self.assertIn('storageDirectoryName = "dictionaries"', spec)
+        self.assertIn('family = "russian_top100k"', spec)
+        self.assertIn('storageDirectoryName = "dictionaries-ru"', spec)
 
     def test_no_licensed_sources_are_tracked(self) -> None:
         result = subprocess.run(
             ["git", "ls-files"], cwd=ROOT, check=True, capture_output=True, text=True
         )
+        # `-sentences.txt` is here for the same reason `-words.txt` is: it is the licensed
+        # input the bigram tables are counted from (`scripts/bigram_asset_pack.py`), and the
+        # Russian table added a second language's worth of them on 2026-08-21.
         pattern = re.compile(
-            r"(^|/)(tat_(mixed|news|web).*-words\.txt|.*\.tar\.gz)$"
+            r"(^|/)((tat|rus)_(mixed|news|web|wikipedia).*-(words|sentences)\.txt"
+            r"|.*\.tar\.gz)$"
         )
         self.assertFalse(any(pattern.search(path) for path in result.stdout.splitlines()))
 

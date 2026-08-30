@@ -36,6 +36,11 @@ fun interface PersonalLearningPredicate {
     fun mayLearn(): Boolean
 }
 
+/** The subtype whose personal store a write belongs to right now, or null when there is none. */
+fun interface ActiveSubtypeSupplier {
+    fun get(): String?
+}
+
 /**
  * Turns clean-completion events into store mutations, under [PersonalLearningPredicate].
  *
@@ -45,14 +50,35 @@ fun interface PersonalLearningPredicate {
  */
 object PersonalLearning {
 
+    /**
+     * The sink for a FIXED subtype. Kept for callers that know their language at construction time
+     * (the tests do); production goes through the [ActiveSubtypeSupplier] overload instead.
+     */
     @JvmStatic
     fun sinkFor(
         context: Context,
         subtypeId: String,
         predicate: PersonalLearningPredicate,
+    ): WordCompletionSink = sinkFor(context, ActiveSubtypeSupplier { subtypeId }, predicate)
+
+    /**
+     * The sink for whatever language is active at the moment of the event.
+     *
+     * The subtype is resolved per event, not per sink: the sink is built once for the IME's whole
+     * lifetime, while the user switches layouts inside a single editor session. A word completed on
+     * the Russian layout must reach the Russian store and nothing else — there is no shared
+     * "default" store, and writing it to the Tatar one would put Russian words into Tatar
+     * suggestions for good. A null subtype (a layout with no dictionary) writes nothing.
+     */
+    @JvmStatic
+    fun sinkFor(
+        context: Context,
+        activeSubtype: ActiveSubtypeSupplier,
+        predicate: PersonalLearningPredicate,
     ): WordCompletionSink = object : WordCompletionSink {
         override fun onCleanCompletion(word: String) {
             if (!predicate.mayLearn()) return
+            val subtypeId = activeSubtype.get() ?: return
             PersonalDictionaries.storeFor(context, subtypeId).noteCompletion(word)
         }
 
@@ -60,6 +86,7 @@ object PersonalLearning {
             // The flush is gated too: without the predicate a session that became ineligible could
             // still put what it accumulated on disk.
             if (!predicate.mayLearn()) return
+            val subtypeId = activeSubtype.get() ?: return
             PersonalDictionaries.storeFor(context, subtypeId).flush()
         }
     }

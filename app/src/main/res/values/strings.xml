@@ -131,31 +131,31 @@
     <string name="show_number_row">Show separate number row</string>
     <string name="show_emoji_key">Show emoji key</string>
     <!-- Description for option to show the emoji key next to the space bar -->
-    <string name="show_emoji_key_summary">Key next to the space bar that opens the emoji panel</string>
+    <string name="show_emoji_key_summary">Opens the emoji panel: a key of its own next to the space bar, or a long press on the comma key when the language switch key is shown</string>
     <string name="space_swipe">Space swipe cursor move</string>
     <!-- Description for option to move the cursor by swiping on the space bar -->
     <string name="space_swipe_summary">Swipe the space bar to move the cursor</string>
     <string name="delete_swipe">Delete swipe</string>
     <!-- Description for option to delete more text by swiping on the delete key -->
     <string name="delete_swipe_summary">Swipe the delete key to delete more text</string>
-    <!-- Option to show Tatar word suggestions above the keyboard while typing -->
-    <string name="tatar_suggestions">Tatar word suggestions</string>
-    <!-- Description for the Tatar word suggestions option -->
-    <string name="tatar_suggestions_summary">Show suggested Tatar words above the keyboard as you type</string>
-    <!-- Title of the one-time dialog offering to turn Tatar word suggestions on -->
-    <string name="tatar_suggestions_offer_title">Turn on Tatar suggestions?</string>
-    <!-- Body of the one-time dialog offering to turn Tatar word suggestions on -->
-    <string name="tatar_suggestions_offer_message">Suggested Tatar words can appear above the keyboard as you type. The word list stays on your device and no internet connection is used.</string>
-    <!-- Button that turns Tatar word suggestions on -->
+    <!-- Option to show word suggestions above the keyboard while typing -->
+    <string name="tatar_suggestions">Word suggestions</string>
+    <!-- Description for the word suggestions option -->
+    <string name="tatar_suggestions_summary">Show suggested and predicted words above the keyboard as you type, in Tatar and in Russian</string>
+    <!-- Title of the one-time dialog offering to turn word suggestions on -->
+    <string name="tatar_suggestions_offer_title">Turn on word suggestions?</string>
+    <!-- Body of the one-time dialog offering to turn word suggestions on -->
+    <string name="tatar_suggestions_offer_message">Suggested and predicted words can appear above the keyboard as you type, in Tatar and in Russian. The word lists stay on your device and no internet connection is used.</string>
+    <!-- Button that turns word suggestions on -->
     <string name="tatar_suggestions_offer_enable">Turn on</string>
-    <!-- Button that declines the offer to turn Tatar word suggestions on -->
+    <!-- Button that declines the offer to turn word suggestions on -->
     <string name="tatar_suggestions_offer_dismiss">Not now</string>
-    <!-- Message shown once when Tatar word suggestions could not be turned on -->
-    <string name="tatar_suggestions_unavailable">Tatar suggestions could not be turned on right now. You can try again later.</string>
-    <!-- Option to replace a misspelled Tatar word with a dictionary word when a separator is typed -->
-    <string name="tatar_autocorrect">Autocorrect Tatar words</string>
-    <!-- Description for the Tatar autocorrection option. Says plainly that text already typed is changed and how to undo it. -->
-    <string name="tatar_autocorrect_summary">Fix a misspelled Tatar word when you type a space or punctuation. Press backspace right after to get back what you typed.</string>
+    <!-- Message shown once when word suggestions could not be turned on -->
+    <string name="tatar_suggestions_unavailable">Word suggestions could not be turned on right now. You can try again later.</string>
+    <!-- Option to replace a misspelled word with a dictionary word when a separator is typed -->
+    <string name="tatar_autocorrect">Autocorrect words</string>
+    <!-- Description for the autocorrection option. Says plainly that text already typed is changed and how to undo it. -->
+    <string name="tatar_autocorrect_summary">Fix a misspelled word when you type a space or punctuation. Press backspace right after to get back what you typed.</string>
     <!-- Option to remember words the user types and suggest them later -->
     <string name="personal_dictionary">Personal dictionary</string>
     <!-- Description for the personal dictionary option. Says plainly that words are saved on the device and that turning the option off keeps what was already saved. -->
@@ -188,6 +188,38 @@
     <string name="personal_dictionary_no_matches">No words match your search.</string>
     <!-- Says how many of the matching words are actually listed. %1$d is shown, %2$d is the total. -->
     <string name="personal_dictionary_shown_of_total">Showing %1$d of %2$d. Use search to narrow the list.</string>
+    <!-- Shown when a word the user asked to save did not reach the device. Names no file, no code and no cause: none of that is anything the user could act on. -->
+    <string name="personal_dictionary_save_failed">Could not save the word. Try again.</string>
+    <!-- Shown when a word the user asked to remove is still saved -->
+    <string name="personal_dictionary_delete_failed">Could not remove the word. It is still saved.</string>
+    <!-- Shown when erasing every saved word did not remove everything -->
+    <string name="personal_dictionary_erase_failed">Could not erase everything. Some saved words are still on this device.</string>
+    <!-- Shown once when the saved words could not be read, so the list appears empty -->
+    <string name="personal_dictionary_unreadable">Saved words could not be read, so the list is empty. A copy was kept \u2014 open Saved words to bring back what can still be read.</string>
+    <!-- Title of the card offering the kept copy of words that could not be read. Says what happened, not why. -->
+    <string name="personal_dictionary_quarantine_title">Words that could not be read</string>
+    <!-- Beside the title when part of the copy is damaged. The count is what was READ, and the damage must be said in the same breath: a partial recovery presented as a whole one is the outcome this feature must never produce. -->
+    <plurals name="personal_dictionary_quarantine_partial">
+        <item quantity="one">%1$d word can be brought back. The rest of the copy is damaged and cannot be recovered.</item>
+        <item quantity="other">%1$d words can be brought back. The rest of the copy is damaged and cannot be recovered.</item>
+    </plurals>
+    <!-- Beside the title when the whole copy could be read -->
+    <plurals name="personal_dictionary_quarantine_whole">
+        <item quantity="one">%1$d word can be brought back.</item>
+        <item quantity="other">%1$d words can be brought back.</item>
+    </plurals>
+    <!-- Beside the title when nothing at all could be read out of the copy. It is still offered, because the copy is still on the device and the user is entitled to remove it. -->
+    <string name="personal_dictionary_quarantine_none">None of these words can be brought back. The copy is still on this device.</string>
+    <!-- Action that puts the readable words back into the saved list -->
+    <string name="personal_dictionary_quarantine_restore">Bring the words back</string>
+    <!-- Action that removes the kept copy -->
+    <string name="personal_dictionary_quarantine_discard">Delete the copy</string>
+    <!-- Body of the confirmation dialog for deleting the kept copy -->
+    <string name="personal_dictionary_quarantine_discard_confirm">Remove the copy of the words that could not be read? This cannot be undone.</string>
+    <!-- Shown when bringing the words back did not happen. Says where the words are now. -->
+    <string name="personal_dictionary_quarantine_restore_failed">Could not bring the words back. They are still only in the copy.</string>
+    <!-- Shown when the copy could not be removed -->
+    <string name="personal_dictionary_quarantine_discard_failed">Could not delete the copy. It is still on this device.</string>
     <!-- Title of the settings item and its confirmation dialog that erases recently used emoji -->
     <string name="clear_recent_emoji">Clear recent emoji</string>
     <!-- Body of the confirmation dialog that erases recently used emoji -->
@@ -205,4 +237,23 @@
     <string name="change_keyboard">Change keyboard</string>
     <string name="privacy_policy">Privacy Policy</string>
     <string name="license">License</string>
+    <!-- Shown when a long press lands on a word the keyboard did not learn from you. The word itself is never named: the message can appear over any app. -->
+    <string name="personal_dictionary_not_saved">This word comes from the built-in dictionary. Only words the keyboard saved from your own typing can be forgotten.</string>
+    <!-- Shown when the emoji key or the search pill has nothing to open. Names no file and no cause. -->
+    <string name="emoji_unavailable">Emoji are not available right now. Restarting the keyboard may help.</string>
+    <!-- Shown when a link row is tapped and no app on the device can open links. -->
+    <string name="no_app_for_link">No app on this device can open links.</string>
+    <!-- Shown when nothing has been saved yet AND the personal dictionary is already on, so there is nothing for the person to switch. -->
+    <string name="personal_dictionary_empty_ready">No saved words yet. Words you type will appear here.</string>
+    <!-- Shown when a long press asks to forget a word while saved words are switched off. Names the switch, because turning it on is the only thing the person can do about it. -->
+    <string name="personal_dictionary_off_nothing_to_forget">Saved words are off, so there is nothing to forget. Turn on Personal dictionary in the keyboard settings to have the words you type remembered.</string>
+    <!-- Title of the settings row and screen that lists where the keyboard's language data comes from. -->
+    <string name="settings_screen_data_sources">Data sources</string>
+    <!-- Opening line of the Data sources screen. Says the two things a person actually wants to know: nothing leaves the phone, and the words came from somewhere nameable. -->
+    <string name="data_sources_intro">The keyboard works offline and sends nothing anywhere. Its word lists and next-word suggestions are built from open collections of text. These are the collections.</string>
+    <!-- Section header above the sources whose data is inside this version of the app. -->
+    <string name="data_sources_in_app">In this version</string>
+    <string name="data_sources_leipzig_summary">Most of both word lists, and all of the next-word tables. CC BY 4.0.</string>
+    <string name="data_sources_tatoeba_summary">Everyday words in both lists: frequencies from example sentences. CC BY 2.0 FR.</string>
+    <string name="data_sources_opensubtitles_summary">Everyday words in both lists: frequencies from film subtitles.</string>
 </resources>

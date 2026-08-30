@@ -50,6 +50,18 @@ class TokenizationAndPairingTest(unittest.TestCase):
         self.assertEqual(["әни", None, "китап"], tokens)
         self.assertEqual([], list(bigram_pack.iter_pairs(tokens, self.VOCABULARY)))
 
+    def test_an_imperative_with_a_trailing_mark_yields_no_pair(self) -> None:
+        # The case docs/RUSSIAN-BIGRAMS.md section 12 item 3 raised and docs/BIGRAM-ADJACENCY.md
+        # measured: "позвони!" is rejected WHOLE, so the imperative gets no successor from this
+        # sentence. Pinned as the rule's behaviour, NOT as a defect — the measurement found the
+        # missing prediction after imperatives has a different cause (the H = 10 000 head cutoff,
+        # which this rule cannot influence: see
+        # tests/bigram_asset_pack test_bigram_evidence_never_promotes_a_word_to_a_head), and that
+        # relaxing the rule made the held-out hit-rate WORSE in both languages.
+        tokens = bigram_pack.normalized_tokens("позвони! мин")
+        self.assertEqual([None, "мин"], tokens)
+        self.assertEqual([], list(bigram_pack.iter_pairs(tokens, self.VOCABULARY | {"позвони", "мин"})))
+
     def test_punctuation_alone_between_two_words_produces_no_pair(self) -> None:
         tokens = bigram_pack.normalized_tokens("әни , китап")
         self.assertEqual([], list(bigram_pack.iter_pairs(tokens, self.VOCABULARY)))

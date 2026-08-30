@@ -28,18 +28,29 @@ class ImmutableUtf8Prefix private constructor(private val value: ByteArray) {
     }
 }
 
+/**
+ * PROPOSALS.md, "E5c. Вид запроса": the owner of state must know which kind of result it holds
+ * before it may commit it — NEXT_WORD can never be committed through the PREFIX path or vice
+ * versa. NOT introduced to make tokens of different requests unequal (`requestSerial` already
+ * does that on every `request`/`requestNextWord` call).
+ */
+enum class LookupKind { PREFIX, NEXT_WORD }
+
 data class LookupToken(
     val engineInstanceId: Long,
     val requestSerial: Long,
     val editorSessionId: Long,
     val subtypeId: String,
-    val exactPrefix: ImmutableUtf8Prefix,
+    /** Prefix bytes for [LookupKind.PREFIX], normalized context-word bytes for [LookupKind.NEXT_WORD]. */
+    val normalizedQuery: ImmutableUtf8Prefix,
     val dictionary: DictionaryIdentity,
+    val kind: LookupKind = LookupKind.PREFIX,
 )
 
 data class LookupResult(
     val token: LookupToken,
     val suggestions: List<String>,
+    val kind: LookupKind = token.kind,
 )
 
 /**
@@ -97,11 +108,38 @@ class LatestOnlyPrefixEngine internal constructor(
         editorSessionId: Long,
         subtypeId: String,
         normalizedPrefixUtf8: ByteArray,
+    ): LookupToken? = requestInternal(
+        editorSessionId, subtypeId, normalizedPrefixUtf8,
+        LookupKind.PREFIX, TdictPrefixIndex.MAX_PREFIX_BYTES,
+    )
+
+    /**
+     * PROPOSALS.md, "E5c. Вид запроса": the NEXT_WORD sibling of [request]. Existing PREFIX
+     * behaviour is untouched by this method's existence — empty input is still rejected and still
+     * invalidates the generation for PREFIX, exactly as before; here an empty
+     * [normalizedContextWordUtf8] is rejected the same way, because "no context" and "no prefix"
+     * are the same kind of nothing to look up.
+     */
+    fun requestNextWord(
+        editorSessionId: Long,
+        subtypeId: String,
+        normalizedContextWordUtf8: ByteArray,
+    ): LookupToken? = requestInternal(
+        editorSessionId, subtypeId, normalizedContextWordUtf8,
+        LookupKind.NEXT_WORD, TatBigrPrefixIndex.MAX_WORD_BYTES,
+    )
+
+    private fun requestInternal(
+        editorSessionId: Long,
+        subtypeId: String,
+        normalizedBytes: ByteArray,
+        kind: LookupKind,
+        maxBytes: Int,
     ): LookupToken? {
-        // Reject before constructing the immutable token or making the single owned prefix copy.
-        if (normalizedPrefixUtf8.isEmpty() ||
-            normalizedPrefixUtf8.size > TdictPrefixIndex.MAX_PREFIX_BYTES ||
-            !isValidUtf8Scalar(normalizedPrefixUtf8)
+        // Reject before constructing the immutable token or making the single owned copy.
+        if (normalizedBytes.isEmpty() ||
+            normalizedBytes.size > maxBytes ||
+            !isValidUtf8Scalar(normalizedBytes)
         ) {
             synchronized(lock) {
                 if (state == State.ACTIVE) invalidateGenerationLocked()
@@ -112,14 +150,15 @@ class LatestOnlyPrefixEngine internal constructor(
         val token = synchronized(lock) {
             if (state != State.ACTIVE) return@synchronized null
             requestSerial = nextSerial(requestSerial)
-            val immutablePrefix = ImmutableUtf8Prefix.copyOf(normalizedPrefixUtf8)
+            val immutableQuery = ImmutableUtf8Prefix.copyOf(normalizedBytes)
             val token = LookupToken(
                 engineInstanceId,
                 requestSerial,
                 editorSessionId,
                 subtypeId,
-                immutablePrefix,
+                immutableQuery,
                 dictionaryIdentity,
+                kind,
             )
             val request = Request(token)
             currentToken = token
@@ -212,7 +251,12 @@ class LatestOnlyPrefixEngine internal constructor(
             while (true) {
                 val lookup = synchronized(lock) { computer }
                 val suggestions = try {
-                    lookup?.lookup(request.token.exactPrefix) ?: emptyList()
+                    when (request.token.kind) {
+                        LookupKind.PREFIX -> lookup?.lookup(request.token.normalizedQuery) ?: emptyList()
+                        LookupKind.NEXT_WORD ->
+                            (lookup as? NextWordComputer)?.predict(request.token.normalizedQuery)
+                                ?: emptyList()
+                    }
                 } catch (_: Throwable) {
                     emptyList()
                 }

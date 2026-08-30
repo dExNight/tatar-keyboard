@@ -1,0 +1,5 @@
+• "Forget word" can no longer close the keyboard while you type
+• A personal dictionary that cannot be read is no longer wiped silently
+• "Erase all words" now really removes everything
+• Failed saves, removals and erasures now say so instead of looking fine
+• Suggestions: the switch no longer goes quiet if you flip it while the dictionary is unpacking

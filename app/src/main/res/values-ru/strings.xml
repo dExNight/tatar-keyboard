@@ -62,18 +62,20 @@
     <string name="pref_enable_ime_switch_summary">Кнопка языка переключает и на другие приложения-клавиатуры</string>
     <string name="show_number_row">Показать ряд цифр</string>
     <string name="show_emoji_key">Показать клавишу эмодзи</string>
-    <string name="show_emoji_key_summary">Клавиша рядом с пробелом, открывающая панель эмодзи</string>
+    <string name="show_emoji_key_summary">Открывает панель эмодзи: отдельной клавишей рядом с пробелом или долгим нажатием на запятую, когда показана клавиша смены языка</string>
     <string name="space_swipe">Перемещать курсор пробелом</string>
     <string name="space_swipe_summary">Проведите по пробелу, чтобы переместить курсор</string>
     <string name="delete_swipe">Удалить смахиванием</string>
     <string name="delete_swipe_summary">Проведите по клавише удаления, чтобы стереть больше текста</string>
-    <string name="tatar_suggestions">Подсказки татарских слов</string>
-    <string name="tatar_suggestions_summary">Показывать подсказки татарских слов над клавиатурой при вводе</string>
-    <string name="tatar_suggestions_offer_title">Включить татарские подсказки?</string>
-    <string name="tatar_suggestions_offer_message">Подсказки татарских слов могут появляться над клавиатурой при вводе. Список слов хранится на вашем устройстве, интернет не используется.</string>
+    <string name="tatar_suggestions">Подсказки слов</string>
+    <string name="tatar_suggestions_summary">Показывать подсказки слов над клавиатурой при вводе — татарских и русских</string>
+    <string name="tatar_suggestions_offer_title">Включить подсказки слов?</string>
+    <string name="tatar_suggestions_offer_message">Подсказки татарских и русских слов могут появляться над клавиатурой при вводе. Списки слов хранятся на вашем устройстве, интернет не используется.</string>
     <string name="tatar_suggestions_offer_enable">Включить</string>
     <string name="tatar_suggestions_offer_dismiss">Не сейчас</string>
-    <string name="tatar_suggestions_unavailable">Сейчас не удалось включить татарские подсказки. Можно попробовать позже.</string>
+    <string name="tatar_suggestions_unavailable">Сейчас не удалось включить подсказки слов. Можно попробовать позже.</string>
+    <string name="tatar_autocorrect">Исправление слов</string>
+    <string name="tatar_autocorrect_summary">Исправляет слово с опечаткой, когда вы ставите пробел или знак препинания. Нажмите стирание сразу после, чтобы вернуть набранное.</string>
     <string name="personal_dictionary">Личный словарь</string>
     <string name="personal_dictionary_summary">Запоминать набранные вами слова и предлагать их позже. Сохраняются только на этом устройстве. Выключение не удаляет накопленное — стереть можно на экране «Личный словарь».</string>
     <string name="personal_dictionary_screen">Сохранённые слова</string>
@@ -90,6 +92,29 @@
     <string name="personal_dictionary_empty">Пока ничего не сохранено. Набранные слова будут появляться здесь, когда личный словарь включён.</string>
     <string name="personal_dictionary_no_matches">Ничего не найдено.</string>
     <string name="personal_dictionary_shown_of_total">Показано %1$d из %2$d. Уточните поиск, чтобы сузить список.</string>
+    <string name="personal_dictionary_save_failed">Не удалось сохранить слово. Попробуйте ещё раз.</string>
+    <string name="personal_dictionary_delete_failed">Не удалось удалить слово. Оно осталось в словаре.</string>
+    <string name="personal_dictionary_erase_failed">Не удалось стереть всё. Часть сохранённых слов осталась на устройстве.</string>
+    <string name="personal_dictionary_unreadable">Сохранённые слова не удалось прочитать, поэтому список пуст. Их копия сохранена \u2014 откройте «Сохранённые слова», чтобы вернуть то, что ещё читается.</string>
+    <string name="personal_dictionary_quarantine_title">Слова, которые не удалось прочитать</string>
+    <plurals name="personal_dictionary_quarantine_partial">
+        <item quantity="one">Можно вернуть %1$d слово. Остальная часть копии повреждена, её не восстановить.</item>
+        <item quantity="few">Можно вернуть %1$d слова. Остальная часть копии повреждена, её не восстановить.</item>
+        <item quantity="many">Можно вернуть %1$d слов. Остальная часть копии повреждена, её не восстановить.</item>
+        <item quantity="other">Можно вернуть %1$d слова. Остальная часть копии повреждена, её не восстановить.</item>
+    </plurals>
+    <plurals name="personal_dictionary_quarantine_whole">
+        <item quantity="one">Можно вернуть %1$d слово.</item>
+        <item quantity="few">Можно вернуть %1$d слова.</item>
+        <item quantity="many">Можно вернуть %1$d слов.</item>
+        <item quantity="other">Можно вернуть %1$d слова.</item>
+    </plurals>
+    <string name="personal_dictionary_quarantine_none">Ни одного слова вернуть не удаётся. Копия по-прежнему хранится на этом устройстве.</string>
+    <string name="personal_dictionary_quarantine_restore">Вернуть слова</string>
+    <string name="personal_dictionary_quarantine_discard">Удалить копию</string>
+    <string name="personal_dictionary_quarantine_discard_confirm">Удалить копию слов, которые не удалось прочитать? Это действие необратимо.</string>
+    <string name="personal_dictionary_quarantine_restore_failed">Не удалось вернуть слова. Они остались только в копии.</string>
+    <string name="personal_dictionary_quarantine_discard_failed">Не удалось удалить копию. Она осталась на этом устройстве.</string>
     <string name="clear_recent_emoji">Очистить недавние эмодзи</string>
     <string name="clear_recent_emoji_confirm">Удалить все недавно использованные эмодзи, сохранённые на этом устройстве? Это действие нельзя отменить.</string>
     <string name="clear_recent_emoji_action">Очистить</string>
@@ -102,4 +127,18 @@
     <string name="change_keyboard">Сменить клавиатуру</string>
     <string name="privacy_policy">Политика конфиденциальности</string>
     <string name="license">Лицензия</string>
+    <string name="personal_dictionary_not_saved">Это слово из встроенного словаря. Забыть можно только те слова, которые клавиатура запомнила за вами.</string>
+    <string name="emoji_unavailable">Эмодзи сейчас недоступны. Может помочь перезапуск клавиатуры.</string>
+    <string name="no_app_for_link">На устройстве нет приложения, которое открывает ссылки.</string>
+    <string name="personal_dictionary_empty_ready">Пока ничего не сохранено. Набранные слова будут появляться здесь.</string>
+    <string name="personal_dictionary_off_nothing_to_forget">Сохранение слов выключено, забывать нечего. Включите «Личный словарь» в настройках клавиатуры, чтобы набранные слова запоминались.</string>
+    <!-- Title of the settings row and screen that lists where the keyboard's language data comes from. -->
+    <string name="settings_screen_data_sources">Источники данных</string>
+    <!-- Opening line of the Data sources screen. -->
+    <string name="data_sources_intro">Клавиатура работает без интернета и никуда ничего не отправляет. Списки слов и подсказки следующего слова собраны из открытых собраний текстов. Вот эти собрания.</string>
+    <!-- Section header above the sources whose data is inside this version of the app. -->
+    <string name="data_sources_in_app">В этой версии</string>
+    <string name="data_sources_leipzig_summary">Большая часть обоих списков слов и все таблицы подсказок. CC BY 4.0.</string>
+    <string name="data_sources_tatoeba_summary">Разговорные слова в обоих списках: частоты из примеров предложений. CC BY 2.0 FR.</string>
+    <string name="data_sources_opensubtitles_summary">Разговорные слова в обоих списках: частоты из субтитров к фильмам.</string>
 </resources>

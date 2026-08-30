@@ -1,0 +1,7 @@
+• Russian word suggestions: 100,000 forms from open Leipzig corpora
+• The dictionary follows the layout — Russian on Russian, Tatar on Tatar
+• Switching layouts is instant; the other language stays ready
+• "ё" is kept apart from "е", so both spellings are suggested
+• Each language keeps its own personal dictionary
+• Next-word prediction is still Tatar only
+• Still no internet permission and no new dependencies

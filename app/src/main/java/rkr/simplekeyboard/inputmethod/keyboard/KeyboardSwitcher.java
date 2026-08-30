@@ -37,6 +37,9 @@ import rkr.simplekeyboard.inputmethod.latin.LatinIME;
 import rkr.simplekeyboard.inputmethod.latin.RichInputMethodManager;
 import rkr.simplekeyboard.inputmethod.latin.common.Constants;
 import rkr.simplekeyboard.inputmethod.latin.emoji.EmojiPanelView;
+import rkr.simplekeyboard.inputmethod.latin.emoji.EmojiSearchIndex;
+import rkr.simplekeyboard.inputmethod.latin.emoji.EmojiSearchView;
+import rkr.simplekeyboard.inputmethod.latin.emoji.EmojiSkinTones;
 import rkr.simplekeyboard.inputmethod.latin.emoji.EmojiSetSnapshot;
 import rkr.simplekeyboard.inputmethod.latin.settings.Settings;
 import rkr.simplekeyboard.inputmethod.latin.settings.SettingsValues;
@@ -46,12 +49,16 @@ import rkr.simplekeyboard.inputmethod.latin.utils.RecapitalizeStatus;
 import rkr.simplekeyboard.inputmethod.latin.utils.ResourceUtils;
 
 public final class KeyboardSwitcher implements KeyboardState.SwitchActions,
-        EmojiPanelView.Listener {
+        EmojiPanelView.Listener, EmojiSearchView.Listener {
     private static final String TAG = KeyboardSwitcher.class.getSimpleName();
 
     private MainKeyboardView mKeyboardView;
     private InputView mCurrentInputView;
     private boolean mEmojiPanelShown;
+    private boolean mEmojiSearchShown;
+
+    /** Held so a panel created after the table arrived (or recreated later) still gets it. */
+    private EmojiSkinTones mEmojiSkinTones;
     private LatinIME mLatinIME;
     private RichInputMethodManager mRichImm;
 
@@ -261,7 +268,9 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions,
             final KeyboardSwitchState toggleState) {
         // While the emoji panel is the active surface, MainKeyboardView must stay hidden even if a
         // loadKeyboard/setKeyboard runs underneath it: the two surfaces are never visible at once.
-        final int visibility = (mEmojiPanelShown
+        // The search keeps the letter keyboard on screen — that is the whole point of it — so only
+        // the panel proper hides MainKeyboardView.
+        final int visibility = ((mEmojiPanelShown && !mEmojiSearchShown)
                 || isImeSuppressedByHardwareKeyboard(settingsValues, toggleState))
                 ? View.GONE : View.VISIBLE;
         mKeyboardView.setVisibility(visibility);
@@ -369,7 +378,7 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions,
     }
 
     public View getVisibleKeyboardView() {
-        if (mEmojiPanelShown && mCurrentInputView != null) {
+        if (mEmojiPanelShown && !mEmojiSearchShown && mCurrentInputView != null) {
             final View panel = mCurrentInputView.getEmojiPanelView();
             if (panel != null) {
                 return panel;
@@ -398,8 +407,73 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions,
             return;
         }
         panel.setListener(this);
+        if (mEmojiSkinTones != null) {
+            panel.setSkinTones(mEmojiSkinTones);
+        }
         mEmojiPanelShown = true;
         mKeyboardView.setVisibility(View.GONE);
+    }
+
+    /**
+     * Binds the skin-tone table to the panel. Kept here rather than passed through
+     * {@link #showEmojiPanel}: the table is read once per process and outlives every show.
+     */
+    public void bindEmojiSkinTones(final EmojiSkinTones tones) {
+        mEmojiSkinTones = tones;
+        if (mCurrentInputView == null) {
+            return;
+        }
+        final EmojiPanelView panel = mCurrentInputView.getEmojiPanelView();
+        if (panel != null) {
+            panel.setSkinTones(tones);
+        }
+    }
+
+    public boolean isEmojiSearchShown() {
+        return mEmojiSearchShown;
+    }
+
+    /**
+     * Enters the emoji search: the grid steps aside, the letter keyboard comes back and the two
+     * search bands take the suggestion strip's place. The panel keeps its snapshot and its scroll,
+     * so leaving the search puts back exactly the grid the user came from.
+     */
+    public void showEmojiSearch(final EmojiSearchIndex index) {
+        if (mCurrentInputView == null || !mEmojiPanelShown) {
+            return;
+        }
+        final EmojiSearchView search = mCurrentInputView.enterEmojiSearch(index);
+        if (search == null) {
+            return;
+        }
+        search.setListener(this);
+        mEmojiSearchShown = true;
+        setMainKeyboardFrame(Settings.getInstance().getCurrent(), KeyboardSwitchState.OTHER);
+    }
+
+    /** Hands the current query text to the search bands, which re-run the match and redraw. */
+    public void setEmojiSearchQuery(final String query) {
+        if (!mEmojiSearchShown || mCurrentInputView == null) {
+            return;
+        }
+        final EmojiSearchView search = mCurrentInputView.getEmojiSearchView();
+        if (search != null) {
+            search.setQuery(query);
+        }
+    }
+
+    /** Leaves the emoji search and shows the emoji panel again; a no-op when no search is open. */
+    public void leaveEmojiSearch() {
+        if (!mEmojiSearchShown) {
+            return;
+        }
+        mEmojiSearchShown = false;
+        if (mCurrentInputView != null) {
+            mCurrentInputView.leaveEmojiSearch();
+        }
+        if (mKeyboardView != null) {
+            setMainKeyboardFrame(Settings.getInstance().getCurrent(), KeyboardSwitchState.OTHER);
+        }
     }
 
     /** Hides the emoji panel and restores the keyboard surface through the normal visibility path. */
@@ -408,6 +482,12 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions,
             return;
         }
         mEmojiPanelShown = false;
+        if (mEmojiSearchShown) {
+            mEmojiSearchShown = false;
+            if (mCurrentInputView != null) {
+                mCurrentInputView.hideEmojiSearch();
+            }
+        }
         if (mCurrentInputView != null) {
             mCurrentInputView.hideEmojiPanel();
         }
@@ -436,11 +516,38 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions,
         }
     }
 
+    // Implements {@link EmojiPanelView.Listener}. The search pill opens the emoji-search mode,
+    // where the letter keyboard comes back and the query is typed into the keyboard itself.
+    @Override
+    public void onEmojiPanelSearch() {
+        if (mLatinIME != null) {
+            mLatinIME.onEmojiSearchRequested();
+        }
+    }
+
     // Implements {@link EmojiPanelView.Listener}. Insertion goes solely through the ordinary
     // text-input path; the panel never commits text itself. The use is then recorded in the
     // recent-emoji list through the gated, serialized controller path.
     @Override
     public void onEmojiPanelPick(final String sequence) {
+        if (mLatinIME != null) {
+            mLatinIME.onTextInput(sequence);
+            mLatinIME.onEmojiInserted(sequence);
+        }
+    }
+
+    // Implements {@link EmojiSearchView.Listener}. Leaving the search brings the grid back.
+    @Override
+    public void onEmojiSearchClosed() {
+        if (mLatinIME != null) {
+            mLatinIME.onEmojiSearchClosed();
+        }
+    }
+
+    // Implements {@link EmojiSearchView.Listener}. A picked result travels the very same path as a
+    // panel cell: the ordinary text-input route, then the gated recent-emoji recording.
+    @Override
+    public void onEmojiSearchPick(final String sequence) {
         if (mLatinIME != null) {
             mLatinIME.onTextInput(sequence);
             mLatinIME.onEmojiInserted(sequence);
@@ -467,7 +574,7 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions,
      * surface so it never blanks a live grid.
      */
     public void releaseEmojiPanelCaches() {
-        if (mEmojiPanelShown || mCurrentInputView == null) {
+        if (mEmojiPanelShown || mEmojiSearchShown || mCurrentInputView == null) {
             return;
         }
         final EmojiPanelView panel = mCurrentInputView.getEmojiPanelView();
@@ -492,6 +599,7 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions,
         // The "panel is open" state never survives an input-view recreation (rotation, theme or
         // height change): the panel closes and the letters come back.
         mEmojiPanelShown = false;
+        mEmojiSearchShown = false;
         return currentInputView;
     }
 }

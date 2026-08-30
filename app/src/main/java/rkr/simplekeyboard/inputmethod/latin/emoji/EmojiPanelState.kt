@@ -24,28 +24,54 @@ import kotlin.math.abs
  * primitives and the immutable [EmojiSetSnapshot], so every rule in it is exercised on the plain
  * JVM without a device.
  *
- * Layout, top to bottom: a vertically scrollable grid of cells, then a fixed-height bottom bar of
- * `categoryCount + 2` equal slots — slot 0 is the "back to letters" key, slots `1..categoryCount`
- * are the category tabs, and the last slot is delete. There are exactly two functional keys (back
- * and delete); no space, no Enter.
+ * Layout, top to bottom (the Telegram-client arrangement the operator asked for):
  *
- * Cell width is exactly `panelWidth / columns` (8 columns portrait, 12 landscape). Cell height
- * equals the width, clamped to [MIN_CELL_DP]..[MAX_CELL_DP] once the metrics are supplied. Cell
- * indices are a compact `0 until entryCount` addressing of the active category and never shift when
+ *  1. a fixed-height row of category tabs across the full width, the active one under a rounded
+ *     pill;
+ *  2. a fixed-height band holding the search pill;
+ *  3. the scrolling content: every category one after another, each introduced by a header row,
+ *     so a scroll runs continuously through the whole set and it is visible where one section
+ *     ends and the next begins. There is no per-category scroll any more — the active tab is a
+ *     consequence of where the content is scrolled to, not a separate mode.
+ *
+ * Two functional keys float above the content in the bottom corners rather than sitting in a bar:
+ * "back to letters" on the left (horizontally where `?123` sits on the letter keyboard, so the
+ * muscle memory survives) and delete on the right, exactly as the reference screenshot has them.
+ *
+ * Cell width is exactly `panelWidth / columns` (8 columns portrait, 12 landscape) and the cell is
+ * square, its height clamped to [MIN_CELL_DP]..[MAX_CELL_DP]. Cell indices are a compact
+ * `0 until totalEntryCount` addressing of the WHOLE set (not of one category) and never shift when
  * the grid scrolls: scrolling only changes which rows are visible and where they are drawn.
  */
 internal class EmojiPanelState {
     private var snapshot: EmojiSetSnapshot = EmojiSetSnapshot.EMPTY
-    private var activeCategory = 0
 
     private var panelWidth = 0
     private var panelHeight = 0
     private var columns = PORTRAIT_COLUMNS
     private var minCellPx = 0
     private var maxCellPx = 0
-    private var bottomBarPx = 0
+
+    private var tabBarPx = 0
+    private var searchBarPx = 0
+    private var headerPx = 0
+    private var floatingPx = 0
+    private var floatingInsetPx = 0
+    private var backWidthPx = 0
+
+    /**
+     * Content layout, rebuilt only when the snapshot, the column count or the cell metrics change —
+     * never while drawing or scrolling. `sectionTop[s]` is the y of section s's header inside the
+     * content, `sectionTop[sectionCount]` is the total content height; `sectionStart[s]` is the
+     * global compact index of that section's first entry.
+     */
+    private var sectionTop = EMPTY_INTS
+    private var sectionStart = EMPTY_INTS
 
     private var scrollY = 0
+
+    /** Minimum horizontal travel that turns a sideways drag into a jump between sections. */
+    private var swipeMinPx = 0
 
     // Gesture bookkeeping.
     private var downTarget = NO_TARGET
@@ -53,47 +79,104 @@ internal class EmojiPanelState {
     private var activePointerId = INVALID_POINTER_ID
     private var downInGrid = false
     private var scrolling = false
+    private var swiping = false
+    private var downX = 0f
     private var downY = 0f
     private var lastMoveY = 0f
+
+    /** Set by [onUp] and drained by the view: -1 previous section, +1 next, 0 nothing. */
+    private var pendingSwipe = 0
+
+    // The long-press popup of skin-tone variants; NO_TARGET in [popupCell] means "closed".
+    private var popupCell = NO_TARGET
+    private var popupVariants = 0
+    private var popupVariant = NO_TARGET
 
     // --- Configuration ------------------------------------------------------------------------
 
     fun setSnapshot(snapshot: EmojiSetSnapshot) {
         this.snapshot = snapshot
-        if (activeCategory !in 0 until snapshot.categoryCount) {
-            activeCategory = 0
-        }
         scrollY = 0
-        clampScroll()
+        rebuildLayout()
     }
 
     fun setColumns(columns: Int) {
         if (columns > 0 && columns != this.columns) {
             this.columns = columns
+            rebuildLayout()
+        }
+    }
+
+    /**
+     * Supplies every fixed band and floating-key measurement in px. The view measures them from dp
+     * and from its own label widths; this class only arranges what it is given.
+     */
+    fun setCellMetrics(
+        minCellPx: Int,
+        maxCellPx: Int,
+        tabBarPx: Int,
+        searchBarPx: Int,
+        headerPx: Int,
+        floatingPx: Int,
+        floatingInsetPx: Int,
+        backWidthPx: Int,
+    ) {
+        this.minCellPx = minCellPx
+        this.maxCellPx = maxCellPx
+        this.tabBarPx = tabBarPx.coerceAtLeast(0)
+        this.searchBarPx = searchBarPx.coerceAtLeast(0)
+        this.headerPx = headerPx.coerceAtLeast(0)
+        this.floatingPx = floatingPx.coerceAtLeast(0)
+        this.floatingInsetPx = floatingInsetPx.coerceAtLeast(0)
+        this.backWidthPx = backWidthPx.coerceAtLeast(0)
+        rebuildLayout()
+    }
+
+    /**
+     * Sets how far a sideways drag must travel before it counts as a jump between sections. The
+     * view measures it from the platform touch slop; keeping it a parameter is what lets the rule
+     * be exercised on the JVM.
+     */
+    fun setSwipeMinDistance(px: Int) {
+        swipeMinPx = px.coerceAtLeast(0)
+    }
+
+    fun setViewport(width: Int, height: Int) {
+        val newWidth = width.coerceAtLeast(0)
+        val widthChanged = newWidth != panelWidth
+        panelWidth = newWidth
+        panelHeight = height.coerceAtLeast(0)
+        if (widthChanged) {
+            rebuildLayout()
+        } else {
             clampScroll()
         }
     }
 
-    fun setCellMetrics(minCellPx: Int, maxCellPx: Int, bottomBarPx: Int) {
-        this.minCellPx = minCellPx
-        this.maxCellPx = maxCellPx
-        this.bottomBarPx = bottomBarPx
-        clampScroll()
-    }
-
-    fun setViewport(width: Int, height: Int) {
-        panelWidth = width.coerceAtLeast(0)
-        panelHeight = height.coerceAtLeast(0)
-        clampScroll()
-    }
-
+    /** Scrolls the content so section [category]'s header sits at the top of the viewport. */
     fun setActiveCategory(category: Int): Boolean {
-        if (category == activeCategory || category !in 0 until snapshot.categoryCount) return false
-        activeCategory = category
-        scrollY = 0
+        if (category !in 0 until sectionCount()) return false
         cancelGesture()
-        return true
+        return setScrollY(sectionTop[category])
     }
+
+    // --- Bands --------------------------------------------------------------------------------
+
+    fun tabBarHeight(): Int = tabBarPx
+
+    fun searchBarTop(): Int = tabBarPx
+
+    fun searchBarHeight(): Int = searchBarPx
+
+    fun headerHeight(): Int = headerPx
+
+    /** Top of the scrolling content area: below the tab row and the search band. */
+    fun gridTop(): Int = tabBarPx + searchBarPx
+
+    fun gridHeight(): Int = (panelHeight - gridTop()).coerceAtLeast(0)
+
+    /** Kept as the name the accessibility and fling paths use; the viewport is the grid itself. */
+    fun gridViewportHeight(): Int = gridHeight()
 
     // --- Grid geometry ------------------------------------------------------------------------
 
@@ -101,12 +184,20 @@ internal class EmojiPanelState {
 
     fun categoryCount(): Int = snapshot.categoryCount
 
-    fun activeCategory(): Int = activeCategory
+    fun sectionCount(): Int = snapshot.categoryCount
+
+    fun categoryName(category: Int): String =
+        if (category in 0 until snapshot.categoryCount) snapshot.categoryName(category) else ""
 
     /** Cell width in px: exactly `panelWidth / columns`, never clamped. */
     fun cellWidth(): Int = if (columns > 0) panelWidth / columns else 0
 
-    /** Cell height in px: equal to the width, clamped to the dp range once metrics are set. */
+    /**
+     * Cell height in px: the square cell, clamped to the dp range. The previous design squeezed it
+     * so that a whole number of rows filled the panel exactly; with one continuous scroll through
+     * every section there is no row to align to any more, and the squeeze was what made the glyphs
+     * look small.
+     */
     fun cellHeight(): Int {
         val width = cellWidth()
         if (maxCellPx <= 0) return width
@@ -117,20 +208,38 @@ internal class EmojiPanelState {
 
     fun columnRight(column: Int): Int = if (columns > 0) panelWidth * (column + 1) / columns else 0
 
-    fun entryCount(): Int =
-        if (activeCategory in 0 until snapshot.categoryCount) snapshot.entryCount(activeCategory) else 0
+    /** Total number of entries across every section; the compact cell index space. */
+    fun entryCount(): Int {
+        val sections = sectionCount()
+        return if (sections == 0) 0 else sectionStart[sections]
+    }
 
-    fun rowCount(): Int {
+    /** The global compact index of section [section]'s first entry. */
+    fun sectionStartIndex(section: Int): Int =
+        if (section in 0..sectionCount()) sectionStart[section] else 0
+
+    fun sectionEntryCount(section: Int): Int =
+        if (section in 0 until sectionCount()) snapshot.entryCount(section) else 0
+
+    fun sectionRowCount(section: Int): Int {
         if (columns <= 0) return 0
-        val count = entryCount()
+        val count = sectionEntryCount(section)
         return (count + columns - 1) / columns
     }
 
-    fun contentHeight(): Int = rowCount() * cellHeight()
+    /** Content y of section [section]'s header top; `sectionTop(sectionCount())` is the total. */
+    fun sectionTop(section: Int): Int =
+        if (section in 0..sectionCount()) sectionTop[section] else 0
 
-    fun gridViewportHeight(): Int = (panelHeight - bottomBarPx).coerceAtLeast(0)
+    /** Content y of section [section]'s first cell row. */
+    fun sectionGridTop(section: Int): Int = sectionTop(section) + headerPx
 
-    fun maxScrollY(): Int = (contentHeight() - gridViewportHeight()).coerceAtLeast(0)
+    fun contentHeight(): Int {
+        val sections = sectionCount()
+        return if (sections == 0) 0 else sectionTop[sections]
+    }
+
+    fun maxScrollY(): Int = (contentHeight() - gridHeight()).coerceAtLeast(0)
 
     fun scrollY(): Int = scrollY
 
@@ -143,101 +252,268 @@ internal class EmojiPanelState {
 
     fun scrollBy(deltaY: Int): Boolean = setScrollY(scrollY + deltaY)
 
-    fun firstVisibleRow(): Int {
-        val height = cellHeight()
-        if (height <= 0 || rowCount() == 0) return 0
-        return (scrollY / height).coerceIn(0, rowCount() - 1)
+    /** The section owning content y, clamped into range; `0` when there is no content. */
+    fun sectionAtContentY(contentY: Int): Int {
+        val sections = sectionCount()
+        if (sections == 0) return 0
+        var section = 0
+        while (section < sections - 1 && contentY >= sectionTop[section + 1]) section++
+        return section
     }
 
-    fun lastVisibleRow(): Int {
+    /** The tab drawn as active: the section the top of the viewport is inside. */
+    fun activeCategory(): Int = sectionAtContentY(scrollY)
+
+    fun firstVisibleSection(): Int = sectionAtContentY(scrollY)
+
+    fun lastVisibleSection(): Int {
+        val sections = sectionCount()
+        if (sections == 0) return -1
+        val bottom = scrollY + gridHeight() - 1
+        return sectionAtContentY(bottom.coerceAtLeast(scrollY))
+    }
+
+    /** First row of [section] at least partly visible, or -1 when the section shows no row. */
+    fun firstVisibleRowOf(section: Int): Int {
         val height = cellHeight()
-        val viewport = gridViewportHeight()
-        val rows = rowCount()
-        if (height <= 0 || viewport <= 0 || rows == 0) return -1
-        return ((scrollY + viewport - 1) / height).coerceIn(0, rows - 1)
+        val rows = sectionRowCount(section)
+        if (height <= 0 || rows == 0) return -1
+        val top = sectionGridTop(section)
+        val relative = scrollY - top
+        if (relative + gridHeight() <= 0) return -1
+        val row = if (relative <= 0) 0 else relative / height
+        return if (row >= rows) -1 else row
+    }
+
+    /** Last row of [section] at least partly visible, or -1 when the section shows no row. */
+    fun lastVisibleRowOf(section: Int): Int {
+        val height = cellHeight()
+        val rows = sectionRowCount(section)
+        if (height <= 0 || rows == 0) return -1
+        val top = sectionGridTop(section)
+        val relativeBottom = scrollY + gridHeight() - top
+        if (relativeBottom <= 0) return -1
+        val row = (relativeBottom - 1) / height
+        return if (row < 0) -1 else row.coerceAtMost(rows - 1)
     }
 
     /** Number of cells at least partially inside the grid viewport at the current scroll. */
     fun visibleCellCount(): Int {
-        val first = firstVisibleRow()
-        val last = lastVisibleRow()
-        if (last < first) return 0
-        val start = first * columns
-        val end = ((last + 1) * columns).coerceAtMost(entryCount())
-        return (end - start).coerceAtLeast(0)
+        val sections = sectionCount()
+        if (sections == 0 || columns <= 0) return 0
+        var total = 0
+        var section = firstVisibleSection()
+        val last = lastVisibleSection()
+        while (section in 0..last) {
+            val first = firstVisibleRowOf(section)
+            val lastRow = lastVisibleRowOf(section)
+            if (first >= 0 && lastRow >= first) {
+                val count = sectionEntryCount(section)
+                val start = first * columns
+                val end = ((lastRow + 1) * columns).coerceAtMost(count)
+                if (end > start) total += end - start
+            }
+            section++
+        }
+        return total
     }
 
-    /** The sequence at compact cell [index]; scroll never shifts this mapping. */
-    fun entryAt(index: Int): String =
-        if (index in 0 until entryCount()) snapshot.entryAt(activeCategory, index) else ""
+    /** The sequence at compact global cell [index]; scroll never shifts this mapping. */
+    fun entryAt(index: Int): String {
+        if (index < 0 || index >= entryCount()) return ""
+        val section = sectionOfIndex(index)
+        return snapshot.entryAt(section, index - sectionStart[section])
+    }
 
-    // --- Bottom bar geometry ------------------------------------------------------------------
+    /** The section a global compact cell index belongs to. */
+    fun sectionOfIndex(index: Int): Int {
+        val sections = sectionCount()
+        if (sections == 0) return 0
+        var section = 0
+        while (section < sections - 1 && index >= sectionStart[section + 1]) section++
+        return section
+    }
+
+    // --- Tabs and floating keys ----------------------------------------------------------------
 
     /** Number of category tabs shown; a category with 0 surviving entries is absent by construction. */
     fun tabCount(): Int = snapshot.categoryCount
 
-    /** Slots on the bottom bar: back key + tabs + delete key. */
-    fun slotCount(): Int = tabCount() + 2
-
-    fun slotLeft(slot: Int): Int {
-        val slots = slotCount()
-        return if (slots > 0) panelWidth * slot / slots else 0
+    /**
+     * Tabs share the width inside the same side inset the search pill uses, so the first and the
+     * last glyph keep their air instead of touching the panel edge.
+     */
+    fun tabLeft(tab: Int): Int {
+        val tabs = tabCount()
+        if (tabs <= 0) return 0
+        val span = tabSpan()
+        return floatingInsetPx + span * tab / tabs
     }
 
-    fun slotRight(slot: Int): Int {
-        val slots = slotCount()
-        return if (slots > 0) panelWidth * (slot + 1) / slots else 0
+    fun tabRight(tab: Int): Int {
+        val tabs = tabCount()
+        if (tabs <= 0) return 0
+        val span = tabSpan()
+        return floatingInsetPx + span * (tab + 1) / tabs
     }
 
-    fun barTop(): Int = (panelHeight - bottomBarPx).coerceAtLeast(0)
+    private fun tabSpan(): Int = (panelWidth - 2 * floatingInsetPx).coerceAtLeast(0)
 
-    /** The active tab's slot, or [NO_TARGET] if there are no tabs. */
-    fun activeTabSlot(): Int = if (tabCount() > 0) activeCategory + 1 else NO_TARGET
+    fun searchLeft(): Int = floatingInsetPx
 
-    /** The slot a target paints in, or [NO_TARGET]. Used only for the pressed highlight. */
-    fun slotOfTarget(target: Int): Int = when {
-        isBack(target) -> 0
-        isDelete(target) -> slotCount() - 1
-        isTab(target) -> tabIndexOf(target) + 1
-        else -> NO_TARGET
-    }
+    fun searchRight(): Int = (panelWidth - floatingInsetPx).coerceAtLeast(floatingInsetPx)
+
+    fun floatingTop(): Int = (panelHeight - floatingInsetPx - floatingPx).coerceAtLeast(0)
+
+    fun floatingBottom(): Int = (panelHeight - floatingInsetPx).coerceAtLeast(0)
+
+    fun backLeft(): Int = floatingInsetPx
+
+    fun backRight(): Int = floatingInsetPx + backWidthPx
+
+    fun deleteLeft(): Int = (panelWidth - floatingInsetPx - floatingPx).coerceAtLeast(0)
+
+    fun deleteRight(): Int = (panelWidth - floatingInsetPx).coerceAtLeast(0)
+
+    // --- Skin-tone popup ------------------------------------------------------------------------
 
     /**
-     * Virtual-node count the accessibility delegate (E2c) will expose: every visible cell, every
-     * tab, and the two functional keys. Kept here so it is verifiable without a device.
+     * Opens the variant popup over cell [cell] with [variants] entries. The popup is a row of
+     * cell-sized slots centred on its anchor, pushed inside the panel horizontally and drawn above
+     * the anchor row — or below it when the anchor is too close to the top.
      */
-    fun virtualNodeCount(): Int = visibleCellCount() + tabCount() + 2
+    fun openPopup(cell: Int, variants: Int): Boolean {
+        if (cell < 0 || cell >= entryCount() || variants <= 0) return false
+        popupCell = cell
+        popupVariants = variants
+        popupVariant = NO_TARGET
+        return true
+    }
+
+    fun closePopup(): Boolean {
+        if (popupCell == NO_TARGET) return false
+        popupCell = NO_TARGET
+        popupVariants = 0
+        popupVariant = NO_TARGET
+        return true
+    }
+
+    fun isPopupOpen(): Boolean = popupCell != NO_TARGET
+
+    fun popupCell(): Int = popupCell
+
+    fun popupVariantCount(): Int = popupVariants
+
+    /** The variant the finger is currently over, or [NO_TARGET]. */
+    fun popupVariant(): Int = popupVariant
+
+    fun popupWidth(): Int = popupVariants * cellWidth()
+
+    fun popupHeight(): Int = cellHeight()
+
+    fun popupLeft(): Int {
+        if (!isPopupOpen()) return 0
+        val columns = this.columns.coerceAtLeast(1)
+        val section = sectionOfIndex(popupCell)
+        val column = (popupCell - sectionStart[section]) % columns
+        val centre = (columnLeft(column) + columnRight(column)) / 2
+        val width = popupWidth()
+        return (centre - width / 2).coerceIn(0, (panelWidth - width).coerceAtLeast(0))
+    }
+
+    fun popupRight(): Int = popupLeft() + popupWidth()
+
+    /** Top of the popup in view coordinates; above the anchor row, or below it when it would clip. */
+    fun popupTop(): Int {
+        if (!isPopupOpen()) return 0
+        val columns = this.columns.coerceAtLeast(1)
+        val section = sectionOfIndex(popupCell)
+        val row = (popupCell - sectionStart[section]) / columns
+        val height = cellHeight()
+        val anchorTop = gridTop() + sectionGridTop(section) + row * height - scrollY
+        val above = anchorTop - height
+        return if (above >= gridTop()) above else anchorTop + height
+    }
+
+    fun popupBottom(): Int = popupTop() + popupHeight()
+
+    fun popupVariantLeft(variant: Int): Int = popupLeft() + variant * cellWidth()
+
+    fun popupVariantRight(variant: Int): Int = popupLeft() + (variant + 1) * cellWidth()
+
+    /** The slot a target paints in, kept for the pressed highlight of a tab. */
+    fun slotOfTarget(target: Int): Int = if (isTab(target)) tabIndexOf(target) else NO_TARGET
+
+    /**
+     * Virtual-node count the accessibility delegate exposes: every visible cell, every tab, the
+     * search pill and the two functional keys — or, while the skin-tone popup is up, exactly its
+     * variants, because the popup owns the whole surface and a touch outside it dismisses rather
+     * than reaching the grid. Kept here so it is verifiable without a device.
+     */
+    fun virtualNodeCount(): Int =
+        if (isPopupOpen()) popupVariants else visibleCellCount() + tabCount() + 3
 
     // --- Hit testing --------------------------------------------------------------------------
 
-    fun isInGrid(x: Float, y: Float): Boolean =
-        x >= 0f && x < panelWidth && y >= 0f && y < gridViewportHeight()
+    fun isInGrid(x: Float, y: Float): Boolean {
+        val top = gridTop()
+        return x >= 0f && x < panelWidth && y >= top && y < top + gridHeight()
+    }
+
+    private fun inRect(x: Float, y: Float, left: Int, top: Int, right: Int, bottom: Int): Boolean =
+        x >= left && x < right && y >= top && y < bottom
 
     /**
-     * The target under ([x], [y]): a compact cell index (`>= 0`), [BACK_TARGET], [DELETE_TARGET],
-     * a tab (see [isTab]/[tabIndexOf]), or [NO_TARGET].
+     * The target under ([x], [y]): a compact global cell index (`>= 0`), [BACK_TARGET],
+     * [DELETE_TARGET], [SEARCH_TARGET], a tab (see [isTab]/[tabIndexOf]), or [NO_TARGET]. The two
+     * floating keys are tested first because they are drawn above the content.
      */
     fun targetAt(x: Float, y: Float): Int {
         if (x < 0f || x >= panelWidth || y < 0f || y >= panelHeight) return NO_TARGET
-        val barTop = barTop()
-        if (bottomBarPx > 0 && y >= barTop) {
-            val slots = slotCount()
-            var slot = 0
-            while (slot < slots - 1 && x >= slotRight(slot)) slot++
-            return when {
-                slot == 0 -> BACK_TARGET
-                slot == slots - 1 -> DELETE_TARGET
-                else -> TAB_TARGET_BASE - (slot - 1)
+        if (isPopupOpen()) {
+            // While the popup is up it owns the whole surface: it is drawn over everything, and a
+            // touch outside it dismisses rather than reaching the grid underneath.
+            if (y >= popupTop() && y < popupBottom() && x >= popupLeft() && x < popupRight()) {
+                val cellWidth = cellWidth()
+                if (cellWidth <= 0) return NO_TARGET
+                val variant = ((x - popupLeft()) / cellWidth).toInt()
+                if (variant in 0 until popupVariants) return POPUP_TARGET_BASE - variant
             }
+            return NO_TARGET
+        }
+        if (floatingPx > 0) {
+            val top = floatingTop()
+            val bottom = floatingBottom()
+            if (inRect(x, y, backLeft(), top, backRight(), bottom)) return BACK_TARGET
+            if (inRect(x, y, deleteLeft(), top, deleteRight(), bottom)) return DELETE_TARGET
+        }
+        if (tabBarPx > 0 && y < tabBarPx) {
+            val tabs = tabCount()
+            if (tabs <= 0) return NO_TARGET
+            // The side insets belong to the outermost tabs rather than being dead space.
+            var tab = 0
+            while (tab < tabs - 1 && x >= tabRight(tab)) tab++
+            return TAB_TARGET_BASE - tab
+        }
+        if (searchBarPx > 0 && y < tabBarPx + searchBarPx) {
+            return if (x >= searchLeft() && x < searchRight()) SEARCH_TARGET else NO_TARGET
         }
         val height = cellHeight()
-        if (height <= 0) return NO_TARGET
-        val contentY = y.toInt() + scrollY
-        val row = contentY / height
+        if (height <= 0 || columns <= 0) return NO_TARGET
+        val gridTop = gridTop()
+        if (y < gridTop || y >= gridTop + gridHeight()) return NO_TARGET
+        val contentY = (y.toInt() - gridTop) + scrollY
+        if (contentY < 0 || contentY >= contentHeight()) return NO_TARGET
+        val section = sectionAtContentY(contentY)
+        val rowTop = sectionGridTop(section)
+        if (contentY < rowTop) return NO_TARGET // the header itself is not a target
+        val row = (contentY - rowTop) / height
+        if (row >= sectionRowCount(section)) return NO_TARGET
         var column = 0
         while (column < columns - 1 && x >= columnRight(column)) column++
-        val index = row * columns + column
-        return if (index in 0 until entryCount()) index else NO_TARGET
+        val local = row * columns + column
+        if (local >= sectionEntryCount(section)) return NO_TARGET
+        return sectionStart[section] + local
     }
 
     // --- Gesture state machine ----------------------------------------------------------------
@@ -248,10 +524,13 @@ internal class EmojiPanelState {
         downTarget = target
         pressedTarget = target
         activePointerId = pointerId
-        downInGrid = isInGrid(x, y)
+        downInGrid = isInGrid(x, y) && !isPopupOpen()
+        downX = x
         downY = y
         lastMoveY = y
         scrolling = false
+        swiping = false
+        if (isPopupOpen()) popupVariant = if (isPopupVariant(target)) popupVariantIndexOf(target) else NO_TARGET
         return target
     }
 
@@ -259,12 +538,35 @@ internal class EmojiPanelState {
     fun onMove(pointerId: Int, x: Float, y: Float, touchSlop: Int): Boolean {
         if (pointerId != activePointerId || activePointerId == INVALID_POINTER_ID) return false
         var changed = false
-        if (!scrolling && downInGrid && abs(y - downY) > touchSlop) {
-            scrolling = true
-            if (pressedTarget != NO_TARGET) {
+        if (isPopupOpen()) {
+            // The finger slides along the open popup and the highlighted variant follows it.
+            val here = targetAt(x, y)
+            val variant = if (isPopupVariant(here)) popupVariantIndexOf(here) else NO_TARGET
+            if (variant != popupVariant) {
+                popupVariant = variant
+                changed = true
+            }
+            return changed
+        }
+        // The axis is decided once, by whichever direction clears the slop first: a vertical drag
+        // scrolls the content, a horizontal one jumps between sections. Deciding once is what keeps
+        // a slightly slanted scroll from turning into a section jump halfway through.
+        if (!scrolling && !swiping && downInGrid) {
+            val dx = abs(x - downX)
+            val dy = abs(y - downY)
+            if (dy > touchSlop && dy >= dx) {
+                scrolling = true
+            } else if (dx > touchSlop && dx > dy) {
+                swiping = true
+            }
+            if ((scrolling || swiping) && pressedTarget != NO_TARGET) {
                 pressedTarget = NO_TARGET
                 changed = true
             }
+        }
+        if (swiping) {
+            lastMoveY = y
+            return changed
         }
         if (scrolling) {
             val delta = (lastMoveY - y).toInt()
@@ -288,13 +590,34 @@ internal class EmojiPanelState {
             cancelGesture()
             return NO_TARGET
         }
+        if (isPopupOpen()) {
+            // A release on a variant picks it; a release anywhere else dismisses the popup. The
+            // caller closes the popup either way.
+            val here = targetAt(x, y)
+            cancelGesture()
+            return if (isPopupVariant(here)) here else POPUP_DISMISS_TARGET
+        }
         val result = when {
+            swiping -> {
+                val travel = x - downX
+                if (abs(travel) >= swipeMinPx && swipeMinPx > 0) {
+                    pendingSwipe = if (travel < 0f) 1 else -1
+                }
+                NO_TARGET
+            }
             scrolling -> NO_TARGET
             targetAt(x, y) == downTarget -> downTarget
             else -> NO_TARGET
         }
         cancelGesture()
         return result
+    }
+
+    /** Drains the swipe left by the last [onUp]: -1 previous section, +1 next, 0 nothing. */
+    fun consumeSwipe(): Int {
+        val swipe = pendingSwipe
+        pendingSwipe = 0
+        return swipe
     }
 
     /** Ends the gesture only when Android reports the active pointer went up. */
@@ -305,12 +628,14 @@ internal class EmojiPanelState {
         val changed = downTarget != NO_TARGET ||
             pressedTarget != NO_TARGET ||
             activePointerId != INVALID_POINTER_ID ||
-            scrolling
+            scrolling ||
+            swiping
         downTarget = NO_TARGET
         pressedTarget = NO_TARGET
         activePointerId = INVALID_POINTER_ID
         downInGrid = false
         scrolling = false
+        swiping = false
         return changed
     }
 
@@ -322,11 +647,49 @@ internal class EmojiPanelState {
 
     fun isScrolling(): Boolean = scrolling
 
+    fun isSwiping(): Boolean = swiping
+
+    /**
+     * Recomputes the two section-offset arrays. Called only from the four setters that can change
+     * the content shape, never from drawing, hit testing or scrolling: this is the single place in
+     * the class that allocates.
+     */
+    private fun rebuildLayout() {
+        val sections = snapshot.categoryCount
+        if (sections == 0) {
+            sectionTop = EMPTY_INTS
+            sectionStart = EMPTY_INTS
+            scrollY = 0
+            return
+        }
+        if (sectionTop.size != sections + 1) {
+            sectionTop = IntArray(sections + 1)
+            sectionStart = IntArray(sections + 1)
+        }
+        val height = cellHeight()
+        var y = 0
+        var index = 0
+        for (section in 0 until sections) {
+            sectionTop[section] = y
+            sectionStart[section] = index
+            val count = snapshot.entryCount(section)
+            val rows = if (columns > 0) (count + columns - 1) / columns else 0
+            y += headerPx + rows * height
+            index += count
+        }
+        // Trailing air so the last row can be scrolled clear of the floating keys.
+        sectionTop[sections] = y + floatingPx + 2 * floatingInsetPx
+        sectionStart[sections] = index
+        clampScroll()
+    }
+
     private fun clampScroll() {
         scrollY = scrollY.coerceIn(0, maxScrollY())
     }
 
     companion object {
+        private val EMPTY_INTS = IntArray(0)
+
         const val PORTRAIT_COLUMNS = 8
         const val LANDSCAPE_COLUMNS = 12
         const val MIN_CELL_DP = 36
@@ -335,6 +698,15 @@ internal class EmojiPanelState {
         const val NO_TARGET = -1
         const val BACK_TARGET = -2
         const val DELETE_TARGET = -3
+        const val SEARCH_TARGET = -4
+
+        /** Returned by [onUp] when a release dismissed the popup without picking a variant. */
+        const val POPUP_DISMISS_TARGET = -5
+
+        // Popup variants occupy a short block well above the tab block, so the two never collide:
+        // variant k is POPUP_TARGET_BASE - k, and there are at most VARIANT_COUNT of them.
+        const val POPUP_TARGET_BASE = -50
+        private const val POPUP_TARGET_SPAN = 16
 
         // Tabs occupy the block at and below this value: tab k is encoded as TAB_TARGET_BASE - k.
         const val TAB_TARGET_BASE = -100
@@ -344,8 +716,12 @@ internal class EmojiPanelState {
         fun isCell(target: Int): Boolean = target >= 0
         fun isBack(target: Int): Boolean = target == BACK_TARGET
         fun isDelete(target: Int): Boolean = target == DELETE_TARGET
+        fun isSearch(target: Int): Boolean = target == SEARCH_TARGET
         fun isTab(target: Int): Boolean = target <= TAB_TARGET_BASE
         fun tabIndexOf(target: Int): Int = TAB_TARGET_BASE - target
+        fun isPopupVariant(target: Int): Boolean =
+            target <= POPUP_TARGET_BASE && target > POPUP_TARGET_BASE - POPUP_TARGET_SPAN
+        fun popupVariantIndexOf(target: Int): Int = POPUP_TARGET_BASE - target
     }
 }
 

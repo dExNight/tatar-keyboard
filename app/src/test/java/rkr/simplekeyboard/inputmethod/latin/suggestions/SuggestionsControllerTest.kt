@@ -21,6 +21,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import rkr.simplekeyboard.inputmethod.latin.dictionary.engine.LookupKind
 import java.util.concurrent.AbstractExecutorService
 import java.util.concurrent.TimeUnit
 
@@ -68,6 +69,11 @@ class SuggestionsControllerTest {
         var textAfterCursor: String = ""
         val commits = mutableListOf<Pair<String, String>>()
 
+        // --- E5d NEXT_WORD ------------------------------------------------------------------
+        var nextWordContext: String = ""
+        var predictedCommitResult: Boolean = true
+        val predictedCommits = mutableListOf<Pair<String, String>>()
+
         override fun cachedWordBeforeCursor(): String = word
 
         override fun commitSuggestion(expectedPrefix: String, suggestion: String): Boolean {
@@ -79,10 +85,18 @@ class SuggestionsControllerTest {
 
         override fun hasLetterAfterCursor(): Boolean =
             TatarWordUtils.startsWithWordCharacter(textAfterCursor)
+
+        override fun cachedNextWordContext(): String = nextWordContext
+
+        override fun commitPredictedWord(expectedContextWord: String, suggestion: String): Boolean {
+            predictedCommits.add(expectedContextWord to suggestion)
+            return predictedCommitResult
+        }
     }
 
     private class FakeEngine : EngineHandle {
         val requestedPrefixes = mutableListOf<ByteArray>()
+        val requestedContexts = mutableListOf<ByteArray>()
         var nextToken: Any? = TOKEN
         var isCurrentResult: Boolean = true
         var finishCount = 0
@@ -91,6 +105,15 @@ class SuggestionsControllerTest {
 
         override fun request(editorSessionId: Long, subtypeId: String, prefixUtf8: ByteArray): Any? {
             requestedPrefixes.add(prefixUtf8)
+            return nextToken
+        }
+
+        override fun requestNextWord(
+            editorSessionId: Long,
+            subtypeId: String,
+            contextWordUtf8: ByteArray,
+        ): Any? {
+            requestedContexts.add(contextWordUtf8)
             return nextToken
         }
 
@@ -218,9 +241,13 @@ class SuggestionsControllerTest {
         h.controller.onStartInput(eligible = true)
 
         // DirectExecutor publishes inline: the transition must still be GONE first, then reserve
-        // only after the engine handle has published successfully.
-        assertEquals(listOf("hide", "reserve"), h.strip.visibilityEvents)
-        assertEquals(1, h.strip.reserveCount)
+        // only after the engine handle has published successfully. The second "reserve" is E5d's
+        // widened re-request gate (publishEngine no longer skips requestCurrentPrefix() on an empty
+        // prefix, because an empty prefix is exactly when NEXT_WORD needs to fire): with no context
+        // word available either (the fake editor's default), requestNextWordContext() falls through
+        // to clearToReservedBand(), an idempotent no-op re-assertion of the already-reserved band.
+        assertEquals(listOf("hide", "reserve", "reserve"), h.strip.visibilityEvents)
+        assertEquals(2, h.strip.reserveCount)
         assertEquals(1, h.strip.hideCount)
         assertTrue(h.strip.visible)
     }
@@ -295,6 +322,7 @@ class SuggestionsControllerTest {
         h.capturedCallback!!.onResult(
             FakeEngine.TOKEN,
             listOf("сүзләр", "сүзлек", "сүзсез", "сүзчән"),
+            LookupKind.PREFIX,
         )
 
         assertEquals(1, h.strip.shown.size)
@@ -310,7 +338,7 @@ class SuggestionsControllerTest {
         val reserveBefore = h.strip.reserveCount
         val hideBefore = h.strip.hideCount
 
-        h.capturedCallback!!.onResult(FakeEngine.TOKEN, emptyList())
+        h.capturedCallback!!.onResult(FakeEngine.TOKEN, emptyList(), LookupKind.PREFIX)
 
         assertTrue(h.strip.shown.isEmpty())
         assertEquals(reserveBefore + 1, h.strip.reserveCount)
@@ -328,7 +356,7 @@ class SuggestionsControllerTest {
         // guard must drop the result anyway.
         h.controller.onSelectionChanged()
         h.engine.isCurrentResult = true
-        h.capturedCallback!!.onResult(FakeEngine.TOKEN, listOf("сүзләр"))
+        h.capturedCallback!!.onResult(FakeEngine.TOKEN, listOf("сүзләр"), LookupKind.PREFIX)
 
         assertTrue(h.strip.shown.isEmpty())
     }
@@ -342,7 +370,7 @@ class SuggestionsControllerTest {
 
         h.controller.onFinishInput()
         h.engine.isCurrentResult = true
-        h.capturedCallback!!.onResult(FakeEngine.TOKEN, listOf("сүзләр"))
+        h.capturedCallback!!.onResult(FakeEngine.TOKEN, listOf("сүзләр"), LookupKind.PREFIX)
 
         assertTrue(h.strip.shown.isEmpty())
     }
@@ -355,7 +383,7 @@ class SuggestionsControllerTest {
         h.controller.onTextChanged()
 
         h.engine.isCurrentResult = false
-        h.capturedCallback!!.onResult(FakeEngine.TOKEN, listOf("сүзләр"))
+        h.capturedCallback!!.onResult(FakeEngine.TOKEN, listOf("сүзләр"), LookupKind.PREFIX)
 
         assertTrue(h.strip.shown.isEmpty())
     }
@@ -369,7 +397,7 @@ class SuggestionsControllerTest {
         h.editor.word = "сүз"
         h.controller.onTextChanged()
         // A tap only commits against a prefix that is actually DISPLAYED, so deliver a result first.
-        h.capturedCallback!!.onResult(FakeEngine.TOKEN, listOf("сүзләр", "сүзлек"))
+        h.capturedCallback!!.onResult(FakeEngine.TOKEN, listOf("сүзләр", "сүзлек"), LookupKind.PREFIX)
         val reserveBefore = h.strip.reserveCount
         val hideBefore = h.strip.hideCount
 
@@ -387,7 +415,7 @@ class SuggestionsControllerTest {
         h.controller.onStartInput(eligible = true)
         h.editor.word = "сүз"
         h.controller.onTextChanged()
-        h.capturedCallback!!.onResult(FakeEngine.TOKEN, listOf("сүзләр", "сүзлек"))
+        h.capturedCallback!!.onResult(FakeEngine.TOKEN, listOf("сүзләр", "сүзлек"), LookupKind.PREFIX)
         val reserveBefore = h.strip.reserveCount
         val hideBefore = h.strip.hideCount
 
@@ -405,7 +433,7 @@ class SuggestionsControllerTest {
         h.controller.onStartInput(eligible = true)
         h.editor.word = "сүз"
         h.controller.onTextChanged()
-        h.capturedCallback!!.onResult(FakeEngine.TOKEN, listOf("сүзләр", "сүзлек"))
+        h.capturedCallback!!.onResult(FakeEngine.TOKEN, listOf("сүзләр", "сүзлек"), LookupKind.PREFIX)
         val shownBefore = h.strip.shown.size
         val hideBefore = h.strip.hideCount
 
@@ -631,7 +659,7 @@ class SuggestionsControllerTest {
         // Type A ("сүз") and receive a real result: candidates are displayed and bound to A.
         h.editor.word = "сүз"
         h.controller.onTextChanged()
-        h.capturedCallback!!.onResult(FakeEngine.TOKEN, listOf("сүзләр", "сүзлек"))
+        h.capturedCallback!!.onResult(FakeEngine.TOKEN, listOf("сүзләр", "сүзлек"), LookupKind.PREFIX)
         assertEquals(1, h.strip.shown.size)
 
         // Text changes to B ("сүзл"): the displayed A candidates must be invalidated immediately.
@@ -652,7 +680,7 @@ class SuggestionsControllerTest {
         // A real result for B ("сүз") is delivered and shown.
         h.editor.word = "сүз"
         h.controller.onTextChanged()
-        h.capturedCallback!!.onResult(FakeEngine.TOKEN, listOf("сүзләр", "сүзлек"))
+        h.capturedCallback!!.onResult(FakeEngine.TOKEN, listOf("сүзләр", "сүзлек"), LookupKind.PREFIX)
         assertEquals(1, h.strip.shown.size)
 
         // Tapping the displayed candidate commits against the displayed prefix.
@@ -726,7 +754,7 @@ class SuggestionsControllerTest {
         assertEquals(1, engine.destroyCount)
 
         // It never became the active engine: a late result cannot be applied.
-        capturedCallback!!.onResult(FakeEngine.TOKEN, listOf("сүзләр"))
+        capturedCallback!!.onResult(FakeEngine.TOKEN, listOf("сүзләр"), LookupKind.PREFIX)
         assertTrue(strip.shown.isEmpty())
     }
 
@@ -792,7 +820,11 @@ class SuggestionsControllerTest {
 
         h.controller.onSubtypeChanged(eligible = true)
 
-        assertEquals(reserveBefore + 1, h.strip.reserveCount)
+        // +2, not +1: E5d's widened re-request gate (see the comment in
+        // eligibleStartShowsBandOnlyAfterColdEnginePublishes) fires requestCurrentPrefix() here too,
+        // and with no prefix and no context word available it falls through to an idempotent
+        // clearToReservedBand() on top of the explicit reserve() just above it.
+        assertEquals(reserveBefore + 2, h.strip.reserveCount)
         assertEquals(hideBefore, h.strip.hideCount)
     }
 
@@ -824,7 +856,7 @@ class SuggestionsControllerTest {
         assertNotNull(h.strip.listener)
 
         // The re-registered listener must be live: a tap on a displayed candidate commits.
-        h.capturedCallback!!.onResult(FakeEngine.TOKEN, listOf("сүзләр", "сүзлек"))
+        h.capturedCallback!!.onResult(FakeEngine.TOKEN, listOf("сүзләр", "сүзлек"), LookupKind.PREFIX)
         h.strip.listener!!.onTap("сүзләр")
 
         assertEquals(listOf("сүз" to "сүзләр"), h.editor.commits)
@@ -859,7 +891,7 @@ class SuggestionsControllerTest {
         // Candidates are displayed for a word typed at the end of the text.
         h.editor.word = "кит"
         h.controller.onTextChanged()
-        h.capturedCallback!!.onResult(FakeEngine.TOKEN, listOf("китап", "китаплар"))
+        h.capturedCallback!!.onResult(FakeEngine.TOKEN, listOf("китап", "китаплар"), LookupKind.PREFIX)
         assertEquals(1, h.strip.shown.size)
 
         // The cursor then ends up inside a word (the user typed into "ки|тап"). The next text
@@ -867,7 +899,7 @@ class SuggestionsControllerTest {
         // re-display them, so a tap cannot commit.
         h.editor.textAfterCursor = "ап"
         h.controller.onTextChanged()
-        h.capturedCallback!!.onResult(FakeEngine.TOKEN, listOf("китап", "китаплар"))
+        h.capturedCallback!!.onResult(FakeEngine.TOKEN, listOf("китап", "китаплар"), LookupKind.PREFIX)
         h.strip.listener!!.onTap("китаплар")
 
         assertEquals(1, h.strip.shown.size)
@@ -903,7 +935,7 @@ class SuggestionsControllerTest {
 
         h.editor.word = "сүз"
         h.controller.onTextChanged()
-        h.capturedCallback!!.onResult(FakeEngine.TOKEN, listOf("сүзләр", "сүзлек", "сүзсез"))
+        h.capturedCallback!!.onResult(FakeEngine.TOKEN, listOf("сүзләр", "сүзлек", "сүзсез"), LookupKind.PREFIX)
 
         assertEquals(Triple("сүзләр", "сүзлек", "сүзсез"), h.strip.shown.single())
 
@@ -923,7 +955,7 @@ class SuggestionsControllerTest {
             h.engine.requestedPrefixes.single()
                 .contentEquals("сүз".toByteArray(Charsets.UTF_8)),
         )
-        h.capturedCallback!!.onResult(FakeEngine.TOKEN, listOf("сүзләр", "сүзлек", "сүзсез"))
+        h.capturedCallback!!.onResult(FakeEngine.TOKEN, listOf("сүзләр", "сүзлек", "сүзсез"), LookupKind.PREFIX)
 
         assertEquals(Triple("Сүзләр", "Сүзлек", "Сүзсез"), h.strip.shown.single())
 
@@ -939,7 +971,7 @@ class SuggestionsControllerTest {
 
         h.editor.word = "СҮЗ"
         h.controller.onTextChanged()
-        h.capturedCallback!!.onResult(FakeEngine.TOKEN, listOf("сүзләр", "сүзлек"))
+        h.capturedCallback!!.onResult(FakeEngine.TOKEN, listOf("сүзләр", "сүзлек"), LookupKind.PREFIX)
 
         assertEquals(Triple("СҮЗЛӘР", "СҮЗЛЕК", null), h.strip.shown.single())
 
@@ -975,7 +1007,7 @@ class SuggestionsControllerTest {
         h.controller.onStartInput(eligible = true)
         h.editor.word = "сүз"
         h.controller.onTextChanged()
-        h.capturedCallback!!.onResult(FakeEngine.TOKEN, listOf("сүзләр", "сүзлек"))
+        h.capturedCallback!!.onResult(FakeEngine.TOKEN, listOf("сүзләр", "сүзлек"), LookupKind.PREFIX)
         assertEquals(1, h.strip.shown.size)
         val reserveBefore = h.strip.reserveCount
 
@@ -1093,5 +1125,205 @@ class SuggestionsControllerTest {
 
         // No second engine is ever mapped on top of an unreleased lease.
         assertEquals(1, h.engines.size)
+    }
+
+    // --- E5d NEXT_WORD ("Контракт текста" amendment, 2026-08-17) --------------------------------
+
+    @Test
+    fun emptyPrefixWithSuggestionsOnAndAvailableContextBuildsANextWordRequest() {
+        val h = Harness()
+        h.controller.onStartInput(eligible = true)
+
+        h.editor.word = ""
+        h.editor.nextWordContext = "сүз"
+        h.controller.onTextChanged()
+
+        assertEquals(
+            listOf("сүз"),
+            h.engine.requestedContexts.map { String(it, Charsets.UTF_8) },
+        )
+        assertTrue("an empty prefix must never also build a PREFIX request", h.engine.requestedPrefixes.isEmpty())
+
+        h.capturedCallback!!.onResult(FakeEngine.TOKEN, listOf("өйгә"), LookupKind.NEXT_WORD)
+        assertEquals(Triple("өйгә", null, null), h.strip.shown.single())
+
+        h.strip.listener!!.onTap("өйгә")
+        assertEquals(listOf("сүз" to "өйгә"), h.editor.predictedCommits)
+        assertTrue("PREFIX commit path must never see a NEXT_WORD tap", h.editor.commits.isEmpty())
+    }
+
+    @Test
+    fun emptyPrefixWithSuggestionsOffClearsResultsAndNeverBuildsARequest() {
+        val h = Harness()
+        h.controller.onStartInput(eligible = false)
+
+        h.editor.word = ""
+        h.editor.nextWordContext = "сүз"
+        h.controller.onTextChanged()
+
+        assertTrue(h.engine.requestedContexts.isEmpty())
+        assertTrue(h.engine.requestedPrefixes.isEmpty())
+    }
+
+    @Test
+    fun emptyPrefixWithNoContextClearsResultsAndNeverBuildsARequest() {
+        val h = Harness()
+        h.controller.onStartInput(eligible = true)
+        val reserveBefore = h.strip.reserveCount
+
+        h.editor.word = ""
+        h.editor.nextWordContext = ""
+        h.controller.onTextChanged()
+
+        assertTrue(h.engine.requestedContexts.isEmpty())
+        assertTrue(h.engine.requestedPrefixes.isEmpty())
+        assertEquals(reserveBefore + 1, h.strip.reserveCount)
+    }
+
+    @Test
+    fun selectionOrLetterAfterCursorClearsResultsRegardlessOfContext() {
+        // The LETTER-after-cursor half is testable at this level; the SELECTION half is not — no
+        // EditorSurface method exposes selection state to the controller at all (the same gap the
+        // frozen contract already names for D3: hasSelection() is checked only inside
+        // InputLogic.commitPredictedWord/replaceTrailingWord, verified there by source-contract
+        // tests below, not observable from a JVM fake at the controller level).
+        val h = Harness()
+        h.controller.onStartInput(eligible = true)
+
+        h.editor.word = ""
+        h.editor.nextWordContext = "сүз"
+        h.editor.textAfterCursor = "т" // a letter sits right after the cursor
+        h.controller.onTextChanged()
+
+        assertTrue(
+            "a letter after the cursor must suppress NEXT_WORD even with a context word available",
+            h.engine.requestedContexts.isEmpty(),
+        )
+        assertTrue(h.engine.requestedPrefixes.isEmpty())
+    }
+
+    @Test
+    fun nonPrefixModeSuggestionsAreNeverMixedWithPredictionsInOneBand() {
+        val h = Harness()
+        h.controller.onStartInput(eligible = true)
+
+        // NEXT_WORD first.
+        h.editor.word = ""
+        h.editor.nextWordContext = "сүз"
+        h.controller.onTextChanged()
+        h.capturedCallback!!.onResult(FakeEngine.TOKEN, listOf("өйгә"), LookupKind.NEXT_WORD)
+        assertEquals(1, h.strip.shown.size)
+
+        // A non-empty prefix must unconditionally switch to PREFIX mode: the NEXT_WORD binding is
+        // dropped even though no new NEXT_WORD result has arrived to explicitly clear it.
+        h.editor.word = "кит"
+        h.controller.onTextChanged()
+        h.capturedCallback!!.onResult(FakeEngine.TOKEN, listOf("китап"), LookupKind.PREFIX)
+        assertEquals(Triple("китап", null, null), h.strip.shown.last())
+
+        // A tap now commits through the PREFIX path, never the NEXT_WORD one — proving the earlier
+        // prediction binding is gone, not merely shadowed.
+        h.strip.listener!!.onTap("китап")
+        assertEquals(listOf("кит" to "китап"), h.editor.commits)
+        assertTrue(h.editor.predictedCommits.isEmpty())
+    }
+
+    @Test
+    fun aNonEmptyPrefixNeverShowsAPredictionAndAnEmptyPrefixNeverShowsAPrefixSuggestion() {
+        // PROPOSALS.md, "E5d." fail-closed acceptance: both directions of "Сосуществование" checked
+        // explicitly, not just inferred from the mode-switch test above.
+        val h = Harness()
+        h.controller.onStartInput(eligible = true)
+
+        h.editor.word = "кит"
+        h.controller.onTextChanged()
+        h.capturedCallback!!.onResult(FakeEngine.TOKEN, listOf("китап"), LookupKind.PREFIX)
+        h.strip.listener!!.onTap("китап")
+        assertTrue(
+            "a non-empty prefix must never leave a NEXT_WORD binding live",
+            h.editor.predictedCommits.isEmpty(),
+        )
+
+        h.editor.word = ""
+        h.editor.nextWordContext = "сүз"
+        h.controller.onTextChanged()
+        h.capturedCallback!!.onResult(FakeEngine.TOKEN, listOf("өйгә"), LookupKind.NEXT_WORD)
+        h.strip.listener!!.onTap("өйгә")
+        assertTrue(
+            "an empty prefix must never leave a PREFIX binding live",
+            h.editor.commits.size == 1, // only the earlier "кит"->"китап" commit, nothing new
+        )
+    }
+
+    @Test
+    fun predictionsKeepThePackingOrderAndAreNeverReRanked() {
+        val h = Harness()
+        h.controller.onStartInput(eligible = true)
+        h.editor.word = ""
+        h.editor.nextWordContext = "сүз"
+        h.controller.onTextChanged()
+
+        // "яр" sorts before "әби" in code-point order (see docs/DICTIONARY-E5B.md on 'з' < 'ә'), so
+        // an alphabetical or frequency re-sort would visibly reorder this pair; the packing order
+        // handed to onResult must survive to the strip byte-for-byte instead.
+        h.capturedCallback!!.onResult(FakeEngine.TOKEN, listOf("яр", "әби", "зур"), LookupKind.NEXT_WORD)
+
+        assertEquals(Triple("яр", "әби", "зур"), h.strip.shown.single())
+    }
+
+    @Test
+    fun predictedWordCasingIsNeverDerivedFromContextCasing() {
+        val h = Harness()
+        h.controller.onStartInput(eligible = true)
+        h.editor.word = ""
+        h.editor.nextWordContext = "Сүз" // capitalized context — PREFIX mode would re-apply this
+        h.controller.onTextChanged()
+
+        h.capturedCallback!!.onResult(FakeEngine.TOKEN, listOf("өйгә"), LookupKind.NEXT_WORD)
+
+        // Shown exactly as the table stores it (lowercase) — not "Өйгә": the capitalized context
+        // casing is never carried into the prediction, unlike the PREFIX casing rules above.
+        assertEquals(Triple("өйгә", null, null), h.strip.shown.single())
+    }
+
+    @Test
+    fun mixedCaseContextDoesNotSuppressPredictions() {
+        val h = Harness()
+        h.controller.onStartInput(eligible = true)
+        h.editor.word = ""
+        h.editor.nextWordContext = "сҮз" // mixed case — PREFIX mode would give 0 results for this
+        h.controller.onTextChanged()
+
+        // Unlike PrefixCasing.MIXED for PREFIX, NEXT_WORD has no casing gate at all: the request is
+        // still built — normalized (NFC + lowercase) for the lookup key, the same as PREFIX does.
+        assertEquals(
+            listOf("сүз"),
+            h.engine.requestedContexts.map { String(it, Charsets.UTF_8) },
+        )
+    }
+
+    // --- "Состояния полосы" amendment, 2026-08-17, пятый пункт ----------------------------------
+
+    @Test
+    fun emptyBandStatesShowNextWordRowsWithoutChangingHeightOrCellCount() {
+        // Both new rows are a "частный случай уже существующих строк" by construction: NEXT_WORD
+        // reuses the exact same StripSurface.showSuggestions/reserve calls PREFIX does, so there is
+        // no separate height/cell-count code path that could diverge. Proven here by showing both
+        // the 0-results and the filled NEXT_WORD state through the one StripSurface seam.
+        val h = Harness()
+        h.controller.onStartInput(eligible = true)
+
+        h.editor.word = ""
+        h.editor.nextWordContext = "сүз"
+        h.controller.onTextChanged()
+        h.capturedCallback!!.onResult(FakeEngine.TOKEN, emptyList(), LookupKind.NEXT_WORD)
+        assertTrue("0 predictions still reserves the band, same as 0 PREFIX results", h.strip.visible)
+        assertTrue(h.strip.shown.isEmpty())
+
+        h.editor.nextWordContext = "юл"
+        h.controller.onTextChanged()
+        h.capturedCallback!!.onResult(FakeEngine.TOKEN, listOf("өйгә"), LookupKind.NEXT_WORD)
+        assertTrue(h.strip.visible)
+        assertEquals(1, h.strip.shown.size)
     }
 }

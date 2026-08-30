@@ -22,6 +22,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import rkr.simplekeyboard.inputmethod.latin.dictionary.engine.LookupKind
 
 /**
  * Named test for the E2c "Состояния полосы" row (contract amendment 2026-07-27, procedure step 3):
@@ -151,7 +152,7 @@ class SuggestionsControllerEmojiPanelBandStateTest {
         // Put words on the band so we can prove the panel empties it (and does not resize it).
         h.editor.word = "сүз"
         h.controller.onTextChanged()
-        h.capturedCallback!!.onResult(FakeEngine.TOKEN, listOf("сүзләр", "сүзлек"))
+        h.capturedCallback!!.onResult(FakeEngine.TOKEN, listOf("сүзләр", "сүзлек"), LookupKind.PREFIX)
         assertTrue("precondition: band shows words before the panel", h.strip.shown.isNotEmpty())
         assertTrue("precondition: band is visible before the panel", h.strip.visible)
 
@@ -179,7 +180,7 @@ class SuggestionsControllerEmojiPanelBandStateTest {
         assertTrue("tap while the panel is up must not commit", h.editor.commits.isEmpty())
 
         // A late result for the pre-panel prefix must not repaint the band either.
-        h.capturedCallback!!.onResult(FakeEngine.TOKEN, listOf("сүзләр"))
+        h.capturedCallback!!.onResult(FakeEngine.TOKEN, listOf("сүзләр"), LookupKind.PREFIX)
         assertEquals("a stale result must not repaint", shownBefore, h.strip.shown.size)
     }
 

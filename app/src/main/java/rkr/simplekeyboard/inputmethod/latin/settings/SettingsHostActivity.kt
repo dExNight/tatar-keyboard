@@ -49,6 +49,7 @@ import rkr.simplekeyboard.inputmethod.latin.AudioAndHapticFeedbackManager
 import rkr.simplekeyboard.inputmethod.latin.RichInputMethodManager
 import rkr.simplekeyboard.inputmethod.latin.common.LocaleUtils
 import rkr.simplekeyboard.inputmethod.latin.dictionary.personal.PersonalSubtypes
+import rkr.simplekeyboard.inputmethod.latin.dictionary.personalstore.PersonalQuarantineReport
 import rkr.simplekeyboard.inputmethod.latin.emoji.EmojiPanelController
 import rkr.simplekeyboard.inputmethod.latin.utils.LocaleResourceUtils
 import rkr.simplekeyboard.inputmethod.latin.utils.SubtypeLocaleUtils
@@ -98,7 +99,8 @@ class SettingsHostActivity : Activity() {
         LANGUAGES(R.string.keyboard_languages),
         // Title is the language display name, set dynamically in showScreen.
         LANGUAGE_DETAIL(0),
-        PERSONAL_DICTIONARY(R.string.personal_dictionary)
+        PERSONAL_DICTIONARY(R.string.personal_dictionary),
+        DATA_SOURCES(R.string.settings_screen_data_sources)
     }
 
     companion object {
@@ -129,6 +131,18 @@ class SettingsHostActivity : Activity() {
      * travels through Binder into `system_server`.
      */
     private var personalSearchQuery: String = ""
+
+    /**
+     * The quarantine copies found for each language, or null while the answer is still being read.
+     *
+     * Null is "not asked yet", not "none": the read happens on the personal-store worker like every
+     * other read in that subsystem, so the screen paints once without the card and repaints when the
+     * answers arrive. Every finished mutation puts it back to null, because a restore, a discard and
+     * an erasure all change what the answer is.
+     *
+     * It holds two numbers per language and no word — see `PersonalQuarantineReport`.
+     */
+    private var personalQuarantines: Map<String, PersonalQuarantineReport>? = null
 
     /**
      * Registered on the device-protected prefs exactly like
@@ -263,6 +277,7 @@ class SettingsHostActivity : Activity() {
             Screen.LANGUAGES -> buildLanguagesScreen()
             Screen.LANGUAGE_DETAIL -> buildLanguageDetailScreen(detail!!)
             Screen.PERSONAL_DICTIONARY -> buildPersonalDictionaryScreen()
+            Screen.DATA_SOURCES -> buildDataSourcesScreen()
         }
         scrollView.scrollTo(0, 0)
     }
@@ -283,7 +298,43 @@ class SettingsHostActivity : Activity() {
             linkRow(R.string.settings_screen_appearance) { navigateTo(Screen.APPEARANCE) }))
         addCard(listOf(
             linkRow(R.string.privacy_policy) { openUrl(getString(R.string.privacy_policy_url)) },
-            linkRow(R.string.license) { openUrl(getString(R.string.license_url)) }))
+            linkRow(R.string.license) { openUrl(getString(R.string.license_url)) },
+            linkRow(R.string.settings_screen_data_sources) { navigateTo(Screen.DATA_SOURCES) }))
+    }
+
+    /**
+     * "Data sources": where the words in this keyboard come from, one row per collection.
+     *
+     * It exists because the collections ask for it. Leipzig and Tatoeba are CC BY, and the BY is
+     * the whole condition — naming the source is what buys the right to ship a word list derived
+     * from it. OpenSubtitles asks for one thing only, a link back to opensubtitles.org, and that
+     * link is this screen's [R.string.data_sources_opensubtitles_url] row. `NOTICE.txt` next to
+     * the assets carries the same names in full; this screen is the half a person can actually
+     * reach without unpacking an APK.
+     *
+     * The two section headers are not decoration. Only the Leipzig data is inside the app today;
+     * the conversational frequencies from Tatoeba and OpenSubtitles are measured, queued for
+     * word-by-word acceptance (`docs/DICTIONARY-*-CONV-REVIEW.tsv`) and not packed into any
+     * asset. Listing all three under one heading would claim something untrue about the shipped
+     * files, and the release that merges them has a checklist line to move the rows up.
+     */
+    private fun buildDataSourcesScreen() {
+        addCard(listOf(textRow(getString(R.string.data_sources_intro))))
+
+        addSectionHeader(getString(R.string.data_sources_in_app))
+        addCard(listOf(
+            linkRow(getString(R.string.data_sources_leipzig_title),
+                    getString(R.string.data_sources_leipzig_summary)) {
+                openUrl(getString(R.string.data_sources_leipzig_url))
+            },
+            linkRow(getString(R.string.data_sources_tatoeba_title),
+                    getString(R.string.data_sources_tatoeba_summary)) {
+                openUrl(getString(R.string.data_sources_tatoeba_url))
+            },
+            linkRow(getString(R.string.data_sources_opensubtitles_title),
+                    getString(R.string.data_sources_opensubtitles_summary)) {
+                openUrl(getString(R.string.data_sources_opensubtitles_url))
+            }), spacedFromPrevious = false)
     }
 
     private fun buildPreferencesScreen() {
@@ -395,13 +446,19 @@ class SettingsHostActivity : Activity() {
         setRowEnabled(addRow, Settings.readPersonalDictionaryEnabled(prefs)
                 && !isRestricted(Settings.PREF_PERSONAL_DICTIONARY))
 
+        addPersonalQuarantineCards(controller, subtypeIds)
+
         if (content.totalCount == 0) {
-            addCard(listOf(inflateRow(R.layout.row_link,
-                    getString(if (personalSearchQuery.isEmpty()) {
-                        R.string.personal_dictionary_empty
-                    } else {
-                        R.string.personal_dictionary_no_matches
-                    }), null).also {
+            // Three states, not two. "Nothing saved yet" while the personal dictionary is ALREADY on
+            // used to end with "…once the personal dictionary is on", sending the person to look for
+            // a switch that is not off. The hint belongs only to the state it describes.
+            val emptyMessage = when {
+                personalSearchQuery.isNotEmpty() -> R.string.personal_dictionary_no_matches
+                Settings.readPersonalDictionaryEnabled(prefs) ->
+                    R.string.personal_dictionary_empty_ready
+                else -> R.string.personal_dictionary_empty
+            }
+            addCard(listOf(inflateRow(R.layout.row_link, getString(emptyMessage), null).also {
                 it.findViewById<View>(R.id.row_chevron).visibility = View.GONE
             }))
         }
@@ -437,9 +494,112 @@ class SettingsHostActivity : Activity() {
         }
     }
 
+    /**
+     * The card that finishes what 1.8.2 started: a personal dictionary that could not be read is
+     * kept as a copy, and until this card existed no screen showed it and no code could read it.
+     *
+     * One card per language that has a copy, with the two numbers the user needs and nothing else:
+     * how many words came out of it, and — when part of it is damaged — that the rest is lost. That
+     * second sentence is not decoration. Handing back two thirds of someone's words under the word
+     * "restored" is the one outcome this feature must never produce, so the count and the damage are
+     * printed in the same breath.
+     *
+     * Two actions, both started by the person and neither by the keyboard: put the readable words
+     * back, and delete the copy. They are separate on purpose — restoring does not destroy the part
+     * no parser could read, so a better reader later still has something to read.
+     *
+     * A copy that yielded NOTHING still gets a card. There is nothing to restore, but the bytes are
+     * the user's own words sitting on their device, and the only way to ask for them to go must not
+     * be hidden behind a word count greater than zero.
+     */
+    private fun addPersonalQuarantineCards(
+            controller: PersonalDictionaryScreenController, subtypeIds: List<String>) {
+        val reports = personalQuarantines
+        if (reports == null) {
+            // Not asked yet. The read is file work and belongs on the store's worker; the screen
+            // repaints when it answers, which is the same shape every mutation on it already uses.
+            controller.quarantines(subtypeIds) { found ->
+                if (isFinishing || isDestroyed) return@quarantines
+                personalQuarantines = found
+                if (currentScreen == Screen.PERSONAL_DICTIONARY) {
+                    showScreen(Screen.PERSONAL_DICTIONARY)
+                }
+            }
+            return
+        }
+        // In the order the languages are listed, not the order the worker happened to answer in.
+        for (subtypeId in subtypeIds) {
+            val report = reports[subtypeId] ?: continue
+            // Plurals, not a bare %d: "1 words" in English and "1 слов" in Russian are the kind of
+            // sloppiness that makes a person doubt the sentence beside it, and the sentence beside it
+            // is the one that says part of their words is gone.
+            val summary = when {
+                report.wordCount == 0 -> getString(R.string.personal_dictionary_quarantine_none)
+                report.readToEnd -> resources.getQuantityString(
+                        R.plurals.personal_dictionary_quarantine_whole,
+                        report.wordCount, report.wordCount)
+                else -> resources.getQuantityString(
+                        R.plurals.personal_dictionary_quarantine_partial,
+                        report.wordCount, report.wordCount)
+            }
+            addSectionHeader(LocaleResourceUtils.getLocaleDisplayNameInSystemLocale(subtypeId))
+            val rows = ArrayList<View>()
+            rows.add(inflateRow(R.layout.row_link,
+                    getString(R.string.personal_dictionary_quarantine_title), summary).also {
+                it.findViewById<View>(R.id.row_chevron).visibility = View.GONE
+            })
+            if (report.wordCount > 0) {
+                rows.add(actionRow(R.string.personal_dictionary_quarantine_restore) {
+                    controller.restoreQuarantine(subtypeId) { restored ->
+                        personalQuarantines = null
+                        afterPersonalMutation(restored,
+                                R.string.personal_dictionary_quarantine_restore_failed)
+                    }
+                })
+            }
+            rows.add(actionRow(R.string.personal_dictionary_quarantine_discard) {
+                showDiscardPersonalQuarantineDialog(controller, subtypeId)
+            })
+            addCard(rows)
+        }
+    }
+
+    private fun showDiscardPersonalQuarantineDialog(
+            controller: PersonalDictionaryScreenController, subtypeId: String) {
+        currentDialog?.dismiss()
+        currentDialog = AlertDialog.Builder(this)
+                .setTitle(R.string.personal_dictionary_quarantine_discard)
+                .setMessage(R.string.personal_dictionary_quarantine_discard_confirm)
+                .setPositiveButton(R.string.personal_dictionary_delete) { _, _ ->
+                    controller.discardQuarantine(subtypeId) { discarded ->
+                        personalQuarantines = null
+                        afterPersonalMutation(discarded,
+                                R.string.personal_dictionary_quarantine_discard_failed)
+                    }
+                }
+                .setNegativeButton(android.R.string.cancel, null)
+                .show()
+    }
+
     /** Subtypes whose words the screen shows: every enabled one, in the order the system lists them. */
     private fun personalSubtypeIds(): List<String> =
             richImm.getEnabledSubtypes(true).map { it.locale }.distinct()
+
+    /**
+     * The store a hand-added word goes into: the language the keyboard is currently set to, when it
+     * has a personal dictionary, and otherwise the first enabled subtype that does.
+     *
+     * With two languages "the first enabled one" is no longer good enough — it would file a Russian
+     * word under Tatar for a user whose Tatar layout simply sits earlier in the system's list. The
+     * live subtype is the closest thing this screen has to "the language the user means"; the
+     * screen shows every language's words in separate sections either way, so a wrong guess stays
+     * visible and fixable rather than silent.
+     */
+    private fun targetSubtypeForAddedWord(subtypeIds: List<String>): String? {
+        val current = richImm.currentSubtype?.locale
+        if (current != null && PersonalSubtypes.alphabetFor(current) != null) return current
+        return subtypeIds.firstOrNull { PersonalSubtypes.alphabetFor(it) != null }
+    }
 
     private fun showAddPersonalWordDialog(
             controller: PersonalDictionaryScreenController, subtypeIds: List<String>) {
@@ -451,14 +611,17 @@ class SettingsHostActivity : Activity() {
                 .setTitle(R.string.personal_dictionary_add)
                 .setView(field)
                 .setPositiveButton(R.string.personal_dictionary_add_action) { _, _ ->
-                    val subtypeId = subtypeIds.firstOrNull { PersonalSubtypes.alphabetFor(it) != null }
-                    val added = subtypeId != null
-                            && controller.addWord(subtypeId, field.text.toString())
-                    if (!added) {
+                    val subtypeId = targetSubtypeForAddedWord(subtypeIds)
+                    val accepted = subtypeId != null
+                            && controller.addWord(subtypeId, field.text.toString()) { saved ->
+                                afterPersonalMutation(saved,
+                                        R.string.personal_dictionary_save_failed)
+                            }
+                    if (!accepted) {
                         Toast.makeText(this, R.string.personal_dictionary_add_rejected,
                                 Toast.LENGTH_SHORT).show()
+                        showScreen(Screen.PERSONAL_DICTIONARY)
                     }
-                    showScreen(Screen.PERSONAL_DICTIONARY)
                 }
                 .setNegativeButton(android.R.string.cancel, null)
                 .show()
@@ -470,8 +633,10 @@ class SettingsHostActivity : Activity() {
         currentDialog = AlertDialog.Builder(this)
                 .setTitle(getString(R.string.personal_dictionary_forget_title, row.rawForm))
                 .setPositiveButton(R.string.personal_dictionary_delete) { _, _ ->
-                    controller.removeWord(row.subtypeId, row.normalizedForm)
-                    showScreen(Screen.PERSONAL_DICTIONARY)
+                    controller.removeWord(row.subtypeId, row.normalizedForm) { removed ->
+                        afterPersonalMutation(removed,
+                                R.string.personal_dictionary_delete_failed)
+                    }
                 }
                 .setNegativeButton(android.R.string.cancel, null)
                 .show()
@@ -484,11 +649,35 @@ class SettingsHostActivity : Activity() {
                 .setTitle(R.string.personal_dictionary_erase_all)
                 .setMessage(R.string.personal_dictionary_erase_confirm)
                 .setPositiveButton(R.string.personal_dictionary_erase_action) { _, _ ->
-                    controller.eraseAll(subtypeIds)
-                    showScreen(Screen.PERSONAL_DICTIONARY)
+                    controller.eraseAll(subtypeIds) { erased ->
+                        // "Erase all words" takes the copies with it, so the card must be re-read
+                        // rather than repainted from an answer that is now out of date.
+                        personalQuarantines = null
+                        afterPersonalMutation(erased,
+                                R.string.personal_dictionary_erase_failed)
+                    }
                 }
                 .setNegativeButton(android.R.string.cancel, null)
                 .show()
+    }
+
+    /**
+     * The one place the personal-dictionary screen reacts to a mutation that has actually finished.
+     *
+     * Both halves matter and neither used to happen. The list is repainted only NOW, because the
+     * published snapshot is what it reads and the snapshot did not exist yet at the moment the
+     * dialog closed — the added word was simply missing from the list, which reads as "the button
+     * did nothing". And a mutation that failed says so: the subsystem may not log, so a message on
+     * screen is the only channel it has, and it names no word, no file and no cause.
+     */
+    private fun afterPersonalMutation(succeeded: Boolean, failureMessageRes: Int) {
+        if (isFinishing || isDestroyed) return
+        if (!succeeded) {
+            Toast.makeText(this, failureMessageRes, Toast.LENGTH_LONG).show()
+        }
+        if (currentScreen == Screen.PERSONAL_DICTIONARY) {
+            showScreen(Screen.PERSONAL_DICTIONARY)
+        }
     }
 
     /**
@@ -787,6 +976,16 @@ class SettingsHostActivity : Activity() {
         return row
     }
 
+    /** Non-interactive text cell: a paragraph inside a card, with no chevron and no tap target. */
+    private fun textRow(text: CharSequence): View {
+        val row = inflateRow(R.layout.row_link, text, null)
+        row.findViewById<View>(R.id.row_chevron).visibility = View.GONE
+        row.isClickable = false
+        row.isFocusable = false
+        row.foreground = null
+        return row
+    }
+
     /**
      * Action row (iOS "button cell"): accent-colored title, no chevron —
      * it opens a dialog on the same screen instead of navigating.
@@ -941,11 +1140,21 @@ class SettingsHostActivity : Activity() {
     // Row actions
     // ---------------------------------------------------------------------
 
+    /**
+     * Opens a link, or says that nothing on this device can.
+     *
+     * The log line alone was the whole answer before: the row took the tap, the screen did not
+     * change, and only `adb logcat` knew why. On a keyboard whose one claim is privacy, "Privacy
+     * Policy" being a row that does nothing is the worst row to lose quietly. The log line stays for
+     * a developer; the Toast is for the person holding the phone, and it names no package and no
+     * intent — neither is anything they could act on.
+     */
     private fun openUrl(uri: String) {
         try {
             startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(uri)))
         } catch (e: ActivityNotFoundException) {
             Log.e(TAG, "Browser not found")
+            Toast.makeText(this, R.string.no_app_for_link, Toast.LENGTH_LONG).show()
         }
     }
 

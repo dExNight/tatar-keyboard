@@ -55,7 +55,7 @@ import java.io.PrintWriter;
 import java.util.Locale;
 import java.util.concurrent.TimeUnit;
 
-import kotlin.jvm.functions.Function1;
+import kotlin.jvm.functions.Function2;
 
 import rkr.simplekeyboard.inputmethod.R;
 import rkr.simplekeyboard.inputmethod.compat.EditorInfoCompatUtils;
@@ -70,6 +70,7 @@ import rkr.simplekeyboard.inputmethod.keyboard.MainKeyboardView;
 import rkr.simplekeyboard.inputmethod.latin.common.Constants;
 import rkr.simplekeyboard.inputmethod.latin.define.DebugFlags;
 import rkr.simplekeyboard.inputmethod.latin.inputlogic.InputLogic;
+import rkr.simplekeyboard.inputmethod.latin.dictionary.storage.DictionaryArtifactSpec;
 import rkr.simplekeyboard.inputmethod.latin.dictionary.storage.PublishedDictionaryCatalog;
 import rkr.simplekeyboard.inputmethod.latin.dictionary.personal.PersonalCandidateSource;
 import rkr.simplekeyboard.inputmethod.latin.dictionary.personal.PersonalSubtypes;
@@ -77,6 +78,9 @@ import rkr.simplekeyboard.inputmethod.latin.dictionary.personalstore.PersonalDic
 import rkr.simplekeyboard.inputmethod.latin.dictionary.personalstore.PersonalForget;
 import rkr.simplekeyboard.inputmethod.latin.dictionary.personalstore.PersonalLearning;
 import rkr.simplekeyboard.inputmethod.latin.emoji.EmojiPanelController;
+import rkr.simplekeyboard.inputmethod.latin.emoji.EmojiSearchIndex;
+import rkr.simplekeyboard.inputmethod.latin.emoji.EmojiSearchQuery;
+import rkr.simplekeyboard.inputmethod.latin.emoji.EmojiSkinTones;
 import rkr.simplekeyboard.inputmethod.latin.emoji.EmojiSetSnapshot;
 import rkr.simplekeyboard.inputmethod.latin.emoji.EmojiSurface;
 import rkr.simplekeyboard.inputmethod.latin.emoji.RecentEmojiGate;
@@ -138,6 +142,18 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
     // Owns the emoji panel's single-per-process snapshot. Null until set up in onCreate().
     private EmojiPanelController mEmojiPanelController;
 
+    /**
+     * The emoji-search query while the search is open, and null otherwise. It holds every key press
+     * made during the search; not one of them reaches {@link InputLogic} or the editor.
+     */
+    private EmojiSearchQuery mEmojiSearchQuery;
+
+    /**
+     * The auto-caps state reported to the keyboard while the emoji search is open: no
+     * {@code TextUtils.CAP_MODE_*} bit at all. See {@link #maybeRouteToEmojiSearch}.
+     */
+    private static final int NO_AUTO_CAPS = 0;
+
     // Decides the one-shot offer to turn Tatar suggestions on. Null until set up in onCreate().
     private SuggestionsOfferController mSuggestionsOffer;
 
@@ -160,8 +176,21 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
     public final UIHandler mHandler = new UIHandler(this);
 
     public static final class UIHandler extends LeakGuardHandlerWrapper<LatinIME> {
-        private static final int MSG_UPDATE_SHIFT_STATE = 0;
+        // NO MESSAGE ID HERE MAY BE ZERO, and MSG_UPDATE_SHIFT_STATE is 3 rather than 0 for
+        // exactly that reason.
+        //
+        // {@link Handler#post(Runnable)} enqueues an ordinary Message whose {@code what} is 0 and
+        // whose {@code callback} is the runnable. {@link Handler#removeMessages(int)} matches on
+        // {@code what} ALONE and ignores the callback, so the {@code removeMessages(0)} inside
+        // postUpdateShiftState() used to delete every pending posted Runnable of this handler along
+        // with its own message. Six places post such runnables — among them the suggestion engine's
+        // result delivery (SuggestionsController's UiPoster), the emoji panel's poster and four
+        // dialogs — and postUpdateShiftState() runs at the end of every editor text-cache reload,
+        // i.e. after practically every keystroke. The result was a suggestion band that went blank
+        // and stayed blank for as long as the reload kept winning the race: see docs/SUGGEST-DIES.md.
+        private static final int MSG_UPDATE_SHIFT_STATE = 3;
         private static final int MSG_PENDING_IMS_CALLBACK = 1;
+        private static final int MSG_REFRESH_SUGGESTION_BAND = 2;
         private static final int MSG_DEALLOCATE_MEMORY = 9;
 
         public UIHandler(final LatinIME ownerInstance) {
@@ -180,6 +209,9 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
                 switcher.requestUpdatingShiftState(latinIme.getCurrentAutoCapsState(),
                         latinIme.getCurrentRecapitalizeState());
                 break;
+            case MSG_REFRESH_SUGGESTION_BAND:
+                latinIme.refreshSuggestionBandAfterCursorMove();
+                break;
             case MSG_DEALLOCATE_MEMORY:
                 latinIme.deallocateMemory();
                 break;
@@ -189,6 +221,23 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         public void postUpdateShiftState() {
             removeMessages(MSG_UPDATE_SHIFT_STATE);
             sendMessage(obtainMessage(MSG_UPDATE_SHIFT_STATE));
+        }
+
+        /**
+         * Asks the suggestion band to re-derive itself once the cursor has settled and the editor
+         * text cache behind it is current again.
+         *
+         * Posted rather than called inline, from the two places that know the cache is (or is about
+         * to be) correct: the keyboard's own cursor gestures, whose
+         * {@link RichInputConnection#setSelection} keeps the cache in step as it moves, and the
+         * completion of the asynchronous cache reload that an EXTERNAL cursor move triggers. Both
+         * may fire for one and the same move, so the message coalesces: the band is re-derived at
+         * most once per looper turn, and {@link SuggestionsController#onCursorMoveSettled} is itself
+         * a no-op unless the band is genuinely left unbound.
+         */
+        public void postRefreshSuggestionBand() {
+            removeMessages(MSG_REFRESH_SUGGESTION_BAND);
+            sendMessage(obtainMessage(MSG_REFRESH_SUGGESTION_BAND));
         }
 
         public void postDeallocateMemory() {
@@ -456,18 +505,43 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
                     final String typedForm) {
                 return mInputLogic.revertTatarAutocorrection(insertedForm, separator, typedForm);
             }
+
+            @Override
+            public String cachedNextWordContext() {
+                return TatarWordUtils.INSTANCE.extractNextWordContext(
+                        mInputLogic.mConnection.getCachedTextBeforeCursor());
+            }
+
+            @Override
+            public boolean commitPredictedWord(final String expectedContextWord,
+                    final String suggestion) {
+                final boolean committed =
+                        mInputLogic.commitPredictedWord(expectedContextWord, suggestion);
+                if (committed) {
+                    // Same reason as the other two insertion paths above: commitPredictedWord runs
+                    // outside an InputTransaction, so the auto-caps state is refreshed with the very
+                    // same call used everywhere else.
+                    mKeyboardSwitcher.requestUpdatingShiftState(getCurrentAutoCapsState(),
+                            getCurrentRecapitalizeState());
+                }
+                return committed;
+            }
         };
 
         // Runs on the controller's background executor. The catalog is the one the controller
         // already owns: no second store and no throwaway executor are built per engine start. It is
         // null until a preparation request has actually created the storage, and a null catalog
         // simply yields no engine — the strip stays GONE and plain typing is untouched.
-        final Function1<ResultCallback, EngineHandle> engineFactory = resultCallback -> {
+        // subtypeId names the language the controller is starting an engine for; every language
+        // has its own catalog and its own personal store, so both are resolved from it and never
+        // from a constant.
+        final Function2<String, ResultCallback, EngineHandle> engineFactory =
+                (subtypeId, resultCallback) -> {
             final SuggestionsController controller = mSuggestionsController;
             if (controller == null) {
                 return null;
             }
-            final PublishedDictionaryCatalog catalog = controller.engineCatalog();
+            final PublishedDictionaryCatalog catalog = controller.engineCatalog(subtypeId);
             if (catalog == null) {
                 return null;
             }
@@ -476,7 +550,7 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
             // keystroke without restarting the engine, its lease or its mapping. Reading is bound to
             // the active subtype: personal words of one language can never surface in another.
             final PersonalCandidateSource personalCandidates =
-                    PersonalDictionaries.sourceFor(this, PersonalSubtypes.TATAR_RU,
+                    PersonalDictionaries.sourceFor(this, subtypeId,
                             () -> Settings.readPersonalDictionaryEnabled(mDevicePrefs));
             return MappedEngineHandle.start(catalog, resultCallback, personalCandidates);
         };
@@ -484,12 +558,15 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         mSuggestionsController = new SuggestionsController(
                 this, stripSurface, editorSurface, mHandler, engineFactory);
         // E4c: clean completions become writes ONLY through this sink, and only when all five
-        // factors hold at the moment of the event. isTatarSuggestionsEligible() already carries
+        // factors hold at the moment of the event. isSuggestionsEligible() already carries
         // three of them — the field allows suggestions, it does not ask us not to personalize, and
         // an absent editorInfo is not eligible at all — so what is added here is the personal
         // dictionary setting, the unlock state and the postal-address exclusion.
+        // The sink resolves the subtype at the moment of the event, not at construction: a word
+        // completed on the Russian layout belongs in the Russian personal store, and the sink is
+        // built once for the service's whole lifetime.
         mSuggestionsController.setCompletionSink(PersonalLearning.sinkFor(
-                this, PersonalSubtypes.TATAR_RU, this::mayLearnPersonalWords));
+                this, this::activeDictionarySubtype, this::mayLearnPersonalWords));
         // D3: read live off the already-rebuilt SettingsValues, which carries the subordination to
         // the suggestions switch, so flipping either setting takes effect on the next separator
         // without restarting the engine or touching its lease.
@@ -505,6 +582,11 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
                 controller.onPersonalDictionaryErased();
             }
         }));
+        // B2. The saved words could not be read, so the store set the file aside and the list the
+        // user sees is empty through no act of theirs. Same hop for the same reason: the notice comes
+        // from the store's worker.
+        PersonalDictionaries.setQuarantineListener(
+                () -> mHandler.post(this::showPersonalDictionaryUnreadableDialog));
     }
 
     /**
@@ -525,6 +607,26 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
                     mSuggestionsController.onSelectionChanged();
                 }
                 mKeyboardSwitcher.showEmojiPanel(snapshot);
+            }
+
+            @Override
+            public void bindSkinTones(final EmojiSkinTones tones) {
+                mKeyboardSwitcher.bindEmojiSkinTones(tones);
+            }
+
+            @Override
+            public void showEmojiSearch(final EmojiSearchIndex index) {
+                mEmojiSearchQuery = new EmojiSearchQuery();
+                mKeyboardSwitcher.showEmojiSearch(index);
+                // The letters come back with shift unlatched: a query is not a sentence.
+                mKeyboardSwitcher.requestUpdatingShiftState(NO_AUTO_CAPS,
+                        getCurrentRecapitalizeState());
+                updateEmojiSearchView();
+            }
+
+            @Override
+            public void onEmojiSearchUnavailable() {
+                LatinIME.this.onEmojiSearchUnavailable();
             }
 
             @Override
@@ -577,7 +679,9 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
 
             @Override
             public boolean isTatarSubtypeActive() {
-                return PersonalSubtypes.TATAR_RU.equals(mRichImm.getCurrentSubtype().getLocale());
+                // Any layout with a dictionary: the offer is about the suggestion strip, and the
+                // strip now answers in Russian as well as in Tatar.
+                return activeDictionarySubtype() != null;
             }
 
             @Override
@@ -712,12 +816,25 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
      */
     private void showForgetPersonalWordDialog(final String shownWord) {
         if (!Settings.readPersonalDictionaryEnabled(mDevicePrefs)) {
+            // The DEFAULT state of the keyboard: the personal dictionary ships off, so without this
+            // the long press is silent for every user who never turned it on — which is everyone,
+            // until they do. Answered with the one thing they can act on.
+            showPersonalDictionaryOffDialog();
             return;
         }
-        final String savedForm =
-                PersonalForget.savedFormOf(this, PersonalSubtypes.TATAR_RU, shownWord);
+        final String subtypeId = activeDictionarySubtype();
+        if (subtypeId == null) {
+            // The active layout keeps no personal dictionary, so nothing here was ever the user's.
+            showNotASavedWordDialog();
+            return;
+        }
+        final String savedForm = PersonalForget.savedFormOf(this, subtypeId, shownWord);
         if (savedForm == null) {
-            // An ordinary dictionary word: a long press on it is a no-op by contract.
+            // An ordinary dictionary word. Nothing can be forgotten here, but the gesture still gets
+            // an answer: the user cannot tell their own saved words apart from the dictionary's by
+            // looking at the band, so a silent long press reads as "long press is broken" rather
+            // than "this word is not yours".
+            showNotASavedWordDialog();
             return;
         }
         final MainKeyboardView mainKeyboardView = mKeyboardSwitcher.getMainKeyboardView();
@@ -732,7 +849,8 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
                 DialogUtils.getPlatformDialogThemeContext(this))
                 .setTitle(getString(R.string.personal_dictionary_forget_title, savedForm))
                 .setPositiveButton(R.string.personal_dictionary_delete, (di, which) ->
-                        PersonalForget.confirmForget(this, PersonalSubtypes.TATAR_RU, shownWord))
+                        PersonalForget.confirmForget(this, subtypeId, shownWord,
+                                () -> mHandler.post(this::showPersonalForgetFailedDialog)))
                 .setNegativeButton(android.R.string.cancel, null)
                 .create();
         dialog.setCancelable(true);
@@ -764,6 +882,164 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         final AlertDialog dialog = new AlertDialog.Builder(
                 DialogUtils.getPlatformDialogThemeContext(this))
                 .setMessage(R.string.tatar_suggestions_unavailable)
+                .setPositiveButton(android.R.string.ok, null)
+                .create();
+        dialog.setCancelable(true);
+        dialog.setCanceledOnTouchOutside(true);
+        attachDialogToInputWindow(dialog, windowToken);
+        mOptionsDialog = dialog;
+        dialog.show();
+    }
+
+    /**
+     * Says that saved words are switched off, so a long press has nothing it could forget.
+     *
+     * The personal dictionary ships OFF, so this is the answer almost every long press gets until
+     * the person turns it on — and the switch is the one action they can take, so the message names
+     * it. Same shape and the same window attachment as the other notices here.
+     */
+    private void showPersonalDictionaryOffDialog() {
+        final MainKeyboardView mainKeyboardView = mKeyboardSwitcher.getMainKeyboardView();
+        if (mainKeyboardView == null) {
+            return;
+        }
+        final IBinder windowToken = mainKeyboardView.getWindowToken();
+        if (windowToken == null) {
+            return;
+        }
+        final AlertDialog dialog = new AlertDialog.Builder(
+                DialogUtils.getPlatformDialogThemeContext(this))
+                .setMessage(R.string.personal_dictionary_off_nothing_to_forget)
+                .setPositiveButton(android.R.string.ok, null)
+                .create();
+        dialog.setCancelable(true);
+        dialog.setCanceledOnTouchOutside(true);
+        attachDialogToInputWindow(dialog, windowToken);
+        mOptionsDialog = dialog;
+        dialog.show();
+    }
+
+    /**
+     * Says that the long-pressed word is not one of the user's own saved words.
+     *
+     * Same shape and same reasoning as {@link #showSuggestionsUnavailableDialog()}: a dialog rather
+     * than a Toast, because a toast from a background process is at the platform's discretion and
+     * this is the only answer the gesture will ever get. The body names no word — the message can
+     * be shown over any app, and what the person typed must not appear on top of someone else's
+     * screen.
+     */
+    private void showNotASavedWordDialog() {
+        final MainKeyboardView mainKeyboardView = mKeyboardSwitcher.getMainKeyboardView();
+        if (mainKeyboardView == null) {
+            return;
+        }
+        final IBinder windowToken = mainKeyboardView.getWindowToken();
+        if (windowToken == null) {
+            return;
+        }
+        final AlertDialog dialog = new AlertDialog.Builder(
+                DialogUtils.getPlatformDialogThemeContext(this))
+                .setMessage(R.string.personal_dictionary_not_saved)
+                .setPositiveButton(android.R.string.ok, null)
+                .create();
+        dialog.setCancelable(true);
+        dialog.setCanceledOnTouchOutside(true);
+        attachDialogToInputWindow(dialog, windowToken);
+        mOptionsDialog = dialog;
+        dialog.show();
+    }
+
+    /**
+     * Says that emoji are not available in this process, so the key that was just pressed — or the
+     * search pill that was just tapped — has nothing to open.
+     *
+     * Answered on EVERY press rather than once: the key stays on the keyboard and the person will
+     * press it again, and a one-shot notice would put the silence straight back. Same shape and the
+     * same window attachment as the other notices here; the body names no file and no cause.
+     */
+    private void showEmojiUnavailableDialog() {
+        final MainKeyboardView mainKeyboardView = mKeyboardSwitcher.getMainKeyboardView();
+        if (mainKeyboardView == null) {
+            return;
+        }
+        final IBinder windowToken = mainKeyboardView.getWindowToken();
+        if (windowToken == null) {
+            return;
+        }
+        final AlertDialog dialog = new AlertDialog.Builder(
+                DialogUtils.getPlatformDialogThemeContext(this))
+                .setMessage(R.string.emoji_unavailable)
+                .setPositiveButton(android.R.string.ok, null)
+                .create();
+        dialog.setCancelable(true);
+        dialog.setCanceledOnTouchOutside(true);
+        attachDialogToInputWindow(dialog, windowToken);
+        mOptionsDialog = dialog;
+        dialog.show();
+    }
+
+    /**
+     * Says that a word the user asked to forget is still saved.
+     *
+     * Same shape and same reasoning as {@link #showSuggestionsUnavailableDialog()}: a dialog rather
+     * than a Toast, because a toast from a background process is at the platform's discretion and
+     * this is the only notice the user will ever get — the personal-dictionary subsystem may not
+     * log, and nothing else waits for the result of the write. The body names no word, no file and
+     * no cause; the word is the one thing that must not appear here, since the message can be shown
+     * over any app.
+     *
+     * <p>Arrives from the store's worker through the handler, so by the time it runs the keyboard
+     * window may be gone; both null checks below are the ordinary answer to that.</p>
+     */
+    private void showPersonalForgetFailedDialog() {
+        final MainKeyboardView mainKeyboardView = mKeyboardSwitcher.getMainKeyboardView();
+        if (mainKeyboardView == null) {
+            return;
+        }
+        final IBinder windowToken = mainKeyboardView.getWindowToken();
+        if (windowToken == null) {
+            return;
+        }
+        final AlertDialog dialog = new AlertDialog.Builder(
+                DialogUtils.getPlatformDialogThemeContext(this))
+                .setMessage(R.string.personal_dictionary_delete_failed)
+                .setPositiveButton(android.R.string.ok, null)
+                .create();
+        dialog.setCancelable(true);
+        dialog.setCanceledOnTouchOutside(true);
+        attachDialogToInputWindow(dialog, windowToken);
+        mOptionsDialog = dialog;
+        dialog.show();
+    }
+
+    /**
+     * Tells the user, once, that the saved words could not be read — so the empty list is explained
+     * rather than merely appearing. Same shape and the same window attachment as
+     * {@link #showPersonalForgetFailedDialog()}, and a dialog for the same reason.
+     *
+     * <p>The notice is CONSUMED here, after both window checks pass and immediately before the
+     * dialog is shown, not when it was raised: the store opens from a background executor and from
+     * the settings screen, so it can be raised with no keyboard window up. Clearing it any earlier
+     * would spend the one message on nobody, which is the silence this whole register is about. It is
+     * consumed exactly once, so a second input view start does not repeat it.</p>
+     *
+     * <p>The body names no word, no file and no cause. It may be shown over any app.</p>
+     */
+    private void showPersonalDictionaryUnreadableDialog() {
+        final MainKeyboardView mainKeyboardView = mKeyboardSwitcher.getMainKeyboardView();
+        if (mainKeyboardView == null) {
+            return;
+        }
+        final IBinder windowToken = mainKeyboardView.getWindowToken();
+        if (windowToken == null) {
+            return;
+        }
+        if (!PersonalDictionaries.consumeQuarantineNotice()) {
+            return;
+        }
+        final AlertDialog dialog = new AlertDialog.Builder(
+                DialogUtils.getPlatformDialogThemeContext(this))
+                .setMessage(R.string.personal_dictionary_unreadable)
                 .setPositiveButton(android.R.string.ok, null)
                 .create();
         dialog.setCancelable(true);
@@ -814,7 +1090,7 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         }
         if (enabled) {
             mSuggestionsController.onSuggestionsSettingEnabled(
-                    isTatarSuggestionsEligible(true));
+                    isSuggestionsEligible(true), activeDictionarySubtype());
             updateKeyNeighbors();
         } else {
             mSuggestionsController.onSuggestionsSettingDisabled();
@@ -830,10 +1106,23 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
     }
 
     /**
-     * Computes whether opt-in Tatar suggestions may run for the current field and subtype.
+     * The subtype whose dictionary should answer right now, or null when the active layout ships
+     * none.
+     *
+     * This is the ONE place the app decides which language it is suggesting in. It reads the live
+     * subtype and asks {@link DictionaryArtifactSpec#forSubtype} whether a dictionary exists for it,
+     * so adding a third language is adding a spec — never another branch here.
      */
-    private boolean isTatarSuggestionsEligible() {
-        return isTatarSuggestionsEligible(mSettings.getCurrent().mTatarSuggestionsEnabled);
+    private String activeDictionarySubtype() {
+        final String locale = mRichImm.getCurrentSubtype().getLocale();
+        return DictionaryArtifactSpec.forSubtype(locale) == null ? null : locale;
+    }
+
+    /**
+     * Computes whether opt-in word suggestions may run for the current field and subtype.
+     */
+    private boolean isSuggestionsEligible() {
+        return isSuggestionsEligible(mSettings.getCurrent().mTatarSuggestionsEnabled);
     }
 
     /**
@@ -843,10 +1132,10 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
      * same SharedPreferences instance, the platform does not order them, so {@link SettingsValues}
      * may still carry the previous value at the moment the change reaches this service.
      */
-    private boolean isTatarSuggestionsEligible(final boolean suggestionsEnabled) {
+    private boolean isSuggestionsEligible(final boolean suggestionsEnabled) {
         final SettingsValues settingsValues = mSettings.getCurrent();
         return suggestionsEnabled
-                && PersonalSubtypes.TATAR_RU.equals(mRichImm.getCurrentSubtype().getLocale())
+                && activeDictionarySubtype() != null
                 && settingsValues.mInputAttributes.mShouldShowSuggestions
                 // IME_FLAG_NO_PERSONALIZED_LEARNING closes eligibility outright: the strip reserves
                 // no band and not a single prefix reaches the engine in such a field, even for a
@@ -869,7 +1158,7 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
      * names are precisely what this feature is for.</p>
      */
     private boolean mayLearnPersonalWords() {
-        if (!isTatarSuggestionsEligible()) {
+        if (!isSuggestionsEligible()) {
             return false;
         }
         if (!Settings.readPersonalDictionaryEnabled(mDevicePrefs)) {
@@ -899,12 +1188,17 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
             return;
         }
         final Keyboard keyboard = mKeyboardSwitcher.getKeyboard();
+        final String subtypeId = activeDictionarySubtype();
         KeyNeighborTable table = null;
-        if (keyboard != null && keyboard.mId.isAlphabetKeyboard() && isTatarSuggestionsEligible()) {
+        if (keyboard != null && keyboard.mId.isAlphabetKeyboard() && subtypeId != null
+                && isSuggestionsEligible()) {
+            // KeyboardId carries the subtype in its equals/hashCode, so this memo is per layout AND
+            // per language: switching layouts rebuilds the table instead of handing the engine the
+            // neighbours of the layout the user just left.
             if (keyboard.mId.equals(mNeighborTableKeyboardId) && mNeighborTable != null) {
                 table = mNeighborTable;
             } else {
-                table = KeyNeighborTableBuilder.fromKeyboard(keyboard, PersonalSubtypes.TATAR_RU);
+                table = KeyNeighborTableBuilder.fromKeyboard(keyboard, subtypeId);
                 mNeighborTableKeyboardId = keyboard.mId;
                 mNeighborTable = table;
             }
@@ -917,6 +1211,7 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         // Dropped first: the listener holds this service, and the store outlives it (it is
         // process-wide). Leaving it registered would keep a destroyed IME reachable.
         PersonalDictionaries.setErasureListener(null);
+        PersonalDictionaries.setQuarantineListener(null);
         if (mSuggestionsController != null) {
             mSuggestionsController.onDestroy();
         }
@@ -967,6 +1262,7 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
     public View onCreateInputView() {
         // The input view is being (re)created (rotation, theme or height change): a deferred show
         // for the old view must not fire. The panel's "was open" state never survives recreation.
+        abandonEmojiSearch();
         if (mEmojiPanelController != null) {
             mEmojiPanelController.onInputViewRecreated();
         }
@@ -1036,7 +1332,8 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         mInputLogic.onSubtypeChanged();
         loadKeyboard();
         if (mSuggestionsController != null) {
-            mSuggestionsController.onSubtypeChanged(isTatarSuggestionsEligible());
+            mSuggestionsController.onSubtypeChanged(
+                    isSuggestionsEligible(), activeDictionarySubtype());
             updateKeyNeighbors();
         }
     }
@@ -1137,19 +1434,26 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         }
 
         if (mSuggestionsController != null) {
-            mSuggestionsController.onStartInput(isTatarSuggestionsEligible());
+            mSuggestionsController.onStartInput(
+                    isSuggestionsEligible(), activeDictionarySubtype());
             updateKeyNeighbors();
         }
         if (mEmojiPanelController != null) {
             // A new editor session: a deferred emoji-panel show armed for the previous one must not
             // fire now.
             mEmojiPanelController.onEditorSessionChanged();
+            abandonEmojiSearch();
         }
         if (mSuggestionsOffer != null) {
             // The boundary at which a deferred "could not turn suggestions on" message gets another
             // chance. It is not a trigger for the offer itself: showing the keyboard proves nothing
             // about wanting to type Tatar.
             mSuggestionsOffer.onInputViewStarted();
+        }
+        if (PersonalDictionaries.hasPendingQuarantineNotice()) {
+            // The same boundary, for the same reason: a notice raised while no window was up would
+            // otherwise be dropped, and the user would be left with an empty list and no explanation.
+            mHandler.post(this::showPersonalDictionaryUnreadableDialog);
         }
 
         if (TRACE) Debug.startMethodTracing("/data/trace/latinime");
@@ -1185,6 +1489,7 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         if (mSuggestionsController != null) {
             mSuggestionsController.onFinishInput();
         }
+        abandonEmojiSearch();
         if (mEmojiPanelController != null) {
             mEmojiPanelController.onFinishInputView();
         }
@@ -1346,6 +1651,14 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
     }
 
     int getCurrentAutoCapsState() {
+        if (mEmojiSearchQuery != null) {
+            // While the emoji search is open the keys type into the query, not into the editor, so
+            // auto-caps has nothing to derive from: the editor's text never changes and shift would
+            // be re-armed after every letter, turning the whole query into capitals. Reporting no
+            // CAP_MODE bit here covers every path that asks — a key press, a layout switch, a
+            // keyboard reload — with one answer.
+            return NO_AUTO_CAPS;
+        }
         return mInputLogic.getCurrentAutoCapsState(mSettings.getCurrent(),
                 mRichImm.getCurrentSubtype().getKeyboardLayoutSet());
     }
@@ -1455,7 +1768,31 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
     private void onSuggestionsAffectingCursorMove() {
         if (mSuggestionsController != null) {
             mSuggestionsController.onSelectionChanged();
+            // Clearing the band is only half of what a cursor move needs: the cursor has stopped
+            // somewhere, and wherever that is the band must describe it. Without this the strip
+            // stays blank until the next keystroke even though the cursor sits at the end of a word
+            // the dictionary answers.
+            mHandler.postRefreshSuggestionBand();
         }
+    }
+
+    /**
+     * Re-derives the suggestion band after a cursor move has settled. Posted by
+     * {@link UIHandler#postRefreshSuggestionBand}, never called directly.
+     *
+     * The emoji panel and the emoji search route through
+     * {@link SuggestionsController#onSelectionChanged} to get a band that stays empty for as long as
+     * they are up, so neither may be re-derived out from under: while either is shown the band is
+     * left exactly as they left it.
+     */
+    private void refreshSuggestionBandAfterCursorMove() {
+        if (mSuggestionsController == null) {
+            return;
+        }
+        if (mKeyboardSwitcher.isEmojiPanelShown() || mEmojiSearchQuery != null) {
+            return;
+        }
+        mSuggestionsController.onCursorMoveSettled();
     }
 
     private boolean isShowingOptionDialog() {
@@ -1491,6 +1828,9 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
     // This method is public for testability of LatinIME, but also in the future it should
     // completely replace #onCodeInput.
     public void onEvent(final Event event) {
+        if (maybeRouteToEmojiSearch(event)) {
+            return;
+        }
         if (maybeRevertTatarAutocorrection(event)) {
             return;
         }
@@ -1617,9 +1957,26 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
      * the keyboard switcher once the controller asks to show the panel.
      */
     public void showEmojiPanel() {
-        if (mEmojiPanelController != null) {
-            mEmojiPanelController.onEmojiKeyPressed();
+        if (mEmojiPanelController == null) {
+            return;
         }
+        // False means the panel will not show in THIS process: the snapshot could not be built and
+        // the preparation is never retried. Discarding that answer left a key that is drawn on the
+        // keyboard, takes the press and does nothing, for as long as the process lives.
+        if (!mEmojiPanelController.onEmojiKeyPressed()) {
+            showEmojiUnavailableDialog();
+        }
+    }
+
+    /**
+     * The search pill inside the emoji panel was tapped and no search can be opened.
+     *
+     * Same register as {@link #showEmojiUnavailableDialog()} and for the same reason: the verdict
+     * "the index is unusable" is cached for the life of the process, so without this the pill stays
+     * painted and stays dead.
+     */
+    public void onEmojiSearchUnavailable() {
+        showEmojiUnavailableDialog();
     }
 
     /**
@@ -1631,6 +1988,87 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         if (mEmojiPanelController != null) {
             mEmojiPanelController.onEmojiInserted(sequence);
         }
+    }
+
+    /**
+     * The search pill in the emoji panel was tapped. The panel closes, the letter keyboard comes
+     * back and every key press is routed into the emoji-search query instead of into the editor
+     * until the search is left again.
+     */
+    public void onEmojiSearchRequested() {
+        if (mEmojiPanelController != null) {
+            mEmojiPanelController.onSearchRequested();
+        }
+    }
+
+    /**
+     * The emoji search was left — through the "✕" key, a backspace on an empty query, or any
+     * lifecycle event that abandons it. The query is dropped and the emoji grid comes back.
+     */
+    public void onEmojiSearchClosed() {
+        if (mEmojiSearchQuery == null) {
+            return;
+        }
+        mEmojiSearchQuery = null;
+        mKeyboardSwitcher.leaveEmojiSearch();
+    }
+
+    /**
+     * Routes one key press into the emoji-search query instead of into the editor, and returns true
+     * when it did. This is the single seam that makes the keyboard type "into itself": while the
+     * search is open the query grows here and {@link InputLogic} is never called, so no character
+     * the user types while searching can reach the application's text field and no marked region is
+     * ever started there. A backspace on an already-empty query means "leave the search".
+     *
+     * <p>The keyboard's own state machine still sees the event, so shift and the symbols/letters
+     * switch behave exactly as they do while typing. Auto-caps is deliberately reported as OFF
+     * ({@code 0}, no {@code TextUtils.CAP_MODE_*} bit): it is derived from the editor's text, which
+     * the search never changes, so leaving it on would re-arm shift after every letter and turn the
+     * whole query into capitals.
+     */
+    private boolean maybeRouteToEmojiSearch(final Event event) {
+        final EmojiSearchQuery query = mEmojiSearchQuery;
+        if (query == null || !mKeyboardSwitcher.isEmojiSearchShown()) {
+            return false;
+        }
+        final boolean changed;
+        if (event.mKeyCode == Constants.CODE_DELETE) {
+            if (!query.backspace()) {
+                onEmojiSearchClosed();
+                mKeyboardSwitcher.onEvent(event, getCurrentAutoCapsState(),
+                        getCurrentRecapitalizeState());
+                return true;
+            }
+            changed = true;
+        } else if (event.mCodePoint != Event.NOT_A_CODE_POINT) {
+            changed = query.appendCodePoint(event.mCodePoint);
+        } else {
+            // Delete is handled above; every other key that carries no code point (the language
+            // key, the emoji key) is left to the ordinary path so the search never swallows it.
+            return false;
+        }
+        if (changed) {
+            updateEmojiSearchView();
+        }
+        mKeyboardSwitcher.onEvent(event, getCurrentAutoCapsState(), getCurrentRecapitalizeState());
+        return true;
+    }
+
+    /** Hands the current query text to the search bands, which re-run the match and redraw. */
+    private void updateEmojiSearchView() {
+        final EmojiSearchQuery query = mEmojiSearchQuery;
+        if (query != null) {
+            mKeyboardSwitcher.setEmojiSearchQuery(query.text());
+        }
+    }
+
+    /**
+     * Abandons an open emoji search without touching the surfaces; used by the lifecycle events
+     * that tear the input view down or move to another editor, where the keyboard switcher already
+     * resets its own state.
+     */
+    private void abandonEmojiSearch() {
+        mEmojiSearchQuery = null;
     }
 
     /**

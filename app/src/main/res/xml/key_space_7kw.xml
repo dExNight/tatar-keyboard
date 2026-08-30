@@ -22,8 +22,14 @@
     xmlns:latin="http://schemas.android.com/apk/res-auto"
     >
     <switch>
-        <!-- The emoji key takes the row's default width (9%p on sw600dp) and that width is
-             subtracted from the space bar, so each case's total (10+9+63+9+9=100) is preserved.
+        <!-- Every case totals 63%p, so the row's total (10+9+63+9+9=100) is preserved.
+
+             Same rule as on the phone (key_space_5kw.xml): the emoji key takes the row's default
+             width (9%p on sw600dp) out of the space bar and is only laid out when the language
+             switch key is not already spending a slot. When both are asked for, the emoji key is
+             dropped and the emoji panel moves onto the comma key's long press (key_styles_settings.xml), so
+             the bottom row behaves the same way on every form factor.
+
              The showEmojiKey="false" cases are byte-for-byte identical to the pre-emoji layout. -->
         <case
             latin:keyboardLayoutSet="bengali_akkhor|farsi|kannada|nepali_romanized|nepali_traditional|urdu|telugu"
@@ -33,10 +39,8 @@
             <Key
                 latin:keyStyle="languageSwitchKeyStyle" />
             <Key
-                latin:keyStyle="emojiKeyStyle" />
-            <Key
                 latin:keyStyle="spaceKeyStyle"
-                latin:keyWidth="36.0%p" />
+                latin:keyWidth="45.0%p" />
             <Key
                 latin:keyStyle="zwnjKeyStyle" />
         </case>
@@ -84,10 +88,8 @@
             <Key
                 latin:keyStyle="languageSwitchKeyStyle" />
             <Key
-                latin:keyStyle="emojiKeyStyle" />
-            <Key
                 latin:keyStyle="spaceKeyStyle"
-                latin:keyWidth="45%p" />
+                latin:keyWidth="54%p" />
         </case>
         <case
             latin:languageSwitchKeyEnabled="true"
