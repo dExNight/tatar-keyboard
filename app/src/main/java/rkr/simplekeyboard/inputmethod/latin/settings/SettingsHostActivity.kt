@@ -73,10 +73,10 @@ import rkr.simplekeyboard.inputmethod.latin.utils.SubtypeLocaleUtils
  *  - device-protected SharedPreferences via [PreferenceManagerCompat]
  *  - the legacy harness scheduled a backup after every preference change;
  *    that is deliberately NOT carried over. E2b-3 turns backup off
- *    (android:allowBackup="false") and excludes every app data domain from
- *    both backup editions (res/xml/data_extraction_rules.xml for API 31+,
- *    res/xml/backup_rules.xml for 24–30), so a per-change backup request
- *    would have nothing to back up and is gone
+ *    (android:allowBackup="false") and excludes every app data domain in
+ *    res/xml/data_extraction_rules.xml (API 31+; its device-transfer section
+ *    is what closes D2D transfer, which allowBackup=false does not), so a
+ *    per-change backup request would have nothing to back up and is gone
  *  - enterprise restrictions ([Settings.ACTIVE_RESTRICTIONS]) disable rows
  *  - dependency chains: sound volume ⇢ sound_on, IME switch ⇢ language key
  *  - [KeyboardLayoutSet.onKeyboardThemeChanged] for the number-row and

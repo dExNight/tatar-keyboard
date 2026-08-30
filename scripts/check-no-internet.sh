@@ -2,17 +2,24 @@
 # PERF-04 + E2b-3: verify two properties the project promises are checkable, not just
 # claimed — on the BUILT artifact, not only in source:
 #   (1) the app never carries android.permission.INTERNET;
-#   (2) backup is closed as a whitelist (E2b-3): android:allowBackup="false", both rule
-#       editions referenced, and every referenced res/xml rule carries no allowing
-#       (<include>) element while excluding every app data domain whole.
+#   (2) backup is closed as a whitelist (E2b-3): android:allowBackup="false" and the
+#       dataExtractionRules reference present, with the referenced res/xml rule carrying
+#       no allowing (<include>) element while excluding every app data domain whole in
+#       BOTH sections (cloud-backup and device-transfer).
+#
+# dataExtractionRules is LIVE and must stay: on Android 12+ allowBackup="false" stops
+# cloud backup but does NOT stop device-to-device transfer — the <device-transfer>
+# section is the only thing closing that channel (E2b-3). The legacy
+# android:fullBackupContent edition was dead (Auto Backup never runs with
+# allowBackup=false) and was removed in phase 3a; its reappearance is an error.
 #
 # Level 1: grep the source manifest for INTERNET (instant signal, no toolchain needed).
 # Level 2: aapt2 on the built APK (authoritative — sees the merged manifest):
 #   - INTERNET: aapt2 dump permissions.
 #   - Backup:   aapt2 dump xmltree of the in-APK manifest confirms the actual
-#               android:allowBackup value and the presence of both rule references, then
-#               the referenced res/xml files are extracted from the APK (their paths are
-#               obfuscated by resource shrinking in release, so they are resolved through
+#               android:allowBackup value and the dataExtractionRules reference, then
+#               the referenced res/xml file is extracted from the APK (its path is
+#               obfuscated by resource shrinking in release, so it is resolved through
 #               the resource id the manifest points at) and checked against the whitelist
 #               edition. Rationale: <application> attributes are subject to manifest
 #               merging and tools:replace, and a backup mistake is silent — the user only
@@ -26,7 +33,7 @@ MANIFEST="app/src/main/AndroidManifest.xml"
 
 # Domains every backup rule section must exclude whole (regular + device-protected:
 # files, SharedPreferences, databases, external storage). Kept in lockstep with
-# res/xml/data_extraction_rules.xml and res/xml/backup_rules.xml.
+# res/xml/data_extraction_rules.xml.
 BACKUP_DOMAINS=(file database sharedpref external device_file device_database device_sharedpref)
 
 # E2b-3 level 2: prove on the built APK that backup is a whitelist.
@@ -49,41 +56,37 @@ check_backup_apk() {
         exit 1
     fi
 
-    # Both rule editions must be referenced. Capture the resource ids they point at.
+    # dataExtractionRules must be referenced. Capture the resource id it points at.
     der_id=$(grep -F ":dataExtractionRules(" <<<"$manifest_tree" | sed -nE 's/.*=@(0x[0-9a-fA-F]+).*/\1/p' | head -1)
-    fbc_id=$(grep -F ":fullBackupContent(" <<<"$manifest_tree" | sed -nE 's/.*=@(0x[0-9a-fA-F]+).*/\1/p' | head -1)
     if [ -z "$der_id" ]; then
         echo "ERROR: android:dataExtractionRules reference missing from built manifest in $apk" >&2
+        echo "       (it is the only thing closing device-to-device transfer on API 31+; E2b-3)" >&2
         exit 1
     fi
-    if [ -z "$fbc_id" ]; then
-        echo "ERROR: android:fullBackupContent reference missing from built manifest in $apk" >&2
+    # fullBackupContent was dead once allowBackup became false (Auto Backup never runs)
+    # and was removed in phase 3a; it must not come back.
+    fbc_id=$(grep -F ":fullBackupContent(" <<<"$manifest_tree" | sed -nE 's/.*=@(0x[0-9a-fA-F]+).*/\1/p' | head -1 || true)
+    if [ -n "$fbc_id" ]; then
+        echo "ERROR: android:fullBackupContent reference present in built manifest in $apk" >&2
+        echo "       (dead with allowBackup=false; removed in phase 3a — remove it again)" >&2
         exit 1
     fi
-    echo "Backup: manifest references dataExtractionRules=@$der_id fullBackupContent=@$fbc_id"
+    echo "Backup: manifest references dataExtractionRules=@$der_id (fullBackupContent absent as intended)"
 
     res_dump=$("$aapt2" dump resources "$apk")
 
-    local der_file fbc_file
+    local der_file
     der_file=$(_resolve_res_file "$res_dump" "$der_id")
-    fbc_file=$(_resolve_res_file "$res_dump" "$fbc_id")
     if [ -z "$der_file" ]; then
         echo "ERROR: cannot resolve dataExtractionRules ($der_id) to a file inside $apk" >&2
-        exit 1
-    fi
-    if [ -z "$fbc_file" ]; then
-        echo "ERROR: cannot resolve fullBackupContent ($fbc_id) to a file inside $apk" >&2
         exit 1
     fi
 
     # data-extraction-rules (API 31+): both sections, whitelist, all domains excluded.
     _check_rules_tree "$apk" "$aapt2" "$der_file" "data-extraction-rules" \
         "cloud-backup device-transfer" 2
-    # full-backup-content (API 24-30): single section, whitelist, all domains excluded.
-    _check_rules_tree "$apk" "$aapt2" "$fbc_file" "full-backup-content" \
-        "" 1
 
-    echo "Level 2 OK: backup closed as a whitelist (allowBackup=false, both editions, no <include>, all domains excluded) in $apk"
+    echo "Level 2 OK: backup closed as a whitelist (allowBackup=false, dataExtractionRules with no <include>, all domains excluded) in $apk"
 }
 
 # Resolve a resource id (e.g. 0x7f110002) to the file path it maps to inside the APK.

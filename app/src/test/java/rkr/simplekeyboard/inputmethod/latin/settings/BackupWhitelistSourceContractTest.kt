@@ -29,12 +29,14 @@ import org.junit.Test
  * with the final XML; what is checked is the RESULT, in the three assertions the contract
  * names, plus a fourth on the code:
  *
- *  (1) neither section of either rule edition carries a single allowing (<include>)
- *      element;
+ *  (1) neither section of the rule file carries a single allowing (<include>) element;
  *  (2) no allowing element can resolve to a path under `personal/`, `dictionaries/` or the
  *      "recent emoji" medium (`recent_emoji*`);
- *  (3) the manifest carries android:allowBackup="false" and references both XML editions
- *      (and no longer carries android:fullBackupOnly);
+ *  (3) the manifest carries android:allowBackup="false" and references the
+ *      dataExtractionRules edition (and carries neither android:fullBackupOnly nor the
+ *      legacy android:fullBackupContent — dead once allowBackup=false, removed in
+ *      phase 3a; dataExtractionRules stays because on API 31+ allowBackup=false does
+ *      NOT close device-to-device transfer, the <device-transfer> section does);
  *  (4) not one call to BackupManager remains in the code.
  *
  * The level-2 check on the BUILT artifact (aapt2 on the APK) lives in
@@ -55,9 +57,6 @@ class BackupWhitelistSourceContractTest {
     private val manifest by lazy { File(sourceRoot(), "AndroidManifest.xml").readText() }
     private val dataExtractionRules by lazy {
         stripXmlComments(File(sourceRoot(), "res/xml/data_extraction_rules.xml").readText())
-    }
-    private val fullBackupContent by lazy {
-        stripXmlComments(File(sourceRoot(), "res/xml/backup_rules.xml").readText())
     }
 
     /** The data domains a whitelist must exclude WHOLE (regular + device-protected). */
@@ -103,14 +102,13 @@ class BackupWhitelistSourceContractTest {
         return sensitiveMarkers.any { path.contains(it) }
     }
 
-    // --- (1) no allowing element in any section of either edition -----------------------------
+    // --- (1) no allowing element in any section ---------------------------------------------
 
     @Test
-    fun neitherSectionOfEitherEditionCarriesAnAllowingElement() {
+    fun neitherSectionCarriesAnAllowingElement() {
         val sections = listOf(
             "data_extraction_rules/cloud-backup" to innerXml(dataExtractionRules, "cloud-backup"),
             "data_extraction_rules/device-transfer" to innerXml(dataExtractionRules, "device-transfer"),
-            "backup_rules/full-backup-content" to innerXml(fullBackupContent, "full-backup-content"),
         )
         for ((name, body) in sections) {
             assertTrue(
@@ -125,7 +123,7 @@ class BackupWhitelistSourceContractTest {
     @Test
     fun noAllowingElementCanResolveUnderASensitivePath() {
         // The strongest form of (2): the allow-list is empty, so nothing can resolve anywhere.
-        val allIncludes = allowingElements(dataExtractionRules) + allowingElements(fullBackupContent)
+        val allIncludes = allowingElements(dataExtractionRules)
         assertTrue(
             "an empty allow-list is the only way to guarantee nothing resolves to a sensitive path",
             allIncludes.isEmpty(),
@@ -158,20 +156,10 @@ class BackupWhitelistSourceContractTest {
         )
     }
 
-    @Test
-    fun fullBackupContentExcludesEveryDomainWhole() {
-        assertTrue(fullBackupContent.contains("<full-backup-content>"))
-        assertEquals(
-            "full-backup-content must exclude every data domain whole",
-            requiredDomains,
-            excludedDomains(innerXml(fullBackupContent, "full-backup-content")),
-        )
-    }
-
-    // --- (3) manifest disables backup and references both editions ---------------------------
+    // --- (3) manifest disables backup and references the API 31+ edition ----------------------
 
     @Test
-    fun manifestDisablesBackupAndReferencesBothRuleEditions() {
+    fun manifestDisablesBackupAndReferencesDataExtractionRules() {
         assertTrue(
             "android:allowBackup must be false",
             manifest.contains("android:allowBackup=\"false\""),
@@ -185,12 +173,12 @@ class BackupWhitelistSourceContractTest {
             manifest.contains("android:fullBackupOnly"),
         )
         assertTrue(
-            "manifest must reference the API 31+ rules",
+            "manifest must reference the API 31+ rules (they close device-to-device transfer)",
             manifest.contains("android:dataExtractionRules=\"@xml/data_extraction_rules\""),
         )
-        assertTrue(
-            "manifest must reference the API 24-30 rules",
-            manifest.contains("android:fullBackupContent=\"@xml/backup_rules\""),
+        assertFalse(
+            "android:fullBackupContent is dead with allowBackup=false and must stay removed",
+            manifest.contains("android:fullBackupContent"),
         )
     }
 
