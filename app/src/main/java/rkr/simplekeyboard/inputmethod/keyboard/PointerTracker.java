@@ -32,7 +32,6 @@ import rkr.simplekeyboard.inputmethod.keyboard.internal.PointerTrackerQueue;
 import rkr.simplekeyboard.inputmethod.keyboard.internal.TimerProxy;
 import rkr.simplekeyboard.inputmethod.latin.common.Constants;
 import rkr.simplekeyboard.inputmethod.latin.common.CoordinateUtils;
-import rkr.simplekeyboard.inputmethod.latin.define.DebugFlags;
 import rkr.simplekeyboard.inputmethod.latin.settings.Settings;
 
 public final class PointerTracker implements PointerTrackerQueue.Element {
@@ -40,7 +39,7 @@ public final class PointerTracker implements PointerTrackerQueue.Element {
     private static final boolean DEBUG_EVENT = false;
     private static final boolean DEBUG_MOVE_EVENT = false;
     private static final boolean DEBUG_LISTENER = false;
-    private static boolean DEBUG_MODE = DebugFlags.DEBUG_ENABLED || DEBUG_EVENT;
+    private static boolean DEBUG_MODE = DEBUG_EVENT;
 
     static final class PointerTrackerParams {
         public final boolean mKeySelectionByDraggingFinger;
