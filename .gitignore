@@ -8,6 +8,7 @@ local.properties
 
 # Built application files
 *.apk
+*.aab
 *.ap_
 output.json
 output-metadata.json
@@ -37,6 +38,7 @@ proguard/
 # Python tooling caches
 __pycache__/
 *.py[cod]
+.pytest_cache/
 
 # Android Studio Navigation editor temp files
 .navigation/
@@ -66,6 +68,9 @@ tat_*-sentences.txt
 
 # Сырые отчёты прогонов (числа переносятся в markdown вручную, сам JSON не коммитится)
 docs/*.generated.json
+# Уточнение 2026-08-30: три JSON в docs/lang-priority/*.generated.json закоммичены
+# осознанно — это пины-свидетельства миссии lang-priority, на них ссылается отчёт.
+# Паттерн выше покрывает только верхний уровень docs/ и остаётся в силе.
 .smgr/
 
 # Разговорные корпуса миссии tt-corpus (OPUS) и её тестовые артефакты.
