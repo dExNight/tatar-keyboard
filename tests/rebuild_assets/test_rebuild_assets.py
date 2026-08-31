@@ -342,7 +342,11 @@ class RealTreeTest(unittest.TestCase):
         report = json.loads(stream.getvalue())
         self.assertEqual(1, code)
         self.assertEqual("drift", report["bigrams"]["rus"]["verdict"])
-        self.assertEqual(4195, report["bigrams"]["rus"]["drift"]["missing_top_heads"])
+        # Since the 2026-08-31 repack (docs/RUSSIAN-BIGRAMS-REPACK.md) the remaining 59 are
+        # not a drift but the generator rule: conversational top-10k words with no
+        # in-vocabulary pair in the Leipzig training corpora are dropped, not stored empty.
+        self.assertEqual(59, report["bigrams"]["rus"]["drift"]["missing_top_heads"])
+        self.assertEqual(0, report["bigrams"]["rus"]["drift"]["unexpected_heads"])
 
 
 if __name__ == "__main__":

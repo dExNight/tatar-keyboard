@@ -137,27 +137,30 @@ data class BigramArtifactSpec(
         )
 
         /**
-         * The ru table repacked 2026-08-23 by `scripts/bigram_asset_pack.py pack --language rus`
-         * from the same three Leipzig corpora the Russian dictionary is built from, at
-         * H = 10 000 / **K = 4** — `docs/RUSSIAN-BIGRAMS.md` records the
-         * matrix that chose H and the original K = 6; docs/BIGRAM-ADJACENCY.md records the drop to
-         * K = 4 and the head-by-head proof that none of the 10 000 heads changes its displayed
-         * three successors. 47 098 fewer bytes at byte-identical behaviour.
+         * The ru table packed by `scripts/bigram_asset_pack.py pack --language rus` from the
+         * same three Leipzig corpora the Russian dictionary is built from, at H = 10 000 /
+         * **K = 4** — `docs/archive/bigrams/RUSSIAN-BIGRAMS.md` records the matrix that chose H
+         * and the original K = 6; docs/archive/bigrams/BIGRAM-ADJACENCY.md records the drop to
+         * K = 4.
          *
-         * 10 000 heads, none dropped: unlike Tatar, every one of the top-10 000 Russian forms
-         * occurs as the head of an in-vocabulary pair in the training corpora.
+         * **Repacked 2026-08-31 against the CURRENT shipped dictionary** (the 2026-08-23 packing
+         * predated the `bfb78e93` dictionary rebuild and its heads had drifted: 4 195 of 10 000
+         * no longer in the top 10 000). `docs/RUSSIAN-BIGRAMS-REPACK.md` records the measurement:
+         * every dropped head left the top 10 000 legitimately, and every displayed triple of the
+         * 5 805 retained heads is unchanged except for successors the current dictionary no
+         * longer ships at all (39 heads, 47 dead successors replaced).
+         *
+         * 9 941 heads, not 10 000: 59 words of today's top 10 000 — conversational imperatives
+         * and address forms lifted into the top by the OpenSubtitles frequencies merged in
+         * 1.9.0/1.9.1 (`погоди`, `волнуйся`, `окей`, …) — never occur as the head of an
+         * in-vocabulary pair in the Leipzig training corpora (news + Wikipedia) and are dropped
+         * rather than stored with an empty range, the same rule that drops the Tatar `-гәнчә`
+         * converbs. The genre gap is documented, not new: docs/archive/bigrams/RUSSIAN-BIGRAMS.md
+         * §7.
          *
          * Its own family and its own directory, so the Tatar table already inflated on a device
          * updating from 1.7.0 is neither renamed, re-inflated, nor sharing this language's lease
          * counter.
-         *
-         * **Not repacked since 2026-08-23, and its heads have drifted from the dictionary it is
-         * paired with.** The Russian dictionary was rebuilt afterwards from whole-corpus
-         * frequencies (`bfb78e93`), which reordered it far more than the Tatar one: 4 195 of
-         * these 10 000 heads are no longer in the top 10 000 by today's frequencies, and 4 195
-         * words that are do not appear here. Repacking would swap them all at once, which is a
-         * change of a different size and a different question from the Tatar imperatives, so
-         * docs/IMPERATIVE-HEADS.md records the number and leaves the table alone.
          */
         @JvmField
         val RUSSIAN_BIGRAMS_V1 = BigramArtifactSpec(
@@ -167,13 +170,13 @@ data class BigramArtifactSpec(
             subtypeId = PersonalSubtypes.RUSSIAN,
             storageDirectoryName = "bigrams-ru",
             assetPath = "bigrams/russian_bigrams_v1.tatbigr.zlib",
-            expectedCompressedSize = 160_510,
+            expectedCompressedSize = 152_947,
             expectedCompressedSha256 =
-                "741f55b94fc0c367833a6e2aa2f22b1332debb59fcfe19f9429a71aed56bff73",
-            expectedRawSize = 505_768,
+                "c357a9fdfda58a5d8c87e4101cff8fb94fff42da80e8e6c01086db59b2098242",
+            expectedRawSize = 473_256,
             expectedRawSha256 =
-                "264b09fc6e73becf4cfe47cfecb26e6911f56d39707e038e2702b97244cbb631",
-            expectedHeadCount = 10_000,
+                "0091be8ba4b68f403a90455e1875f24a2f8faa36335a9c54b3d35a5a2a3e690d",
+            expectedHeadCount = 9_941,
         )
     }
 }
