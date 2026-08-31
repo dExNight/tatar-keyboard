@@ -20,8 +20,9 @@
 #     дампе есть) — это заодно функциональное доказательство раскладки:
 #     «при» по координатам ru-раскладки на tt-раскладке дало бы другие буквы;
 #   - переключение сабтипов читается из префа pref_current_subtype через
-#     run-as (только debuggable-пакет; на релизном APK — SKIP, остаются
-#     функциональные проверки набора);
+#     run-as (debuggable-пакет); на релизном APK раскладка определяется
+#     функциональным зондом (probe_layout): тап по верхнему левому углу
+#     буквенной области даёт «ә» на tt, «й» на ru, «q» на en;
 #   - подсказки — пиксельная дельта полосы над клавиатурой между скриншотом
 #     до и после набора слова (ImageMagick compare; нет ImageMagick — SKIP);
 #   - эмодзи-панель — тап по первой ячейке сетки обязан закоммитить эмодзи
@@ -38,6 +39,13 @@
 # Координаты клавиш — доли экрана, откалиброваны на tt_suggest_a14 (1080×2280),
 # как KeyGeom в baselineprofile/ImeBaselineProfileGenerator.java; на AVD с
 # другим размером сценарий набора не пройдёт — это осознанно.
+# Окно IME не видно uiautomator (проверено на API 34), поэтому клавиши остаются
+# долями экрана; bounds из дампа читаются там, где виджет в дампе есть (try-it
+# поле). Переключение сабтипов глобусом на не-debuggable APK проверяется
+# функциональным зондом (probe_layout) — слепая серия тапов по глобусу была
+# нестабильна: порядок цикла пересобирается (resetSubtypeCycleOrder), и без
+# чтения pref'а три тапа приземлялись не на той раскладке (флаки type-en-hi
+# на release APK, 2026-08-31).
 #
 # Итог — машинные строки `RESULT|PASS|FAIL|SKIP|проверка|деталь` в stdout и
 # $OUTDIR/result.txt; любой FAIL = ненулевой код выхода. Эмулятор гасится,
@@ -215,9 +223,18 @@ A install -r "$APK" >"$OUTDIR/install.log" 2>&1 \
     && result PASS install "$(basename "$APK") pkg=$PKG" \
     || { result FAIL install "$(tail -1 "$OUTDIR/install.log")"; exit 1; }
 
-IME_ID=$(SHELL ime list -s | tr -d '\r' | grep "^$PKG/" | head -1 || true)
+# На медленных/старых образах (tatar_e5_test, API 30) IME появляется в
+# списке не мгновенно после install — опрашиваем до 30 с. `ime list -a -s`,
+# а не `-s`: на API 30 короткий список без `-a` содержит только ВКЛЮЧЁННЫЕ
+# IME (наш ещё не включён), на API 34 — все; `-a` работает на обоих.
+IME_ID=""
+for _ in $(seq 1 15); do
+    IME_ID=$(SHELL ime list -a -s | tr -d '\r' | grep "^$PKG/" | head -1 || true)
+    [ -n "$IME_ID" ] && break
+    sleep 2
+done
 if [ -z "$IME_ID" ]; then
-    result FAIL ime-id "ime list -s не показывает $PKG"
+    result FAIL ime-id "ime list -a -s не показывает $PKG"
     exit 1
 fi
 result PASS ime-id "$IME_ID"
@@ -378,26 +395,79 @@ TAPF ${SPACE%,*} ${SPACE#*,}
 sleep 1
 
 # ── сабтипы глобусом: tt → ru → en → tt ──
-# Глобус идёт по MRU-списку, а MRU после набора пересобирается (штатное
-# поведение форка, см. docs/RESTRUCTURE.md фаза 3б) — поэтому тапаем до трёх
-# раз, пока преф не покажет нужную раскладку.
-switch_and_check() {                         # $1 тег, $2 ожидаемый layout в префе
-    local tag="$1" want="$2" pref="" tap
-    for tap in 1 2 3; do
-        TAPF ${GLOBE%,*} ${GLOBE#*,}
-        for _ in $(seq 1 8); do
-            sleep 1
-            pref=$(read_pref pref_current_subtype)
+# Глобус циклит список сабтипов, а порядок списка пересобирается
+# (resetSubtypeCycleOrder, MRU-ротация префа) — поэтому без обратной связи
+# серия тапов приземляется непредсказуемо. На debuggable-пакете обратная
+# связь — преф pref_current_subtype (run-as); на релизном APK преф нечитаем,
+# раскладку определяем функциональным зондом и тапаем до совпадения.
+
+# Функциональный зонд текущей раскладки (для release-APK, где run-as
+# недоступен). Точка (0.045, 0.665) — внутри «ә» верхнего татарского ряда
+# tt-раскладки (6 клавиш по 16.667%: «ә» занимает x 0–0.167); на 4-рядных
+# ru/en тот же пиксель — первая клавиша первого ряда: «й» (ru, 11 клавиш по
+# 9.091%) и «q» (en, 10 клавиш по 10%). Зондированный символ стирается
+# KEYCODE_DEL, поле не портится.
+PROBE_KEY="0.045,0.665"
+probe_layout() {                           # → tatar|russian|qwerty|""
+    local before after
+    before=$(field_text)
+    [ "$before" = "__NOFIELD__" ] && { echo ""; return; }
+    [[ "$before" == "Try it:"* ]] && before=""   # пустое поле отдаёт hint как text
+    TAPF ${PROBE_KEY%,*} ${PROBE_KEY#*,}
+    sleep 0.6
+    after=$(field_text)
+    if [ ${#after} -le ${#before} ]; then
+        echo ""                            # тап не достал до клавиши
+        return
+    fi
+    SHELL input keyevent KEYCODE_DEL       # стереть зондированный символ
+    sleep 0.4
+    if   [[ "$after" == *"ә" || "$after" == *"Ә" ]]; then echo tatar
+    elif [[ "$after" == *"й" || "$after" == *"Й" ]]; then echo russian
+    elif [[ "$after" == *"q" || "$after" == *"Q" ]]; then echo qwerty
+    else echo ""
+    fi
+}
+
+switch_and_check() {                         # $1 тег, $2 ожидаемый layout
+    local tag="$1" want="$2" pref="" tap cur=""
+    if [ "$SUGGESTIONS" = on ]; then
+        for tap in 1 2 3; do
+            TAPF ${GLOBE%,*} ${GLOBE#*,}
+            for _ in $(seq 1 8); do
+                sleep 1
+                pref=$(read_pref pref_current_subtype)
+                [[ "$pref" == *":$want" ]] && break
+            done
             [[ "$pref" == *":$want" ]] && break
         done
-        [[ "$pref" == *":$want" ]] && break
+        if [[ "$pref" == *":$want" ]]; then
+            result PASS "subtype-$tag" "pref_current_subtype=$pref"
+        else
+            result FAIL "subtype-$tag" "pref_current_subtype='$pref' (ждали :$want)"
+        fi
+        return
+    fi
+    # release: преф нечитаем — функциональный зонд. Тонкость: зонд печатает
+    # символ, commitText вызывает resetSubtypeCycleOrder (текущий сабтип
+    # уходит в голову цикла), поэтому ОДИНОЧНЫЙ тап глобуса после зонда
+    # всегда возвращает предыдущую раскладку — tt↔ru качаются, а en
+    # недостижим (именно так ломался type-en-hi). ДВОЙНОЙ тап без печати
+    # между тапами из [cur, prev, X] приземляется в X; три зонда подряд
+    # покрывают все три раскладки.
+    cur=$(probe_layout)
+    for tap in 1 2 3; do
+        [ "$cur" = "$want" ] && break
+        TAPF ${GLOBE%,*} ${GLOBE#*,}
+        sleep 0.8
+        TAPF ${GLOBE%,*} ${GLOBE#*,}
+        sleep 1.2
+        cur=$(probe_layout)
     done
-    if [ "$SUGGESTIONS" != on ]; then
-        result SKIP "subtype-$tag" "преф сабтипа нечитаем (не debuggable)"
-    elif [[ "$pref" == *":$want" ]]; then
-        result PASS "subtype-$tag" "pref_current_subtype=$pref"
+    if [ "$cur" = "$want" ]; then
+        result PASS "subtype-$tag" "функциональный зонд: раскладка $want"
     else
-        result FAIL "subtype-$tag" "pref_current_subtype='$pref' (ждали :$want)"
+        result FAIL "subtype-$tag" "зонд показывает '$cur' (ждали $want)"
     fi
 }
 
