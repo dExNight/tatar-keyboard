@@ -2,7 +2,9 @@ Bigram (next-word prediction) table data notice
 
 Both shipped tables are derived from downloadable text corpora in the Leipzig
 Corpora Collection -- the sentence-aligned files, not the word-frequency lists
-the top-100k dictionaries are built from.
+the top-100k dictionaries are built from. Since 2026-08-31 the Russian table
+additionally contains a conversational admixture from Tatoeba and
+OpenSubtitles (details in its section below).
 
 Source catalogue: https://wortschatz.uni-leipzig.de/en/download
 Terms: https://wortschatz.uni-leipzig.de/en/usage
@@ -42,19 +44,34 @@ measure the table's predictive usefulness before it was built and contributed
 no data to the shipped table itself.
 Catalogue page: https://wortschatz.uni-leipzig.de/en/download/Russian
 
+Since 2026-08-31 (corpus-conversational part A, docs/CORPUS-CONVERSATIONAL-RU.md)
+the training input additionally contains a deduplicated, deterministically
+thinned (every 60th unique line) conversational part built from:
+
+- Tatoeba, https://tatoeba.org/ -- Creative Commons Attribution 2.0 France
+  (CC BY 2.0 FR), https://creativecommons.org/licenses/by/2.0/fr/
+- OpenSubtitles, taken from the OPUS collection (OpenSubtitles v2024),
+  http://www.opensubtitles.org/ -- OpenSubtitles publishes NO license grant
+  for this text, and this table now carries data derived from it: the
+  project's operator decided on 2026-08-24 to use the data anyway, knowing
+  there is no grant. The decision, the measurements behind it and the release
+  risk are recorded in ../dictionaries/NOTICE.txt, docs/CORPUS-OS.md and
+  docs/PUBLISH-CHECKLIST.md. Recommended citation: P. Lison, J. Tiedemann,
+  "OpenSubtitles2016: Extracting Large Parallel Corpora from Movie and TV
+  Subtitles", LREC 2016.
+
 Changes by the Tatar Keyboard project: the same transformation as above, with
 the 33-letter Russian alphabet in place of the Tatar one and the shipped
 russian_top100k_v1 dictionary as the vocabulary both halves of every pair must
 belong to; same top 10,000 head words, same top 4 successors per head, same
-binary format, same SHA-256 and zlib settings. Full transformation record:
-docs/RUSSIAN-BIGRAMS.md.
+binary format, same SHA-256 and zlib settings. The conversational lines were
+deduplicated before counting, and no sentence from either collection is stored
+in the app -- the table holds word pairs and their ranks only. Full
+transformation records: docs/RUSSIAN-BIGRAMS.md and
+docs/CORPUS-CONVERSATIONAL-RU.md.
 
 --------------------------------------------------------------------------------
-The table data remains a separate CC BY 4.0 component; the application's
-Apache-2.0 license does not replace that data license.
-
-Conversational corpora (Tatoeba, OpenSubtitles) were measured against these tables
-and contributed nothing to them: both shipped tables are Leipzig-derived exactly as
-described above. What that measurement found, and under what terms those two
-collections may be used, is recorded in ../dictionaries/NOTICE.txt and in
-docs/CORPUS-OS.md.
+The Leipzig-derived table data remains a separate CC BY 4.0 component; the
+application's Apache-2.0 license does not replace that data license. The
+Tatoeba-derived part remains under CC BY 2.0 FR. The OpenSubtitles-derived
+part is used without a license grant, as stated above.

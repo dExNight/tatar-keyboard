@@ -229,7 +229,7 @@
     <string name="data_sources_intro">The keyboard works offline and sends nothing anywhere. Its word lists and next-word suggestions are built from open collections of text. These are the collections.</string>
     <!-- Section header above the sources whose data is inside this version of the app. -->
     <string name="data_sources_in_app">In this version</string>
-    <string name="data_sources_leipzig_summary">Most of both word lists, and all of the next-word tables. CC BY 4.0.</string>
-    <string name="data_sources_tatoeba_summary">Everyday words in both lists: frequencies from example sentences. CC BY 2.0 FR.</string>
-    <string name="data_sources_opensubtitles_summary">Everyday words in both lists: frequencies from film subtitles.</string>
+    <string name="data_sources_leipzig_summary">Most of both word lists, and the Tatar next-word table. CC BY 4.0.</string>
+    <string name="data_sources_tatoeba_summary">Everyday words in both lists, and part of the Russian next-word table: frequencies from example sentences. CC BY 2.0 FR.</string>
+    <string name="data_sources_opensubtitles_summary">Everyday words in both lists, and part of the Russian next-word table: frequencies from film subtitles.</string>
 </resources>
