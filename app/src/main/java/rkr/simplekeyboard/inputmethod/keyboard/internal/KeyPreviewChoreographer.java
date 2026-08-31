@@ -26,6 +26,7 @@ import android.view.ViewGroup;
 
 import java.util.ArrayDeque;
 import java.util.HashMap;
+import java.util.Map;
 
 import rkr.simplekeyboard.inputmethod.keyboard.Key;
 import rkr.simplekeyboard.inputmethod.latin.common.CoordinateUtils;
@@ -43,6 +44,11 @@ public final class KeyPreviewChoreographer {
     // Map from {@link Key} to {@link KeyPreviewView} that is currently being displayed as key
     // preview.
     private final HashMap<Key,KeyPreviewView> mShowingKeyPreviewViews = new HashMap<>();
+    // Dismiss animators cached per preview view: an animator is bound to its target, and preview
+    // views outlive individual key presses (they are pooled), so the animator is built once per
+    // view and restarted afterwards — zero allocations in the per-press path.
+    private final HashMap<KeyPreviewView,KeyPreviewAnimators> mDismissAnimatorsCache =
+            new HashMap<>();
 
     private final KeyPreviewDrawParams mParams;
 
@@ -140,21 +146,51 @@ public final class KeyPreviewChoreographer {
         }
 
         // Show preview with animation.
-        final Animator dismissAnimator = createDismissAnimator(key, keyPreviewView);
-        final KeyPreviewAnimators animators = new KeyPreviewAnimators(dismissAnimator);
+        final KeyPreviewAnimators animators = getDismissAnimators(keyPreviewView);
         keyPreviewView.setTag(animators);
         showKeyPreview(key, keyPreviewView, false /* withAnimation */);
     }
 
-    private Animator createDismissAnimator(final Key key, final KeyPreviewView keyPreviewView) {
+    private KeyPreviewAnimators getDismissAnimators(final KeyPreviewView keyPreviewView) {
+        KeyPreviewAnimators animators = mDismissAnimatorsCache.get(keyPreviewView);
+        if (animators == null) {
+            animators = new KeyPreviewAnimators(createDismissAnimator(keyPreviewView));
+            mDismissAnimatorsCache.put(keyPreviewView, animators);
+        }
+        return animators;
+    }
+
+    private Animator createDismissAnimator(final KeyPreviewView keyPreviewView) {
         final Animator dismissAnimator = mParams.createDismissAnimator(keyPreviewView);
         dismissAnimator.addListener(new AnimatorListenerAdapter() {
             @Override
             public void onAnimationEnd(final Animator animator) {
-                dismissKeyPreview(key, false /* withAnimation */);
+                dismissKeyPreviewView(keyPreviewView);
             }
         });
         return dismissAnimator;
+    }
+
+    /**
+     * The animation-end half of {@link #dismissKeyPreview(Key,boolean)}, keyed by the view rather
+     * than by the key: the cached animator's listener is created once per view, so it cannot
+     * capture the key that was current at creation time.
+     */
+    private void dismissKeyPreviewView(final KeyPreviewView keyPreviewView) {
+        Key showingKey = null;
+        for (final Map.Entry<Key,KeyPreviewView> entry : mShowingKeyPreviewViews.entrySet()) {
+            if (entry.getValue() == keyPreviewView) {
+                showingKey = entry.getKey();
+                break;
+            }
+        }
+        if (showingKey == null) {
+            return;
+        }
+        mShowingKeyPreviewViews.remove(showingKey);
+        keyPreviewView.setTag(null);
+        keyPreviewView.setVisibility(View.INVISIBLE);
+        mFreeKeyPreviewViews.add(keyPreviewView);
     }
 
     private static class KeyPreviewAnimators extends AnimatorListenerAdapter {

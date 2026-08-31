@@ -18,7 +18,7 @@
 package rkr.simplekeyboard.inputmethod.keyboard.internal;
 
 import android.animation.Animator;
-import android.animation.AnimatorInflater;
+import android.animation.ObjectAnimator;
 import android.content.res.TypedArray;
 import android.view.View;
 import android.view.animation.AccelerateInterpolator;
@@ -31,7 +31,6 @@ public final class KeyPreviewDrawParams {
     public final int mPreviewHeight;
     public final int mMinPreviewWidth;
     public final int mPreviewBackgroundResId;
-    private final int mDismissAnimatorResId;
     private int mLingerTimeout;
     private boolean mShowPopup = true;
 
@@ -71,8 +70,6 @@ public final class KeyPreviewDrawParams {
                 R.styleable.MainKeyboardView_keyPreviewBackground, 0);
         mLingerTimeout = mainKeyboardViewAttr.getInt(
                 R.styleable.MainKeyboardView_keyPreviewLingerTimeout, 0);
-        mDismissAnimatorResId = mainKeyboardViewAttr.getResourceId(
-                R.styleable.MainKeyboardView_keyPreviewDismissAnimator, 0);
     }
 
     public void setVisibleOffset(final int previewVisibleOffset) {
@@ -121,10 +118,18 @@ public final class KeyPreviewDrawParams {
     private static final AccelerateInterpolator ACCELERATE_INTERPOLATOR =
             new AccelerateInterpolator();
 
+    // The parameters of the former res/anim/key_preview_dismiss_lxx.xml, built in code instead:
+    // the XML used to be parsed by AnimatorInflater on EVERY key press (~15 objects per press).
+    // The scaleX 1.0 -> 1.0 half of that set is a no-op (the pool resets both scales to 1 on
+    // reuse), so one ObjectAnimator on scaleY is the whole animation.
+    private static final long DISMISS_ANIMATION_DURATION_MS = 53;
+    private static final float DISMISS_ANIMATION_FROM_SCALE_Y = 1.0f;
+    private static final float DISMISS_ANIMATION_TO_SCALE_Y = 0.94f;
+
     public Animator createDismissAnimator(final View target) {
-        final Animator animator = AnimatorInflater.loadAnimator(
-                target.getContext(), mDismissAnimatorResId);
-        animator.setTarget(target);
+        final ObjectAnimator animator = ObjectAnimator.ofFloat(target, View.SCALE_Y,
+                DISMISS_ANIMATION_FROM_SCALE_Y, DISMISS_ANIMATION_TO_SCALE_Y);
+        animator.setDuration(DISMISS_ANIMATION_DURATION_MS);
         animator.setInterpolator(ACCELERATE_INTERPOLATOR);
         return animator;
     }

@@ -63,7 +63,6 @@
         <item name="keyPreviewHeight">@dimen/config_key_preview_height_lxx</item>
         <item name="keyPreviewWidth">@dimen/config_key_preview_width_lxx</item>
         <item name="keyPreviewOffset">@dimen/config_key_preview_offset_lxx</item>
-        <item name="keyPreviewDismissAnimator">@anim/key_preview_dismiss_lxx</item>
         <item name="languageOnSpacebarTextColor">@color/ios_key_text_inactive_color</item>
     </style>
     <style
