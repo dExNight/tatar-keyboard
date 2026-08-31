@@ -1,21 +1,21 @@
-😀	широко улыбается	широко улыбается лицо радость счастье улыбка широкая улыбка grinning face face grin
+😀	широко улыбается	широко улыбается лицо радость счастье улыбка широкая улыбка grinning face face grin елмаю шатлык көлү бит
 😃	смеется	смеется лицо радость рот смех улыбка grinning face with big eyes face mouth open smile
-😄	смеется с закрытыми глазами	смеется с закрытыми глазами закрытые глаза радость смех улыбка с закрытыми глазами grinning face with smiling eyes eye face mouth open smile
+😄	смеется с закрытыми глазами	смеется с закрытыми глазами закрытые глаза радость смех улыбка с закрытыми глазами grinning face with smiling eyes eye face mouth open smile елмаю бәхет шатлык көлү
 😁	светится от счастья	светится от счастья зубы счастливое лицо улыбающиеся глаза широкая улыбка beaming face with smiling eyes eye face grin smile
 😆	смеется с прищуренными глазами	смеется с прищуренными глазами прищуренные глаза смеется с закрытыми глазами смех смех с прищуренными глазами grinning squinting face face laugh mouth satisfied smile
 😅	нервно смеется	нервно смеется нервный смех облегчение пот холодный пот grinning face with sweat cold face open smile sweat
-🤣	катается со смеху	катается со смеху rofl кататься от хохота смех смеяться rolling on the floor laughing face floor laugh rolling rotfl
-😂	смеется до слез	смеется до слез лицо радость слезы смех смех до слез face with tears of joy face joy laugh tear
-🙂	слегка улыбается	слегка улыбается легкая улыбка лицо радость улыбка хорошо slightly smiling face face smile
+🤣	катается со смеху	катается со смеху rofl кататься от хохота смех смеяться rolling on the floor laughing face floor laugh rolling rotfl көлү шаян яшь
+😂	смеется до слез	смеется до слез лицо радость слезы смех смех до слез face with tears of joy face joy laugh tear көлү яшь шаян
+🙂	слегка улыбается	слегка улыбается легкая улыбка лицо радость улыбка хорошо slightly smiling face face smile елмаю бит тыныч
 🙃	вверх тормашками	вверх тормашками вверх лицо ногами перевернутое upside-down face face upside-down
 🫠	тает	тает жидкое исчезает плавится растворяется melting face disappear dissolve liquid melt
-😉	подмигивает	подмигивает глаз лицо мигать подмигивать прищур winking face face wink
-😊	довольно улыбается	довольно улыбается глаза лицо румянец улыбка щеки smiling face with smiling eyes blush eye face smile
-😇	с нимбом	с нимбом ангел лицо невинность святость сказка smiling face with halo angel face fantasy halo innocent
-🥰	улыбающееся лицо с сердечками	улыбающееся лицо с сердечками влюбленность влюбленный сердечки улыбка с сердечками smiling face with hearts adore crush hearts in love
-😍	влюбленное лицо	влюбленное лицо глаза лицо любовь сердце чувства smiling face with heart-eyes eye face love smile
-🤩	звезды в глазах	звезды в глазах звезды радость смеяться улыбка star-struck eyes face grinning star
-😘	воздушный поцелуй	воздушный поцелуй воздушный любовь отправляет воздушный поцелуй сердечко целует целую face blowing a kiss face kiss
+😉	подмигивает	подмигивает глаз лицо мигать подмигивать прищур winking face face wink күз кысу шаян елмаю
+😊	довольно улыбается	довольно улыбается глаза лицо румянец улыбка щеки smiling face with smiling eyes blush eye face smile бәхет елмаю шат йомшак
+😇	с нимбом	с нимбом ангел лицо невинность святость сказка smiling face with halo angel face fantasy halo innocent фәрештә изге нур
+🥰	улыбающееся лицо с сердечками	улыбающееся лицо с сердечками влюбленность влюбленный сердечки улыбка с сердечками smiling face with hearts adore crush hearts in love сөю мәхәббәт йомшаклык елмаю
+😍	влюбленное лицо	влюбленное лицо глаза лицо любовь сердце чувства smiling face with heart-eyes eye face love smile мәхәббәт сөю йөрәк гашыйк
+🤩	звезды в глазах	звезды в глазах звезды радость смеяться улыбка star-struck eyes face grinning star йолдыз соклану куаныч
+😘	воздушный поцелуй	воздушный поцелуй воздушный любовь отправляет воздушный поцелуй сердечко целует целую face blowing a kiss face kiss үбү сөю үбешү
 😗	целует	целует лицо любовь поцелуй kissing face face kiss
 ☺️	улыбается	улыбается довольный лицо смайлик счастье улыбка хорошо smiling face face outlined relaxed smile
 😚	целует с закрытыми глазами	целует с закрытыми глазами глаза закрытые лицо поцелуй поцелуй с закрытыми глазами kissing face with closed eyes closed eye face kiss
@@ -23,16 +23,16 @@
 🥲	улыбающееся лицо со слезой	улыбающееся лицо со слезой гордость признательность слеза трогательный улыбка smiling face with tear grateful proud relieved smiling tear touched
 😋	вкусно	вкусно вкус еда пища смак face savoring food delicious face savouring smile yum
 😛	показывает язык	показывает язык дразнит лицо хитрый язык face with tongue face tongue
-😜	показывает язык и подмигивает	показывает язык и подмигивает лицо подмигивание подтрунивание розыгрыш язык winking face with tongue eye face joke tongue wink
+😜	показывает язык и подмигивает	показывает язык и подмигивает лицо подмигивание подтрунивание розыгрыш язык winking face with tongue eye face joke tongue wink тел шаян елмаю
 🤪	сумасшедшее лицо	сумасшедшее лицо большой глаз кривой лицо маленький рожа zany face eye goofy large small
 😝	морщится и показывает язык	морщится и показывает язык гадость зажмуривается отвращение показывает язык squinting face with tongue eye face horrible taste tongue
 🤑	деньги в глазах	деньги в глазах жадный лицо прибыль рот money-mouth face face money mouth
-🤗	обнимает	обнимает лицо объятие руки smiling face with open hands face hug hugging open hands smiling face
-🤭	прикрывает рот рукой	прикрывает рот рукой лишнего лишнее ляпнуть ой проговориться хи-хи face with hand over mouth whoops
+🤗	обнимает	обнимает лицо объятие руки smiling face with open hands face hug hugging open hands smiling face кочаклау кочак сөенеч
+🤭	прикрывает рот рукой	прикрывает рот рукой лишнего лишнее ляпнуть ой проговориться хи-хи face with hand over mouth whoops көлү оялу авыз
 🫢	прикрывает рот рукой с открытыми глазами	прикрывает рот рукой с открытыми глазами изумление испуг недоверие смущение страх удивление шок face with open eyes and hand over mouth amazement awe disbelief embarrass scared surprise
 🫣	подсматривает	подсматривает взгляд глаз не отвести глаз не оторвать загляденье подсматривать пристально смотреть украдкой face with peeking eye captivated peep stare
-🤫	тс-с-с	тс-с-с молчи секрет тайна тихо тишина shushing face quiet shush
-🤔	думает	думает задумчивость лицо пальцы размышления thinking face face thinking
+🤫	тс-с-с	тс-с-с молчи секрет тайна тихо тишина shushing face quiet shush тынлык сер тавышсыз
+🤔	думает	думает задумчивость лицо пальцы размышления thinking face face thinking уйлау уйчан сорау
 🫡	воинское приветствие	воинское приветствие войска да есть окей отдать честь солнечно saluting face ok salute sunny troops yes
 🤐	рот на замке	рот на замке закрытый лицо молчание рот секрет zipper-mouth face face mouth zip zipper
 🤨	не верит	не верит недоверие подозрение скептик скептически face with raised eyebrow distrust skeptic
@@ -50,22 +50,22 @@
 😔	размышляет	размышляет задумчивость лицо мысли размышления pensive face dejected face pensive
 😪	хочет спать	хочет спать лицо мало сон сонливость усталость sleepy face face good night sleep
 🤤	пускает слюни	пускает слюни лицо слюни drooling face drooling face
-😴	спит	спит дрема лицо отдых сон sleeping face face good night sleep zzz
-😷	в медицинской маске	в медицинской маске больной врач защита лицо маска медик face with medical mask cold doctor face mask sick
-🤒	с градусником во рту	с градусником во рту болезнь лицо недуг рот термометр face with thermometer face ill sick thermometer
+😴	спит	спит дрема лицо отдых сон sleeping face face good night sleep zzz йокы йоклау төн
+😷	в медицинской маске	в медицинской маске больной врач защита лицо маска медик face with medical mask cold doctor face mask sick авыру битлек
+🤒	с градусником во рту	с градусником во рту болезнь лицо недуг рот термометр face with thermometer face ill sick thermometer авыру эссе үлчәү
 🤕	с перевязанной головой	с перевязанной головой боль лицо лоб плохо повязка face with head-bandage bandage face hurt injury
 🤢	тошнит	тошнит болезнь лицо морская болезнь тошно nauseated face face nauseated vomit
 🤮	рвота	рвота блевать тошнит тошнота face vomiting puke sick vomit
 🤧	чихает	чихает апчхи лицо насморк пчхи sneezing face face gesundheit sneeze
 🥵	жар	жар болеет высокая температура лихорадка потеет hot face feverish heat stroke hot red-faced sweating
-🥶	мерзнет	мерзнет замерз морозно посинел холодно cold face blue-faced cold freezing frostbite icicles
+🥶	мерзнет	мерзнет замерз морозно посинел холодно cold face blue-faced cold freezing frostbite icicles салкын боз кыш
 🥴	чувствует головокружение	чувствует головокружение головокружение дезориентация плохо тошнота woozy face dizzy intoxicated tipsy uneven eyes wavy mouth
 😵	головокружение	головокружение голова кружится головокружительный лицо face with crossed-out eyes crossed-out eyes dead face knocked out
-🤯	взрыв мозга	взрыв мозга в шоке голова шок exploding head mind blown shocked
+🤯	взрыв мозга	взрыв мозга в шоке голова шок exploding head mind blown shocked шашу акыл гаҗәп
 🤠	в ковбойской шляпе	в ковбойской шляпе в шляпе ковбой лицо шляпа cowboy hat face cowboy cowgirl face hat
-🥳	на вечеринке	на вечеринке веселится вечеринка день рождения праздник partying face celebration hat horn party
+🥳	на вечеринке	на вечеринке веселится вечеринка день рождения праздник partying face celebration hat horn party бәйрәм туган көн куаныч
 🥸	маскировка	маскировка инкогнито лицо нос очки disguised face disguise face glasses incognito nose
-😎	лицо в темных очках	лицо в темных очках клево круто лицо в солнцезащитный очках солнцезащитные очки smiling face with sunglasses bright cool face sun sunglasses
+😎	лицо в темных очках	лицо в темных очках клево круто лицо в солнцезащитный очках солнцезащитные очки smiling face with sunglasses bright cool face sun sunglasses кояш күзлек салкынча кызык
 🤓	очкарик	очкарик в очках всезнайка отличник очки nerd face face geek nerd
 🧐	с моноклем	с моноклем задавака монокль напыщенный старомодный face with monocle face monocle stuffy
 😕	в замешательстве	в замешательстве замешательство конфуз лицо стеснение confused face confused face meh
@@ -77,78 +77,78 @@
 😯	неприятный сюрприз	неприятный сюрприз лицо молчание неприятно сюрприз удивление hushed face face hushed stunned surprised
 😲	в шоке	в шоке лицо потрясение удивление шок astonished face astonished face shocked totally
 😳	краснеет	краснеет красный лицо смущение щеки flushed face dazed face flushed
-🥺	умоляет	умоляет большие глаза глаза просит слезы pleading face begging mercy puppy eyes
+🥺	умоляет	умоляет большие глаза глаза просит слезы pleading face begging mercy puppy eyes үтенеч ялыныш сөйкемле күзләр
 🥹	еле сдерживает слезы	еле сдерживает слезы гордость грусть злость сдерживаться слезы face holding back tears angry cry proud resist sad
 😦	в изумлении	в изумлении изумление лицо открыт рот удивление хмурый frowning face with open mouth face frown mouth open
 😧	страдает	страдает боль лицо муки плохо страдание тоска anguished face anguished face
 😨	боится	боится жуть испуг лицо рот страх fearful face face fear fearful scared
 😰	сильно беспокоится	сильно беспокоится боится открытый рот пот страх anxious face with sweat blue cold face rushed sweat
 😥	обошлось	обошлось лицо облегчение прошло разочарование фух sad but relieved face disappointed face relieved whew
-😢	плачет	плачет грусть лицо печаль слезы crying face cry face sad tear
-😭	слезы рекой	слезы рекой крокодильи слезы плач плачет рев loudly crying face cry face sad sob tear
-😱	в ужасе	в ужасе испуг крик страх ужас face screaming in fear face fear munch scared scream
+😢	плачет	плачет грусть лицо печаль слезы crying face cry face sad tear елау кайгы яшь
+😭	слезы рекой	слезы рекой крокодильи слезы плач плачет рев loudly crying face cry face sad sob tear елау кайгы яшь зар
+😱	в ужасе	в ужасе испуг крик страх ужас face screaming in fear face fear munch scared scream курку куркыныч вай
 😖	в растерянности	в растерянности лицо растерянность сбит сбит с толку толк тупик confounded face confounded face
 😣	упорство	упорство зажмурился лицо настойчивость проявляет настойчивость смайлик persevering face face persevere
-😞	разочарование	разочарование испытывает разочарование лицо недоволен фрустрация disappointed face disappointed face
+😞	разочарование	разочарование испытывает разочарование лицо недоволен фрустрация disappointed face disappointed face кайгы өметсез моңсу
 😓	в холодном поту	в холодном поту болезнь нервничает пот страх downcast face with sweat cold face sweat
 😩	усталость	усталость истощен лицо устал weary face face tired weary
 😫	сильная усталость	сильная усталость лицо отдых работа спать усталость tired face face tired
 🥱	зевает	зевает зевота сонный спать усталость утомлен yawning face bored tired yawn
 😤	в ожидании успеха	в ожидании успеха гордость гордый пар из носа face with steam from nose face triumph won
-😡	злится	злится злой красный лицо рассерженный сердитый enraged face angry enraged face mad pouting rage red
+😡	злится	злится злой красный лицо рассерженный сердитый enraged face angry enraged face mad pouting rage red ачу ачулану кызару
 😠	сердится	сердится злой лицо недовольный сердитый angry face anger angry face mad
-🤬	цензура	цензура браниться брань мат материться ругань ругаться face with symbols on mouth swearing
+🤬	цензура	цензура браниться брань мат материться ругань ругаться face with symbols on mouth swearing сүгенү ачу
 😈	улыбающийся чертенок	улыбающийся чертенок лицо рога сказка улыбка фэнтези smiling face with horns face fairy tale fantasy horns smile
 👿	злой чертенок	злой чертенок демон мифология чертенок чертик angry face with horns demon devil face fantasy imp
-💀	череп	череп голова опасность смерть страх skull death face fairy tale monster
+💀	череп	череп голова опасность смерть страх skull death face fairy tale monster баш сөяге үлем курку
 ☠️	череп и кости	череп и кости кости опасность смерть череп skull and crossbones crossbones death face monster skull
-💩	какашка	какашка лицо смех фекалии шутка pile of poo dung face monster poo poop
-🤡	клоун	клоун лицо clown face clown face
+💩	какашка	какашка лицо смех фекалии шутка pile of poo dung face monster poo poop тезәк шаян ис
+🤡	клоун	клоун лицо clown face clown face цирк шаян
 👹	чудовище	чудовище лицо мифология монстр страх существо ogre creature face fairy tale fantasy monster
 👺	японский гоблин	японский гоблин гоблин монстр носатое чудище сказка goblin creature face fairy tale fantasy monster
-👻	привидение	привидение лицо сказки страх существо ghost creature face fairy tale fantasy monster
+👻	привидение	привидение лицо сказки страх существо ghost creature face fairy tale fantasy monster өрәк курку шаян
 👽	инопланетянин	инопланетянин космос пришелец существо фантастика чужой alien creature extraterrestrial face fantasy ufo
 👾	космический монстр	космический монстр космос лицо нло пришелец фантастика чужой alien monster alien creature extraterrestrial face monster ufo
-🤖	робот	робот лицо монстр страх robot face monster
-😺	улыбающийся кот	улыбающийся кот кот кот с широкой улыбкой морда широкая улыбка grinning cat cat face grinning mouth open smile
+🤖	робот	робот лицо монстр страх robot face monster техника машина
+😺	улыбающийся кот	улыбающийся кот кот кот с широкой улыбкой морда широкая улыбка grinning cat cat face grinning mouth open smile мәче елмаю көлү
 😸	смеющийся кот	смеющийся кот кот кот с закрытыми глазами кот с широкой улыбкой и закрытыми глазами морда grinning cat with smiling eyes cat eye face grin smile
 😹	смеющийся до слез кот	смеющийся до слез кот кот кот смеется до слез морда смеющийся кот cat with tears of joy cat face joy tear
-😻	влюбленный кот	влюбленный кот кот морда сердечки счастье улыбка smiling cat with heart-eyes cat eye face heart love smile
+😻	влюбленный кот	влюбленный кот кот морда сердечки счастье улыбка smiling cat with heart-eyes cat eye face heart love smile мәче мәхәббәт йөрәк сөю
 😼	ухмыляющийся кот	ухмыляющийся кот кот кот с ухмылкой улыбка ухмылка хитрость хитрый cat with wry smile cat face ironic smile wry
 😽	целующий кот	целующий кот глаза губы кот кот целует морда kissing cat cat eye face kiss
 🙀	кот в шоке	кот в шоке кот морда удивление weary cat cat face oh surprised weary
 😿	плачущий кот	плачущий кот кот кот плачет морда печаль плач слезы crying cat cat cry face sad tear
 😾	злой кот	злой кот злой кот морда недовольный раздраженный pouting cat cat face pouting
-🙈	ничего не вижу	ничего не вижу глаза запрещено зрение нельзя обезьяна see-no-evil monkey evil face forbidden monkey see
+🙈	ничего не вижу	ничего не вижу глаза запрещено зрение нельзя обезьяна see-no-evil monkey evil face forbidden monkey see маймыл күрмәү оялу
 🙉	ничего не слышу	ничего не слышу запрещено лапы нельзя обезьяна слух уши hear-no-evil monkey evil face forbidden hear monkey
 🙊	ничего никому не скажу	ничего никому не скажу закрыт запрещено лапы молчание обезьяна рот speak-no-evil monkey evil face forbidden monkey speak
-💌	любовное письмо	любовное письмо записка любовь письмо почта тайна love letter heart letter love mail
+💌	любовное письмо	любовное письмо записка любовь письмо почта тайна love letter heart letter love mail хат мәхәббәт йөрәк
 💘	сердце, пронзенное стрелой	сердце, пронзенное стрелой купидон лук любовь пронзенное стрелой сердце стрела heart with arrow arrow cupid
 💝	сердце с лентой	сердце с лентой валентин лента перевязано сердце heart with ribbon ribbon valentine
 💖	сверкающее сердце	сверкающее сердце блеск звездочки радость сердце sparkling heart excited sparkle
 💗	растущее сердце	растущее сердце биение больше размер ритм сердце growing heart excited growing nervous pulse
 💓	пульсирующее сердце	пульсирующее сердце бьется красное сердце пульсирует сердце beating heart beating heartbeat pulsating
 💞	вращающиеся сердца	вращающиеся сердца вращение два круги сердца revolving hearts revolving
-💕	два сердца	два сердца влюбленные любовь чувства two hearts love
+💕	два сердца	два сердца влюбленные любовь чувства two hearts love йөрәкләр мәхәббәт сөю
 💟	значок «сердце»	значок «сердце» белое значок "сердце" квадрат красное куб розовый сердце heart decoration heart
 ❣️	восклицательный знак в виде сердца	восклицательный знак в виде сердца восклицание знак препинания сердце сердце в виде восклицательного знака heart exclamation exclamation mark punctuation
-💔	разбитое сердце	разбитое сердце разбитое разочарование сердце части broken heart break broken
-❤️	алое сердце	алое сердце алое красное сердце чувства red heart heart
+💔	разбитое сердце	разбитое сердце разбитое разочарование сердце части broken heart break broken сынган йөрәк кайгы мәхәббәт
+❤️	алое сердце	алое сердце алое красное сердце чувства red heart heart йөрәк мәхәббәт сөю кызыл
 🩷	розовое сердце	розовое сердце люблю любовь мило нравится розовое сердце pink heart cute heart like love pink
 🧡	оранжевое сердце	оранжевое сердце оранжевое сердце orange heart orange
-💛	желтое сердце	желтое сердце желтое сердце yellow heart yellow
-💚	зеленое сердце	зеленое сердце зеленое сердце green heart green
-💙	синее сердце	синее сердце сердце синее blue heart blue
+💛	желтое сердце	желтое сердце желтое сердце yellow heart yellow йөрәк сары дуслык
+💚	зеленое сердце	зеленое сердце зеленое сердце green heart green йөрәк яшел сөю
+💙	синее сердце	синее сердце сердце синее blue heart blue йөрәк зәңгәр сөю
 🩵	голубое сердце	голубое сердце голубое сердце light blue heart cyan heart light blue teal
-💜	фиолетовое сердце	фиолетовое сердце сердце фиолетовое purple heart purple
+💜	фиолетовое сердце	фиолетовое сердце сердце фиолетовое purple heart purple йөрәк шәмәхә сөю
 🤎	коричневое сердце	коричневое сердце бурый коричневое коричневый сердце brown heart brown heart
-🖤	черное сердце	черное сердце злоба сердце черное black heart black evil wicked
+🖤	черное сердце	черное сердце злоба сердце черное black heart black evil wicked йөрәк кара
 🩶	серое сердце	серое сердце сердце серебряное серое grey heart gray heart silver slate
-🤍	белое сердце	белое сердце белое белый сердце white heart heart white
+🤍	белое сердце	белое сердце белое белый сердце white heart heart white йөрәк ак
 💋	след от поцелуя	след от поцелуя движение поцелуй романтика чувства kiss mark kiss lips
-💯	сто баллов	сто баллов 100 очки очков сто hundred points full hundred score
+💯	сто баллов	сто баллов 100 очки очков сто hundred points full hundred score йөз бик яхшы билге
 💢	значок «гнев»	значок «гнев» гнев злость ярость anger symbol angry comic mad
-💥	взрыв	взрыв бум столкновение collision boom comic
+💥	взрыв	взрыв бум столкновение collision boom comic шартлау каты
 💫	кружащаяся звезда	кружащаяся звезда головокружение звезда звезды dizzy comic star
 💦	капли пота	капли пота брызги брызги воды вода капли пот sweat droplets comic splashing sweat
 💨	исчезновение	исчезновение облако облачко пыли пыль dashing away comic dash running
@@ -158,7 +158,7 @@
 🗯️	гневное облачко	гневное облачко вправо гнев негатив облачко ярость right anger bubble angry balloon bubble mad
 💭	облачко с мыслями	облачко с мыслями мысли облако облачко размышления thought balloon balloon bubble comic thought
 💤	сон	сон храп zzz comic good night sleep
-👋	машет рукой	машет рукой взмах привет приветствие рука waving hand hand wave waving
+👋	машет рукой	машет рукой взмах привет приветствие рука waving hand hand wave waving сәлам исәнмесез кул исәнләшү
 🤚	поднятая рука	поднятая рука ладонь поднятая raised back of hand backhand raised
 🖐️	раскрытая ладонь	раскрытая ладонь ладонь пальцы раскрытая рука hand with fingers splayed finger hand splayed
 ✋	поднятая ладонь	поднятая ладонь вверх пальцы рука raised hand hand high 5 high five
@@ -169,11 +169,11 @@
 🫴	рука ладонью вверх	рука ладонью вверх ладонь вверх манить подзывать позвать поймать рука palm up hand beckon catch come offer
 🫷	рука ладонью влево	рука ладонью влево влево дай пять отказ подожди стоп толкать leftwards pushing hand high five leftward push refuse stop wait
 🫸	рука ладонью вправо	рука ладонью вправо вправо дай пять отказ подожди стоп толкать rightwards pushing hand high five push refuse rightward stop wait
-👌	жест «все хорошо»	жест «все хорошо» жест жест "все хорошо" ок окей рука хорошо ok hand hand ok
+👌	жест «все хорошо»	жест «все хорошо» жест жест "все хорошо" ок окей рука хорошо ok hand hand ok яхшы әйбәт тамаша килешү
 🤌	щепоть	щепоть вопрос жест пальцы рега сарказм щепотка pinched fingers fingers hand gesture interrogation pinched sarcastic
 🤏	жест «мало»	жест «мало» мало небольшое количество немного чуть-чуть pinching hand small amount
-✌️	жест v	жест v виктория пальцы победа рука триумф victory hand hand v victory
-🤞	скрещенные пальцы	скрещенные пальцы жест удачи пальцы скрестить удача crossed fingers cross finger hand luck
+✌️	жест v	жест v виктория пальцы победа рука триумф victory hand hand v victory җиңү тынычлык бармаклар
+🤞	скрещенные пальцы	скрещенные пальцы жест удачи пальцы скрестить удача crossed fingers cross finger hand luck өмет уңыш бармаклар
 🫰	жест «деньги»	жест «деньги» деньги дорого сердечко щелчок hand with index finger and thumb crossed expensive heart love money snap
 🤟	я-тебя-люблю	я-тебя-люблю ily жест рука я тебя люблю язык глухих язык знаков love-you gesture hand
 🤘	рокерский жест	рокерский жест жест коза пальцы рок рука фанат sign of the horns finger hand horns rock-on
@@ -185,23 +185,23 @@
 👇	указывающий вниз палец	указывающий вниз палец вниз палец указательный backhand index pointing down backhand down finger hand point
 ☝️	указательный палец вверх	указательный палец вверх вверх направление палец рука указательный index pointing up finger hand index point up
 🫵	указательный палец на себя	указательный палец на себя ты указательный палец указывать index pointing at the viewer point you
-👍	большой палец вверх	большой палец вверх вверх нравится одобрение палец рука хорошо thumbs up +1 hand thumb up
-👎	большой палец вниз	большой палец вниз вниз палец плохо порицание рука thumbs down -1 down hand thumb
+👍	большой палец вверх	большой палец вверх вверх нравится одобрение палец рука хорошо thumbs up +1 hand thumb up яхшы әйбәт килешү бармак
+👎	большой палец вниз	большой палец вниз вниз палец плохо порицание рука thumbs down -1 down hand thumb начар яман килешмәү бармак
 ✊	поднятый кулак	поднятый кулак кулак пальцы рука удар raised fist clenched fist hand punch
 👊	кулак	кулак опасность рука удар удар кулаком oncoming fist clenched fist hand punch
 🤛	кулак влево	кулак влево влево кулак left-facing fist fist leftwards
 🤜	кулак вправо	кулак вправо вправо кулак right-facing fist fist rightwards
-👏	аплодисменты	аплодисменты движение жест овация рука хлопать clapping hands clap hand
-🙌	ура	ура вверх жест класс отлично победа руки raising hands celebration gesture hand hooray raised
+👏	аплодисменты	аплодисменты движение жест овация рука хлопать clapping hands clap hand алкыш кул чабу мактав
+🙌	ура	ура вверх жест класс отлично победа руки raising hands celebration gesture hand hooray raised куаныч куллар бәйрәм
 🫶	жест «сердце»	жест «сердце» жест любовь руки сердце heart hands love
 👐	ладони в стороны	ладони в стороны врозь ладони открытые рука open hands hand open
 🤲	ладони лодочкой	ладони лодочкой вверх вместе ладони молитва руки сложенные лодочкой palms up together prayer
-🤝	рукопожатие	рукопожатие встреча договорились согласие handshake agreement hand meeting shake
-🙏	сложенные руки	сложенные руки молитва пожалуйста просьба руки умолять folded hands ask hand high 5 high five please pray thanks
+🤝	рукопожатие	рукопожатие встреча договорились согласие handshake agreement hand meeting shake исәнләшү килешү кул алушу дуслык
+🙏	сложенные руки	сложенные руки молитва пожалуйста просьба руки умолять folded hands ask hand high 5 high five please pray thanks рәхмәт дога үтенеч куллар
 ✍️	пишущая рука	пишущая рука бумага письмо рука ручка writing hand hand write
 💅	маникюр	маникюр кисть с лаком лак для ногтей ногти уход за руками nail polish care cosmetics manicure nail polish
 🤳	селфи	селфи снимок телефон selfie camera phone
-💪	бицепс	бицепс мышцы flexed biceps biceps comic flex muscle
+💪	бицепс	бицепс мышцы flexed biceps biceps comic flex muscle көч куәт мускул спорт
 🦾	механическая рука	механическая рука инвалид люди с ограниченными возможностями ограниченные возможности протез mechanical arm accessibility prosthetic
 🦿	механическая нога	механическая нога инвалид люди с ограниченными возможностями ограниченные возможности протез mechanical leg accessibility prosthetic
 🦵	нога	нога бедро пинок leg kick limb
@@ -214,23 +214,23 @@
 🫁	легкие	легкие вдох выдох дыхание орган lungs breath exhalation inhalation organ respiration
 🦷	зуб	зуб дантист зубной зубы стоматолог tooth dentist
 🦴	кость	кость косточка скелет bone skeleton
-👀	глаза	глаза два тело человек eyes eye face
+👀	глаза	глаза два тело человек eyes eye face күзләр карау күзәтү
 👁️	глаз	глаз зрачок тело человек eye body
 👅	язык	язык розовый рот tongue body
 👄	рот	рот алые губы зубы красные mouth lips
 🫦	кусать губы	кусать губы беспокойство не в своей тарелке нервный переживать страшно флирт biting lip anxious fear flirting nervous uncomfortable worried
-👶	младенец	младенец дитя карапуз маленький ребенок baby young
+👶	младенец	младенец дитя карапуз маленький ребенок baby young бәби бала кечкенә
 🧒	ребенок	ребенок гендерно нейтральный дитя малыш child gender-neutral unspecified gender young
 👦	мальчик	мальчик дитя маленький малыш ребенок boy young
 👧	девочка	девочка дитя маленькая малышка ребенок girl virgo young zodiac
 🧑	взрослый	взрослый гендерно нейтральный совершеннолетний person adult gender-neutral unspecified gender
 👱	человек со светлыми волосами	человек со светлыми волосами блондин волосы светлые человек person: blond hair blond blond-haired person hair
-👨	мужчина	мужчина взрослый усы человек man adult
+👨	мужчина	мужчина взрослый усы человек man adult ир-ат әти кеше
 🧔	бородатый человек	бородатый человек борода бородач мужчина person: beard beard person
-👩	женщина	женщина взрослая волосы длинные человек woman adult
+👩	женщина	женщина взрослая волосы длинные человек woman adult хатын-кыз әни кеше
 🧓	пожилой человек	пожилой человек в возрасте гендерно нейтральный пожилой старый older person adult gender-neutral old unspecified gender
-👴	пожилой мужчина	пожилой мужчина годы мужчина пожилой старик старый человек old man adult man old
-👵	пожилая женщина	пожилая женщина женщина пожилая старая старуха человек old woman adult old woman
+👴	пожилой мужчина	пожилой мужчина годы мужчина пожилой старик старый человек old man adult man old бабай олы ир-ат
+👵	пожилая женщина	пожилая женщина женщина пожилая старая старуха человек old woman adult old woman әби олы хатын-кыз
 🙍	нахмурившийся человек	нахмурившийся человек лицо расстроен хмурый человек person frowning frown gesture
 🙎	обиженный человек	обиженный человек недовольство обида обиженный person pouting gesture pouting
 🙅	человек против	человек против жест запрещено нельзя руки человек person gesturing no forbidden gesture hand prohibited
@@ -240,7 +240,7 @@
 🧏	глухой человек	глухой человек глухой люди с ограниченными возможностями ограниченные возможности слышать ухо deaf person accessibility deaf ear hear
 🙇	человек кланяется	человек кланяется извинение поклон просьба прощение человек person bowing apology bow gesture sorry
 🤦	человек потерял дар речи	человек потерял дар речи лицо не могу поверить нет слов раздражение рука фейспалм person facepalming disbelief exasperation face palm
-🤷	человек пожимает плечами	человек пожимает плечами не знаю пожимает плечами равнодушие сомнение person shrugging doubt ignorance indifference shrug
+🤷	человек пожимает плечами	человек пожимает плечами не знаю пожимает плечами равнодушие сомнение person shrugging doubt ignorance indifference shrug белмим сорау җилкә
 👮	полицейский	полицейский лицо охрана полиция человек police officer cop officer police
 🕵️	детектив	детектив ищейка расследование сыщик шпион detective sleuth spy
 💂	гвардеец	гвардеец гвардия охрана почетный караул солдат guard
@@ -259,7 +259,7 @@
 🫄	беременный человек	беременный человек беременный в ожидании ребенка в положении животик pregnant person belly bloated full pregnant
 🤱	кормление грудью	кормление грудью кормить молоко ребенок breast-feeding baby breast nursing
 👼	ангелочек	ангелочек ангел дитя крылья лик нимб фэнтези baby angel angel baby face fairy tale fantasy
-🎅	санта-клаус	санта-клаус дед мороз дедушка мороз клаус новый год рождество санта santa claus celebration christmas claus father santa
+🎅	санта-клаус	санта-клаус дед мороз дедушка мороз клаус новый год рождество санта santa claus celebration christmas claus father santa кыш бабай яңа ел бүләк
 🤶	миссис клаус	миссис клаус новый год рождество снегурочка mrs. claus celebration christmas claus mother mrs.
 🦸	супергерой	супергерой героиня герой супермен суперсила superhero good hero heroine superpower
 🦹	суперзлодей	суперзлодей зло злодей supervillain criminal evil superpower villain
@@ -276,8 +276,8 @@
 🚶	человек идет	человек идет дорога прогулка тротуар ходьба человек person walking hike walk walking
 🧍	человек стоит	человек стоит стоя стоять person standing stand standing
 🧎	человек на коленях	человек на коленях колени на коленях person kneeling kneel kneeling
-🏃	человек бежит	человек бежит бег марафон спорт трусцой человек person running marathon running
-💃	танцующая женщина	танцующая женщина движения женщина красота танцы человек woman dancing dance dancing woman
+🏃	человек бежит	человек бежит бег марафон спорт трусцой человек person running marathon running йөгерү тиз ярыш
+💃	танцующая женщина	танцующая женщина движения женщина красота танцы человек woman dancing dance dancing woman бию бәйрәм җыр
 🕺	танцующий мужчина	танцующий мужчина движения красота мужчина танцы человек man dancing dance dancing man
 🕴️	бизнесмен в воздухе	бизнесмен в воздухе бизнес костюм полет человек person in suit levitating business person suit
 👯	люди с ушами кролика	люди с ушами кролика вечеринка кордебалет кролик танец уши уши кролика people with bunny ears bunny ear dancer partying
@@ -318,32 +318,32 @@
 🐒	обезьяна	обезьяна животное monkey
 🦍	горилла	горилла животное обезьяна gorilla
 🦧	орангутан	орангутан обезьяна орангутанг примат человекоподобная человекоподобный orangutan ape
-🐶	морда собаки	морда собаки животное морда собака dog face dog face pet
+🐶	морда собаки	морда собаки животное морда собака dog face dog face pet эт дус йорт
 🐕	собака	собака домашнее животное животное щенок dog pet
 🦮	собака-поводырь	собака-поводырь инвалид поводырь помощь слепой собака guide dog accessibility blind guide
 🐩	пудель	пудель домашнее животное животное порода собака poodle dog
-🐺	морда волка	морда волка волк животное морда wolf face
-🦊	морда лисицы	морда лисицы животное лис лиса лисица морда fox face
+🐺	морда волка	морда волка волк животное морда wolf face бүре урман кырыс
+🦊	морда лисицы	морда лисицы животное лис лиса лисица морда fox face төлке уян кызыл
 🦝	морда енота	морда енота енот животное морда полоскун raccoon curious sly
-🐱	морда кошки	морда кошки домашнее животное животное кот кошка морда cat face cat face pet
+🐱	морда кошки	морда кошки домашнее животное животное кот кошка морда cat face cat face pet мәче йорт мырлавык
 🐈	кошка	кошка домашнее животное животное кот cat pet
-🦁	морда льва	морда льва грива знак зодиака лев морда lion face leo zodiac
-🐯	морда тигра	морда тигра животное зверь морда тигр tiger face face tiger
+🦁	морда льва	морда льва грива знак зодиака лев морда lion face leo zodiac арслан патша куәт
+🐯	морда тигра	морда тигра животное зверь морда тигр tiger face face tiger юлбарыс урман куәт
 🐅	тигр	тигр животное зверь tiger
 🐆	леопард	леопард животное зверь leopard
-🐴	морда лошади	морда лошади конь лошадь морда horse face face horse
+🐴	морда лошади	морда лошади конь лошадь морда horse face face horse ат йөгерү спорт
 🫎	лось	лось животное млекопитающее рога сохатый moose animal antlers elk mammal
 🫏	осел	осел животное ишак млекопитающее мул ослик упрямый donkey animal ass burro mammal mule stubborn
 🐎	лошадь	лошадь животное конь скаковая скакун скачки horse equestrian racehorse racing
-🦄	голова единорога	голова единорога единорог животное рог фэнтези unicorn face
+🦄	голова единорога	голова единорога единорог животное рог фэнтези unicorn face бермөгез тылсым әкият
 🦓	зебра	зебра зебры полосатая полоски черно-белая zebra stripe
 🦌	олень	олень животное зверь рога deer
 🦬	бизон	бизон буйвол зубр стадо bison buffalo herd wisent
-🐮	морда коровы	морда коровы животное корова морда cow face cow face
+🐮	морда коровы	морда коровы животное корова морда cow face cow face сыер мөгез сөт
 🐂	бык	бык гороскоп животное знак зодиака зодиак телец ox bull taurus zodiac
 🐃	буйвол	буйвол животное зверь рога water buffalo buffalo water
 🐄	корова	корова вымя животное рога cow
-🐷	морда свиньи	морда свиньи животное морда свинья pig face face pig
+🐷	морда свиньи	морда свиньи животное морда свинья pig face face pig дуңгыз чучка авыл
 🐖	свинья	свинья животное хрюшка pig sow
 🐗	кабан	кабан голова дикий животное boar pig
 🐽	свиной пятачок	свиной пятачок пятачок свинья pig nose face nose pig
@@ -362,15 +362,15 @@
 🐁	мышь	мышь грызун мышка мышонок mouse
 🐀	крыса	крыса грызун rat
 🐹	морда хомяка	морда хомяка домашнее животное животное морда хомяк hamster face pet
-🐰	морда кролика	морда кролика домашнее животное животное кролик морда rabbit face bunny face pet rabbit
+🐰	морда кролика	морда кролика домашнее животное животное кролик морда rabbit face bunny face pet rabbit куян колак сикерү
 🐇	кролик	кролик белый домашнее животное животное rabbit bunny pet
 🐿️	бурундук	бурундук животное chipmunk squirrel
 🦫	бобр	бобр бобер плотина beaver dam
 🦔	еж	еж ежик животное иголка иголки колючий колючки hedgehog spiny
 🦇	летучая мышь	летучая мышь вампир животное летучая мышь bat vampire
-🐻	морда медведя	морда медведя бурый животное медведь морда bear face
+🐻	морда медведя	морда медведя бурый животное медведь морда bear face аю урман бал
 🐨	морда коалы	морда коалы австралия животное коала медведь морда эвкалипт koala face marsupial
-🐼	морда панды	морда панды животное медведь морда панда panda face
+🐼	морда панды	морда панды животное медведь морда панда panda face аю кытай
 🦥	ленивец	ленивец животное лень медленно спать sloth lazy slow
 🦦	выдра	выдра вода животное играть ловить otter fishing playful
 🦨	скунс	скунс вонь вонючка вонять фу skunk stink
@@ -378,18 +378,18 @@
 🦡	барсук	барсук животное носуха badger honey badger pester
 🐾	следы животного	следы животного животное лапы отпечатки следы paw prints feet paw print
 🦃	индейка	индейка индюк крылья птица turkey bird
-🐔	курица	курица голова птица цыпленок chicken bird
+🐔	курица	курица голова птица цыпленок chicken bird тавык авыл йомырка
 🐓	петух	петух гребешок петушок птица rooster bird
 🐣	цыпленок в яйце	цыпленок в яйце вылупился желтый цыпленок яйцо hatching chick baby bird chick hatching
 🐤	цыпленок боком	цыпленок боком голова маленький цыпленок baby chick baby bird chick
 🐥	цыпленок	цыпленок крылья курица маленький front-facing baby chick baby bird chick
-🐦	птица	птица голова bird
-🐧	пингвин	пингвин голова penguin bird
+🐦	птица	птица голова bird кош очу канат
+🐧	пингвин	пингвин голова penguin bird боз кош
 🕊️	голубь	голубь белый мир полет dove bird fly peace
-🦅	орел	орел птица eagle bird
+🦅	орел	орел птица eagle bird бөркет очу кош
 🦆	утка	утка птица селезень duck bird
 🦢	лебедь	лебедь белый лебедь водоплавающее гадкий утенок птица swan bird cygnet ugly duckling
-🦉	сова	сова мудрость птица филин owl bird wise
+🦉	сова	сова мудрость птица филин owl bird wise ябалак төн кош
 🦤	дронт	дронт большой вымерший додо маврикий dodo extinction large mauritius
 🪶	перо	перо лёгкий оперение полёт птица feather bird flight light plumage
 🦩	фламинго	фламинго птица розовый тропики тропическая тропический flamingo flamboyant tropical
@@ -397,34 +397,34 @@
 🦜	попугай	попугай ара пират птица-говорун parrot bird pirate talk
 🪽	крыло	крыло авиация ангельский летать мифология полет птица wing angelic aviation bird flying mythology
 🪿	гусь	гусь глупый гоготать дичь птица goose bird fowl honk silly
-🐸	голова лягушки	голова лягушки голова жаба зеленая лягушка морда frog face
+🐸	голова лягушки	голова лягушки голова жаба зеленая лягушка морда frog face бака су сикерү
 🐊	крокодил	крокодил аллигатор зеленый crocodile
 🐢	черепаха	черепаха зеленая turtle terrapin tortoise
 🦎	ящерица	ящерица зеленая рептилия lizard reptile
-🐍	змея	змея гадюка змееносец знак зодиак опасность яд snake bearer ophiuchus serpent zodiac
+🐍	змея	змея гадюка змееносец знак зодиак опасность яд snake bearer ophiuchus serpent zodiac елан сөйрәлү куркыныч
 🐲	голова дракона	голова дракона дракон морда сказка фентези фэнтези dragon face dragon face fairy tale
 🐉	дракон	дракон голова сказка фентези фэнтези dragon fairy tale
 🦕	зауропод	зауропод брахиозавр бронтозавр динозавр диплодок sauropod brachiosaurus brontosaurus diplodocus
 🦖	ти-рекс	ти-рекс динозавр рекс тираннозавр t-rex tyrannosaurus rex
-🐳	кит с фонтанчиком	кит с фонтанчиком брызги вода кит spouting whale face spouting whale
+🐳	кит с фонтанчиком	кит с фонтанчиком брызги вода кит spouting whale face spouting whale диңгез зур
 🐋	кит	кит океан whale
-🐬	дельфин	дельфин вода море океан dolphin flipper
+🐬	дельфин	дельфин вода море океан dolphin flipper диңгез уен
 🦭	тюлень	тюлень морской лев нерпа seal sea lion
-🐟	рыба	рыба знак зодиака зодиак рыбы fish pisces zodiac
+🐟	рыба	рыба знак зодиака зодиак рыбы fish pisces zodiac балык елга су
 🐠	тропическая рыба	тропическая рыба рыба тропики экзотическая tropical fish fish tropical
 🐡	рыба-еж	рыба-еж еж иголки рыба blowfish fish
-🦈	акула	акула рыба shark fish
-🐙	осьминог	осьминог щупальца octopus
+🦈	акула	акула рыба shark fish диңгез куркыныч
+🐙	осьминог	осьминог щупальца octopus сигезаяк диңгез су
 🐚	раковина	раковина ракушка спираль spiral shell shell spiral
 🪸	коралл	коралл океан риф coral ocean reef
 🪼	медуза	медуза беспозвоночное морское ожог ой ужалить jellyfish burn invertebrate jelly marine ouch stinger
 🐌	улитка	улитка раковина snail
-🦋	бабочка	бабочка красота мотылек насекомое butterfly insect pretty
-🐛	гусеница	гусеница насекомое bug insect
+🦋	бабочка	бабочка красота мотылек насекомое butterfly insect pretty күбәләк җәй чәчәк
+🐛	гусеница	гусеница насекомое bug insect корт яшел
 🐜	муравей	муравей насекомое ant insect
-🐝	пчела	пчела желто-черная насекомое honeybee bee insect
+🐝	пчела	пчела желто-черная насекомое honeybee bee insect бал корты бал эш җәй
 🪲	жук	жук букашка жучок насекомое beetle bug insect
-🐞	божья коровка	божья коровка божья жук коровка красная насекомое солнышко lady beetle beetle insect ladybird ladybug
+🐞	божья коровка	божья коровка божья жук коровка красная насекомое солнышко lady beetle beetle insect ladybird ladybug хан кызы кызыл корт
 🦗	сверчок	сверчок кузнечик насекомое cricket grasshopper
 🪳	таракан	таракан вредитель насекомое прусак cockroach insect pest roach
 🕷️	паук	паук насекомое spider insect
@@ -435,56 +435,56 @@
 🪱	червяк	червяк земляной червь круглый червь паразит червь worm annelid earthworm parasite
 🦠	микроб	микроб амеба бактерия вирус microbe amoeba bacteria virus
 💐	букет	букет любовь цветы bouquet flower
-🌸	цветок вишни	цветок вишни сакура цветок cherry blossom blossom cherry flower
+🌸	цветок вишни	цветок вишни сакура цветок cherry blossom blossom cherry flower чәчәк яз алсу
 💮	белый цветок	белый цветок белый цветок white flower flower
 🪷	лотос	лотос буддизм вьетнам индия индуизм цветок чистота lotus buddhism flower hinduism purity
 🏵️	розетка	розетка растение rosette plant
-🌹	роза	роза бутон красная цветок rose flower
+🌹	роза	роза бутон красная цветок rose flower гөл чәчәк мәхәббәт кызыл
 🥀	увядший цветок	увядший цветок увядший цветок wilted flower flower wilted
 🌺	гибискус	гибискус китайская роза цветок hibiscus flower
-🌻	подсолнух	подсолнух солнце цветок sunflower flower sun
+🌻	подсолнух	подсолнух солнце цветок sunflower flower sun кояш чәчәге җәй сары
 🌼	цветок	цветок растение blossom flower
-🌷	тюльпан	тюльпан цветок tulip flower
+🌷	тюльпан	тюльпан цветок tulip flower лалә яз чәчәк
 🪻	гиацинт	гиацинт лаванда львиный зев люпин цветок hyacinth bluebonnet flower lavender lupine snapdragon
-🌱	росток	росток молодое растение молодой новое растение новый растение seedling young
+🌱	росток	росток молодое растение молодой новое растение новый растение seedling young үсемлек яз яшел үсү
 🪴	растение в горшке	растение в горшке горшок домашнее растение растение растение в доме цветок в горшке potted plant boring grow house nurturing plant useless
-🌲	елка	елка вечнозеленое дерево дерево ель evergreen tree tree
-🌳	дерево	дерево зеленое растение deciduous tree deciduous shedding tree
+🌲	елка	елка вечнозеленое дерево дерево ель evergreen tree tree нарат урман кыш
+🌳	дерево	дерево зеленое растение deciduous tree deciduous shedding tree агач урман җәй
 🌴	пальма	пальма дерево palm tree palm tree
 🌵	кактус	кактус зеленое колючки растение cactus plant
 🌾	колос	колос зерно рис sheaf of rice ear grain rice
 🌿	веточка	веточка трава herb leaf
 ☘️	трилистник	трилистник ирландия клевер растение shamrock plant
 🍀	четырехлистный клевер	четырехлистный клевер клевер удача четыре four leaf clover 4 clover four four-leaf clover leaf
-🍁	кленовый лист	кленовый лист клен красный лист осень maple leaf falling leaf maple
+🍁	кленовый лист	кленовый лист клен красный лист осень maple leaf falling leaf maple яфрак көз сары
 🍂	падающие листья	падающие листья листья осень fallen leaf falling leaf
 🍃	листья на ветру	листья на ветру ветер листья leaf fluttering in wind blow flutter leaf wind
 🪹	пустое гнездо	пустое гнездо гнездо гнездование птицы пусто empty nest nesting
 🪺	гнездо с яйцами	гнездо с яйцами гнездо гнездование птицы яйца nest with eggs nesting
-🍄	гриб	гриб мухомор несъедобный поганка растение ядовитый mushroom toadstool
-🍇	виноград	виноград виноградина сок фрукт grapes fruit grape
+🍄	гриб	гриб мухомор несъедобный поганка растение ядовитый mushroom toadstool гөмбә урман көз
+🍇	виноград	виноград виноградина сок фрукт grapes fruit grape йөзем җимеш җәй
 🍈	дыня	дыня растение фрукт ягода melon fruit
-🍉	арбуз	арбуз растение фрукт ягода watermelon fruit
-🍊	мандарин	мандарин апельсин клементин фрукт цитрус цитрусовый tangerine fruit orange
-🍋	лимон	лимон фрукт цитрус цитрусовый lemon citrus fruit
-🍌	банан	банан фрукт banana fruit
+🍉	арбуз	арбуз растение фрукт ягода watermelon fruit карбыз җәй тәмле
+🍊	мандарин	мандарин апельсин клементин фрукт цитрус цитрусовый tangerine fruit orange кызгылт җимеш
+🍋	лимон	лимон фрукт цитрус цитрусовый lemon citrus fruit сары әче
+🍌	банан	банан фрукт banana fruit сары җимеш
 🍍	ананас	ананас фрукт pineapple fruit
 🥭	манго	манго тропики тропический фрукт фрукт mango fruit tropical
-🍎	красное яблоко	красное яблоко красное фрукт яблоко red apple apple fruit red
+🍎	красное яблоко	красное яблоко красное фрукт яблоко red apple apple fruit red алма кызыл җимеш
 🍏	зеленое яблоко	зеленое яблоко зеленое фрукт яблоко green apple apple fruit green
 🍐	груша	груша фрукт pear fruit
-🍑	персик	персик нектарин фрукт peach fruit
-🍒	вишня	вишня вишни фрукт черешни черешня cherries berries cherry fruit red
-🍓	клубника	клубника земляника ягода strawberry berry fruit
+🍑	персик	персик нектарин фрукт peach fruit шәфтәле җимеш җәй
+🍒	вишня	вишня вишни фрукт черешни черешня cherries berries cherry fruit red чия җиләк җәй
+🍓	клубника	клубника земляника ягода strawberry berry fruit җиләк җәй тәмле
 🫐	голубика	голубика голубой черника ягода blueberries berry bilberry blue blueberry
 🥝	киви	киви еда фрукт kiwi fruit food fruit kiwi
-🍅	помидор	помидор овощ томат ягода tomato fruit vegetable
+🍅	помидор	помидор овощ томат ягода tomato fruit vegetable кызыл яшелчә
 🫒	оливка	оливка еда маслина олива olive food
 🥥	кокос	кокос кокосы орех пальма пина колада coconut palm piña colada
 🥑	авокадо	авокадо еда фрукт avocado food fruit
 🍆	баклажан	баклажан овощ синенькие синенький eggplant aubergine vegetable
-🥔	картофель	картофель еда овощ potato food vegetable
-🥕	морковь	морковь еда морковка овощ carrot food vegetable
+🥔	картофель	картофель еда овощ potato food vegetable бәрәңге яшелчә казан
+🥕	морковь	морковь еда морковка овощ carrot food vegetable кишер яшелчә куян
 🌽	кукурузный початок	кукурузный початок кукуруза початок ear of corn corn ear maize maze
 🌶️	острый перец	острый перец красный острый перец растение hot pepper hot pepper
 🫑	болгарский перец	болгарский перец овощ перец растение сладкий bell pepper capsicum pepper vegetable
@@ -498,7 +498,7 @@
 🌰	каштан	каштан растение chestnut plant
 🫚	корень имбиря	корень имбиря имбирь корень специя ginger root beer root spice
 🫛	стручок гороха	стручок гороха бобовые бобы горох овощ стручок эдамамэ pea pod beans edamame legume pea pod vegetable
-🍞	хлеб	хлеб батон буханка bread loaf
+🍞	хлеб	хлеб батон буханка bread loaf икмәк ипи аш
 🥐	круассан	круассан еда рогалик французский хлеб croissant bread breakfast food french roll
 🥖	багет	багет еда французский хлеб baguette bread baguette bread food french
 🫓	лепешка	лепешка лаваш наан пита flatbread arepa lavash naan pita
@@ -508,12 +508,12 @@
 🧇	вафля	вафля вафельный вафли десерт waffle breakfast indecisive iron
 🧀	сыр	сыр дырки желтый кусок cheese wedge cheese
 🍖	мясо на косточке	мясо на косточке кость мясо meat on bone bone meat
-🍗	куриная ножка	куриная ножка кость курица нога окорочок птица poultry leg bone chicken drumstick leg poultry
+🍗	куриная ножка	куриная ножка кость курица нога окорочок птица poultry leg bone chicken drumstick leg poultry тавык ит аш
 🥩	кусок мяса	кусок мяса кусок мясо отбивная стейк cut of meat chop lambchop porkchop steak
 🥓	бекон	бекон еда мясо bacon breakfast food meat
 🍔	гамбургер	гамбургер бургер бутерброд сэндвич фастфуд hamburger burger
 🍟	картофель фри	картофель фри картофель картошка фастфуд фри french fries french fries
-🍕	пицца	пицца кусок кусок пиццы сыр pizza cheese slice
+🍕	пицца	пицца кусок кусок пиццы сыр pizza cheese slice тәмле
 🌭	хот-дог	хот-дог сосиска тесто hot dog frankfurter hotdog sausage
 🥪	сэндвич	сэндвич бутерброд хлеб sandwich bread
 🌮	тако	тако кухня мексика мексиканская кухня taco mexican
@@ -522,13 +522,13 @@
 🥙	шаурма	шаурма еда кебаб лаваш пита фалафель шаверма stuffed flatbread falafel flatbread food gyro kebab stuffed
 🧆	фалафель	фалафель бобовый бобы горох гороховый нут шарик falafel chickpea meatball
 🥚	яйцо	яйцо еда egg breakfast food
-🍳	яичница на сковороде	яичница на сковороде глазунья желток сковорода яичница яйцо cooking breakfast egg frying pan
+🍳	яичница на сковороде	яичница на сковороде глазунья желток сковорода яичница яйцо cooking breakfast egg frying pan йомырка иртә аш
 🥘	рагу в сковороде	рагу в сковороде еда паэлья рагу сковорода shallow pan of food casserole food paella pan shallow
 🍲	кастрюля с горячей едой	кастрюля с горячей едой горячая еда горячее кастрюля тарелка с горячей едой pot of food pot stew
 🫕	фондю	фондю какелон плавленый сыр швейцарский шоколад fondue cheese chocolate melted pot swiss
 🥣	миска с ложкой	миска с ложкой гранола завтрак мюсли овсяные хлопья bowl with spoon breakfast cereal congee
-🥗	овощной салат	овощной салат еда овощи салат green salad food green salad
-🍿	попкорн	попкорн кукуруза стакан popcorn
+🥗	овощной салат	овощной салат еда овощи салат green salad food green salad яшелчә сәламәтлек
+🍿	попкорн	попкорн кукуруза стакан popcorn кино тәмле
 🧈	масло	масло масленка масляный молокопродукты молочный сливки сливочное butter dairy
 🧂	солонка	солонка морская соль соль salt condiment shaker
 🥫	консервы	консервы банка жестянка консервная банка canned food can
@@ -537,11 +537,11 @@
 🍙	онигири	онигири рис шарик япония rice ball ball japanese rice
 🍚	рис	рис вареный миска плошка тарелка чашка cooked rice cooked rice
 🍛	рис с карри	рис с карри карри рис curry rice curry rice
-🍜	лапша	лапша миска пар чашка steaming bowl bowl noodle ramen steaming
+🍜	лапша	лапша миска пар чашка steaming bowl bowl noodle ramen steaming аш кайнар
 🍝	спагетти	спагетти вермишель макароны паста spaghetti pasta
 🍠	печеный сладкий картофель	печеный сладкий картофель батат картошка сладкий картофель roasted sweet potato potato roasted sweet
 🍢	одэн	одэн закуска на палочке шашлык oden kebab seafood skewer stick
-🍣	суши	суши кухня япония sushi
+🍣	суши	суши кухня япония sushi балык дөге
 🍤	жареная креветка	жареная креветка креветки темпура fried shrimp fried prawn shrimp tempura
 🍥	камабоко	камабоко начинка рыба сурими fish cake with swirl cake fish pastry swirl
 🥮	лунный пирог	лунный пирог лунный пряник осень фестиваль юэбин moon cake autumn festival yuèbǐng
@@ -554,27 +554,27 @@
 🦐	креветка	креветка еда маленькая морепродукты shrimp food shellfish small
 🦑	кальмар	кальмар еда моллюск squid food molusc
 🦪	устрица	устрица жемчуг жемчужина раковина ракушка устричный oyster diving pearl
-🍦	мороженое в стаканчике	мороженое в стаканчике вафельный стаканчик вафля мороженое мягкое мороженое soft ice cream cream dessert ice icecream soft sweet
+🍦	мороженое в стаканчике	мороженое в стаканчике вафельный стаканчик вафля мороженое мягкое мороженое soft ice cream cream dessert ice icecream soft sweet туңдырма тәмле җәй салкын
 🍧	мороженое в креманке	мороженое в креманке десерт креманка мороженое строганый лед shaved ice dessert ice shaved sweet
 🍨	мороженое	мороженое десерт сладкое холодное ice cream cream dessert ice sweet
 🍩	пончик	пончик глазурь пирожок сладкое doughnut breakfast dessert donut sweet
-🍪	печенье	печенье выпечка сладкое cookie dessert sweet
-🎂	торт ко дню рождения	торт ко дню рождения выпечка день рождения пирог свечки сладкое торт birthday cake birthday cake celebration dessert pastry sweet
-🍰	кусочек торта	кусочек торта выпечка крем сладкая торт shortcake cake dessert pastry slice sweet
+🍪	печенье	печенье выпечка сладкое cookie dessert sweet татлы чәй
+🎂	торт ко дню рождения	торт ко дню рождения выпечка день рождения пирог свечки сладкое торт birthday cake birthday cake celebration dessert pastry sweet туган көн бәйрәм
+🍰	кусочек торта	кусочек торта выпечка крем сладкая торт shortcake cake dessert pastry slice sweet татлы бәйрәм
 🧁	капкейк	капкейк выпечка кекс cupcake bakery sweet
 🥧	пирог	пирог выпечка сдоба торт pie filling pastry
-🍫	шоколад	шоколад плитка шоколада шоколадка chocolate bar bar chocolate dessert sweet
-🍬	конфета	конфета обертка сладость фантик candy dessert sweet
-🍭	леденец	леденец конфета конфета на палочке леденец на палочке палочка сладкий сладость lollipop candy dessert sweet
+🍫	шоколад	шоколад плитка шоколада шоколадка chocolate bar bar chocolate dessert sweet татлы
+🍬	конфета	конфета обертка сладость фантик candy dessert sweet кәмпит татлы шикәр
+🍭	леденец	леденец конфета конфета на палочке леденец на палочке палочка сладкий сладость lollipop candy dessert sweet кәмпит татлы таяк
 🍮	пудинг	пудинг десерт сладкий custard dessert pudding sweet
-🍯	мед	мед бочонок бочонок меда горшок горшок с медом honey pot honey honeypot pot sweet
+🍯	мед	мед бочонок бочонок меда горшок горшок с медом honey pot honey honeypot pot sweet бал татлы бал корты
 🍼	бутылочка с соской	бутылочка с соской бутылка дети молоко соска baby bottle baby bottle drink milk
-🥛	стакан молока	стакан молока молоко напиток стакан glass of milk drink glass milk
-☕	горячий напиток	горячий напиток горячий кофе напиток пар чай hot beverage beverage coffee drink hot steaming tea
+🥛	стакан молока	стакан молока молоко напиток стакан glass of milk drink glass milk сөт аш ак
+☕	горячий напиток	горячий напиток горячий кофе напиток пар чай hot beverage beverage coffee drink hot steaming tea чәй кайнар иртә
 🫖	чайник	чайник заварка заварочный чайник напиток чай teapot drink pot tea
-🍵	чашка без ручки	чашка без ручки зеленый чай чашка чашка зеленого чая чашка чая teacup without handle beverage cup drink tea teacup
+🍵	чашка без ручки	чашка без ручки зеленый чай чашка чашка зеленого чая чашка чая teacup without handle beverage cup drink tea teacup чәй кайнар кунак
 🍶	бутылка саке	бутылка саке водка горячее саке япония sake bar beverage bottle cup drink
-🍾	шампанское	шампанское бутылка вино игристое пробка bottle with popping cork bar bottle cork drink popping
+🍾	шампанское	шампанское бутылка вино игристое пробка bottle with popping cork bar bottle cork drink popping шампанский бәйрәм яңа ел
 🍷	бокал вина	бокал вина бокал вино wine glass bar beverage drink glass wine
 🍸	коктейль	коктейль бар бокал напиток cocktail glass bar cocktail drink glass
 🍹	тропический коктейль	тропический коктейль зонтик напиток прохладительный соломинка тропики tropical drink bar drink tropical
@@ -620,17 +620,17 @@
 🛖	хижина	хижина дом юрта hut house roundhouse yurt
 🏘️	дома	дома здания много много домов много зданий houses
 🏚️	заброшенный дом	заброшенный дом дом заброшенный упадок derelict house derelict house
-🏠	дом	дом здание крыша стены house home
-🏡	дом с садом	дом с садом дом крыша сад стены house with garden garden home house
+🏠	дом	дом здание крыша стены house home өй йорт туган як
+🏡	дом с садом	дом с садом дом крыша сад стены house with garden garden home house өй йорт авыл бакча
 🏢	офисное здание	офисное здание бизнес-центр здание офис office building building
 🏣	японская почта	японская почта здание почта япония japanese post office japanese post
 🏤	почта	почта европа здание post office european post
-🏥	больница	больница больные врачи здание поликлиника стационар хоспис hospital doctor medicine
+🏥	больница	больница больные врачи здание поликлиника стационар хоспис hospital doctor medicine хастаханә табиб авыру
 🏦	банк	банк деньги здание bank building
 🏨	гостиница	гостиница здание отель хостел hotel building
 🏩	гостиница для свиданий	гостиница для свиданий гостиница здание на час отель свидания love hotel hotel love
 🏪	круглосуточный магазин	круглосуточный магазин 24 часа здание магазин покупки сутки convenience store convenience store
-🏫	школа	школа здание обучение учебное заведение school building
+🏫	школа	школа здание обучение учебное заведение school building мәктәп уку бала
 🏬	универмаг	универмаг магазин супермаркет торговый центр универсам department store department store
 🏭	завод	завод предприятие промышленность фабрика factory building
 🏯	японский замок	японский замок замок здание япония japanese castle castle japanese
@@ -639,7 +639,7 @@
 🗼	токийская башня	токийская башня башня вышка телебашня телевышка токио tokyo tower tokyo tower
 🗽	статуя свободы	статуя свободы нью-йорк свобода статуя факел statue of liberty liberty statue
 ⛪	церковь	церковь здание религия христианство church christian cross religion
-🕌	мечеть	мечеть здание ислам мусульмане религия mosque islam muslim religion
+🕌	мечеть	мечеть здание ислам мусульмане религия mosque islam muslim religion мәчет дин намаз
 🛕	индуистский храм	индуистский храм ашрам индийский индуизм храм церковь hindu temple hindu temple
 🕍	синагога	синагога евреи здание иудаизм религия synagogue jew jewish religion temple
 ⛩️	синтоистский храм	синтоистский храм дзиндзя синтоизм храм shinto shrine religion shinto shrine
@@ -661,7 +661,7 @@
 🎢	американские горки	американские горки американские горки roller coaster amusement park coaster roller theme park
 💈	парикмахерская	парикмахерская волосы салон стрижка цирюльник barber pole barber haircut pole
 🎪	цирковой шатер	цирковой шатер цирк шатер circus tent circus tent
-🚂	паровоз	паровоз вагон локомотив поезд locomotive engine railway steam train
+🚂	паровоз	паровоз вагон локомотив поезд locomotive engine railway steam train юл сәяхәт тимер юл
 🚃	вагон	вагон поезд трамвай транспорт фуникулер railway car car electric railway train tram trolleybus
 🚄	скоростной поезд	скоростной поезд дорога железная поезд скорость high-speed train railway shinkansen speed train
 🚅	поезд-пуля	поезд-пуля поезд пуля синкансэн скорость bullet train bullet railway shinkansen speed train
@@ -673,17 +673,17 @@
 🚝	монорельс	монорельс легкое метро метро рельсы monorail vehicle
 🚞	поезд в горах	поезд в горах горы железная дорога поезд транспорт mountain railway car mountain railway
 🚋	трамвайный вагон	трамвайный вагон вагон рельсы трамвай электричество tram car car tram trolleybus
-🚌	автобус	автобус транспорт bus vehicle
+🚌	автобус	автобус транспорт bus vehicle юл шәһәр
 🚍	автобус спереди	автобус спереди автобус лобовое стекло приближающийся автобус oncoming bus bus oncoming
 🚎	троллейбус	троллейбус дорога провода транспорт электричество trolleybus bus tram trolley
 🚐	микроавтобус	микроавтобус газель маршрутка minibus bus
-🚑	машина скорой помощи	машина скорой помощи больница врачи машина помощь скорая помощь ambulance vehicle
-🚒	пожарная машина	пожарная машина машина пожарная пожарные fire engine engine fire truck
+🚑	машина скорой помощи	машина скорой помощи больница врачи машина помощь скорая помощь ambulance vehicle ашыгыч ярдәм авыру
+🚒	пожарная машина	пожарная машина машина пожарная пожарные fire engine engine fire truck ут сүндерү янгын
 🚓	полицейская машина	полицейская машина машина полицейские полиция police car car patrol police
 🚔	полицейская машина спереди	полицейская машина спереди лобовое стекло машина полицейская машина полицейские полиция приближающаяся полицейская машина oncoming police car car oncoming police
 🚕	такси	такси машина транспорт taxi vehicle
 🚖	такси спереди	такси спереди машина приближающееся такси такси транспорт oncoming taxi oncoming taxi
-🚗	автомобиль	автомобиль машина транспорт automobile car
+🚗	автомобиль	автомобиль машина транспорт automobile car юл сәяхәт
 🚘	автомобиль спереди	автомобиль спереди автомобиль машина машина спереди приближающаяся машина приближающийся автомобиль транспорт oncoming automobile automobile car oncoming
 🚙	джип	джип suv автомобиль отдых фургон sport utility vehicle recreational sport utility
 🛻	пикап	пикап автомобиль грузовик машина pickup truck pick-up pickup truck
@@ -696,7 +696,7 @@
 🦽	кресло-коляска с ручным приводом	кресло-коляска с ручным приводом инвалид коляска кресло ручной транспорт manual wheelchair accessibility
 🦼	кресло-коляска с мотором	кресло-коляска с мотором инвалид кресло кресло-коляска транспорт электропривод motorized wheelchair accessibility
 🛺	авторикша	авторикша мопед рикша такси тук-тук туктук auto rickshaw tuk tuk
-🚲	велосипед	велосипед колеса руль транспорт bicycle bike
+🚲	велосипед	велосипед колеса руль транспорт bicycle bike юл спорт
 🛴	самокат	самокат колеса руль транспорт kick scooter kick scooter
 🛹	скейтборд	скейтборд доска доска с колесиками доска с роликами скейт skateboard board
 🛼	роликовые коньки	роликовые коньки коньки ролики roller skate roller skate
@@ -720,7 +720,7 @@
 ⛴️	паром	паром перевозки транспорт ferry boat passenger
 🛥️	моторная лодка	моторная лодка вода двигатель лодка мотор моторка motor boat boat motorboat
 🚢	корабль	корабль пароход перевозки судно ship boat passenger
-✈️	самолет	самолет воздух крылья перевозки airplane aeroplane
+✈️	самолет	самолет воздух крылья перевозки airplane aeroplane очкыч сәяхәт һава очу
 🛩️	маленький самолет	маленький самолет воздух крылья маленький перевозки самолет small airplane aeroplane airplane
 🛫	взлет	взлет отправление посадка регистрация самолет airplane departure aeroplane airplane check-in departure departures
 🛬	посадка	посадка прибытие садится самолет airplane arrival aeroplane airplane arrivals arriving landing
@@ -731,14 +731,14 @@
 🚠	вагон фуникулера	вагон фуникулера вагон кабинка подъемник фуникулер mountain cableway cable gondola mountain
 🚡	канатная дорога	канатная дорога дорога канат подвесная дорога подъемник трамвай тросы aerial tramway aerial cable car gondola tramway
 🛰️	спутник	спутник космос satellite space
-🚀	ракета	ракета космос rocket space
+🚀	ракета	ракета космос rocket space галәм очу
 🛸	летающая тарелка	летающая тарелка инопланетяне нло тарелка flying saucer ufo
 🛎️	гостиничный звонок	гостиничный звонок гостиница звук отель портье bellhop bell bell bellhop hotel
 🧳	багаж	багаж путешествие чемодан luggage packing travel
 ⌛	песочные часы	песочные часы время песок часы hourglass done sand timer
 ⏳	время пошло	время пошло время песок песочные часы часы hourglass not done hourglass sand timer
 ⌚	наручные часы	наручные часы время запястье наручные рука часы watch clock
-⏰	будильник	будильник время звенит сигнал alarm clock alarm clock
+⏰	будильник	будильник время звенит сигнал alarm clock alarm clock уяну сәгать иртә
 ⏱️	секундомер	секундомер кнопка стрелки точность stopwatch clock
 ⏲️	таймер	таймер отсчет сигнал часы timer clock clock timer
 🕰️	каминные часы	каминные часы время камин украшение часы mantelpiece clock clock
@@ -774,53 +774,53 @@
 🌖	убывающая луна	убывающая луна луна месяц небо убывающая waning gibbous moon gibbous moon waning
 🌗	луна в последней четверти	луна в последней четверти луна месяц небо четверть last quarter moon moon quarter
 🌘	старая луна	старая луна луна месяц небо старая убывающая waning crescent moon crescent moon waning
-🌙	полумесяц	полумесяц луна месяц crescent moon crescent moon
+🌙	полумесяц	полумесяц луна месяц crescent moon crescent moon ай төн йокы
 🌚	новая луна с лицом	новая луна с лицом луна с лицом новая луна новолуние темная луна new moon face face moon
 🌛	луна в первой четверти с лицом	луна в первой четверти с лицом лицо луна месяц небо четверть first quarter moon face face moon quarter
 🌜	луна в последней четверти с лицом	луна в последней четверти с лицом лицо луна месяц небо четверть last quarter moon face face moon quarter
 🌡️	термометр	термометр градусник измерение температура thermometer weather
-☀️	солнце	солнце жарко лучи планета погода sun bright rays sunny
+☀️	солнце	солнце жарко лучи планета погода sun bright rays sunny кояш җәй эссе нур
 🌝	полная луна с лицом	полная луна с лицом круглая круглая луна лицо месяц небо полная луна full moon face bright face full moon
 🌞	солнце с лицом	солнце с лицом лицо небо солнце sun with face bright face sun
 🪐	планета с кольцом	планета с кольцом кольца кольцо космос планета сатурн ringed planet saturn saturnine
-⭐	желтая звезда	желтая звезда желтая звезда star
+⭐	желтая звезда	желтая звезда желтая звезда star йолдыз күк төн
 🌟	сияющая звезда	сияющая звезда звезда свет сияние glowing star glittery glow shining sparkle star
 🌠	падающая звезда	падающая звезда желание звезда небо падающая shooting star falling shooting star
 🌌	млечный путь	млечный путь космос молоко путь milky way space
-☁️	облако	облако небо туча cloud weather
+☁️	облако	облако небо туча cloud weather болыт күк яңгыр
 ⛅	солнце за облаками	солнце за облаками облака облачно солнце sun behind cloud cloud sun
 ⛈️	гроза	гроза гром дождь молния облако туча cloud with lightning and rain cloud rain thunder
 🌤️	солнце за облачком	солнце за облачком облако облачко солнце туча sun behind small cloud cloud sun
 🌥️	солнце за облаком	солнце за облаком облако солнце туча sun behind large cloud cloud sun
 🌦️	слепой дождь	слепой дождь грибной дождь дождь облако осадки солнце туча sun behind rain cloud cloud rain sun
-🌧️	дождь	дождь осадки туча cloud with rain cloud rain
+🌧️	дождь	дождь осадки туча cloud with rain cloud rain яңгыр болыт көз
 🌨️	снег	снег осадки туча cloud with snow cloud cold snow
 🌩️	молния	молния гром облако туча cloud with lightning cloud lightning
 🌪️	торнадо	торнадо вихрь катастрофа смерч ураган tornado cloud whirlwind
 🌫️	густой туман	густой туман видимость низкая видимость плохая видимость туман fog cloud
 🌬️	дует ветер	дует ветер ветер дует лицо wind face blow cloud face wind
 🌀	циклон	циклон завихрение тайфун cyclone dizzy hurricane twister typhoon
-🌈	радуга	радуга дождь осадки цвета rainbow rain
+🌈	радуга	радуга дождь осадки цвета rainbow rain салават күпере яңгыр төсләр
 🌂	закрытый зонт	закрытый зонт дождь зонт зонтик осадки closed umbrella clothing rain umbrella
 ☂️	зонт	зонт вода дождь зонтик осадки открытый зонт погода umbrella clothing rain
 ☔	зонт под дождем	зонт под дождем зонт зонтик зонтик под дождем капли umbrella with rain drops clothing drop rain umbrella
 ⛱️	пляжный зонт	пляжный зонт дождь защита зонт зонтик пляж солнце umbrella on ground rain sun umbrella
-⚡	высокое напряжение	высокое напряжение молния напряжение опасность электричество high voltage danger electric lightning voltage zap
-❄️	снежинка	снежинка небо рисунок снег холод snowflake cold snow
+⚡	высокое напряжение	высокое напряжение молния напряжение опасность электричество high voltage danger electric lightning voltage zap яшен электр тиз
+❄️	снежинка	снежинка небо рисунок снег холод snowflake cold snow кар кыш салкын кар бөртеге
 ☃️	снеговик под снегом	снеговик под снегом снег снеговик фигура человек человечек snowman cold snow
-⛄	снеговик	снеговик снег фигура человек человечек snowman without snow cold snow snowman
+⛄	снеговик	снеговик снег фигура человек человечек snowman without snow cold snow snowman кар бабасы кыш кар уен
 ☄️	комета	комета космос небо comet space
-🔥	огонь	огонь костер очаг пламя fire flame tool
+🔥	огонь	огонь костер очаг пламя fire flame tool ут кайнар яндыру кызык
 💧	капля	капля вода пот droplet cold comic drop sweat
-🌊	волна	волна вода море океан water wave ocean water wave
+🌊	волна	волна вода море океан water wave ocean water wave диңгез дулкын су җәй
 🎃	тыква-фонарь	тыква-фонарь праздник тыква фонарь из тыквы хеллоуин jack-o-lantern celebration halloween jack lantern
 🎄	новогодняя елка	новогодняя елка елка новый год праздник рождество christmas tree celebration christmas tree
 🎆	фейерверк	фейерверк пиротехника праздник салют свет шум fireworks celebration
 🎇	бенгальский огонь	бенгальский огонь искры огонь праздник sparkler celebration fireworks sparkle
 🧨	динамитная шашка	динамитная шашка взрыв динамит фейерверк шашка firecracker dynamite explosive fireworks
-✨	блестки	блестки блестка звезда звезды искры мерцание свет sparkles * sparkle star
+✨	блестки	блестки блестка звезда звезды искры мерцание свет sparkles * sparkle star ялтырау йолдызчыклар
 🎈	воздушный шарик	воздушный шарик веревочка воздух воздушный праздник шарик balloon celebration
-🎉	хлопушка	хлопушка бабах вечеринка праздник party popper celebration party popper tada
+🎉	хлопушка	хлопушка бабах вечеринка праздник party popper celebration party popper tada бәйрәм куаныч салют
 🎊	конфетти	конфетти вечеринка праздник confetti ball ball celebration confetti
 🎋	бамбук с бумажными лентами	бамбук с бумажными лентами бамбук бумага дерево танабата tanabata tree banner celebration japanese tree
 🎍	украшенный бамбук	украшенный бамбук бамбук новый год растение рождество сосна япония pine decoration bamboo celebration japanese pine
@@ -830,20 +830,20 @@
 🎑	праздник луны	праздник луны луна праздник церемония moon viewing ceremony celebration ceremony moon
 🧧	красный конверт	красный конверт деньги конверт красный подарок удача red envelope gift good luck hóngbāo lai see money
 🎀	бантик	бантик бант волосы одежда праздник ribbon celebration
-🎁	подарок	подарок бантик дарить коробка праздник wrapped gift box celebration gift present wrapped
+🎁	подарок	подарок бантик дарить коробка праздник wrapped gift box celebration gift present wrapped бүләк сюрприз төргәк
 🎗️	памятная лента	памятная лента лента память reminder ribbon celebration reminder ribbon
 🎟️	билеты	билеты билет вход концерт театр admission tickets admission ticket
 🎫	билет	билет билетик пропуск самолет транспорт ticket admission
 🎖️	военная медаль	военная медаль война заслуги медаль одежда military medal celebration medal military
-🏆	кубок	кубок приз трофей trophy prize
+🏆	кубок	кубок приз трофей trophy prize җиңү чемпион бүләк
 🏅	спортивная медаль	спортивная медаль достижение медаль место победа спорт sports medal medal
-🥇	золотая медаль	золотая медаль золото медаль первое место победа чемпион 1st place medal first gold medal
+🥇	золотая медаль	золотая медаль золото медаль первое место победа чемпион 1st place medal first gold medal беренче җиңү
 🥈	серебряная медаль	серебряная медаль второе место медаль серебро 2nd place medal medal second silver
 🥉	бронзовая медаль	бронзовая медаль бронза медаль третье место 3rd place medal bronze medal third
-⚽	футбол	футбол игра мяч спорт футбольный soccer ball ball football soccer
+⚽	футбол	футбол игра мяч спорт футбольный soccer ball ball football soccer уен туп
 ⚾	бейсбол	бейсбол бейсбольный игра мяч спорт baseball ball
 🥎	софтбол	софтбол зажать мягкий мяч нести перчатка softball ball glove underarm
-🏀	баскетбол	баскетбол баскетбольный игра мяч спорт basketball ball hoop
+🏀	баскетбол	баскетбол баскетбольный игра мяч спорт basketball ball hoop туп уен
 🏐	волейбол	волейбол волейбольный игра мяч спорт volleyball ball game
 🏈	американский футбол	американский футбол американский игра мяч спорт футбол american football american ball football
 🏉	регби	регби игра мяч спорт rugby football ball football rugby
@@ -861,23 +861,23 @@
 🥅	спортивные ворота	спортивные ворота ворота гол спорт goal net goal net
 ⛳	гольф	гольф игра лунка поле спорт флажок flag in hole golf hole
 ⛸️	коньки	коньки ботинок катание лед лезвие скорость фигурное катание ice skate ice skate
-🎣	удочка с рыбой	удочка с рыбой крючок леска наживка рыба рыбалка удочка fishing pole fish pole
+🎣	удочка с рыбой	удочка с рыбой крючок леска наживка рыба рыбалка удочка fishing pole fish pole балык тоту елга ял
 🤿	маска с трубкой	маска с трубкой дайвинг маска нырять подводная подводный трубка diving mask diving scuba snorkeling
 🎽	футболка для бега	футболка для бега атлетика бег спорт футболка running shirt athletics running sash shirt
-🎿	лыжи	лыжи горные лыжи горы склон снег спорт трасса skis ski snow
+🎿	лыжи	лыжи горные лыжи горы склон снег спорт трасса skis ski snow чаңгы кар кыш
 🛷	санки	санки гора катание сани снег спуск sled sledge sleigh
 🥌	керлинг	керлинг игра камень лед спорт щетка curling stone game rock
-🎯	мишень	мишень дартс доска дротик попадание bullseye dart direct hit game hit target
+🎯	мишень	мишень дартс доска дротик попадание bullseye dart direct hit game hit target максат уен төгәл
 🪀	йо-йо	йо-йо игрушка йойо yo-yo fluctuate toy
 🪁	воздушный змей	воздушный змей ветер змей летать парить kite fly soar
 🔫	водяной пистолет	водяной пистолет игрушка оружие пистолет water pistol gun handgun pistol revolver tool water weapon
 🎱	бильярд	бильярд 8 восьмерка черный шар шар pool 8 ball ball billiard eight game
 🔮	хрустальный шар	хрустальный шар волшебство гадание магия предсказание хрусталь шар crystal ball ball crystal fairy tale fantasy fortune tool
 🪄	волшебная палочка	волшебная палочка волшебник волшебство колдунья magic wand magic witch wizard
-🎮	видеоигры	видеоигры playstation игры компьютер приставка video game controller game
+🎮	видеоигры	видеоигры playstation игры компьютер приставка video game controller game уен джойстик
 🕹️	джойстик	джойстик видеоигра игровая приставка игры компьютер приставка joystick game video game
 🎰	игровой автомат	игровой автомат автомат азарт деньги казино slot machine game slot
-🎲	игральная кость	игральная кость игра кости кубик кубики game die dice die game
+🎲	игральная кость	игральная кость игра кости кубик кубики game die dice die game уен зар бәхет
 🧩	пазл	пазл головоломка кусочек кусочек пазла мозаика puzzle piece clue interlocking jigsaw piece puzzle
 🧸	плюшевый мишка	плюшевый мишка игрушка мишка мягкая игрушка плюшевая игрушка teddy bear plaything plush stuffed toy
 🪅	пиньята	пиньята вечеринка праздник piñata celebration party
@@ -943,7 +943,7 @@
 ⛑️	каска с белым крестом	каска с белым крестом головной убор крест лицо спасатель шлем rescue worker’s helmet aid cross face hat helmet
 📿	четки	четки бусы молитва ожерелье религия prayer beads beads clothing necklace prayer religion
 💄	помада	помада губы косметика макияж lipstick cosmetics makeup
-💍	кольцо	кольцо бриллиант драгоценный камень обручальное помолвка свадьба ring diamond
+💍	кольцо	кольцо бриллиант драгоценный камень обручальное помолвка свадьба ring diamond боҗра туй алтын
 💎	драгоценный камень	драгоценный камень алмаз драгоценность камень цена gem stone diamond gem jewel
 🔇	без звука	без звука громкость звук молчание тихо тишина muted speaker mute quiet silent speaker
 🔈	низкая громкость	низкая громкость громкость динамик звук низкая уровень speaker low volume soft
@@ -952,16 +952,16 @@
 📢	громкоговоритель	громкоговоритель звук обращение объявление рупор loudspeaker loud public address
 📣	мегафон	мегафон громкоговоритель звук обращение объявление рупор megaphone cheering
 📯	почтовый рожок	почтовый рожок почта рожок postal horn horn post postal
-🔔	колокольчик	колокольчик будильник звонок колокол bell
+🔔	колокольчик	колокольчик будильник звонок колокол bell кыңгырау тавыш хәбәр
 🔕	перечеркнутый колокольчик	перечеркнутый колокольчик будильник отключен колокол тихо тишина bell with slash bell forbidden mute quiet silent
 🎼	нотный стан	нотный стан ключ музыка ноты скрипичный musical score music score
-🎵	нота	нота звук музыка musical note music note
+🎵	нота	нота звук музыка musical note music note көй җыр тавыш
 🎶	ноты	ноты звуки музыка musical notes music note notes
 🎙️	студийный микрофон	студийный микрофон вокал звук микрофон музыка пение studio microphone mic microphone music studio
 🎚️	слайдер	слайдер музыка уровень level slider level music slider
 🎛️	регуляторы	регуляторы звук музыка регулятор ручка уровень control knobs control knobs music
-🎤	микрофон	микрофон звук караоке пение microphone karaoke mic
-🎧	наушники	наушники вкладыши гарнитура затычки звук капли музыка headphone earbud
+🎤	микрофон	микрофон звук караоке пение microphone karaoke mic җыр җырлау сәхнә
+🎧	наушники	наушники вкладыши гарнитура затычки звук капли музыка headphone earbud җыр колак тынлау
 📻	радио	радио передача приемник сигнал radio video
 🎷	саксофон	саксофон инструмент музыка музыкальный инструмент saxophone instrument music sax
 🪗	аккордеон	аккордеон баян гармонь гармошка концертина accordion concertina squeeze box
@@ -974,7 +974,7 @@
 🪘	конга	конга барабан бит ритм long drum beat conga drum rhythm
 🪇	маракасы	маракасы инструмент музыка перкуссия погремушки ритм трясти maracas instrument music percussion rattle shake
 🪈	флейта	флейта деревянный духовой инструмент дудочка духовой инструмент музыка продольная флейта flute fife music pipe recorder woodwind
-📱	мобильный телефон	мобильный телефон мобильник мобильный смартфон сотовый телефон mobile phone cell mobile phone telephone
+📱	мобильный телефон	мобильный телефон мобильник мобильный смартфон сотовый телефон mobile phone cell mobile phone telephone шалтырату элемтә
 📲	входящий вызов	входящий вызов вызов мобильный телефон смартфон сотовый mobile phone with arrow arrow cell mobile phone receive
 ☎️	телефон	телефон аппарат линия трубка telephone phone
 📞	телефонная трубка	телефонная трубка телефон трубка telephone receiver phone receiver telephone
@@ -983,7 +983,7 @@
 🔋	батарейка	батарейка аккумулятор батарея заряд уровень заряда battery
 🪫	низкий уровень заряда	низкий уровень заряда батарея мало зарядки низкий заряд разрядилась low battery electronic low energy
 🔌	вилка	вилка розетка штекер штепсель электричество electric plug electric electricity plug
-💻	ноутбук	ноутбук компьютер портативный laptop computer pc personal
+💻	ноутбук	ноутбук компьютер портативный laptop computer pc personal санак эш программа
 🖥️	компьютер	компьютер настольный desktop computer computer desktop
 🖨️	принтер	принтер бумага печать printer computer
 ⌨️	клавиатура	клавиатура клавиши периферия keyboard computer
@@ -1003,20 +1003,20 @@
 📸	фотоаппарат со вспышкой	фотоаппарат со вспышкой вспышка съемка фото фотоаппарат фотокамера camera with flash camera flash video
 📹	видеокамера	видеокамера видео запись съемка video camera camera video
 📼	видеокассета	видеокассета видео кассета пленка videocassette tape vhs video
-🔍	лупа, наклоненная влево	лупа, наклоненная влево влево лупа наклоненная влево стекло увеличительное стекло magnifying glass tilted left glass magnifying search tool
+🔍	лупа, наклоненная влево	лупа, наклоненная влево влево лупа наклоненная влево стекло увеличительное стекло magnifying glass tilted left glass magnifying search tool эзләү зурайту
 🔎	лупа, наклоненная вправо	лупа, наклоненная вправо вправо лупа наклоненная вправо стекло увеличительное стекло magnifying glass tilted right glass magnifying search tool
 🕯️	свеча	свеча воск огонь пламя свет свечка тепло candle light
-💡	лампочка	лампочка идея лампа свет эврика электричество light bulb bulb comic electric idea light
+💡	лампочка	лампочка идея лампа свет эврика электричество light bulb bulb comic electric idea light якты
 🔦	фонарик	фонарик свет фонарь электричество flashlight electric light tool torch
 🏮	красный бумажный фонарик	красный бумажный фонарик бумажный фонарик китайский фонарик красный фонарик фонарик red paper lantern bar lantern light red
 🪔	масляная лампа	масляная лампа гореть дия лампа масло свет diya lamp diya lamp oil
 📔	записная книжка	записная книжка блокнот записная книжка красивая обложка notebook with decorative cover book cover decorated notebook
 📕	закрытая книга	закрытая книга закрытая книжка захлопнутая книга захлопнутая книжка обложка closed book book closed
-📖	открытая книга	открытая книга книга открытая книжка раскрытая книга раскрытая книжка open book book open
+📖	открытая книга	открытая книга книга открытая книжка раскрытая книга раскрытая книжка open book book open китап уку мәктәп
 📗	зеленая книга	зеленая книга зеленая книга книжка green book book green
 📘	синяя книга	синяя книга голубая книга голубая книжка книга синяя книжка blue book blue book
 📙	оранжевая книга	оранжевая книга книга книжка оранжевая orange book book orange
-📚	книги	книги книжки много книг стопка стопка книг books book
+📚	книги	книги книжки много книг стопка стопка книг books book китаплар уку китапханә
 📓	тетрадь	тетрадь блокнот записная книжка тетрадка notebook
 📒	блокнот	блокнот блокнотик записная книжка тетрадка тетрадь ledger notebook
 📃	страница с загибом	страница с загибом документ загнутая страница загнутый лист лист с загибом page with curl curl document page
@@ -1027,7 +1027,7 @@
 📑	стикеры-закладки	стикеры-закладки закладки клеящиеся закладки наклейки стикеры bookmark tabs bookmark mark marker tabs
 🔖	закладка	закладка книга книжка отметка bookmark mark
 🏷️	бирка	бирка сведения этикетка ярлык label
-💰	мешок денег	мешок денег банкноты деньги доллар доллары мешок много money bag bag dollar money moneybag
+💰	мешок денег	мешок денег банкноты деньги доллар доллары мешок много money bag bag dollar money moneybag акча байлык
 🪙	монета	монета деньги золото казна металл серебро coin gold metal money silver treasure
 💴	банкнота иены	банкнота иены банкнота валюта деньги иена япония yen banknote banknote bill currency money note yen
 💵	банкнота доллара	банкнота доллара австралия банкнота валюта доллар сша dollar banknote banknote bill currency dollar money note
@@ -1056,12 +1056,12 @@
 🖊️	шариковая ручка	шариковая ручка ручка чернила шарик шариковая pen ballpoint
 🖌️	кисточка	кисточка кисть рисование щетина paintbrush painting
 🖍️	восковой мелок	восковой мелок выделение красный мелки crayon
-📝	заметка	заметка запись карандаш memo pencil
-💼	портфель	портфель бумаги дипломат документы briefcase
+📝	заметка	заметка запись карандаш memo pencil язу кәгазь исемлек
+💼	портфель	портфель бумаги дипломат документы briefcase эш офис эшлекле
 📁	папка	папка бумаги документы файл file folder file folder
 📂	открытая папка	открытая папка бумаги документы открытая папка open file folder file folder open
 🗂️	маркированные папки	маркированные папки карточки оглавление разделители card index dividers card dividers index
-📅	календарь	календарь даты числа calendar date
+📅	календарь	календарь даты числа calendar date тәкъвим көн план
 📆	отрывной календарь	отрывной календарь календарь листы отрывной tear-off calendar calendar
 🗒️	перекидной блокнот	перекидной блокнот блокнот листы откидной пружина spiral notepad note pad spiral
 🗓️	перекидной календарь	перекидной календарь календарь листы перекидной пружина spiral calendar calendar pad spiral
@@ -1084,7 +1084,7 @@
 🔓	открытый замок	открытый замок замок затвор открытый unlocked lock open unlock
 🔏	закрытый замок с перьевой ручкой	закрытый замок с перьевой ручкой закрытый замок защита перьевая ручка перьевой наконечник locked with pen ink lock nib pen privacy
 🔐	закрытый замок с ключом	закрытый замок с ключом безопасность закрытый замок ключ locked with key closed key lock secure
-🔑	ключ	ключ пароль key lock password
+🔑	ключ	ключ пароль key lock password ачкыч йозак өй
 🗝️	старинный ключ	старинный ключ замок ключ старинный старый old key clue key lock old
 🔨	молоток	молоток инструмент молот удар hammer tool
 🪓	топор	топор дрова дровосек рубить рубка axe chop hatchet split wood
@@ -1268,10 +1268,10 @@
 ♾️	бесконечность	бесконечность знак бесконечности навсегда постоянно infinity forever unbounded universal
 ‼️	два восклицательных знака	два восклицательных знака восклицание восклицательные восклицательный знак знаки пунктуация double exclamation mark ! !! bangbang exclamation mark
 ⁉️	восклицательный и вопросительный знаки	восклицательный и вопросительный знаки вопрос восклицание знак пунктуация exclamation question mark ! !? ? exclamation interrobang mark punctuation question
-❓	красный вопросительный знак	красный вопросительный знак вопрос вопросительный знак знак красный пунктуация red question mark ? mark punctuation question
+❓	красный вопросительный знак	красный вопросительный знак вопрос вопросительный знак знак красный пунктуация red question mark ? mark punctuation question сорау нигә белмәү
 ❔	белый вопросительный знак	белый вопросительный знак белый вопрос знак пунктуация white question mark ? mark outlined punctuation question
 ❕	белый восклицательный знак	белый восклицательный знак белый восклицание знак пунктуация white exclamation mark ! exclamation mark outlined punctuation
-❗	красный восклицательный знак	красный восклицательный знак восклицание восклицательный знак знак красный пунктуация red exclamation mark ! exclamation mark punctuation
+❗	красный восклицательный знак	красный восклицательный знак восклицание восклицательный знак знак красный пунктуация red exclamation mark ! exclamation mark punctuation мөһим игътибар
 〰️	волнистая линия	волнистая линия волна волнистая знак линия пунктуация wavy dash dash punctuation wavy
 💱	обмен валюты	обмен валюты валюта деньги касса пункт currency exchange bank currency exchange money
 💲	жирный знак доллара	жирный знак доллара валюта деньги доллар сша heavy dollar sign currency dollar money
@@ -1282,10 +1282,10 @@
 📛	бейдж	бейдж бейджик значок значок с именем имя name badge badge name
 🔰	символ новичка	символ новичка новичок символ япония японский символ новичка japanese symbol for beginner beginner chevron japanese leaf
 ⭕	красное кольцо	красное кольцо большое кольцо кольцо круг hollow red circle circle large o red
-✅	белая галочка	белая галочка белая галочка знак check mark button ✓ button check mark
+✅	белая галочка	белая галочка белая галочка знак check mark button ✓ button check mark билге дөрес килешү эшләнде
 ☑️	галочка в квадрате	галочка в квадрате бюллетень бюллетень с галочкой выполнено галочка check box with check ✓ box check
 ✔️	галочка	галочка знак значок черная галочка черный check mark ✓ check mark
-❌	крестик	крестик закрытие значок отмена умножение cross mark × cancel cross mark multiplication multiply x
+❌	крестик	крестик закрытие значок отмена умножение cross mark × cancel cross mark multiplication multiply x хата юк кире
 ❎	кнопка «крестик»	кнопка «крестик» квадрат кнопка кнопка "крестик" крестик cross mark button × mark square x
 ➰	петля	петля значок петелька curly loop curl loop
 ➿	двойная петля	двойная петля две двойная петля double curly loop curl double loop

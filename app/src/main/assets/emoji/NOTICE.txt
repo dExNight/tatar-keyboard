@@ -60,9 +60,16 @@ only this derived index is shipped. The CLDR data remains subject to the Unicode
 Terms of Use referenced above; the application's Apache-2.0 license does not
 replace those terms.
 
-Tatar (tt) is deliberately absent from the index: CLDR 44 ships eight
-punctuation annotations for Tatar and no emoji annotations at all, so no Tatar
-emoji keywords can be derived from this source.
+Tatar (tt) keywords cannot be derived from CLDR (release 44 ships eight
+punctuation annotations for Tatar and no emoji annotations at all), so the
+index additionally carries hand-written Tatar synonyms: the project's own
+file scripts/emoji_search_tt_extra.txt (one line per emoji: the panel
+sequence, a tab, comma-separated lowercase Tatar synonyms) is validated
+against the panel asset and the Tatar alphabet by the same generator
+(scripts/emoji_search_pack.py, option --tt-extra) and appended after the
+Russian and English keywords of each line, so the CLDR-based ranking is
+unchanged. That file is original Tatar Keyboard project data, licensed like
+the project (Apache-2.0); it is not part of the CLDR-derived content.
 
 ---
 

@@ -3,8 +3,9 @@
 
 The tool uses only the Python standard library. The inputs are the locally
 downloaded CLDR 44 annotation files (``common/annotations/{ru,en}.xml`` and
-``common/annotationsDerived/{ru,en}.xml``) with pinned SHA-256s, plus the
-already-generated emoji panel asset ``emoji_set_v1.txt``; the output is
+``common/annotationsDerived/{ru,en}.xml``) with pinned SHA-256s, the
+already-generated emoji panel asset ``emoji_set_v1.txt``, and optionally the
+hand-written Tatar keyword file (``--tt-extra``); the output is
 ``app/src/main/assets/emoji/emoji_search_v1.txt``, a deterministic UTF-8/LF text
 asset (data, not code).
 
@@ -29,9 +30,19 @@ partial asset when:
 * a guardrail is breached (asset > 262144 bytes or > 1400 lines).
 
 CLDR strips U+FE0F (VARIATION SELECTOR-16) from its ``cp`` attributes, so a
-sequence is looked up with U+FE0F removed. Tatar is deliberately absent: CLDR 44
-ships eight punctuation annotations for ``tt`` and no emoji at all, so a Tatar
-emoji index cannot be derived from it (see docs/EMOJI-PANEL-TELEGRAM.md).
+sequence is looked up with U+FE0F removed. Tatar cannot be derived from CLDR
+(CLDR 44 ships eight punctuation annotations for ``tt`` and no emoji at all),
+so Tatar keywords come from a hand-written file instead: ``--tt-extra``
+(``scripts/emoji_search_tt_extra.txt``), one line per emoji::
+
+    <sequence>\\t<tt-синоним>,<tt-синоним>,...
+
+The sequence must be exactly the panel-asset sequence (U+FE0F included where
+the panel has it); synonyms are comma-separated, lowercase, NFC, and spelled
+from the Tatar alphabet only. These keywords are appended AFTER the Russian
+and English ones, so they extend the search without changing its ranking. The
+file is validated fail-closed: an unknown or duplicated sequence, a malformed
+line, or a non-Tatar character fails the build.
 """
 
 from __future__ import annotations
@@ -42,6 +53,7 @@ import json
 import re
 import sys
 import tempfile
+import unicodedata
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Sequence
@@ -168,6 +180,69 @@ def lookup_key(sequence: str) -> str:
     return sequence.replace(VARIATION_SELECTOR_16, "")
 
 
+# The lowercase Tatar Cyrillic alphabet — the same set
+# `PersonalSubtypes.TATAR_RU_ALPHABET` enforces on personal-dictionary words
+# and `TdictValidator` on the packed dictionary. Hand-written Tatar keywords
+# are checked against it, so a stray Russian-only or Latin letter fails the
+# build instead of silently shipping.
+TATAR_ALPHABET = frozenset("аәбвгдеёжҗзийклмнңоөпрстуүфхһцчшщъыьэюя")
+
+# A Tatar synonym word: alphabet letters, spaces (a phrase is one keyword;
+# the app's word-prefix matching still hits each word of it) and the hyphen
+# of compounds like «ир-ат» / «хатын-кыз».
+TATAR_WORD_CHARS = TATAR_ALPHABET | {" ", "-"}
+
+
+def read_tt_extra(
+    path: Path, panel_sequences: Sequence[str]
+) -> dict[str, list[str]]:
+    """Reads the hand-written Tatar keyword file; fail-closed.
+
+    One line per emoji: ``<sequence>\\t<synonym>,<synonym>,...`` with the
+    sequence exactly as in the panel asset. Blank lines and ``#`` comment
+    lines are skipped. Every sequence must belong to the panel (otherwise the
+    index would drift from what the panel can draw), may appear once, and
+    every synonym must be non-empty, lowercase, NFC and spelled from
+    :data:`TATAR_WORD_CHARS`.
+    """
+    try:
+        text = path.read_text(encoding="utf-8")
+    except UnicodeDecodeError as error:
+        raise EmojiSearchPackError(f"{path.name}: input is not valid UTF-8") from error
+    panel = set(panel_sequences)
+    extra: dict[str, list[str]] = {}
+    for lineno, raw_line in enumerate(text.split("\n"), start=1):
+        line = raw_line.rstrip("\r")
+        if not line or line.startswith("#"):
+            continue
+        where = f"{path.name}:{lineno}"
+        if line.count("\t") != 1:
+            raise EmojiSearchPackError(f"{where}: expected exactly one tab")
+        sequence, synonyms = line.split("\t")
+        if sequence not in panel:
+            raise EmojiSearchPackError(f"{where}: sequence not in the panel asset")
+        if sequence in extra:
+            raise EmojiSearchPackError(f"{where}: duplicate sequence")
+        words = [" ".join(word.strip().split()) for word in synonyms.split(",")]
+        words = [word for word in words if word]
+        if not words:
+            raise EmojiSearchPackError(f"{where}: no synonyms")
+        for word in words:
+            if word != unicodedata.normalize("NFC", word) or word != word.lower():
+                raise EmojiSearchPackError(
+                    f"{where}: synonym {word!r} is not canonical (NFC lowercase)"
+                )
+            bad = sorted(set(word) - TATAR_WORD_CHARS)
+            if bad:
+                raise EmojiSearchPackError(
+                    f"{where}: non-Tatar characters in {word!r}: {bad}"
+                )
+        extra[sequence] = words
+    if not extra:
+        raise EmojiSearchPackError(f"{path.name}: the Tatar keyword file is empty")
+    return extra
+
+
 def build_index(
     sequences: Sequence[str],
     sources: Sequence[tuple[dict[str, list[str]], dict[str, str]]],
@@ -175,12 +250,16 @@ def build_index(
     max_bytes: int,
     max_lines: int,
     min_russian_coverage: float,
+    tt_extra: dict[str, list[str]] | None = None,
 ) -> SearchIndex:
     """Composes one index line per sequence that has at least one keyword.
 
     ``sources`` is ordered: Russian first (its name becomes the ranking name and
-    its keywords come first), English after it.
+    its keywords come first), English after it. ``tt_extra`` maps panel
+    sequences to hand-written Tatar synonyms; they are appended last, so they
+    never displace a Russian or English keyword.
     """
+    tt_extra = tt_extra or {}
     lines: list[str] = []
     with_russian = 0
     russian_keywords, russian_names = sources[0]
@@ -192,6 +271,9 @@ def build_index(
                 word = " ".join(word.lower().split())
                 if word and word not in words:
                     words.append(word)
+        for word in tt_extra.get(sequence, []):
+            if word not in words:
+                words.append(word)
         if not words:
             continue
         if key in russian_keywords or key in russian_names:
@@ -243,6 +325,8 @@ def create_argument_parser() -> argparse.ArgumentParser:
     build.add_argument("--cldr-dir", type=Path, required=True,
                        help="directory holding ru.xml, en.xml, derived-ru.xml, derived-en.xml")
     build.add_argument("--panel-asset", type=Path, required=True)
+    build.add_argument("--tt-extra", type=Path, default=None,
+                       help="hand-written Tatar keywords: sequence<TAB>synonym,synonym,...")
     build.add_argument("--output", type=Path, required=True)
     return parser
 
@@ -268,12 +352,19 @@ def main(argv: Sequence[str] | None = None) -> int:
                 names = dict(parsed[f"derived-{lang}"][1])
                 names.update(parsed[lang][1])
                 merged[lang] = (keywords, names)
+            panel_sequences = read_panel_sequences(args.panel_asset)
+            tt_extra = (
+                read_tt_extra(args.tt_extra, panel_sequences)
+                if args.tt_extra is not None
+                else None
+            )
             index = build_index(
-                read_panel_sequences(args.panel_asset),
+                panel_sequences,
                 (merged["ru"], merged["en"]),
                 max_bytes=MAX_ASSET_BYTES,
                 max_lines=MAX_LINES,
                 min_russian_coverage=MIN_RUSSIAN_COVERAGE,
+                tt_extra=tt_extra,
             )
             write_atomic(args.output, index.data)
             _print_json(
@@ -284,6 +375,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                     "line_count": index.line_count,
                     "russian_coverage": round(index.russian_coverage, 4),
                     "sequence_count": index.sequence_count,
+                    "tt_extra_sequences": len(tt_extra) if tt_extra else 0,
                 }
             )
         else:  # pragma: no cover

@@ -78,6 +78,7 @@
     <string name="personal_dictionary_add_hint">Сүз</string>
     <string name="personal_dictionary_add_action">Өстәү</string>
     <string name="personal_dictionary_add_rejected">Бу сүзне сакларга ярамый: 3 тән 24 кә кадәр татар хәрефе кирәк, саннар һәм тыныш билгеләре булмаска тиеш.</string>
+    <string name="personal_dictionary_add_rejected_ru">Бу сүзне сакларга ярамый: 3 тән 24 кә кадәр рус хәрефе кирәк, саннар һәм тыныш билгеләре булмаска тиеш.</string>
     <string name="personal_dictionary_delete">Бетерү</string>
     <string name="personal_dictionary_forget_title">«%1$s» сүзен онытыргамы?</string>
     <string name="personal_dictionary_erase_all">Барлык сакланган сүзләрне бетерү</string>

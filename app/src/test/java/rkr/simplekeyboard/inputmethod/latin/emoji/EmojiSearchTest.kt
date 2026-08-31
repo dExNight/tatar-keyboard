@@ -198,6 +198,35 @@ class EmojiSearchTest {
         assertTrue("cat", results(index, "cat").isNotEmpty())
     }
 
+    /**
+     * Audit `docs/AUDIT-2026-08-31.md`, finding m2: CLDR has no Tatar annotations, so the index
+     * carries hand-written Tatar keywords (`scripts/emoji_search_tt_extra.txt`, appended by
+     * `scripts/emoji_search_pack.py --tt-extra`). Matching itself needed no change: a query is
+     * lowercased and prefix-matched against space-separated words, and the Tatar-specific letters
+     * ә ө ү җ ң һ are ordinary cased letters for both sides of that comparison.
+     */
+    @Test
+    fun aTatarQueryAgainstTheShippedIndexFindsTheObviousAnswer() {
+        val assets = File(sourceRoot(), "assets/emoji")
+        val index = EmojiSearchIndex.parse(File(assets, "emoji_search_v1.txt").readText())
+        assertTrue("йөрәк", results(index, "йөрәк").contains("❤️"))
+        assertTrue("мәхәббәт", results(index, "мәхәббәт").contains("❤️"))
+        assertTrue("мәче", results(index, "мәче").isNotEmpty())
+        assertTrue("сәлам", results(index, "сәлам").contains("👋"))
+        assertTrue("китап", results(index, "китап").contains("📖"))
+        // A prefix of a Tatar word matches, a suffix does not.
+        assertTrue(results(index, "йөр").contains("❤️"))
+        assertFalse(results(index, "рәк").contains("❤️"))
+    }
+
+    /** The Tatar-specific letters must lowercase the way the generator lowercased the asset. */
+    @Test
+    fun tatarLettersSurviveQueryNormalization() {
+        assertEquals("йөрәк", EmojiSearchIndex.normalize("ЙӨРӘК"))
+        assertEquals("мәҗбур", EmojiSearchIndex.normalize("МӘҖБУР"))
+        assertEquals("җаңһыр", EmojiSearchIndex.normalize("ҖАҢҺЫР"))
+    }
+
     // --- The query ----------------------------------------------------------------------------
 
     @Test

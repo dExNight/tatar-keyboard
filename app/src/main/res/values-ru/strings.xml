@@ -78,6 +78,7 @@
     <string name="personal_dictionary_add_hint">Слово</string>
     <string name="personal_dictionary_add_action">Добавить</string>
     <string name="personal_dictionary_add_rejected">Это слово нельзя сохранить: нужно от 3 до 24 татарских букв, без цифр и знаков препинания.</string>
+    <string name="personal_dictionary_add_rejected_ru">Это слово нельзя сохранить: нужно от 3 до 24 русских букв, без цифр и знаков препинания.</string>
     <string name="personal_dictionary_delete">Удалить</string>
     <string name="personal_dictionary_forget_title">Забыть «%1$s»?</string>
     <string name="personal_dictionary_erase_all">Стереть все сохранённые слова</string>

@@ -304,6 +304,151 @@ class ReadPanelSequencesTest(unittest.TestCase):
                 pack.read_panel_sequences(panel)
 
 
+class ReadPanelSequencesTest(unittest.TestCase):
+    def test_duplicate_sequence_raises(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            panel = write_panel(Path(directory), PANEL + GRINNING + "\n")
+            with self.assertRaises(pack.EmojiSearchPackError):
+                pack.read_panel_sequences(panel)
+
+    def test_empty_panel_raises(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            panel = write_panel(Path(directory), "#smileys-emotion\n")
+            with self.assertRaises(pack.EmojiSearchPackError):
+                pack.read_panel_sequences(panel)
+
+
+class ReadTtExtraTest(unittest.TestCase):
+    """The hand-written Tatar keyword file: fail-closed parsing."""
+
+    def write_extra(self, directory: Path, text: str) -> Path:
+        path = directory / "emoji_search_tt_extra.txt"
+        path.write_text(text, encoding="utf-8")
+        return path
+
+    def test_valid_file_parses_and_skips_comments(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            directory = Path(directory)
+            path = self.write_extra(
+                directory,
+                "# татарские синонимы, составлены вручную\n"
+                f"{GRINNING}\tелмаю,шатлык,көз кысу\n"
+                "\n"
+                f"{SMILING_VS16}\tбәхет\n",
+            )
+            extra = pack.read_tt_extra(path, (GRINNING, SMILING_VS16))
+        self.assertEqual(extra[GRINNING], ["елмаю", "шатлык", "көз кысу"])
+        self.assertEqual(extra[SMILING_VS16], ["бәхет"])
+
+    def test_unknown_sequence_raises(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = self.write_extra(Path(directory), f"{UPSIDE_DOWN}\tелмаю\n")
+            with self.assertRaises(pack.EmojiSearchPackError):
+                pack.read_tt_extra(path, (GRINNING, SMILING_VS16))
+
+    def test_duplicate_sequence_raises(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = self.write_extra(
+                Path(directory),
+                f"{GRINNING}\tелмаю\n{GRINNING}\tбәхет\n",
+            )
+            with self.assertRaises(pack.EmojiSearchPackError):
+                pack.read_tt_extra(path, (GRINNING,))
+
+    def test_malformed_lines_raise(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            directory = Path(directory)
+            for bad in (f"{GRINNING}\n", f"{GRINNING}\t\n",
+                        f"{GRINNING}\tелмаю\tтавыш\n"):
+                path = self.write_extra(directory, bad)
+                with self.assertRaises(pack.EmojiSearchPackError, msg=bad):
+                    pack.read_tt_extra(path, (GRINNING,))
+
+    def test_non_canonical_or_foreign_words_raise(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            directory = Path(directory)
+            for bad in ("Елмаю", "hello", "сәләм!"):
+                path = self.write_extra(directory, f"{GRINNING}\t{bad}\n")
+                with self.assertRaises(pack.EmojiSearchPackError, msg=bad):
+                    pack.read_tt_extra(path, (GRINNING,))
+
+    def test_empty_file_raises(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = self.write_extra(Path(directory), "# только комментарий\n")
+            with self.assertRaises(pack.EmojiSearchPackError):
+                pack.read_tt_extra(path, (GRINNING,))
+
+
+class BuildIndexTtExtraTest(unittest.TestCase):
+    """Tatar keywords extend a line after the CLDR words, never before."""
+
+    def test_tt_keywords_appended_after_ru_and_en(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            index = build_from(Path(directory),
+                               tt_extra={GRINNING: ["елмаю", "шатлык"]})
+        words = index.text.splitlines()[0].split("\t")[2].split(" ")
+        self.assertEqual(words[-2:], ["елмаю", "шатлык"])
+        self.assertEqual(words[0], "широко")
+
+    def test_tt_keywords_deduplicated_against_cldr(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            index = build_from(Path(directory),
+                               tt_extra={GRINNING: ["улыбка", "елмаю"]})
+        words = index.text.splitlines()[0].split("\t")[2].split(" ")
+        self.assertEqual(words.count("улыбка"), 1)
+        self.assertIn("елмаю", words)
+
+    def test_tt_extra_does_not_change_russian_coverage_or_line_count(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            plain = build_from(Path(directory))
+            extended = build_from(Path(directory),
+                                  tt_extra={GRINNING: ["елмаю"]})
+        self.assertEqual(plain.line_count, extended.line_count)
+        self.assertEqual(plain.russian_coverage, extended.russian_coverage)
+
+
+class CliTtExtraTest(unittest.TestCase):
+    def test_tt_extra_reaches_the_asset_and_json_reports_it(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            directory = Path(directory)
+            pins = write_cldr_dir(directory)
+            panel = write_panel(directory)
+            extra = directory / "tt.txt"
+            extra.write_text(f"{GRINNING}\tелмаю,шатлык\n", encoding="utf-8")
+            out = directory / "out.txt"
+            stdout = io.StringIO()
+            with patched(EXPECTED_INPUT_SHA256=pins), \
+                    contextlib.redirect_stdout(stdout), \
+                    contextlib.redirect_stderr(io.StringIO()):
+                code = pack.main([
+                    "build", "--cldr-dir", str(directory),
+                    "--panel-asset", str(panel), "--tt-extra", str(extra),
+                    "--output", str(out)])
+            self.assertEqual(code, 0)
+            payload = json.loads(stdout.getvalue())
+            self.assertEqual(payload["tt_extra_sequences"], 1)
+            line = out.read_text(encoding="utf-8").splitlines()[0]
+            self.assertTrue(line.endswith("елмаю шатлык"))
+
+    def test_bad_tt_extra_exits_2_without_output(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            directory = Path(directory)
+            pins = write_cldr_dir(directory)
+            panel = write_panel(directory)
+            extra = directory / "tt.txt"
+            extra.write_text(f"{UPSIDE_DOWN}\tелмаю\n", encoding="utf-8")
+            out = directory / "out.txt"
+            with patched(EXPECTED_INPUT_SHA256=pins), \
+                    contextlib.redirect_stdout(io.StringIO()), \
+                    contextlib.redirect_stderr(io.StringIO()):
+                code = pack.main([
+                    "build", "--cldr-dir", str(directory),
+                    "--panel-asset", str(panel), "--tt-extra", str(extra),
+                    "--output", str(out)])
+            self.assertEqual(code, 2)
+            self.assertFalse(out.exists())
+
+
 class CliContractTest(unittest.TestCase):
     def test_successful_build_exit_zero_writes_asset_and_json(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -458,6 +603,36 @@ class CommittedAssetTest(unittest.TestCase):
         for line in self.search_lines:
             fields = line.split("\t")
             self.assertNotIn("️", fields[1] + fields[2])
+
+    def test_tatar_keywords_reached_the_committed_asset(self) -> None:
+        # Mission m2 of docs/AUDIT-2026-08-31.md: the hand-written Tatar
+        # synonyms of scripts/emoji_search_tt_extra.txt must be in the index.
+        tt_words = {
+            "❤️": ["йөрәк", "мәхәббәт", "сөю"],
+            "😀": ["елмаю", "шатлык"],
+            "🐱": ["мәче"],
+            "👋": ["сәлам", "исәнмесез"],
+            "📖": ["китап"],
+            "🕌": ["мәчет"],
+        }
+        by_sequence = {}
+        for line in self.search_lines:
+            fields = line.split("\t")
+            by_sequence[fields[0]] = fields[2].split(" ")
+        for sequence, expected in tt_words.items():
+            self.assertIn(sequence, by_sequence)
+            for word in expected:
+                self.assertIn(word, by_sequence[sequence],
+                              msg=f"{word} missing for {sequence}")
+
+    def test_tatar_keywords_never_lead_a_line(self) -> None:
+        # Ranking promise: a Tatar word never stands before the Russian name
+        # and the CLDR keywords of the same line.
+        for line in self.search_lines:
+            fields = line.split("\t")
+            words = fields[2].split(" ")
+            self.assertFalse(set(words[0]) & set("әөүҗңһ"),
+                             msg=f"Tatar word leads the line: {line[:60]}")
 
 
 if __name__ == "__main__":

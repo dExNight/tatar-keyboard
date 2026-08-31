@@ -144,8 +144,10 @@
     <string name="personal_dictionary_add_hint">Word</string>
     <!-- Affirmative button of the add-word dialog -->
     <string name="personal_dictionary_add_action">Add</string>
-    <!-- Shown when the typed word cannot go into the personal dictionary -->
+    <!-- Shown when the typed word cannot go into the Tatar personal dictionary -->
     <string name="personal_dictionary_add_rejected">This word cannot be saved: use 3 to 24 Tatar letters, without digits or punctuation.</string>
+    <!-- Shown when the typed word cannot go into the Russian personal dictionary -->
+    <string name="personal_dictionary_add_rejected_ru">This word cannot be saved: use 3 to 24 Russian letters, without digits or punctuation.</string>
     <!-- Action that removes one saved word -->
     <string name="personal_dictionary_delete">Delete</string>
     <!-- Title of the dialog confirming removal of one word. %1$s is the word itself. -->

@@ -618,8 +618,13 @@ class SettingsHostActivity : Activity() {
                                         R.string.personal_dictionary_save_failed)
                             }
                     if (!accepted) {
-                        Toast.makeText(this, R.string.personal_dictionary_add_rejected,
-                                Toast.LENGTH_SHORT).show()
+                        // The message names the alphabet of the store the word was meant for:
+                        // the same screen adds to the Russian dictionary when the current
+                        // subtype is Russian, and "use Tatar letters" is simply wrong there.
+                        val messageRes = if (subtypeId == PersonalSubtypes.RUSSIAN)
+                                R.string.personal_dictionary_add_rejected_ru
+                            else R.string.personal_dictionary_add_rejected
+                        Toast.makeText(this, messageRes, Toast.LENGTH_SHORT).show()
                         showScreen(Screen.PERSONAL_DICTIONARY)
                     }
                 }
