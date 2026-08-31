@@ -137,26 +137,22 @@ data class BigramArtifactSpec(
         )
 
         /**
-         * The ru table packed by `scripts/bigram_asset_pack.py pack --language rus` from the
-         * same three Leipzig corpora the Russian dictionary is built from, at H = 10 000 /
-         * **K = 4** — `docs/archive/bigrams/RUSSIAN-BIGRAMS.md` records the matrix that chose H
-         * and the original K = 6; docs/archive/bigrams/BIGRAM-ADJACENCY.md records the drop to
-         * K = 4.
+         * The ru table packed by `scripts/bigram_asset_pack.py pack --language rus` at
+         * H = 10 000 / **K = 4** — `docs/archive/bigrams/RUSSIAN-BIGRAMS.md` records the matrix
+         * that chose H and the original K = 6; docs/archive/bigrams/BIGRAM-ADJACENCY.md records
+         * the drop to K = 4.
          *
-         * **Repacked 2026-08-31 against the CURRENT shipped dictionary** (the 2026-08-23 packing
-         * predated the `bfb78e93` dictionary rebuild and its heads had drifted: 4 195 of 10 000
-         * no longer in the top 10 000). `docs/RUSSIAN-BIGRAMS-REPACK.md` records the measurement:
-         * every dropped head left the top 10 000 legitimately, and every displayed triple of the
-         * 5 805 retained heads is unchanged except for successors the current dictionary no
-         * longer ships at all (39 heads, 47 dead successors replaced).
-         *
-         * 9 941 heads, not 10 000: 59 words of today's top 10 000 — conversational imperatives
-         * and address forms lifted into the top by the OpenSubtitles frequencies merged in
-         * 1.9.0/1.9.1 (`погоди`, `волнуйся`, `окей`, …) — never occur as the head of an
-         * in-vocabulary pair in the Leipzig training corpora (news + Wikipedia) and are dropped
-         * rather than stored with an empty range, the same rule that drops the Tatar `-гәнчә`
-         * converbs. The genre gap is documented, not new: docs/archive/bigrams/RUSSIAN-BIGRAMS.md
-         * §7.
+         * Repacked 2026-08-31 against the current shipped dictionary (4 195-head drift closed,
+         * `docs/RUSSIAN-BIGRAMS-REPACK.md`) and **repacked again the same day with the
+         * conversational admixture** (`docs/CORPUS-CONVERSATIONAL-RU.md`, corpus-conversational
+         * part A): training is the three Leipzig corpora plus a deduplicated, 1/60-thinned
+         * Tatoeba + OpenSubtitles input of exactly one Leipzig corpus mass. 57 of the 59
+         * previously silent conversational top-10 000 words (`погоди`, `волнуйся`, …) are heads
+         * now; `окей` and `берегись` still have no in-vocabulary pair in the thinned input and
+         * are dropped rather than stored with an empty range — the same generator rule as the
+         * Tatar `-гәнчә` converbs. The conversational data follows the terms recorded in
+         * `assets/dictionaries/NOTICE.txt` (Tatoeba CC BY 2.0 FR; OpenSubtitles has NO license
+         * grant — operator decision of 2026-08-24, `docs/archive/dictionary/CORPUS-OS.md`).
          *
          * Its own family and its own directory, so the Tatar table already inflated on a device
          * updating from 1.7.0 is neither renamed, re-inflated, nor sharing this language's lease
@@ -170,13 +166,13 @@ data class BigramArtifactSpec(
             subtypeId = PersonalSubtypes.RUSSIAN,
             storageDirectoryName = "bigrams-ru",
             assetPath = "bigrams/russian_bigrams_v1.tatbigr.zlib",
-            expectedCompressedSize = 152_947,
+            expectedCompressedSize = 149_118,
             expectedCompressedSha256 =
-                "c357a9fdfda58a5d8c87e4101cff8fb94fff42da80e8e6c01086db59b2098242",
-            expectedRawSize = 473_256,
+                "e2f41c05be5ed2d97bb60405c90d1b15307baa794d2f81a41d8c04a49c88be4a",
+            expectedRawSize = 465_610,
             expectedRawSha256 =
-                "0091be8ba4b68f403a90455e1875f24a2f8faa36335a9c54b3d35a5a2a3e690d",
-            expectedHeadCount = 9_941,
+                "5e6c3e01bccd8272e82e8c01ded4a84adb9187b5b40b0afbb8486c266c2bf15e",
+            expectedHeadCount = 9_998,
         )
     }
 }

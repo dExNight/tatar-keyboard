@@ -55,10 +55,11 @@ class TatBigrValidatorTest {
      * The ru table shipped in 1.8.x with no test against its real committed bytes while the tt
      * table had one; the K = 4 repack touched both, so both are pinned now.
      *
-     * Repacked 2026-08-31 against the current shipped dictionary (docs/RUSSIAN-BIGRAMS-REPACK.md):
-     * 9 941 heads, not 10 000 — 59 conversational forms of today's top 10 000 have no
-     * in-vocabulary pair in the Leipzig training corpora and are dropped rather than stored with
-     * an empty range.
+     * Repacked 2026-08-31 with the conversational admixture (docs/CORPUS-CONVERSATIONAL-RU.md,
+     * corpus-conversational part A): training = three Leipzig corpora + deduplicated
+     * 1/60-thinned Tatoeba + OpenSubtitles. 9 998 heads, not 10 000 — `окей` and `берегись`
+     * have no in-vocabulary pair in the thinned input and are dropped rather than stored with
+     * an empty range (the same generator rule as the Tatar `-гәнчә` converbs).
      */
     @Test
     fun acceptsCommittedRussianBigramAssetWithFrozenProvenance() {
@@ -67,9 +68,9 @@ class TatBigrValidatorTest {
             BigramArtifactSpec.RUSSIAN_BIGRAMS_V1,
         )
 
-        assertEquals(9_941, validated.headCount)
-        assertEquals(473_256, validated.rawSize)
-        assertEquals(39_261, validated.pairCount)
+        assertEquals(9_998, validated.headCount)
+        assertEquals(465_610, validated.rawSize)
+        assertEquals(39_949, validated.pairCount)
     }
 
     @Test
