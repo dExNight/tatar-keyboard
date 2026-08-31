@@ -25,6 +25,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@color/app_screen_bg"
+    android:filterTouchesWhenObscured="true"
     android:fillViewport="true">
 
     <LinearLayout
@@ -92,6 +93,7 @@
 
                 <Button
                     android:id="@+id/setup_step1_button"
+                    android:filterTouchesWhenObscured="true"
                     android:layout_width="match_parent"
                     android:layout_height="50dp"
                     android:layout_marginTop="12dp"
@@ -144,6 +146,7 @@
 
                 <Button
                     android:id="@+id/setup_step2_button"
+                    android:filterTouchesWhenObscured="true"
                     android:layout_width="match_parent"
                     android:layout_height="50dp"
                     android:layout_marginTop="12dp"
@@ -187,6 +190,7 @@
                  EditText). -->
             <EditText
                 android:id="@+id/setup_test_field"
+                android:filterTouchesWhenObscured="true"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="12dp"
@@ -199,6 +203,7 @@
             <!-- Borderless secondary: system-blue text, iOS accent. -->
             <Button
                 android:id="@+id/setup_done_button"
+                android:filterTouchesWhenObscured="true"
                 style="?android:attr/borderlessButtonStyle"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"

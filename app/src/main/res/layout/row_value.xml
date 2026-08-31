@@ -28,6 +28,7 @@
     android:paddingTop="10dp"
     android:paddingBottom="10dp"
     android:foreground="?android:attr/selectableItemBackground"
+    android:filterTouchesWhenObscured="true"
     android:clickable="true"
     android:focusable="true">
 
