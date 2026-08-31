@@ -320,6 +320,8 @@ class PackArgvTest(unittest.TestCase):
         self.assertIn("--language rus", text)
         for name in ("rus_news_2022_1M", "rus_news_2019_1M", "rus_wikipedia_2021_1M"):
             self.assertIn(f"/corpora/{name}-sentences.txt", text)
+        # С части A (2026-08-31) — разговорный вход, docs/CORPUS-CONVERSATIONAL-RU.md.
+        self.assertIn("/corpora/rus_conv_thinned60-sentences.txt", text)
 
 
 class RealTreeTest(unittest.TestCase):
@@ -342,10 +344,11 @@ class RealTreeTest(unittest.TestCase):
         report = json.loads(stream.getvalue())
         self.assertEqual(1, code)
         self.assertEqual("drift", report["bigrams"]["rus"]["verdict"])
-        # Since the 2026-08-31 repack (docs/RUSSIAN-BIGRAMS-REPACK.md) the remaining 59 are
-        # not a drift but the generator rule: conversational top-10k words with no
-        # in-vocabulary pair in the Leipzig training corpora are dropped, not stored empty.
-        self.assertEqual(59, report["bigrams"]["rus"]["drift"]["missing_top_heads"])
+        # Since corpus-conversational part A (2026-08-31, docs/CORPUS-CONVERSATIONAL-RU.md)
+        # only 2 remain, and they are the generator rule, not a drift: «окей» and «берегись»
+        # have no in-vocabulary pair in the thinned conversational input and are dropped,
+        # not stored empty.
+        self.assertEqual(2, report["bigrams"]["rus"]["drift"]["missing_top_heads"])
         self.assertEqual(0, report["bigrams"]["rus"]["drift"]["unexpected_heads"])
 
 

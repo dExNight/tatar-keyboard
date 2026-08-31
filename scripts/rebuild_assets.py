@@ -31,8 +31,11 @@
       git show 4ca191a7:app/src/main/assets/dictionaries/tatar_top100k_v1.tdict.zlib > ...
   * `--corpus-dir` (по умолчанию `~/corpora-leipzig`) — Leipzig `*-sentences.txt`:
     tat_mixed_2015_1M, tat_web_2018_1M, rus_news_2022_1M, rus_news_2019_1M,
-    rus_wikipedia_2021_1M. Нужны только таблицам биграмм; словарям корпус не нужен
-    (разговорные частоты закоммичены в conv-freq-*.tsv ровно для этого).
+    rus_wikipedia_2021_1M, плюс разговорный вход русской таблицы
+    `rus_conv_thinned60-sentences.txt` (с 2026-08-31, часть A; происхождение и рецепт
+    сборки — docs/CORPUS-CONVERSATIONAL-RU.md). Нужны только таблицам биграмм;
+    словарям корпус не нужен (разговорные частоты закоммичены в conv-freq-*.tsv
+    ровно для этого).
 
 Режим проверки (ничего не пересобирает, корпуса и baseline не нужны):
 
@@ -121,7 +124,8 @@ DICTIONARIES = (
 # Параметры — ровно те, что записаны в отчётах последних упаковок и в KDoc констант:
 # татарская — docs/archive/bigrams/IMPERATIVE-HEADS.md (H = 10 132 выведен из словаря,
 # 13 повелений списком), русская — docs/archive/bigrams/RUSSIAN-BIGRAMS.md плюс
-# BIGRAM-ADJACENCY.md (K: 6 → 4). Меняются только вместе с решением о перевыборе,
+# BIGRAM-ADJACENCY.md (K: 6 → 4) плюс разговорный вход CORPUS-CONVERSATIONAL-RU.md
+# (часть A, 2026-08-31). Меняются только вместе с решением о перевыборе,
 # и тогда же правится этот файл.
 BIGRAMS = (
     BigramAsset(
@@ -142,10 +146,17 @@ BIGRAMS = (
         heads=10_000,
         successes_per_head=4,
         extra_heads=None,
+        # С 2026-08-31 (разговорный корпус, часть A, docs/CORPUS-CONVERSATIONAL-RU.md)
+        # обучение — три Leipzig + разговорный вход: дедуплицированные Tatoeba +
+        # OpenSubtitles, прореженные 1/60 (строки с id % 60 == 0). Файл собирается
+        # скриптом research/corpus/make_conv_train.py из корпусов research/corpus/
+        # и прореживается awk-фильтром, записанными в отчёте; в --corpus-dir его
+        # кладут руками, поэтому полная пересборка без него падает fail-closed.
         train=(
             "rus_news_2022_1M-sentences.txt",
             "rus_news_2019_1M-sentences.txt",
             "rus_wikipedia_2021_1M-sentences.txt",
+            "rus_conv_thinned60-sentences.txt",
         ),
     ),
 )
