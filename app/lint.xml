@@ -7,7 +7,10 @@
          res/values/attrs.xml, same attrs and same defaults as the old manual int[])
          and 4x StringFormatMatches (%s -> %d in abbreviation_unit_milliseconds /
          abbreviation_unit_percent; %d renders an Int identically to %s).
-         The regenerated baseline holds 36 WARNINGS, each classified below:
+         The regenerated baseline holds 36 WARNINGS, each classified below
+         (2026-08-31, P1: 5x IconLauncherShape dropped — icons converted PNG ->
+         lossless WebP and lint's icon-shape detector does not analyse WebP;
+         baseline now holds 31 warnings):
 
          Conscious design / false positive (leave):
          - ApplySharedPref (Settings.java): commit() is deliberately synchronous for the
@@ -28,7 +31,7 @@
 
          Cosmetic / not actionable (leave):
          - RedundantLabel x3, Overdraw x2, UseRequiresApi, UsableSpace,
-           IconLauncherShape x5 (deliberate icon design), TextFields, Autofill x2,
+           TextFields, Autofill x2,
            LabelFor x2, ClickableViewAccessibility x2 (legacy views),
            UnusedResources x2 (icon_launcher_text glyph data, AppText.Button style).
 

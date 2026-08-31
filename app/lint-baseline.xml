@@ -270,41 +270,6 @@
     </issue>
 
     <issue
-        id="IconLauncherShape"
-        message="Launcher icons should not fill every pixel of their square region; see the design guide for details">
-        <location
-            file="src/main/res/mipmap-hdpi/ic_launcher.png"/>
-    </issue>
-
-    <issue
-        id="IconLauncherShape"
-        message="Launcher icons should not fill every pixel of their square region; see the design guide for details">
-        <location
-            file="src/main/res/mipmap-mdpi/ic_launcher.png"/>
-    </issue>
-
-    <issue
-        id="IconLauncherShape"
-        message="Launcher icons should not fill every pixel of their square region; see the design guide for details">
-        <location
-            file="src/main/res/mipmap-xhdpi/ic_launcher.png"/>
-    </issue>
-
-    <issue
-        id="IconLauncherShape"
-        message="Launcher icons should not fill every pixel of their square region; see the design guide for details">
-        <location
-            file="src/main/res/mipmap-xxhdpi/ic_launcher.png"/>
-    </issue>
-
-    <issue
-        id="IconLauncherShape"
-        message="Launcher icons should not fill every pixel of their square region; see the design guide for details">
-        <location
-            file="src/main/res/mipmap-xxxhdpi/ic_launcher.png"/>
-    </issue>
-
-    <issue
         id="TextFields"
         message="This text field does not specify an `inputType`"
         errorLine1="&lt;EditText xmlns:android=&quot;http://schemas.android.com/apk/res/android&quot;"
