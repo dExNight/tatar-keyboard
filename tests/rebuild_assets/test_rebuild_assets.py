@@ -309,6 +309,8 @@ class PackArgvTest(unittest.TestCase):
         self.assertIn("--language tat", text)
         self.assertIn("/corpora/tat_mixed_2015_1M-sentences.txt", text)
         self.assertIn("/corpora/tat_web_2018_1M-sentences.txt", text)
+        # С части B (2026-08-31) — разговорный вход, docs/CORPUS-CONVERSATIONAL-TT.md.
+        self.assertIn("/corpora/tt_conv_train90-sentences.txt", text)
 
     def test_russian_command(self):
         argv = rebuild_assets.bigram_pack_argv(

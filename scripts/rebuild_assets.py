@@ -31,10 +31,11 @@
       git show 4ca191a7:app/src/main/assets/dictionaries/tatar_top100k_v1.tdict.zlib > ...
   * `--corpus-dir` (по умолчанию `~/corpora-leipzig`) — Leipzig `*-sentences.txt`:
     tat_mixed_2015_1M, tat_web_2018_1M, rus_news_2022_1M, rus_news_2019_1M,
-    rus_wikipedia_2021_1M, плюс разговорный вход русской таблицы
+    rus_wikipedia_2021_1M, плюс разговорные входы обеих таблиц:
     `rus_conv_thinned60-sentences.txt` (с 2026-08-31, часть A; происхождение и рецепт
-    сборки — docs/CORPUS-CONVERSATIONAL-RU.md). Нужны только таблицам биграмм;
-    словарям корпус не нужен (разговорные частоты закоммичены в conv-freq-*.tsv
+    сборки — docs/CORPUS-CONVERSATIONAL-RU.md) и `tt_conv_train90-sentences.txt`
+    (тем же днём, часть B — docs/CORPUS-CONVERSATIONAL-TT.md). Нужны только таблицам
+    биграмм; словарям корпус не нужен (разговорные частоты закоммичены в conv-freq-*.tsv
     ровно для этого).
 
 Режим проверки (ничего не пересобирает, корпуса и baseline не нужны):
@@ -136,7 +137,18 @@ BIGRAMS = (
         heads=10_132,
         successes_per_head=4,
         extra_heads="scripts/bigram_extra_heads_tat.txt",
-        train=("tat_mixed_2015_1M-sentences.txt", "tat_web_2018_1M-sentences.txt"),
+        # С 2026-08-31 (разговорный корпус, часть B, docs/CORPUS-CONVERSATIONAL-TT.md)
+        # обучение — два Leipzig + разговорный вход: дедуплицированные Tatoeba +
+        # OpenSubtitles tt, строки с id % 10 != 1 (остаток — разговорный held-out).
+        # Без прореживания: разговорная масса — 3,7 % письменной, резать нечего
+        # (решение зафиксировано в DECISION-RULE-PRECOMMIT-TT до прогона). Файл
+        # собирается research/corpus/make_conv_train.py и awk-фильтром из отчёта;
+        # в --corpus-dir его кладут руками, без него пересборка падает fail-closed.
+        train=(
+            "tat_mixed_2015_1M-sentences.txt",
+            "tat_web_2018_1M-sentences.txt",
+            "tt_conv_train90-sentences.txt",
+        ),
     ),
     BigramAsset(
         tag="rus",
