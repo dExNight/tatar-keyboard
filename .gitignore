@@ -65,6 +65,10 @@ dist/
 tat_*.tar.gz
 tat_*-words.txt
 tat_*-sentences.txt
+# То же для русских корпусов Leipzig (входы русской таблицы биграмм и словаря).
+rus_*.tar.gz
+rus_*-words.txt
+rus_*-sentences.txt
 
 # Сырые отчёты прогонов (числа переносятся в markdown вручную, сам JSON не коммитится)
 docs/*.generated.json
