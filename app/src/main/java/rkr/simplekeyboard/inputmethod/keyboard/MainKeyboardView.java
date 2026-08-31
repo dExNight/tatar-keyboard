@@ -193,6 +193,15 @@ public final class MainKeyboardView extends KeyboardView implements MoreKeysPane
                 || super.dispatchHoverEvent(event);
     }
 
+    /**
+     * Announces the input language after a user-initiated subtype switch (globe key or the
+     * subtype picker). Routed through the accessibility delegate so all keyboard TalkBack
+     * announcements live in one place and share the same accessibility-enabled gate.
+     */
+    public void announceLanguageForAccessibility(final String languageName) {
+        mAccessibilityDelegate.announceLanguage(languageName);
+    }
+
     private ObjectAnimator loadObjectAnimator(final int resId, final Object target) {
         if (resId == 0) {
             // TODO: Stop returning null.

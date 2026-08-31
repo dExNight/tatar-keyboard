@@ -105,6 +105,7 @@ import rkr.simplekeyboard.inputmethod.latin.suggestions.TatarWordUtils;
 import rkr.simplekeyboard.inputmethod.latin.utils.ApplicationUtils;
 import rkr.simplekeyboard.inputmethod.latin.utils.DialogUtils;
 import rkr.simplekeyboard.inputmethod.latin.utils.LeakGuardHandlerWrapper;
+import rkr.simplekeyboard.inputmethod.latin.utils.LocaleResourceUtils;
 import rkr.simplekeyboard.inputmethod.latin.utils.ResourceUtils;
 import rkr.simplekeyboard.inputmethod.latin.utils.ViewLayoutUtils;
 
@@ -1324,7 +1325,7 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
     }
 
     @Override
-    public void onCurrentSubtypeChanged() {
+    public void onCurrentSubtypeChanged(final boolean userInitiated) {
         mInputLogic.onSubtypeChanged();
         loadKeyboard();
         if (mSuggestionsController != null) {
@@ -1332,6 +1333,27 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
                     isSuggestionsEligible(), activeDictionarySubtype());
             updateKeyNeighbors();
         }
+        if (userInitiated) {
+            announceCurrentLanguageForAccessibility();
+        }
+    }
+
+    /**
+     * Announces the newly selected input language after a user-initiated subtype switch
+     * (globe key or the fork's subtype picker). The name is rendered in its own locale
+     * ("Татарча" / "Русская" / "English") — the same source as the spacebar hint and the
+     * space key's spoken description. Programmatic subtype changes (hint-locale switch at
+     * field start, subtype removal in settings) arrive with userInitiated=false and stay
+     * silent, so opening a field never spams an announcement.
+     */
+    private void announceCurrentLanguageForAccessibility() {
+        final MainKeyboardView mainKeyboardView = mKeyboardSwitcher.getMainKeyboardView();
+        if (mainKeyboardView == null) {
+            return;
+        }
+        mainKeyboardView.announceLanguageForAccessibility(
+                LocaleResourceUtils.getLanguageDisplayNameInLocale(
+                        mRichImm.getCurrentSubtype().getLocale()));
     }
 
     void onStartInputInternal(final EditorInfo editorInfo, final boolean restarting) {

@@ -120,7 +120,13 @@ public class RichInputMethodManager {
      * Interface used to allow some code to run when the virtual subtype changes.
      */
     public interface SubtypeChangedListener {
-        void onCurrentSubtypeChanged();
+        /**
+         * @param userInitiated true when the change is an explicit language switch by the user
+         *     (globe key or the subtype picker) and may be announced to TalkBack; false for
+         *     programmatic changes (hint-locale switch at field start, subtype removal in
+         *     settings), which must stay silent so field focus never spams an announcement.
+         */
+        void onCurrentSubtypeChanged(boolean userInitiated);
     }
 
     /**
@@ -201,10 +207,11 @@ public class RichInputMethodManager {
 
         /**
          * Call the subtype changed handler to indicate that the virtual subtype has changed.
+         * @param userInitiated see {@link SubtypeChangedListener#onCurrentSubtypeChanged}.
          */
-        public void notifySubtypeChanged() {
+        public void notifySubtypeChanged(final boolean userInitiated) {
             if (mSubtypeChangedListener != null) {
-                mSubtypeChangedListener.onCurrentSubtypeChanged();
+                mSubtypeChangedListener.onCurrentSubtypeChanged(userInitiated);
             }
         }
 
@@ -331,7 +338,9 @@ public class RichInputMethodManager {
             saveSubtypeListPref();
             if (subtypeChanged) {
                 saveCurrentSubtypePref();
-                notifySubtypeChanged();
+                // Subtype removed from the settings screen, not a language switch in the
+                // keyboard: silent for TalkBack.
+                notifySubtypeChanged(false);
             }
             return true;
         }
@@ -424,7 +433,10 @@ public class RichInputMethodManager {
                 }
                 saveCurrentSubtypePref();
             }
-            notifySubtypeChanged();
+            // persist==true marks an explicit user selection (the subtype picker) and is
+            // announced; persist==false is a temporary programmatic switch (eg: hint locale
+            // at field start) and stays silent.
+            notifySubtypeChanged(persist);
         }
 
         /**
@@ -446,7 +458,9 @@ public class RichInputMethodManager {
                 mCurrentSubtypeIndex = nextIndex;
             }
             saveCurrentSubtypePref();
-            notifySubtypeChanged();
+            // Only reachable from the globe key (switchToNextInputMethod), so always a
+            // user-initiated language switch.
+            notifySubtypeChanged(true);
             return true;
         }
 
@@ -558,7 +572,7 @@ public class RichInputMethodManager {
             // the virtual subtype should have been reset to the first item to prepare for switching
             // back to this IME, but we skipped notifying the change because we expected to switch
             // to a different IME, but since that failed, we just need to notify the listener
-            mSubtypeList.notifySubtypeChanged();
+            mSubtypeList.notifySubtypeChanged(true);
             return true;
         }
         return false;

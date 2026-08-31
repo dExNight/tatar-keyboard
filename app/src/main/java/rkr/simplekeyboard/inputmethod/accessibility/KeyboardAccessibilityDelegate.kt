@@ -95,6 +95,17 @@ class KeyboardAccessibilityDelegate(
         keyboardView.announceForAccessibility(cachedString(resId))
     }
 
+    /**
+     * Announces the input language after a user-initiated subtype switch (globe key or the
+     * subtype picker). The name is rendered in its own locale ("Татарча" / "Русская" /
+     * "English") — the same source the spacebar hint and the space key description use.
+     * Programmatic subtype changes are filtered out by the caller and never reach here.
+     */
+    fun announceLanguage(languageName: String) {
+        if (!accessibilityManager.isEnabled) return
+        keyboardView.announceForAccessibility(languageName)
+    }
+
     override fun getVirtualViewAt(x: Float, y: Float): Int {
         val key = keyDetector.detectHitKey(x.toInt(), y.toInt()) ?: return INVALID_ID
         val index = sortedKeys().indexOf(key)
