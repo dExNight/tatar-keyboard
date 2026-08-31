@@ -577,7 +577,15 @@ internal class PersonalDictionaryStore(
     private fun readPending(directory: File) {
         pending = try {
             val file = File(directory, pendingFileName())
-            if (file.isFile) PendingCounters.parse(file.readBytes()) else PendingCounters.EMPTY
+            // The size cap comes BEFORE the read: a file past MAX_SERIALIZED_BYTES can never parse
+            // (parse bounds the record count by MAX_PENDING), so reading it would only allocate for
+            // garbage — and past 2 GiB readBytes() throws an OutOfMemoryError, an Error that the
+            // catch below cannot stop (S2 of docs/AUDIT-2026-08-31.md).
+            if (file.isFile && file.length() <= PendingCounters.MAX_SERIALIZED_BYTES) {
+                PendingCounters.parse(file.readBytes())
+            } else {
+                PendingCounters.EMPTY
+            }
         } catch (_: Exception) {
             PendingCounters.EMPTY
         }

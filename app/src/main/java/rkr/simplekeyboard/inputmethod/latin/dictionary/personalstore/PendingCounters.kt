@@ -159,6 +159,16 @@ internal class PendingCounters private constructor(
         private const val RECORD_SIZE = 14
         private const val MAX_COUNT = 0xFFFF
 
+        /**
+         * The largest byte count [parse] can ever accept: one header plus [MAX_PENDING] records.
+         * The store checks `File.length()` against this BEFORE reading (S2 of
+         * docs/AUDIT-2026-08-31.md), so an oversized file — anything past this can never parse,
+         * because [parse] itself bounds the record count by [MAX_PENDING] — is rejected without
+         * allocating a byte array for it (a file over 2 GiB would not even fit one, and the
+         * resulting `OutOfMemoryError` is an `Error` the store's `catch (Exception)` cannot stop).
+         */
+        const val MAX_SERIALIZED_BYTES: Int = HEADER_SIZE + MAX_PENDING * RECORD_SIZE
+
         val EMPTY = PendingCounters(LongArray(0), IntArray(0), LongArray(0), 1L)
 
         /**
