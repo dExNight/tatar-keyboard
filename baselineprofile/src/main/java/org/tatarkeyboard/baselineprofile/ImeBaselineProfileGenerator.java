@@ -30,6 +30,7 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 
 import java.io.IOException;
+import java.util.regex.Pattern;
 
 import kotlin.Unit;
 
@@ -40,10 +41,21 @@ import kotlin.Unit;
  * BY THE SYSTEM when an editable field gains focus — so each iteration cold-kills the
  * app process, focuses the try-it field of the app's own SetupActivity, waits for the
  * keyboard, types a Tatar word with real key taps (PointerTracker -> InputLogic ->
- * dictionary suggestion engine -> suggestion strip) and opens the emoji panel
- * (long-press comma). This covers process start, onCreateInputView, layout XML
- * parsing/inflation, first frame render, the background suggestion engine and the
- * emoji panel.
+ * dictionary suggestion engine -> suggestion strip), commits a suggestion by tapping
+ * the strip, commits the word with SPACE (which triggers the bigram next-word
+ * prediction), commits a predicted word, and opens the emoji panel (long-press comma)
+ * and commits an emoji. This covers process start, onCreateInputView, layout XML
+ * parsing/inflation, first frame render, the suggestion engine hot path (tdict unpack
+ * + mmap + binary search in TdictPrefixIndex/MappedDictionaryEngine, bigram lookup in
+ * TatBigrPrefixIndex) and the emoji panel.
+ *
+ * Suggestions are opt-in (PREF_TATAR_SUGGESTIONS, default OFF) and a CUJ that never
+ * turns them on profiles nothing of the engine (P2 of docs/AUDIT-2026-08-31.md). The
+ * release APK is not debuggable, so run-as seeding of the device-protected prefs (the
+ * emulator-smoke.sh trick) is unavailable here; instead the first iteration toggles
+ * the switch through the real settings UI — exactly how a user enables it. The pref
+ * survives the force-stop that killProcess() performs, so later iterations start with
+ * suggestions already on.
  *
  * Run: ./gradlew :app:generateReleaseBaselineProfile  (connected API 34 emulator).
  */
@@ -59,9 +71,21 @@ public class ImeBaselineProfileGenerator {
             PACKAGE_NAME + "/rkr.simplekeyboard.inputmethod.latin.LatinIME";
     private static final String SETUP_ACTIVITY =
             "rkr.simplekeyboard.inputmethod.latin.setup.SetupActivity";
+    private static final String SETTINGS_ACTIVITY =
+            "rkr.simplekeyboard.inputmethod.latin.settings.SettingsActivity";
+    // Row labels in all three shipped locales (the AVD locale is not fixed):
+    // settings_screen_preferences and tatar_suggestions.
+    private static final Pattern PREFERENCES_ROW_LABEL =
+            Pattern.compile("^(Preferences|Настройки|Көйләүләр)$");
+    private static final Pattern SUGGESTIONS_ROW_LABEL =
+            Pattern.compile("^(Word suggestions|Подсказки слов|Сүз тәкъдимнәре)$");
 
     @Rule
     public BaselineProfileRule baselineProfileRule = new BaselineProfileRule();
+
+    // Iterations share this test instance, and the pref survives the force-stop
+    // in killProcess() — enabling once per generation run is enough.
+    private boolean mSuggestionsEnsured;
 
     @Test
     public void generate() {
@@ -86,6 +110,7 @@ public class ImeBaselineProfileGenerator {
         // (re)applied AFTER the kill, never before it.
         scope.killProcess();
         enableAndSelectIme(device);
+        ensureSuggestionsEnabled(scope, device);
 
         startSetupActivity(scope, device);
 
@@ -114,9 +139,33 @@ public class ImeBaselineProfileGenerator {
         tapKeyFraction(device, KeyGeom.KEY_L);
         tapKeyFraction(device, KeyGeom.KEY_A);
         tapKeyFraction(device, KeyGeom.KEY_M);
-        SystemClock.sleep(1_000);
+        // Wait for the strip to render the prefix suggestions: the FIRST lookup is
+        // the expensive one (zlib unpack + mmap + binary search), and the whole
+        // point of this CUJ is to get it profiled.
+        SystemClock.sleep(1_500);
 
-        // Emoji panel: long-press the comma key, wait, then leave the panel.
+        // Commit a prefix suggestion from the strip ("сәламәтлек" on the
+        // calibration AVD) — SuggestionStripView touch + commit path.
+        tapKeyFraction(device, KeyGeom.SUGGESTION_LEFT);
+        SystemClock.sleep(800);
+
+        // Type "сәлам" again and commit with SPACE: a word separator after a known
+        // head triggers the bigram next-word prediction (TatBigrPrefixIndex).
+        tapKeyFraction(device, KeyGeom.KEY_S);
+        tapKeyFraction(device, KeyGeom.KEY_AE);
+        tapKeyFraction(device, KeyGeom.KEY_L);
+        tapKeyFraction(device, KeyGeom.KEY_A);
+        tapKeyFraction(device, KeyGeom.KEY_M);
+        tapKeyFraction(device, KeyGeom.KEY_SPACE);
+        SystemClock.sleep(1_500);
+
+        // Commit a next-word prediction from the strip ("белән" in the middle slot
+        // after "сәлам" on the calibration AVD).
+        tapKeyFraction(device, KeyGeom.PREDICTION_MIDDLE);
+        SystemClock.sleep(800);
+
+        // Emoji panel: long-press the comma key, commit the first emoji of the
+        // grid, then leave the panel.
         device.swipe(
                 KeyGeom.x(device, KeyGeom.KEY_COMMA),
                 KeyGeom.y(device, KeyGeom.KEY_COMMA),
@@ -124,10 +173,70 @@ public class ImeBaselineProfileGenerator {
                 KeyGeom.y(device, KeyGeom.KEY_COMMA),
                 /* steps = */ 60);
         SystemClock.sleep(1_500);
+        tapKeyFraction(device, KeyGeom.EMOJI_FIRST_CELL);
+        SystemClock.sleep(800);
         device.pressBack();
         SystemClock.sleep(500);
 
         device.pressHome();
+    }
+
+    /**
+     * Turns on PREF_TATAR_SUGGESTIONS through the settings UI (SettingsActivity →
+     * Preferences → "Word suggestions"), once per generation run. The whole row is
+     * the tap target and reports itself to accessibility as the Switch it toggles
+     * (SettingsHostActivity.switchRowRaw), so the checked state is read from the
+     * checkable ancestor of the label and the row is only clicked when it is OFF —
+     * never blind-toggled, because the pref survives force-stop and a reused
+     * emulator may already have it on.
+     */
+    private void ensureSuggestionsEnabled(MacrobenchmarkScope scope, UiDevice device) {
+        if (mSuggestionsEnsured) {
+            return;
+        }
+        Intent intent = new Intent();
+        intent.setClassName(PACKAGE_NAME, SETTINGS_ACTIVITY);
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+        scope.startActivityAndWait(intent);
+
+        UiObject2 prefsRow = device.wait(
+                Until.findObject(By.text(PREFERENCES_ROW_LABEL)), 10_000);
+        if (prefsRow == null) {
+            throw new IllegalStateException("Settings root: Preferences row not found");
+        }
+        prefsRow.click();
+
+        UiObject2 label = device.wait(
+                Until.findObject(By.text(SUGGESTIONS_ROW_LABEL)), 5_000);
+        // The row is visible without scrolling on 1080x2280; the scroll loop is
+        // only a fallback for smaller screens.
+        for (int i = 0; label == null && i < 5; i++) {
+            device.swipe(device.getDisplayWidth() / 2,
+                    Math.round(device.getDisplayHeight() * 0.7f),
+                    device.getDisplayWidth() / 2,
+                    Math.round(device.getDisplayHeight() * 0.4f),
+                    /* steps = */ 20);
+            label = device.wait(
+                    Until.findObject(By.text(SUGGESTIONS_ROW_LABEL)), 2_000);
+        }
+        if (label == null) {
+            throw new IllegalStateException("Suggestions row not found in Preferences");
+        }
+        UiObject2 row = label;
+        for (int i = 0; row != null && !row.isCheckable() && i < 4; i++) {
+            row = row.getParent();
+        }
+        if (row == null || !row.isCheckable()) {
+            throw new IllegalStateException(
+                    "Checkable row above the suggestions label not found");
+        }
+        if (!row.isChecked()) {
+            row.click();
+            SystemClock.sleep(500);
+        }
+        mSuggestionsEnsured = true;
+        device.pressHome();
+        SystemClock.sleep(500);
     }
 
     private void startSetupActivity(MacrobenchmarkScope scope, UiDevice device) {
@@ -166,7 +275,13 @@ public class ImeBaselineProfileGenerator {
 
     /** Screen-fraction key geometry, calibrated on the tt_suggest_a14 AVD (1080x2280,
      *  Tatar layout): verified that the five taps commit exactly "сәлам" into the
-     *  try-it field and that long-pressing comma opens the emoji panel. */
+     *  try-it field and that long-pressing comma opens the emoji panel.
+     *  Strip geometry verified 2026-08-31 against screenshots of the same AVD: the
+     *  suggestion strip sits at y≈0.60 with three slots (left/middle/right ≈
+     *  0.167/0.5/0.833); tapping SUGGESTION_LEFT after "сәлам" commits "сәламәтлек",
+     *  and after "сәлам"+SPACE the strip shows bigram predictions
+     *  "биреп | белән | биру". EMOJI_FIRST_CELL is the first cell of the emoji grid
+     *  (same calibration as scripts/emulator-smoke.sh). */
     private static final class KeyGeom {
         // {xFraction, yFraction} of key centers on the Tatar layout.
         static final float[] KEY_S = {0.3324f, 0.8474f};
@@ -175,6 +290,10 @@ public class ImeBaselineProfileGenerator {
         static final float[] KEY_A = {0.3176f, 0.7851f};
         static final float[] KEY_M = {0.4231f, 0.8474f};
         static final float[] KEY_COMMA = {0.2009f, 0.9075f};
+        static final float[] KEY_SPACE = {0.55f, 0.9075f};
+        static final float[] SUGGESTION_LEFT = {0.167f, 0.60f};
+        static final float[] PREDICTION_MIDDLE = {0.5f, 0.60f};
+        static final float[] EMOJI_FIRST_CELL = {0.059f, 0.777f};
 
         static int x(UiDevice device, float[] fraction) {
             return Math.round(device.getDisplayWidth() * fraction[0]);
