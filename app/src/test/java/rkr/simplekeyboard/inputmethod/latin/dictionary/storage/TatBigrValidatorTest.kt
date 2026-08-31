@@ -42,13 +42,16 @@ class TatBigrValidatorTest {
             BigramArtifactSpec.TATAR_BIGRAMS_V1,
         )
 
-        // K = 4 since 2026-08-23 (docs/BIGRAM-ADJACENCY.md), H = 10 132 with a thirteen-word
-        // named-head list since 2026-08-25 (docs/IMPERATIVE-HEADS.md). 10 142 = 9 996 heads of
-        // 1.9.3 + 132 the raised cutoff reaches + 13 named + 1 the rebuilt dictionary lifted;
-        // none of the 9 996 was lost, which is the property that repack was constrained by.
-        assertEquals(10_142, validated.headCount)
-        assertEquals(518_728, validated.rawSize)
-        assertEquals(40_501, validated.pairCount)
+        // K = 4 since 2026-08-23 (docs/archive/bigrams/BIGRAM-ADJACENCY.md), H = 10 132 since
+        // 2026-08-25 (docs/archive/bigrams/IMPERATIVE-HEADS.md). Repacked 2026-08-31 with the
+        // conversational admixture (docs/CORPUS-CONVERSATIONAL-TT.md, corpus-conversational
+        // part B): training = two Leipzig corpora + deduplicated Tatoeba + OpenSubtitles tt
+        // (unthinned, 3,7 % of the written mass), extra-heads rule extended to ranks
+        // [10 000, 40 000) — 75 named words. 10 204 = 10 129 (cutoff) + 75 (named); the three
+        // `-гәнчә` converbs are still dropped for zero pairs.
+        assertEquals(10_204, validated.headCount)
+        assertEquals(520_892, validated.rawSize)
+        assertEquals(40_734, validated.pairCount)
     }
 
     /**

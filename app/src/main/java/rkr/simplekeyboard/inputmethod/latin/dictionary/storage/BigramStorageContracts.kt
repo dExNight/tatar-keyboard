@@ -91,33 +91,28 @@ data class BigramArtifactSpec(
         private val FILE_LANGUAGE_TAG_PATTERN = Regex("[a-z]{2,3}")
 
         /**
-         * The tt table repacked 2026-08-25 by `scripts/bigram_asset_pack.py pack` at
-         * **H = 10 132**, K = 4, with `--extra-heads scripts/bigram_extra_heads_tat.txt`.
-         * K = 4 is unchanged since 2026-08-23 (docs/BIGRAM-ADJACENCY.md); the two numbers that
-         * moved are the cutoff and the named-head list, and each answers a different question
-         * (docs/IMPERATIVE-HEADS.md records both, with the measurement):
+         * The tt table packed by `scripts/bigram_asset_pack.py pack` at **H = 10 132**, K = 4,
+         * with `--extra-heads scripts/bigram_extra_heads_tat.txt`. H and K are unchanged since
+         * 2026-08-25 (docs/archive/bigrams/IMPERATIVE-HEADS.md: the cutoff keeps the 78 heads a
+         * 10 000-cutoff repack would have dropped, the list promotes imperatives regardless of
+         * rank).
          *
-         * * **the list** makes thirteen frequent Tatar imperatives heads regardless of rank.
-         *   "кил" (come) sat at unigram rank 10 338 and predicted nothing, while "бир" (give) —
-         *   the same grammatical form, rank 5 955 — predicted "бир әле". Naming thirteen words
-         *   costs **223 compressed bytes**; raising the cutoff to reach "кайт" at 14 706 would
-         *   have cost roughly forty times that for words nobody asked for;
-         * * **the cutoff** moved from 10 000 only to keep faith with what already worked. The
-         *   dictionary was rebuilt after this table was last packed (`bfb78e93`, `01f85d24`,
-         *   `b3673752`), and repacking at 10 000 would have dropped 78 words that predict today.
-         *   All 78 sit at ranks 10 001…10 131, so 10 132 is the smallest cutoff that loses none —
-         *   derived, not chosen. It costs 2 327 compressed bytes and reaches 132 more heads.
+         * Repacked 2026-08-31 with the conversational admixture (`docs/CORPUS-CONVERSATIONAL-TT.md`,
+         * corpus-conversational part B): training is the two Leipzig corpora plus a deduplicated
+         * Tatar Tatoeba + OpenSubtitles input (lines with `id % 10 != 1`; the rest is the
+         * conversational held-out). No thinning — the conversational mass is 3,7 % of the written
+         * one. The extra-heads rule was extended the same day, before the run, from ranks
+         * [10 000, 15 000) to [10 000, 40 000) with pairs required in the new mixed training:
+         * 13 → **75** named words, and all six dossier imperatives beyond rank 15 000
+         * (`шалтырат`, `сөйлә`, `утыр`, `җибәр`, `эшлә`, `укы`) are heads now.
          *
-         * Verified head-by-head against the 1.9.3 artifact before the swap: **0 of the 9 996 old
-         * heads is missing, and 0 of them changes the three successors the strip displays.** The
-         * whole delta is additive: 10 142 heads = 9 996 + 132 (cutoff) + 13 (list) + 1 (a word
-         * the rebuilt dictionary lifted into the top 10 000 on its own).
-         *
-         * 10 142 heads, not 10 145: three words selected by frequency never occur as the head of
-         * an in-vocabulary pair in mixed+web and are dropped rather than stored with an empty
-         * range (docs/DICTIONARY-E5B.md, "Dropped heads") — the same `-гәнчә` converbs as before,
-         * minus `толмацкий`, which the rebuilt dictionary no longer ranks that high. Every one of
-         * the thirteen named words does get pairs; none was dropped.
+         * 10 204 heads = 10 129 (cutoff) + 75 (list): three frequency-selected `-гәнчә` converbs
+         * still never head an in-vocabulary pair and are dropped rather than stored with an empty
+         * range (docs/archive/bigrams/DICTIONARY-E5B.md, "Dropped heads"; recorded in
+         * scripts/known_asset_drift.json). 594 of the 10 142 retained heads change the displayed
+         * triple — genre permutation among live dictionary words, measured head-by-head in the
+         * part-B report; the conversational data follows the terms recorded in
+         * assets/bigrams/NOTICE.txt.
          */
         @JvmField
         val TATAR_BIGRAMS_V1 = BigramArtifactSpec(
@@ -127,13 +122,13 @@ data class BigramArtifactSpec(
             subtypeId = PersonalSubtypes.TATAR_RU,
             storageDirectoryName = "bigrams",
             assetPath = "bigrams/tatar_bigrams_v1.tatbigr.zlib",
-            expectedCompressedSize = 175_843,
+            expectedCompressedSize = 176_749,
             expectedCompressedSha256 =
-                "f91c059937f3c9e8636b274af1f7f36bf5be887b59bc569aba26dfc1f2181893",
-            expectedRawSize = 518_728,
+                "3a25ea6300fdbdd0e5b2cf45339a3359cd0b84cb9b57309e142d990d89c78857",
+            expectedRawSize = 520_892,
             expectedRawSha256 =
-                "d2345b4831291a678c76c5a09b5b0539f0a1ffd4055762d8d69e5fed852822a6",
-            expectedHeadCount = 10_142,
+                "6db063319de1328ae73f084fdca6d76fe58e9571f080cb4738dd640ddfc3c966",
+            expectedHeadCount = 10_204,
         )
 
         /**

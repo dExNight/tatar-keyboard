@@ -543,8 +543,11 @@ class ShippedExtraHeadListTest(unittest.TestCase):
             self.DICTIONARY, pack.coverage.language_for("tat")
         )
         words = pack.read_extra_heads(self.LISTING, vocabulary)
-        self.assertEqual(13, len(words))
-        for expected in ("кил", "кит"):
+        # 75 = 13 первого отбора (IMPERATIVE-HEADS, ранги [10 000, 15 000)) + 62 слова
+        # расширенного правила части B (CORPUS-CONVERSATIONAL-TT, ранги [15 000, 40 000),
+        # пары — в смешанном Leipzig+разговорном обучении).
+        self.assertEqual(75, len(words))
+        for expected in ("кил", "кит", "шалтырат", "сөйлә", "утыр", "җибәр", "эшлә", "укы"):
             self.assertIn(expected, words)
 
     def test_no_named_word_is_reachable_by_the_cutoff_the_asset_was_packed_with(self) -> None:
