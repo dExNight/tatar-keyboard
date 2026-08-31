@@ -691,6 +691,12 @@ public final class KeyboardTextsTable {
         "DEFAULT", TEXTS_DEFAULT, /* 176/176 DEFAULT */
         "en"     , TEXTS_en,    /*   8/ 10 English */
         "ru"     , TEXTS_ru,    /*   9/ 32 Russian */
+    // U1+U2 (2026-08-31, docs/AUDIT-2026-08-31.md): Tatar inherits the Russian table wholesale —
+    // Tatar typography follows Russian («АБВ» alpha key, ₽ currency, „“ quotes). No separate
+    // TEXTS_tt: every non-null field of TEXTS_ru is either correct for tt as-is or never
+    // consulted, because the tatar rowkeys (rowkeys_tatar*.xml) reference no "!text/" names at
+    // all and set their moreKeys explicitly.
+        "tt"     , TEXTS_ru,    /* Tatar → Russian typography */
     };
 
     static {
