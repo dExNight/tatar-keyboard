@@ -301,6 +301,56 @@ else
     cat "$PINS_LOG" >&2
 fi
 
+# --- 3b. эмодзи-ассеты: APK против дерева ------------------------------------------------------
+# Эмодзи-ассеты — открытый текст (без zlib-обёртки), поэтому их пин — сам файл в
+# дереве: содержимое APK обязано быть побайтно тем, что закоммичено (до 2026-09-01
+# они покрывались только python/JVM-тестами, но не этим гейтом).
+
+EMOJI_LOG="$LOG_DIR/emoji-assets.log"
+if python3 - "$APK" >"$EMOJI_LOG" 2>&1 <<'PYEOF'
+import hashlib
+import sys
+import zipfile
+from pathlib import Path
+
+apk_path = sys.argv[1]
+ASSETS = ["emoji_set_v1.txt", "emoji_search_v1.txt",
+          "emoji_skin_v1.txt", "emoji_suggest_v1.txt", "NOTICE.txt"]
+
+problems = []
+with zipfile.ZipFile(apk_path) as apk:
+    for name in ASSETS:
+        repo = Path(f"app/src/main/assets/emoji/{name}")
+        if not repo.is_file():
+            problems.append(f"{name}: нет файла в дереве")
+            continue
+        try:
+            in_apk = apk.read(f"assets/emoji/{name}")
+        except KeyError:
+            problems.append(f"{name}: нет в APK")
+            continue
+        want = repo.read_bytes()
+        if in_apk != want:
+            problems.append(
+                f"{name}: расходится с деревом "
+                f"(дерево {hashlib.sha256(want).hexdigest()[:16]}…, "
+                f"APK {hashlib.sha256(in_apk).hexdigest()[:16]}…)")
+        else:
+            print(f"OK {name} ({len(want)} Б, побайтно дерево)")
+for p in problems:
+    print(f"MISMATCH {p}")
+if problems:
+    sys.exit(1)
+print(f"TOTAL {len(ASSETS)} эмодзи-ассетов совпали с деревом")
+PYEOF
+then
+    report PASS artifact.emoji_assets "$(tail -1 "$EMOJI_LOG")"
+    grep '^OK ' "$EMOJI_LOG" | sed 's/^/       /'
+else
+    report FAIL artifact.emoji_assets "эмодзи-ассеты расходятся, лог $EMOJI_LOG"
+    cat "$EMOJI_LOG" >&2
+fi
+
 # --- 4. разрешения: ровно VIBRATE --------------------------------------------------------------
 
 if PERMS=$("$AAPT2" dump permissions "$APK" 2>&1); then
