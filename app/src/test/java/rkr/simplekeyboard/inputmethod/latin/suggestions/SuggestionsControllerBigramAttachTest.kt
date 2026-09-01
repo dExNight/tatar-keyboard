@@ -4,6 +4,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import rkr.simplekeyboard.inputmethod.latin.dictionary.engine.LookupKind
 import rkr.simplekeyboard.inputmethod.latin.dictionary.storage.BigramPreparationResult
 import rkr.simplekeyboard.inputmethod.latin.dictionary.storage.PublishedBigramTableCatalog
 import rkr.simplekeyboard.inputmethod.latin.dictionary.storage.StorageFailure
@@ -27,8 +28,12 @@ class SuggestionsControllerBigramAttachTest {
     private class FakeStrip : StripSurface {
         var reserveCount = 0
         var hideCount = 0
+        val shown = mutableListOf<Triple<String, String?, String?>>()
 
-        override fun showSuggestions(first: String, second: String?, third: String?) {}
+        override fun showSuggestions(first: String, second: String?, third: String?) {
+            shown += Triple(first, second, third)
+        }
+
         override fun reserve() {
             reserveCount++
         }
@@ -43,10 +48,14 @@ class SuggestionsControllerBigramAttachTest {
     private class FakeEditor : EditorSurface {
         var word: String = ""
 
+        /** E5d: the live NEXT_WORD context the editor cache would re-derive. */
+        var context: String = ""
+
         override fun cachedWordBeforeCursor(): String = word
         override fun commitSuggestion(expectedPrefix: String, suggestion: String): Boolean = true
         override fun hasKnownCursor(): Boolean = true
         override fun hasLetterAfterCursor(): Boolean = false
+        override fun cachedNextWordContext(): String = context
     }
 
     /** Records call ORDER across every tracked method, so tests can assert relative sequencing. */
@@ -55,6 +64,13 @@ class SuggestionsControllerBigramAttachTest {
         var attachCatalog: PublishedBigramTableCatalog? = null
         var attachResult: Boolean = true
 
+        /** The result callback the controller handed to the engine factory. */
+        var callback: ResultCallback? = null
+
+        /** What the next NEXT_WORD request answers; delivered synchronously, like a warm table. */
+        var nextWordAnswer: List<String> = emptyList()
+        val requestedContexts = mutableListOf<ByteArray>()
+
         override fun request(editorSessionId: Long, subtypeId: String, prefixUtf8: ByteArray): Any? {
             events += "request"
             return Any()
@@ -62,7 +78,13 @@ class SuggestionsControllerBigramAttachTest {
 
         override fun requestNextWord(editorSessionId: Long, subtypeId: String, contextWordUtf8: ByteArray): Any? {
             events += "requestNextWord"
-            return null
+            requestedContexts += contextWordUtf8
+            val token = Any()
+            // The real engine answering instantly (table attached — or not attached yet, which is
+            // exactly the same empty list from the controller's side): the controller must digest
+            // a synchronous delivery too.
+            callback?.onResult(token, nextWordAnswer, LookupKind.NEXT_WORD)
+            return token
         }
 
         override fun attachBigramSource(catalog: PublishedBigramTableCatalog): Boolean {
@@ -138,7 +160,7 @@ class SuggestionsControllerBigramAttachTest {
         strip,
         editor,
         UiPoster { it.run() },
-        { _, _ -> engine },
+        { _, callback -> engine.also { it.callback = callback } },
         { executor },
         { _, _ -> null },
         true,
@@ -210,6 +232,69 @@ class SuggestionsControllerBigramAttachTest {
 
         assertEquals(listOf("request"), engine.events)
         assertEquals(1, strip.reserveCount)
+    }
+
+    @Test
+    fun completedAttachReRequestsTheNextWordContextItRaced() {
+        val strip = FakeStrip()
+        val editor = FakeEditor()
+        val engine = FakeEngine()
+        val bigramTable = PendingBigramPreparation()
+        val controller = controller(strip, editor, engine, DirectExecutorService()) { bigramTable }
+
+        controller.onStartInput(eligible = true)
+        // The engine is published, but the bigram attach is still in flight. The user finished a
+        // word and pressed space BEFORE the attach completed: the NEXT_WORD request goes to an
+        // engine without a table and gets the "not attached yet" empty list, which looks exactly
+        // like "no prediction for this context" (docs/NEXTWORD-RACE.md).
+        editor.context = "мин"
+        controller.onTextChanged()
+
+        assertEquals(1, engine.requestedContexts.size)
+        assertTrue(strip.shown.isEmpty())
+
+        // The table attached; the very same context has a real answer now.
+        engine.nextWordAnswer = listOf("дә", "үзем", "бу")
+        bigramTable.completeWith(BigramPreparationResult.Published(fakeTable(), alreadyPresent = false))
+
+        // The fix: a completed attach re-asks the still-pending NEXT_WORD context, and the band
+        // fills without another keystroke. Before it, the request count stayed at one and the
+        // band stayed empty until the next key.
+        assertEquals(2, engine.requestedContexts.size)
+        assertEquals(Triple("дә", "үзем", "бу"), strip.shown.last())
+    }
+
+    @Test
+    fun completedAttachWithoutAPendingNextWordMomentRequestsNothing() {
+        val strip = FakeStrip()
+        val editor = FakeEditor()   // an empty field: no NEXT_WORD moment is pending at all
+        val engine = FakeEngine()
+        val bigramTable = PendingBigramPreparation()
+        val controller = controller(strip, editor, engine, DirectExecutorService()) { bigramTable }
+
+        controller.onStartInput(eligible = true)
+        bigramTable.completeWith(BigramPreparationResult.Published(fakeTable(), alreadyPresent = false))
+
+        // Attach by itself builds no lookup: nothing was asked before it, nothing is asked by it —
+        // "the band stays silent when there is nothing to answer" is preserved.
+        assertEquals(listOf("attachBigramSource"), engine.events)
+        assertTrue(engine.requestedContexts.isEmpty())
+        assertTrue(strip.shown.isEmpty())
+    }
+
+    @Test
+    fun completedAttachMidWordDoesNotReRequestAnything() {
+        val strip = FakeStrip()
+        val editor = FakeEditor().apply { word = "аб" }   // a PREFIX moment, not a NEXT_WORD one
+        val engine = FakeEngine()
+        val bigramTable = PendingBigramPreparation()
+        val controller = controller(strip, editor, engine, DirectExecutorService()) { bigramTable }
+
+        controller.onStartInput(eligible = true)
+        bigramTable.completeWith(BigramPreparationResult.Published(fakeTable(), alreadyPresent = false))
+
+        assertEquals(listOf("request", "attachBigramSource"), engine.events)
+        assertTrue(engine.requestedContexts.isEmpty())
     }
 
     private fun fakeTable() = rkr.simplekeyboard.inputmethod.latin.dictionary.storage.PublishedBigramTable(

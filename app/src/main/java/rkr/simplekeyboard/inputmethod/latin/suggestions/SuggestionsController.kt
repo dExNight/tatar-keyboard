@@ -1074,11 +1074,19 @@ class SuggestionsController internal constructor(
      * strictly AFTER the dictionary engine has already been assigned, reserved and (if a prefix
      * was already typed) looked up — never on the path that gets there. Preparing and attaching
      * the bigram table both happen on the background executor and touch no UI-visible state of
-     * their own: unlike [onDictionaryReady], there is nothing here for the strip to reflect —
-     * [CompositePrefixComputer.predict] simply starts answering once attached, and a NEXT_WORD
-     * lookup is only ever triggered by E5d's own context-driven request, not by this completing.
+     * their own while they run: unlike [onDictionaryReady], there is nothing here for the strip
+     * to reflect — [CompositePrefixComputer.predict] simply starts answering once attached.
      * A missing, corrupted, or not-yet-published table leaves [handle] answering NEXT_WORD with
      * an empty list, exactly like before this ran — no failure path reaches the UI thread.
+     *
+     * The one thing a SUCCESSFUL attach must repair is the window it just closed
+     * (docs/NEXTWORD-RACE.md): a NEXT_WORD request that ran while the table was still attaching
+     * got its empty list from "not attached yet", not from "no prediction for this context" — and
+     * nothing would ask again until the next keystroke, so a field opened on a draft that already
+     * ends in "слово␣" showed an empty band indefinitely. [onBigramAttached] re-derives the band
+     * on the serialized UI owner, guarded to the exact NEXT_WORD moment the lost request was made
+     * for; a context the table genuinely has no answer for comes back empty again and the band
+     * stays silent, exactly as before.
      */
     private fun maybeAttachBigramSource(slot: LanguageSlot, handle: EngineHandle) {
         val preparation = bigramPreparationSeam(slot) ?: return
@@ -1086,15 +1094,46 @@ class SuggestionsController internal constructor(
             preparation.prepare { result ->
                 // Runs on the background executor, exactly like requestPreparationIfNeeded's own
                 // callback — attachBigramSource performs the same class of blocking I/O and must
-                // stay off the UI thread, so this is NOT re-marshaled through uiPoster.
-                if (result is BigramPreparationResult.Published) {
+                // stay off the UI thread, so this is NOT re-marshaled through uiPoster. Only the
+                // tiny re-derivation nudge after a successful attach is.
+                if (result is BigramPreparationResult.Published &&
                     handle.attachBigramSource(preparation.catalog())
+                ) {
+                    uiPoster.post { onBigramAttached(slot, handle) }
                 }
             }
         } catch (_: Throwable) {
             // Best-effort: NEXT_WORD simply keeps answering empty, exactly like a corrupted or
             // missing table would.
         }
+    }
+
+    /**
+     * The bigram table finished attaching to [handle] (E5c's second stage) — the repair half of
+     * the first-NEXT_WORD-request race (docs/NEXTWORD-RACE.md).
+     *
+     * Every guard fails towards leaving the band exactly as it is, the same shape as
+     * [onEmojiSuggestReady]: the attach may belong to a language the user has already left, to an
+     * engine a scheduled release has since made unusable, or to a controller that is gone; and the
+     * live editor state must still be the exact NEXT_WORD moment the outstanding request was
+     * built for — re-derived through [EditorSurface] exactly like the tap path re-derives it, so
+     * an attach that finished after the user typed on changes nothing. A band that already shows
+     * predictions (the request was answered late-but-correctly, or the companion language filled
+     * it) needs nothing. The re-issued request of a context the table genuinely does not answer
+     * comes back empty and the reserved band stays empty: legitimate silence is preserved, only
+     * the "never asked again" kind is repaired.
+     */
+    private fun onBigramAttached(slot: LanguageSlot, handle: EngineHandle) {
+        if (destroyed || !eligible) return
+        if (slot !== activeSlot()) return
+        if (usableEngine() !== handle) return
+        if (requestSessionId != sessionId) return
+        if (!editor.hasKnownCursor() || editor.hasLetterAfterCursor()) return
+        if (editor.cachedWordBeforeCursor().isNotEmpty()) return
+        val context = editor.cachedNextWordContext()
+        if (context.isEmpty() || context != pendingContextWord) return
+        if (displayedContextWord != null) return
+        requestCurrentPrefix()
     }
 
     /**
