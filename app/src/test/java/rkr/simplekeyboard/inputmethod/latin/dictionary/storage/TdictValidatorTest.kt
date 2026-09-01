@@ -46,7 +46,7 @@ class TdictValidatorTest {
         )
 
         assertEquals(100_000, validated.entryCount)
-        assertEquals(2_541_204, validated.rawSize)
+        assertEquals(1_162_870, validated.rawSize)
     }
 
     @Test
@@ -128,7 +128,7 @@ class TdictValidatorTest {
         val artifact = DictionaryTestFixtures.artifact()
         val variants = listOf(
             mutateAndRehash(artifact.raw, 0, 0),
-            mutateU16AndRehash(artifact.raw, 8, 2),
+            mutateU16AndRehash(artifact.raw, 8, 3),
             mutateU16AndRehash(artifact.raw, 10, 2),
             mutateU16AndRehash(artifact.raw, 12, 71),
             mutateU16AndRehash(artifact.raw, 14, 2),
@@ -180,12 +180,13 @@ class TdictValidatorTest {
     @Test
     fun rejectsInvalidOffsetsAndZeroFrequency() {
         val artifact = DictionaryTestFixtures.artifact()
-        val frequencyOffset = ByteBuffer.wrap(artifact.raw, 24, 4)
-            .order(ByteOrder.LITTLE_ENDIAN).int
         val variants = listOf(
+            // The first block offset must equal the blocks-section offset.
             mutateU32AndRehash(artifact.raw, 72, 1),
+            // The first word of a block with a zero u8 length.
             mutateU32AndRehash(artifact.raw, 76, 0),
-            mutateU32AndRehash(artifact.raw, frequencyOffset, 0),
+            // The last byte of the fixture is the last frequency's single-byte varint.
+            mutateAndRehash(artifact.raw, artifact.raw.size - 1, 0),
         )
         variants.forEachIndexed { index, raw -> assertRawFails(raw, 50 + index) }
     }
@@ -193,10 +194,10 @@ class TdictValidatorTest {
     @Test
     fun rejectsInvalidUtf8AlphabetCaseCanonicalOrderAndDuplicates() {
         val artifact = DictionaryTestFixtures.artifact()
-        val blobOffset = ByteBuffer.wrap(artifact.raw, 28, 4)
+        val blocksOffset = ByteBuffer.wrap(artifact.raw, 28, 4)
             .order(ByteOrder.LITTLE_ENDIAN).int
         val malformedUtf8 = DictionaryTestFixtures.refreshEmbeddedChecksum(
-            artifact.raw.copyOf().also { it[blobOffset] = 0xff.toByte() },
+            artifact.raw.copyOf().also { it[blocksOffset + 1] = 0xff.toByte() },
         )
         val rawVariants = listOf(
             malformedUtf8,

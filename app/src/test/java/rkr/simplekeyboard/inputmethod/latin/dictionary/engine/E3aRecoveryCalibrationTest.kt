@@ -21,6 +21,7 @@ import org.junit.Assert.assertTrue
 import org.junit.BeforeClass
 import org.junit.Test
 import rkr.simplekeyboard.inputmethod.latin.dictionary.storage.DictionaryArtifactSpec
+import rkr.simplekeyboard.inputmethod.latin.dictionary.storage.DictionaryTestFixtures
 import rkr.simplekeyboard.inputmethod.latin.dictionary.storage.TdictValidator
 import java.io.File
 import java.nio.ByteBuffer
@@ -297,22 +298,9 @@ class E3aRecoveryCalibrationTest {
             }
         }
 
-        /** Enumerates the words of a validated schema-1 tdict directly off its documented layout. */
-        private fun enumerateWords(raw: ByteArray): List<String> {
-            val buffer = ByteBuffer.wrap(raw).order(ByteOrder.LITTLE_ENDIAN)
-            val entryCount = buffer.getInt(16)
-            val offsetsOffset = 72
-            val blobOffset = buffer.getInt(28)
-            val words = ArrayList<String>(entryCount)
-            for (index in 0 until entryCount) {
-                val start = buffer.getInt(offsetsOffset + index * 4)
-                val end = buffer.getInt(offsetsOffset + (index + 1) * 4)
-                val encoded = ByteArray(end - start)
-                System.arraycopy(raw, blobOffset + start, encoded, 0, encoded.size)
-                words.add(String(encoded, Charsets.UTF_8))
-            }
-            return words
-        }
+        /** Enumerates the words of a validated schema-2 tdict directly off its documented layout. */
+        private fun enumerateWords(raw: ByteArray): List<String> =
+            DictionaryTestFixtures.words(raw)
 
         private fun locate(vararg paths: String): File =
             paths.map(::File).firstOrNull(File::isFile)

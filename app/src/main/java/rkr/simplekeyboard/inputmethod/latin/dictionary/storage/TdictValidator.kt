@@ -3,11 +3,9 @@ package rkr.simplekeyboard.inputmethod.latin.dictionary.storage
 import androidx.annotation.Keep
 import java.io.BufferedInputStream
 import java.io.BufferedOutputStream
-import java.io.EOFException
 import java.io.File
 import java.io.FileInputStream
 import java.io.OutputStream
-import java.io.RandomAccessFile
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.charset.CodingErrorAction
@@ -119,11 +117,10 @@ class TdictValidator {
             throw DictionaryValidationException("unexpected raw size")
         }
 
-        val header = ByteArray(TdictFormat.HEADER_SIZE)
-        RandomAccessFile(file, "r").use { raw ->
-            raw.readFully(header)
-        }
-        val buffer = ByteBuffer.wrap(header).order(ByteOrder.LITTLE_ENDIAN)
+        // The raw file is at most ~1.4 MB by the budget above, so validating from memory is
+        // both simpler and faster than the seek-per-word pass schema 1 needed for its offsets.
+        val bytes = FileInputStream(file).use { stream -> stream.readBytes() }
+        val buffer = ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN)
         val magic = ByteArray(8)
         buffer.get(magic)
         if (!magic.contentEquals(TdictFormat.MAGIC.toByteArray(StandardCharsets.US_ASCII))) {
@@ -134,10 +131,10 @@ class TdictValidator {
         val headerSize = buffer.short.toInt() and 0xffff
         val checksumAlgorithm = buffer.short.toInt() and 0xffff
         val entryCount = buffer.int.toLong() and TdictFormat.MAX_U32
-        val offsetsOffset = buffer.int.toLong() and TdictFormat.MAX_U32
-        val frequenciesOffset = buffer.int.toLong() and TdictFormat.MAX_U32
-        val blobOffset = buffer.int.toLong() and TdictFormat.MAX_U32
-        val blobSize = buffer.int.toLong() and TdictFormat.MAX_U32
+        val blockCount = buffer.int.toLong() and TdictFormat.MAX_U32
+        val blockIndexOffset = buffer.int.toLong() and TdictFormat.MAX_U32
+        val blocksOffset = buffer.int.toLong() and TdictFormat.MAX_U32
+        val blocksSize = buffer.int.toLong() and TdictFormat.MAX_U32
         val declaredFileSize = buffer.int.toLong() and TdictFormat.MAX_U32
         val storedChecksum = ByteArray(TdictFormat.CHECKSUM_SIZE)
         buffer.get(storedChecksum)
@@ -160,80 +157,113 @@ class TdictValidator {
             throw DictionaryValidationException("unexpected entry count")
         }
 
-        val expectedOffsetsOffset = TdictFormat.HEADER_SIZE.toLong()
-        val expectedFrequenciesOffset = checkedAdd(
-            expectedOffsetsOffset,
-            checkedMultiply(4L, checkedAdd(entryCount, 1L)),
+        val expectedBlockCount = checkedAdd(
+            entryCount,
+            (TdictFormat.BLOCK_SIZE - 1).toLong(),
+        ) / TdictFormat.BLOCK_SIZE
+        val expectedBlocksOffset = checkedAdd(
+            TdictFormat.HEADER_SIZE.toLong(),
+            checkedMultiply(4L, blockCount),
         )
-        val expectedBlobOffset = checkedAdd(
-            expectedFrequenciesOffset,
-            checkedMultiply(4L, entryCount),
-        )
-        val expectedFileSize = checkedAdd(expectedBlobOffset, blobSize)
-        if (expectedFrequenciesOffset > TdictFormat.MAX_U32 ||
-            expectedBlobOffset > TdictFormat.MAX_U32 ||
+        val expectedFileSize = checkedAdd(expectedBlocksOffset, blocksSize)
+        if (expectedBlocksOffset > TdictFormat.MAX_U32 ||
             expectedFileSize > TdictFormat.MAX_U32
         ) {
             throw DictionaryValidationException("section arithmetic exceeds u32")
         }
-        if (offsetsOffset != expectedOffsetsOffset ||
-            frequenciesOffset != expectedFrequenciesOffset ||
-            blobOffset != expectedBlobOffset ||
+        if (blockCount != expectedBlockCount ||
+            blockIndexOffset != TdictFormat.HEADER_SIZE.toLong() ||
+            blocksOffset != expectedBlocksOffset ||
             declaredFileSize != expectedFileSize ||
             declaredFileSize != length
         ) {
             throw DictionaryValidationException("noncanonical section layout")
         }
 
-        val digests = calculateDigests(file)
-        if (!MessageDigest.isEqual(storedChecksum, digests.zeroedChecksum)) {
+        val zeroed = bytes.copyOf()
+        zeroed.fill(
+            0,
+            TdictFormat.CHECKSUM_OFFSET,
+            TdictFormat.CHECKSUM_OFFSET + TdictFormat.CHECKSUM_SIZE,
+        )
+        val zeroedChecksum = MessageDigest.getInstance("SHA-256").digest(zeroed)
+        if (!MessageDigest.isEqual(storedChecksum, zeroedChecksum)) {
             throw DictionaryValidationException("SHA-256 checksum mismatch")
         }
-        val rawSha = digests.fullChecksum.toHex()
+        val rawSha = MessageDigest.getInstance("SHA-256").digest(bytes).toHex()
         if (!constantTimeHexEquals(rawSha, spec.expectedRawSha256)) {
             throw DictionaryValidationException("unexpected raw SHA-256")
         }
 
-        RandomAccessFile(file, "r").use { raw ->
-            raw.seek(offsetsOffset)
-            var previousOffset = readU32Le(raw)
-            if (previousOffset != 0L) {
-                throw DictionaryValidationException("first word offset must be zero")
+        val blockCountInt = blockCount.toInt()
+        val entryCountInt = entryCount.toInt()
+        val fileSize = declaredFileSize.toInt()
+        val blockOffsets = IntArray(blockCountInt) {
+            ByteBuffer.wrap(
+                bytes,
+                TdictFormat.HEADER_SIZE + it * 4,
+                4,
+            ).order(ByteOrder.LITTLE_ENDIAN).int
+        }
+        if (blockOffsets[0] != blocksOffset.toInt()) {
+            throw DictionaryValidationException("first block offset must equal the blocks offset")
+        }
+        for (index in 1 until blockCountInt) {
+            if (blockOffsets[index] <= blockOffsets[index - 1] ||
+                blockOffsets[index] >= fileSize
+            ) {
+                throw DictionaryValidationException("block offsets are not strictly increasing")
             }
-            val offsets = LongArray(checkedArraySize(entryCount + 1L))
-            offsets[0] = previousOffset
-            for (index in 1 until offsets.size) {
-                val offset = readU32Le(raw)
-                if (offset > blobSize || offset <= previousOffset) {
-                    throw DictionaryValidationException("word offsets are not strictly increasing")
-                }
-                offsets[index] = offset
-                previousOffset = offset
-            }
-            if (offsets.last() != blobSize) {
-                throw DictionaryValidationException("terminal word offset does not equal blob size")
-            }
+        }
 
-            raw.seek(frequenciesOffset)
-            repeat(checkedArraySize(entryCount)) {
-                if (readU32Le(raw) == 0L) {
-                    throw DictionaryValidationException("frequency must be positive")
-                }
+        var previousWordBytes: ByteArray? = null
+        var wordIndex = 0
+        for (block in 0 until blockCountInt) {
+            val blockStart = blockOffsets[block]
+            val blockEnd = if (block + 1 < blockCountInt) blockOffsets[block + 1] else fileSize
+            val inBlock = minOf(
+                TdictFormat.BLOCK_SIZE,
+                entryCountInt - block * TdictFormat.BLOCK_SIZE,
+            )
+            var cursor = blockStart
+            val firstLength = unsignedByte(bytes, cursor++)
+            if (firstLength == 0 || firstLength > TdictFormat.MAX_WORD_BYTES ||
+                cursor + firstLength > blockEnd
+            ) {
+                throw DictionaryValidationException("invalid first word of a block")
             }
+            val firstStart = cursor
+            cursor += firstLength
 
-            var previousWordBytes: ByteArray? = null
-            for (index in 0 until checkedArraySize(entryCount)) {
-                val wordSize = offsets[index + 1] - offsets[index]
-                if (wordSize <= 0L || wordSize > MAX_CANONICAL_WORD_BYTES) {
-                    throw DictionaryValidationException("invalid word byte length")
+            val blockWords = ArrayList<ByteArray>(inBlock)
+            for (entry in 0 until inBlock) {
+                val word: ByteArray
+                if (entry == 0) {
+                    word = bytes.copyOfRange(firstStart, firstStart + firstLength)
+                } else {
+                    val prefixLength = readCanonicalVarint(bytes, cursor, blockEnd)
+                        .also { cursor = varintEnd }
+                    if (prefixLength > firstLength) {
+                        throw DictionaryValidationException("prefix longer than the first word")
+                    }
+                    if (cursor >= blockEnd) {
+                        throw DictionaryValidationException("truncated block entry")
+                    }
+                    val suffixLength = unsignedByte(bytes, cursor++)
+                    if (suffixLength == 0 ||
+                        prefixLength + suffixLength > TdictFormat.MAX_WORD_BYTES ||
+                        cursor + suffixLength > blockEnd
+                    ) {
+                        throw DictionaryValidationException("invalid block entry")
+                    }
+                    word = ByteArray(prefixLength + suffixLength)
+                    bytes.copyInto(word, 0, firstStart, firstStart + prefixLength)
+                    bytes.copyInto(word, prefixLength, cursor, cursor + suffixLength)
+                    cursor += suffixLength
                 }
-                val encoded = ByteArray(wordSize.toInt())
-                raw.seek(blobOffset + offsets[index])
-                raw.readFully(encoded)
-                val word = decodeStrictUtf8(encoded)
-                validateCanonicalWord(word)
+                validateStoredWord(word, wordIndex)
                 previousWordBytes?.let { previous ->
-                    val order = compareUnsigned(previous, encoded)
+                    val order = compareUnsigned(previous, word)
                     if (order == 0) {
                         throw DictionaryValidationException("duplicate dictionary word")
                     }
@@ -241,7 +271,19 @@ class TdictValidator {
                         throw DictionaryValidationException("dictionary words are not sorted")
                     }
                 }
-                previousWordBytes = encoded
+                previousWordBytes = word
+                blockWords.add(word)
+                wordIndex++
+            }
+            repeat(inBlock) {
+                val frequency = readCanonicalVarint(bytes, cursor, blockEnd)
+                    .also { cursor = varintEnd }
+                if (frequency == 0) {
+                    throw DictionaryValidationException("frequency must be positive")
+                }
+            }
+            if (cursor != blockEnd) {
+                throw DictionaryValidationException("trailing bytes in a block")
             }
         }
 
@@ -254,30 +296,53 @@ class TdictValidator {
         )
     }
 
-    private fun calculateDigests(file: File): Digests {
-        val full = MessageDigest.getInstance("SHA-256")
-        val zeroed = MessageDigest.getInstance("SHA-256")
-        val bytes = ByteArray(BUFFER_SIZE)
-        var absoluteOffset = 0L
-        FileInputStream(file).use { stream ->
-            while (true) {
-                val count = stream.read(bytes)
-                if (count < 0) break
-                full.update(bytes, 0, count)
-                val copy = bytes.copyOf(count)
-                val zeroStart = maxOf(0L, TdictFormat.CHECKSUM_OFFSET - absoluteOffset).toInt()
-                val zeroEnd = minOf(
-                    count.toLong(),
-                    TdictFormat.CHECKSUM_OFFSET + TdictFormat.CHECKSUM_SIZE - absoluteOffset,
-                ).toInt()
-                if (zeroStart < zeroEnd) {
-                    copy.fill(0, zeroStart, zeroEnd)
-                }
-                zeroed.update(copy)
-                absoluteOffset += count
+    /** Last canonical varint's end offset, set by [readCanonicalVarint]. */
+    private var varintEnd = 0
+
+    /** Reads a canonical (minimal-form) base-128 varint; sets [varintEnd] past it. */
+    private fun readCanonicalVarint(bytes: ByteArray, offset: Int, limit: Int): Int {
+        var value = 0
+        var shift = 0
+        var cursor = offset
+        while (true) {
+            if (cursor >= limit) {
+                throw DictionaryValidationException("truncated varint")
             }
+            val byte = bytes[cursor].toInt() and 0xff
+            cursor++
+            if (shift == 28 && byte > 0x0f) {
+                throw DictionaryValidationException("varint exceeds u32")
+            }
+            value = value or ((byte and 0x7f) shl shift)
+            if (byte and 0x80 == 0) break
+            shift += 7
         }
-        return Digests(full.digest(), zeroed.digest())
+        // Canonical form: no overlong encodings (a value that fits fewer bytes).
+        var minimal = 1
+        var rest = value ushr 7
+        while (rest != 0) {
+            minimal++
+            rest = rest ushr 7
+        }
+        if (cursor - offset != minimal) {
+            throw DictionaryValidationException("non-canonical (overlong) varint")
+        }
+        varintEnd = cursor
+        return value
+    }
+
+    private fun unsignedByte(bytes: ByteArray, offset: Int): Int = bytes[offset].toInt() and 0xff
+
+    private fun validateStoredWord(encoded: ByteArray, index: Int) {
+        if (encoded.isEmpty() || encoded.size > MAX_CANONICAL_WORD_BYTES) {
+            throw DictionaryValidationException("invalid word byte length")
+        }
+        val word = decodeStrictUtf8(encoded)
+        try {
+            validateCanonicalWord(word)
+        } catch (error: DictionaryValidationException) {
+            throw DictionaryValidationException("word $index: ${error.message}", error)
+        }
     }
 
     private fun validateCanonicalWord(word: String) {
@@ -308,18 +373,6 @@ class TdictValidator {
         throw DictionaryValidationException("word is not valid UTF-8", error)
     }
 
-    private fun readU32Le(file: RandomAccessFile): Long {
-        val first = file.read()
-        val second = file.read()
-        val third = file.read()
-        val fourth = file.read()
-        if (first or second or third or fourth < 0) throw EOFException()
-        return first.toLong() or
-            (second.toLong() shl 8) or
-            (third.toLong() shl 16) or
-            (fourth.toLong() shl 24)
-    }
-
     private fun compareUnsigned(first: ByteArray, second: ByteArray): Int {
         val count = minOf(first.size, second.size)
         for (index in 0 until count) {
@@ -328,13 +381,6 @@ class TdictValidator {
             if (difference != 0) return difference
         }
         return first.size - second.size
-    }
-
-    private fun checkedArraySize(value: Long): Int {
-        if (value < 0L || value > Int.MAX_VALUE) {
-            throw DictionaryValidationException("section is too large")
-        }
-        return value.toInt()
     }
 
     private fun checkedAdd(first: Long, second: Long): Long = try {
@@ -348,11 +394,6 @@ class TdictValidator {
     } catch (error: ArithmeticException) {
         throw DictionaryValidationException("section arithmetic overflow", error)
     }
-
-    private data class Digests(
-        val fullChecksum: ByteArray,
-        val zeroedChecksum: ByteArray,
-    )
 
     companion object {
         private const val BUFFER_SIZE = 8 * 1024

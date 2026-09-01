@@ -2,6 +2,7 @@ package rkr.simplekeyboard.inputmethod.latin.dictionary.engine
 
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
+import rkr.simplekeyboard.inputmethod.latin.dictionary.storage.TdictFormat
 
 data class DictionaryIdentity(
     val generation: Int,
@@ -99,14 +100,13 @@ private inline fun isValidUtf8Scalar(size: Int, byteAt: (Int) -> Int): Boolean {
     return true
 }
 
-/** Immutable schema-1 reader. The supplied buffer must already have passed D1b validation. */
+/** Immutable schema-2 reader. The supplied buffer must already have passed D1b validation. */
 internal class TdictPrefixIndex private constructor(
     private val bytes: ByteBuffer,
     val identity: DictionaryIdentity,
     private val entryCount: Int,
-    private val offsetsOffset: Int,
-    private val frequenciesOffset: Int,
-    private val blobOffset: Int,
+    private val blockCount: Int,
+    private val blockIndexOffset: Int,
 ) : ClassifiedPrefixComputer, KeyNeighborSink {
     // Reusable per-index scratch. The index stops being fully immutable: these buffers are touched
     // ONLY inside lookup(), whose exclusivity is guaranteed by LatestOnlyPrefixEngine serialization
@@ -114,6 +114,20 @@ internal class TdictPrefixIndex private constructor(
     private val exactScratch = ByteArray(MAX_PREFIX_BYTES)
     private val variantScratch = ByteArray(MAX_PREFIX_BYTES + VARIANT_HEADROOM)
     private val codePointScratch = IntArray(MAX_PREFIX_BYTES)
+    // Front-coding decode scratch: word A is the target of every single-word access; two-word
+    // comparisons (ranking tie-breaks) decode the second word into word B. Neither escapes lookup().
+    private val wordScratchA = ByteArray(TdictFormat.MAX_WORD_BYTES)
+    private val wordScratchB = ByteArray(TdictFormat.MAX_WORD_BYTES)
+    // The block touched by the last access, fully decoded: concatenated word bytes, per-word
+    // start offsets and frequencies. Range scans (the exact pass over thousands of matches for a
+    // one-letter prefix, the fuzzy variant scans) touch every entry of a block, so decoding the
+    // block once — instead of re-walking it per entry — is what keeps schema 2 at schema-1
+    // latency. Worker-confined exactly like the scratches above; the data is immutable, so the
+    // cache is valid across lookups and never needs invalidation.
+    private val blockWordBytes = ByteArray(TdictFormat.BLOCK_SIZE * TdictFormat.MAX_WORD_BYTES)
+    private val blockWordStarts = IntArray(TdictFormat.BLOCK_SIZE + 1)
+    private val blockFrequencies = LongArray(TdictFormat.BLOCK_SIZE)
+    private var cachedBlock = -1
     private val rankedIndices = IntArray(MAX_RESULTS)
     private val rankedFrequencies = LongArray(MAX_RESULTS)
     // Edit class carried alongside every ranked slot as a plain primitive int — no boxing, no
@@ -323,13 +337,18 @@ internal class TdictPrefixIndex private constructor(
         val end = upperBound(exactScratch, prefixLength, start)
         if (start >= end) return 0
         var resultCount = 0
-        for (index in start until end) {
-            if (wordEquals(index, exactScratch, prefixLength)) continue
-            resultCount = insertRanked(
-                rankedIndices, rankedFrequencies, rankedClasses, resultCount, MAX_RESULTS,
-                index, frequencyAt(index), EDIT_CLASS_EXACT,
-            )
-        }
+        scanBlockRange(
+            start, end, exactScratch, prefixLength,
+            onEntry = { index, equalsQuery ->
+                if (equalsQuery) SCAN_SKIP else SCAN_TAKE
+            },
+            onFrequency = { index, frequency ->
+                resultCount = insertRanked(
+                    rankedIndices, rankedFrequencies, rankedClasses, resultCount, MAX_RESULTS,
+                    index, frequency, EDIT_CLASS_EXACT,
+                )
+            },
+        )
         return resultCount
     }
 
@@ -423,28 +442,36 @@ internal class TdictPrefixIndex private constructor(
         if (fuzzyOverBudget) return
         val start = lowerBound(variantBytes, variantLength, 0)
         val end = upperBound(variantBytes, variantLength, start)
-        var index = start
-        while (index < end) {
-            fuzzyVisited++
-            if (fuzzyVisited > MAX_FUZZY_VISITED) {
-                fuzzyOverBudget = true
-                return
-            }
-            // Exact-word exclusion applies on both levels: never suggest the typed word itself.
-            // A word is de-duplicated by dictionary index so it can never occupy two cells. Because
-            // classes run in order (#1, then #2, then #3), the first class to reach a word keeps it,
-            // which is also its best (lowest) class — consistent with the class-first ranking.
-            if (!wordEquals(index, exactScratch, fuzzyPrefixLength) &&
-                !containsIndex(rankedIndices, fuzzyExactCount, index) &&
-                !containsIndex(fuzzyIndices, fuzzyCount, index)
-            ) {
+        // The exact-word exclusion compares against the TYPED word, not the variant that
+        // selected the range — hence exactScratch/fuzzyPrefixLength here.
+        scanBlockRange(
+            start, end, exactScratch, fuzzyPrefixLength,
+            onEntry = { index, equalsQuery ->
+                fuzzyVisited++
+                if (fuzzyVisited > MAX_FUZZY_VISITED) {
+                    fuzzyOverBudget = true
+                    return@scanBlockRange SCAN_ABORT
+                }
+                // Exact-word exclusion applies on both levels: never suggest the typed word itself.
+                // A word is de-duplicated by dictionary index so it can never occupy two cells. Because
+                // classes run in order (#1, then #2, then #3), the first class to reach a word keeps it,
+                // which is also its best (lowest) class — consistent with the class-first ranking.
+                if (!equalsQuery &&
+                    !containsIndex(rankedIndices, fuzzyExactCount, index) &&
+                    !containsIndex(fuzzyIndices, fuzzyCount, index)
+                ) {
+                    SCAN_TAKE
+                } else {
+                    SCAN_SKIP
+                }
+            },
+            onFrequency = { index, frequency ->
                 fuzzyCount = insertRanked(
                     fuzzyIndices, fuzzyFrequencies, fuzzyClasses, fuzzyCount, fuzzyRemaining,
-                    index, frequencyAt(index), fuzzyCurrentClass,
+                    index, frequency, fuzzyCurrentClass,
                 )
-            }
-            index++
-        }
+            },
+        )
     }
 
     /** Bounded insertion sort shared by both levels; returns the new count. */
@@ -512,11 +539,12 @@ internal class TdictPrefixIndex private constructor(
     }
 
     private fun compareWholeWordToPrefix(index: Int, query: ByteArray, queryLength: Int): Int {
-        val start = wordStart(index)
-        val length = wordEnd(index) - start
+        val start = cachedWordStart(index)
+        val length = cachedWordEnd(index) - start
         val shared = minOf(length, queryLength)
         for (offset in 0 until shared) {
-            val difference = unsignedByte(start + offset) - (query[offset].toInt() and 0xff)
+            val difference = unsigned(blockWordBytes[start + offset]) -
+                (query[offset].toInt() and 0xff)
             if (difference != 0) return difference
         }
         return length - queryLength
@@ -524,21 +552,26 @@ internal class TdictPrefixIndex private constructor(
 
     /** Words beginning with the query compare equal, which gives the exclusive range end. */
     private fun compareWordToPrefixBlock(index: Int, query: ByteArray, queryLength: Int): Int {
-        val start = wordStart(index)
-        val length = wordEnd(index) - start
+        val start = cachedWordStart(index)
+        val length = cachedWordEnd(index) - start
         val shared = minOf(length, queryLength)
         for (offset in 0 until shared) {
-            val difference = unsignedByte(start + offset) - (query[offset].toInt() and 0xff)
+            val difference = unsigned(blockWordBytes[start + offset]) -
+                (query[offset].toInt() and 0xff)
             if (difference != 0) return difference
         }
         return if (length < queryLength) -1 else 0
     }
 
     private fun wordEquals(index: Int, query: ByteArray, queryLength: Int): Boolean {
-        val start = wordStart(index)
-        if (wordEnd(index) - start != queryLength) return false
+        val start = cachedWordStart(index)
+        if (cachedWordEnd(index) - start != queryLength) return false
         for (offset in 0 until queryLength) {
-            if (unsignedByte(start + offset) != (query[offset].toInt() and 0xff)) return false
+            if (unsigned(blockWordBytes[start + offset]) !=
+                (query[offset].toInt() and 0xff)
+            ) {
+                return false
+            }
         }
         return true
     }
@@ -561,36 +594,277 @@ internal class TdictPrefixIndex private constructor(
     }
 
     private fun compareWords(firstIndex: Int, secondIndex: Int): Int {
-        val firstStart = wordStart(firstIndex)
-        val secondStart = wordStart(secondIndex)
-        val firstLength = wordEnd(firstIndex) - firstStart
-        val secondLength = wordEnd(secondIndex) - secondStart
+        val firstLength = decodeWordInto(firstIndex, wordScratchA)
+        val secondLength = decodeWordInto(secondIndex, wordScratchB)
         val shared = minOf(firstLength, secondLength)
         for (offset in 0 until shared) {
-            val difference = unsignedByte(firstStart + offset) - unsignedByte(secondStart + offset)
+            val difference = unsigned(wordScratchA[offset]) - unsigned(wordScratchB[offset])
             if (difference != 0) return difference
         }
         return firstLength - secondLength
     }
 
     private fun decodeWord(index: Int): String {
-        val start = wordStart(index)
-        val length = wordEnd(index) - start
-        val encoded = ByteArray(length)
-        for (offset in encoded.indices) encoded[offset] = bytes.get(start + offset)
-        return String(encoded, Charsets.UTF_8)
+        val start = cachedWordStart(index)
+        return String(blockWordBytes, start, cachedWordEnd(index) - start, Charsets.UTF_8)
     }
 
-    private fun wordStart(index: Int): Int = blobOffset + offsetAt(index)
+    /** Start of word [index] inside [blockWordBytes]; decodes its block if it is not cached. */
+    private fun cachedWordStart(index: Int): Int {
+        ensureBlock(index / TdictFormat.BLOCK_SIZE)
+        return blockWordStarts[index % TdictFormat.BLOCK_SIZE]
+    }
 
-    private fun wordEnd(index: Int): Int = blobOffset + offsetAt(index + 1)
+    /** End of word [index] inside [blockWordBytes]; the block is cached by [cachedWordStart]. */
+    private fun cachedWordEnd(index: Int): Int = blockWordStarts[index % TdictFormat.BLOCK_SIZE + 1]
 
-    private fun offsetAt(index: Int): Int = bytes.getInt(offsetsOffset + index * U32_BYTES)
+    /** Decodes block [block] — words and frequencies — into the per-lookup block cache. */
+    private fun ensureBlock(block: Int) {
+        if (block == cachedBlock) return
+        val count = minOf(TdictFormat.BLOCK_SIZE, entryCount - block * TdictFormat.BLOCK_SIZE)
+        var cursor = blockOffset(block)
+        val firstLength = unsigned(bytes.get(cursor))
+        cursor++
+        val firstStart = cursor
+        cursor += firstLength
+        blockWordStarts[0] = 0
+        var writeAt = firstLength
+        for (offset in 0 until firstLength) blockWordBytes[offset] = bytes.get(firstStart + offset)
+        blockWordStarts[1] = writeAt
+        for (entry in 1 until count) {
+            // Inline varint fast path: a prefix length virtually always fits one byte.
+            var prefixLength = unsigned(bytes.get(cursor))
+            cursor++
+            if (prefixLength >= 0x80) {
+                decodeVarint(cursor - 1)
+                prefixLength = varintValue
+                cursor = varintNext
+            }
+            val suffixLength = unsigned(bytes.get(cursor))
+            cursor++
+            // The prefix refers to the block's FIRST word, which lies contiguously in the
+            // mapped buffer — copying from there (not from the partially overwritten cache)
+            // is what makes every entry of the block independently decodable.
+            for (offset in 0 until prefixLength) {
+                blockWordBytes[writeAt + offset] = bytes.get(firstStart + offset)
+            }
+            for (offset in 0 until suffixLength) {
+                blockWordBytes[writeAt + prefixLength + offset] = bytes.get(cursor + offset)
+            }
+            cursor += suffixLength
+            writeAt += prefixLength + suffixLength
+            blockWordStarts[entry + 1] = writeAt
+        }
+        for (entry in 0 until count) {
+            // Inline varint fast path; a varint holds a u32, interpreted unsigned (schema 1 parity).
+            var frequency = unsigned(bytes.get(cursor))
+            cursor++
+            if (frequency >= 0x80) {
+                decodeVarint(cursor - 1)
+                frequency = varintValue
+                cursor = varintNext
+            }
+            blockFrequencies[entry] = frequency.toLong() and MAX_U32
+        }
+        cachedBlock = block
+    }
 
-    private fun frequencyAt(index: Int): Long =
-        bytes.getInt(frequenciesOffset + index * U32_BYTES).toLong() and MAX_U32
+    /**
+     * Streams the entry range [start, end) without materializing words: per in-range entry it
+     * reports [onEntry] (index, equalsQuery) — computed piecewise against the mapped bytes — and
+     * only for entries where [onEntry] answered [SCAN_TAKE] it then reports [onFrequency], still
+     * inside the same block visit. The function is `inline`, so neither callback allocates, and
+     * the word bytes are never copied: a one-letter prefix scan pays a couple of varint reads per
+     * entry instead of a full block decode.
+     *
+     * [onEntry] verdicts: [SCAN_SKIP] — not a candidate; [SCAN_TAKE] — candidate, report its
+     * frequency via [onFrequency]; [SCAN_ABORT] — stop the whole scan immediately (the fuzzy
+     * budget trip, after which the level is dropped in full and pending frequencies are never
+     * needed, so [onFrequency] may then be skipped).
+     *
+     * The [insertRanked] call sequence is unchanged versus the schema-1 loop: [onFrequency] fires
+     * in ascending index order within a block and blocks are visited in ascending order.
+     */
+    private inline fun scanBlockRange(
+        start: Int,
+        end: Int,
+        query: ByteArray,
+        queryLength: Int,
+        onEntry: (Int, Boolean) -> Int,
+        onFrequency: (Int, Long) -> Unit,
+    ) {
+        var index = start
+        while (index < end) {
+            val block = index / TdictFormat.BLOCK_SIZE
+            val inBlock = minOf(TdictFormat.BLOCK_SIZE, entryCount - block * TdictFormat.BLOCK_SIZE)
+            val lastPosition = minOf(inBlock, end - block * TdictFormat.BLOCK_SIZE)
+            var cursor = blockOffset(block)
+            val firstLength = unsigned(bytes.get(cursor))
+            cursor++
+            val firstStart = cursor
+            cursor += firstLength
+            var takeMask = 0
+            var position = 0
+            // Entry 0 is the block's first word; treating it as "prefix 0 + whole-word suffix"
+            // keeps the loop body uniform.
+            var prefixLength = 0
+            var suffixStart = firstStart
+            var wordLength = firstLength
+            while (position < lastPosition) {
+                if (position > 0) {
+                    prefixLength = unsigned(bytes.get(cursor))
+                    cursor++
+                    if (prefixLength >= 0x80) {
+                        decodeVarint(cursor - 1)
+                        prefixLength = varintValue
+                        cursor = varintNext
+                    }
+                    val suffixLength = unsigned(bytes.get(cursor))
+                    cursor++
+                    suffixStart = cursor
+                    cursor += suffixLength
+                    wordLength = prefixLength + suffixLength
+                }
+                val entryIndex = block * TdictFormat.BLOCK_SIZE + position
+                if (entryIndex >= index) {
+                    val equalsQuery = wordLength == queryLength &&
+                        wordBytesEqual(
+                            firstStart, prefixLength, suffixStart,
+                            query, queryLength,
+                        )
+                    when (onEntry(entryIndex, equalsQuery)) {
+                        SCAN_TAKE -> takeMask = takeMask or (1 shl position)
+                        SCAN_ABORT -> return
+                    }
+                }
+                position++
+            }
+            if (takeMask != 0) {
+                // Finish walking the word section to reach the block's frequencies.
+                while (position < inBlock) {
+                    decodeVarint(cursor)
+                    cursor = varintNext
+                    cursor += 1 + unsigned(bytes.get(cursor))
+                    position++
+                }
+                var frequencyPosition = 0
+                while (frequencyPosition < inBlock) {
+                    decodeVarint(cursor)
+                    val frequency = varintValue.toLong() and MAX_U32
+                    cursor = varintNext
+                    if (takeMask and (1 shl frequencyPosition) != 0) {
+                        onFrequency(block * TdictFormat.BLOCK_SIZE + frequencyPosition, frequency)
+                    }
+                    frequencyPosition++
+                }
+            }
+            index = block * TdictFormat.BLOCK_SIZE + lastPosition
+        }
+    }
 
-    private fun unsignedByte(offset: Int): Int = unsigned(bytes.get(offset))
+    /**
+     * Piecewise equality of a front-coded word (prefix of the block's first word + suffix at
+     * [suffixStart]) against [query]. Caller guarantees prefix + suffix lengths equal
+     * [queryLength] (checked before the call), so [prefixLength] never exceeds it.
+     */
+    private fun wordBytesEqual(
+        firstStart: Int,
+        prefixLength: Int,
+        suffixStart: Int,
+        query: ByteArray,
+        queryLength: Int,
+    ): Boolean {
+        for (offset in 0 until prefixLength) {
+            if (unsigned(bytes.get(firstStart + offset)) !=
+                (query[offset].toInt() and 0xff)
+            ) {
+                return false
+            }
+        }
+        for (offset in 0 until queryLength - prefixLength) {
+            if (unsigned(bytes.get(suffixStart + offset)) !=
+                (query[prefixLength + offset].toInt() and 0xff)
+            ) {
+                return false
+            }
+        }
+        return true
+    }
+
+    /**
+     * The varint frequency of word [index], served from the decoded-block cache.
+     */
+    private fun frequencyAt(index: Int): Long {
+        ensureBlock(index / TdictFormat.BLOCK_SIZE)
+        return blockFrequencies[index % TdictFormat.BLOCK_SIZE]
+    }
+
+    /**
+     * Decodes word [index] of the front-coded block structure into [scratch] and returns its
+     * byte length. Used only by [compareWords], whose two words may live in different blocks and
+     * therefore cannot share the single-block cache; the binary-search and scan paths above all
+     * go through the cache instead. A block stores its first word in full and every following
+     * word as a varint shared-prefix length against that FIRST word plus a u8-length suffix, so
+     * decoding word p walks p entries of the block (≤ [TdictFormat.BLOCK_SIZE] - 1) — and only
+     * reads varints and skips suffix bytes on the way, copying nothing until the target word.
+     * The prefix bytes are copied from the mapped buffer (where the block's first word always
+     * lies contiguously), never from [scratch]: consecutive decodes into one scratch would
+     * otherwise corrupt the prefix the next word refers to.
+     */
+    private fun decodeWordInto(index: Int, scratch: ByteArray): Int {
+        val block = index / TdictFormat.BLOCK_SIZE
+        val position = index % TdictFormat.BLOCK_SIZE
+        var cursor = blockOffset(block)
+        val firstLength = unsigned(bytes.get(cursor))
+        cursor++
+        val firstStart = cursor
+        if (position == 0) {
+            for (offset in 0 until firstLength) scratch[offset] = bytes.get(firstStart + offset)
+            return firstLength
+        }
+        cursor += firstLength
+        var prefixLength = 0
+        var suffixLength = 0
+        for (entry in 1..position) {
+            decodeVarint(cursor)
+            prefixLength = varintValue
+            cursor = varintNext
+            suffixLength = unsigned(bytes.get(cursor))
+            cursor++
+            if (entry == position) {
+                for (offset in 0 until prefixLength) {
+                    scratch[offset] = bytes.get(firstStart + offset)
+                }
+                for (offset in 0 until suffixLength) {
+                    scratch[prefixLength + offset] = bytes.get(cursor + offset)
+                }
+            }
+            cursor += suffixLength
+        }
+        return prefixLength + suffixLength
+    }
+
+    // Shared varint decode result, worker-confined exactly like the word scratches above.
+    private var varintValue = 0
+    private var varintNext = 0
+
+    /** Decodes the base-128 varint at [offset] into [varintValue]/[varintNext]. */
+    private fun decodeVarint(offset: Int) {
+        var value = 0
+        var shift = 0
+        var cursor = offset
+        while (true) {
+            val byte = unsigned(bytes.get(cursor))
+            cursor++
+            value = value or ((byte and 0x7f) shl shift)
+            if (byte and 0x80 == 0) break
+            shift += 7
+        }
+        varintValue = value
+        varintNext = cursor
+    }
+
+    private fun blockOffset(block: Int): Int = bytes.getInt(blockIndexOffset + block * U32_BYTES)
 
     companion object {
         private const val HEADER_SIZE = 72
@@ -643,6 +917,12 @@ internal class TdictPrefixIndex private constructor(
         // reference (p95 133 entries, max 522).
         private const val MAX_FUZZY_VARIANTS = 64
         private const val MAX_FUZZY_VISITED = 8192
+
+        // scanBlockRange entry verdicts: not a candidate / candidate, report its frequency /
+        // abort the whole scan (the fuzzy budget trip).
+        private const val SCAN_SKIP = 0
+        private const val SCAN_TAKE = 1
+        private const val SCAN_ABORT = 2
         private val MAGIC = "TATDICT\u0000".toByteArray(Charsets.US_ASCII)
 
         fun open(
@@ -652,8 +932,8 @@ internal class TdictPrefixIndex private constructor(
             expectedRawSize: Long,
         ): TdictPrefixIndex? = try {
             require(identity.generation > 0)
-            require(identity.schemaId == 1)
-            require(identity.formatVersion == 1)
+            require(identity.schemaId == TdictFormat.SCHEMA_ID)
+            require(identity.formatVersion == TdictFormat.FORMAT_VERSION)
             require(expectedEntryCount in 1..Int.MAX_VALUE.toLong())
             require(expectedRawSize in HEADER_SIZE.toLong()..Int.MAX_VALUE.toLong())
             require(source.limit().toLong() == expectedRawSize)
@@ -670,43 +950,97 @@ internal class TdictPrefixIndex private constructor(
 
             val count = u32(buffer, 16)
             require(count == expectedEntryCount)
-            val offsets = u32(buffer, 20)
-            val frequencies = u32(buffer, 24)
-            val blob = u32(buffer, 28)
-            val blobSize = u32(buffer, 32)
+            val blocks = u32(buffer, 20)
+            val blockIndex = u32(buffer, 24)
+            val blocksOffset = u32(buffer, 28)
+            val blocksSize = u32(buffer, 32)
             val fileSize = u32(buffer, 36)
-            val expectedFrequencies = HEADER_SIZE.toLong() + U32_BYTES * (count + 1L)
-            val expectedBlob = expectedFrequencies + U32_BYTES * count
-            val expectedFileSize = expectedBlob + blobSize
-            require(offsets == HEADER_SIZE.toLong())
-            require(frequencies == expectedFrequencies)
-            require(blob == expectedBlob)
-            require(fileSize == expectedFileSize && fileSize == expectedRawSize)
-            require(expectedBlob <= Int.MAX_VALUE && expectedFileSize <= Int.MAX_VALUE)
-
             val entryCount = count.toInt()
-            val offsetsOffset = offsets.toInt()
-            val frequenciesOffset = frequencies.toInt()
-            val blobOffset = blob.toInt()
+            val expectedBlockCount =
+                (entryCount + TdictFormat.BLOCK_SIZE - 1) / TdictFormat.BLOCK_SIZE
+            val expectedBlocksOffset = HEADER_SIZE.toLong() + U32_BYTES * blocks
+            val expectedFileSize = expectedBlocksOffset + blocksSize
+            require(blocks == expectedBlockCount.toLong())
+            require(blockIndex == HEADER_SIZE.toLong())
+            require(blocksOffset == expectedBlocksOffset)
+            require(fileSize == expectedFileSize && fileSize == expectedRawSize)
+            require(expectedBlocksOffset <= Int.MAX_VALUE && expectedFileSize <= Int.MAX_VALUE)
+
+            val blockCount = blocks.toInt()
+            val blockIndexOffset = blockIndex.toInt()
             val index = TdictPrefixIndex(
                 buffer,
                 identity,
                 entryCount,
-                offsetsOffset,
-                frequenciesOffset,
-                blobOffset,
+                blockCount,
+                blockIndexOffset,
             )
-            require(index.offsetAt(0) == 0)
-            var previousOffset = 0
-            for (wordIndex in 0 until entryCount) {
-                val nextOffset = index.offsetAt(wordIndex + 1)
-                require(nextOffset > previousOffset)
-                require(nextOffset.toLong() <= blobSize)
-                require(index.frequencyAt(wordIndex) != 0L)
-                if (wordIndex > 0) require(index.compareWords(wordIndex - 1, wordIndex) < 0)
-                previousOffset = nextOffset
+            // Full structural pass: the block table is canonical and every block decodes to
+            // exactly its entry count, strictly increasing words and positive frequencies.
+            require(index.blockOffset(0) == blocksOffset.toInt())
+            var previousBlockOffset = index.blockOffset(0)
+            for (block in 1 until blockCount) {
+                val offset = index.blockOffset(block)
+                require(offset > previousBlockOffset)
+                require(offset.toLong() < fileSize)
+                previousBlockOffset = offset
             }
-            require(previousOffset.toLong() == blobSize)
+            val previous = ByteArray(TdictFormat.MAX_WORD_BYTES)
+            var previousLength = -1
+            val current = ByteArray(TdictFormat.MAX_WORD_BYTES)
+            for (block in 0 until blockCount) {
+                val blockStart = index.blockOffset(block)
+                val blockEnd =
+                    if (block + 1 < blockCount) index.blockOffset(block + 1) else fileSize.toInt()
+                val inBlock = minOf(TdictFormat.BLOCK_SIZE, entryCount - block * TdictFormat.BLOCK_SIZE)
+                var cursor = blockStart
+                val firstLength = unsigned(buffer.get(cursor))
+                cursor++
+                require(firstLength >= 1 && firstLength <= TdictFormat.MAX_WORD_BYTES)
+                require(cursor + firstLength <= blockEnd)
+                val firstStart = cursor
+                cursor += firstLength
+                for (entry in 0 until inBlock) {
+                    val length: Int
+                    if (entry == 0) {
+                        for (offset in 0 until firstLength) current[offset] = buffer.get(firstStart + offset)
+                        length = firstLength
+                    } else {
+                        index.decodeVarint(cursor)
+                        val prefixLength = index.varintValue
+                        cursor = index.varintNext
+                        require(prefixLength <= firstLength)
+                        require(cursor < blockEnd)
+                        val suffixLength = unsigned(buffer.get(cursor))
+                        cursor++
+                        require(suffixLength >= 1)
+                        require(prefixLength + suffixLength <= TdictFormat.MAX_WORD_BYTES)
+                        require(cursor + suffixLength <= blockEnd)
+                        for (offset in 0 until prefixLength) current[offset] = buffer.get(firstStart + offset)
+                        for (offset in 0 until suffixLength) current[prefixLength + offset] = buffer.get(cursor + offset)
+                        cursor += suffixLength
+                        length = prefixLength + suffixLength
+                    }
+                    if (previousLength >= 0) {
+                        val shared = minOf(previousLength, length)
+                        var difference = 0
+                        for (offset in 0 until shared) {
+                            difference = unsigned(previous[offset]) - unsigned(current[offset])
+                            if (difference != 0) break
+                        }
+                        if (difference == 0) difference = previousLength - length
+                        require(difference < 0)
+                    }
+                    System.arraycopy(current, 0, previous, 0, length)
+                    previousLength = length
+                }
+                for (entry in 0 until inBlock) {
+                    index.decodeVarint(cursor)
+                    require(index.varintValue != 0)
+                    cursor = index.varintNext
+                }
+                require(cursor == blockEnd)
+            }
             index
         } catch (_: RuntimeException) {
             null

@@ -95,13 +95,13 @@ class TdictPrefixIndexTest {
         assertNull(open(badMagic))
 
         val badSchema = raw.copyOf().also {
-            ByteBuffer.wrap(it).order(ByteOrder.LITTLE_ENDIAN).putShort(8, 2)
+            ByteBuffer.wrap(it).order(ByteOrder.LITTLE_ENDIAN).putShort(8, 3)
         }
         assertNull(open(badSchema))
 
         val zeroFrequency = raw.copyOf().also {
-            val frequencyOffset = ByteBuffer.wrap(it).order(ByteOrder.LITTLE_ENDIAN).getInt(24)
-            ByteBuffer.wrap(it).order(ByteOrder.LITTLE_ENDIAN).putInt(frequencyOffset, 0)
+            // The last byte of the fixture is the last entry's single-byte frequency varint.
+            it[it.size - 1] = 0
         }
         assertNull(open(zeroFrequency))
 

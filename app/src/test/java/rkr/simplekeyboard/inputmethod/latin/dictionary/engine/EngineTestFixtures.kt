@@ -8,7 +8,7 @@ import java.util.concurrent.RejectedExecutionException
 import java.util.concurrent.TimeUnit
 
 internal object EngineTestFixtures {
-    val identity = DictionaryIdentity(1, 1, 1, "a".repeat(64))
+    val identity = DictionaryIdentity(1, 2, 1, "a".repeat(64))
     val bigramIdentity = BigramTableIdentity(1, "tt", 2, 1, "b".repeat(64))
 
     fun index(entries: List<Pair<String, Long>>): TdictPrefixIndex {

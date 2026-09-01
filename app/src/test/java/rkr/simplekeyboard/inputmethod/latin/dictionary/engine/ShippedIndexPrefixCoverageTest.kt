@@ -24,6 +24,7 @@ import org.junit.Assert.assertTrue
 import org.junit.BeforeClass
 import org.junit.Test
 import rkr.simplekeyboard.inputmethod.latin.dictionary.storage.DictionaryArtifactSpec
+import rkr.simplekeyboard.inputmethod.latin.dictionary.storage.DictionaryTestFixtures
 import rkr.simplekeyboard.inputmethod.latin.dictionary.storage.TdictValidator
 
 /**
@@ -134,20 +135,8 @@ class ShippedIndexPrefixCoverageTest {
             }
         }
 
-        /** Reads the word blob straight out of the schema-1 file; the reader keeps it private. */
-        private fun decodeWords(raw: ByteArray): List<String> {
-            val buffer = ByteBuffer.wrap(raw).order(ByteOrder.LITTLE_ENDIAN)
-            val count = buffer.getInt(16)
-            val offsetsOffset = buffer.getInt(20)
-            val blobOffset = buffer.getInt(28)
-            val words = ArrayList<String>(count)
-            for (index in 0 until count) {
-                val start = buffer.getInt(offsetsOffset + index * 4)
-                val end = buffer.getInt(offsetsOffset + (index + 1) * 4)
-                words.add(String(raw, blobOffset + start, end - start, Charsets.UTF_8))
-            }
-            return words
-        }
+        /** Reads the words straight out of the schema-2 file; the reader keeps them private. */
+        private fun decodeWords(raw: ByteArray): List<String> = DictionaryTestFixtures.words(raw)
 
         private fun locate(vararg paths: String): File =
             paths.map(::File).firstOrNull(File::isFile) ?: error("cannot locate ${paths.toList()}")

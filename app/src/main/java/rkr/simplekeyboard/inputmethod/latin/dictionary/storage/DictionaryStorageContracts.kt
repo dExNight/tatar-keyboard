@@ -116,12 +116,12 @@ data class DictionaryArtifactSpec(
             storageDirectoryName = "dictionaries",
             generation = 1,
             assetPath = "dictionaries/tatar_top100k_v1.tdict.zlib",
-            expectedCompressedSize = 601_118,
+            expectedCompressedSize = 501_683,
             expectedCompressedSha256 =
-                "76bd5a39bc1091e7e85279e058385321db231084c269fd0a000f7ecb59bce7ac",
-            expectedRawSize = 2_541_204,
+                "cb34fe7d48bbaa73002a2d19e3696610c6e493d61a2a72355382e46987918119",
+            expectedRawSize = 1_162_870,
             expectedRawSha256 =
-                "8f434ec7cfd718df31b4410e55d36cbb914d2497ec265f89db3aaf48ec625f76",
+                "922d14f200ef650f69c45b18183ec30a48c7989cd0b520c5de59215592770130",
             expectedEntryCount = 100_000,
             bigrams = BigramArtifactSpec.TATAR_BIGRAMS_V1,
         )
@@ -159,12 +159,12 @@ data class DictionaryArtifactSpec(
             storageDirectoryName = "dictionaries-ru",
             generation = 1,
             assetPath = "dictionaries/russian_top100k_v1.tdict.zlib",
-            expectedCompressedSize = 638_758,
+            expectedCompressedSize = 539_948,
             expectedCompressedSha256 =
-                "236f21eaee357e563b979e807f38d4bed4674090695a5570b35e61369483de47",
-            expectedRawSize = 2_462_128,
+                "273f1a6928f74fdbd7f0fda4490978124b3748160ac283d0b51e8c913fea5fde",
+            expectedRawSize = 1_151_323,
             expectedRawSha256 =
-                "60b303711fdf7b3d52bc646dc2e8ed4f8c05932d05412bc01baa467a58c9faee",
+                "f05499a3b4c3c2811c6ee8e9084dfaf472951a289a20dde2ab8cb098cb5a15b2",
             expectedEntryCount = 100_000,
             bigrams = BigramArtifactSpec.RUSSIAN_BIGRAMS_V1,
         )
@@ -330,13 +330,21 @@ class DictionaryFileLease internal constructor(
 
 internal object TdictFormat {
     const val MAGIC = "TATDICT\u0000"
-    const val SCHEMA_ID = 1
+    const val SCHEMA_ID = 2
     const val FORMAT_VERSION = 1
     const val HEADER_SIZE = 72
     const val CHECKSUM_OFFSET = 40
     const val CHECKSUM_SIZE = 32
     const val CHECKSUM_ALGORITHM_SHA256 = 1
-    const val MAX_COMPRESSED_SIZE = 700_000L
-    const val MAX_RAW_SIZE = 2_936_012L
+    // Schema 2 (SIZE-1, docs/SIZE-SCHEMA2.md): блоки front-coding по BLOCK_SIZE слов —
+    // первое слово целиком (u8 длина), остальные как varint общего префикса с первым
+    // словом блока + u8 суффикс; затем по varint-частоте на слово. K = 8 выбрано замером
+    // 2026-09-01: минимум и по zlib-размеру, и по работе декода (≤ 7 слов на доступ).
+    const val BLOCK_SIZE = 8
+    const val MAX_WORD_BYTES = 128
+    // Бюджеты пересмотрены под измеренное (татарский 501 683/1 162 870, русский
+    // 539 948/1 151 323) с запасом, соразмерным schema 1.
+    const val MAX_COMPRESSED_SIZE = 600_000L
+    const val MAX_RAW_SIZE = 1_400_000L
     const val MAX_U32 = 0xffff_ffffL
 }
