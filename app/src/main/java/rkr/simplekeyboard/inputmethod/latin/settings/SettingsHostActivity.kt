@@ -365,6 +365,7 @@ class SettingsHostActivity : Activity() {
                 R.string.delete_swipe, R.string.delete_swipe_summary))
         var personalDictionaryRow: View? = null
         var autocorrectRow: View? = null
+        var emojiSuggestRow: View? = null
         rows.add(switchRow(Settings.PREF_TATAR_SUGGESTIONS, false,
                 R.string.tatar_suggestions, R.string.tatar_suggestions_summary) { checked ->
             personalDictionaryRow?.let {
@@ -372,6 +373,9 @@ class SettingsHostActivity : Activity() {
             }
             autocorrectRow?.let {
                 setRowEnabled(it, checked && !isRestricted(Settings.PREF_TATAR_AUTOCORRECT))
+            }
+            emojiSuggestRow?.let {
+                setRowEnabled(it, checked && !isRestricted(Settings.PREF_EMOJI_SUGGESTIONS))
             }
         })
         // The personal dictionary rides on the suggestion band: without suggestions there is
@@ -388,6 +392,13 @@ class SettingsHostActivity : Activity() {
                 R.string.tatar_autocorrect, R.string.tatar_autocorrect_summary)
         autocorrectRow = autocorrectSwitch
         rows.add(autocorrectSwitch)
+        // Emoji suggestions (mission 2 of docs/EMOJI-SUGGEST-PLAN.md) are subordinate to the
+        // suggestions switch because the emoji cell lives in the very same band; separate because
+        // a picture among the words is a taste, not a feature of the words themselves.
+        val emojiSuggestSwitch = switchRow(Settings.PREF_EMOJI_SUGGESTIONS, false,
+                R.string.emoji_suggestions, R.string.emoji_suggestions_summary)
+        emojiSuggestRow = emojiSuggestSwitch
+        rows.add(emojiSuggestSwitch)
         addCard(rows)
         // android:dependency="pref_show_language_switch_key" from the legacy screen.
         setRowEnabled(imeRow,
@@ -399,6 +410,9 @@ class SettingsHostActivity : Activity() {
         setRowEnabled(autocorrectSwitch,
                 Settings.readTatarSuggestionsEnabled(prefs)
                         && !isRestricted(Settings.PREF_TATAR_AUTOCORRECT))
+        setRowEnabled(emojiSuggestSwitch,
+                Settings.readTatarSuggestionsEnabled(prefs)
+                        && !isRestricted(Settings.PREF_EMOJI_SUGGESTIONS))
         // Reachable whatever the toggles say: erasing what was already saved must always be
         // possible, so the entry never depends on the switch above it.
         addCard(listOf(linkRow(R.string.personal_dictionary_screen) {

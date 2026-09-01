@@ -130,6 +130,10 @@
     <string name="tatar_autocorrect">Autocorrect words</string>
     <!-- Description for the autocorrection option. Says plainly that text already typed is changed and how to undo it. -->
     <string name="tatar_autocorrect_summary">Fix a misspelled word when you type a space or punctuation. Press backspace right after to get back what you typed.</string>
+    <!-- Option to show a matching emoji in the suggestion strip after a finished word -->
+    <string name="emoji_suggestions">Emoji suggestions</string>
+    <!-- Description for the emoji suggestions option. Says plainly that tapping the emoji only adds it and never changes the typed word. -->
+    <string name="emoji_suggestions_summary">Show a matching emoji above the keyboard when you finish a word, in Tatar and in Russian. Tapping it only adds the emoji — the typed word stays.</string>
     <!-- Option to remember words the user types and suggest them later -->
     <string name="personal_dictionary">Personal dictionary</string>
     <!-- Description for the personal dictionary option. Says plainly that words are saved on the device and that turning the option off keeps what was already saved. -->

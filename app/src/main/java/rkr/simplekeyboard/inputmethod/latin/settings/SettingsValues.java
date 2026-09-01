@@ -54,6 +54,8 @@ public class SettingsValues {
     public final boolean mPersonalDictionaryEnabled;
     /** Already includes the subordination to {@link #mTatarSuggestionsEnabled} (D3). */
     public final boolean mTatarAutocorrectEnabled;
+    /** Already includes the subordination to {@link #mTatarSuggestionsEnabled} (emoji-suggest). */
+    public final boolean mEmojiSuggestEnabled;
 
     // From the input box
     public final InputAttributes mInputAttributes;
@@ -100,6 +102,7 @@ public class SettingsValues {
         mTatarSuggestionsEnabled = Settings.readTatarSuggestionsEnabled(prefs);
         mPersonalDictionaryEnabled = Settings.readPersonalDictionaryEnabled(prefs);
         mTatarAutocorrectEnabled = Settings.readTatarAutocorrectEnabled(prefs);
+        mEmojiSuggestEnabled = Settings.readEmojiSuggestionsEnabled(prefs);
     }
 
     public boolean isWordSeparator(final int code) {

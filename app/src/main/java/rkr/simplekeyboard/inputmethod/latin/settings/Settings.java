@@ -87,6 +87,12 @@ public final class Settings extends BroadcastReceiver implements SharedPreferenc
      */
     public static final String PREF_TATAR_AUTOCORRECT = "pref_tatar_autocorrect";
     /**
+     * Emoji suggestions in the NEXT_WORD band (mission 2 of {@code docs/EMOJI-SUGGEST-PLAN.md}):
+     * their own toggle, default OFF, subordinate to {@link #PREF_TATAR_SUGGESTIONS} — the emoji
+     * cell lives in the suggestion band, so without suggestions there is nowhere for it to appear.
+     */
+    public static final String PREF_EMOJI_SUGGESTIONS = "pref_emoji_suggestions";
+    /**
      * One-shot marker: the offer to turn Tatar suggestions on has been made and is never made
      * again. Deliberately NOT part of {@link SettingsValues} — that object is rebuilt in full on
      * every change of every setting, and this value is read once per process and written once per
@@ -325,6 +331,17 @@ public final class Settings extends BroadcastReceiver implements SharedPreferenc
      */
     public static boolean readTatarAutocorrectEnabled(final SharedPreferences prefs) {
         return prefs.getBoolean(PREF_TATAR_AUTOCORRECT, false)
+                && readTatarSuggestionsEnabled(prefs);
+    }
+
+    /**
+     * Emoji suggestions are opt-in AND subordinate, exactly like autocorrection: they answer true
+     * only when Tatar suggestions are on as well. Reading both here rather than at the call sites
+     * is what makes the subordination a property of the setting instead of a rule every caller has
+     * to remember.
+     */
+    public static boolean readEmojiSuggestionsEnabled(final SharedPreferences prefs) {
+        return prefs.getBoolean(PREF_EMOJI_SUGGESTIONS, false)
                 && readTatarSuggestionsEnabled(prefs);
     }
 
