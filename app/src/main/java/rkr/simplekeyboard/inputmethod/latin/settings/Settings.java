@@ -335,13 +335,14 @@ public final class Settings extends BroadcastReceiver implements SharedPreferenc
     }
 
     /**
-     * Emoji suggestions are opt-in AND subordinate, exactly like autocorrection: they answer true
-     * only when Tatar suggestions are on as well. Reading both here rather than at the call sites
-     * is what makes the subordination a property of the setting instead of a rule every caller has
-     * to remember.
+     * Emoji suggestions default ON but stay subordinate, exactly like autocorrection: they answer
+     * true only when Tatar suggestions are on as well (M4b — the opt-in default was never
+     * discovered in the field; the master suggestions switch remains the real gate and is itself
+     * opt-in). Reading both here rather than at the call sites is what makes the subordination a
+     * property of the setting instead of a rule every caller has to remember.
      */
     public static boolean readEmojiSuggestionsEnabled(final SharedPreferences prefs) {
-        return prefs.getBoolean(PREF_EMOJI_SUGGESTIONS, false)
+        return prefs.getBoolean(PREF_EMOJI_SUGGESTIONS, true)
                 && readTatarSuggestionsEnabled(prefs);
     }
 

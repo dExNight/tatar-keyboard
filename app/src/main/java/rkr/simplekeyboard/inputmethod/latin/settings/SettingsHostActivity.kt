@@ -394,8 +394,9 @@ class SettingsHostActivity : Activity() {
         rows.add(autocorrectSwitch)
         // Emoji suggestions (mission 2 of docs/EMOJI-SUGGEST-PLAN.md) are subordinate to the
         // suggestions switch because the emoji cell lives in the very same band; separate because
-        // a picture among the words is a taste, not a feature of the words themselves.
-        val emojiSuggestSwitch = switchRow(Settings.PREF_EMOJI_SUGGESTIONS, false,
+        // a picture among the words is a taste, not a feature of the words themselves. The default
+        // matches Settings.readEmojiSuggestionsEnabled (on, M4b); a user-set value always wins.
+        val emojiSuggestSwitch = switchRow(Settings.PREF_EMOJI_SUGGESTIONS, true,
                 R.string.emoji_suggestions, R.string.emoji_suggestions_summary)
         emojiSuggestRow = emojiSuggestSwitch
         rows.add(emojiSuggestSwitch)
