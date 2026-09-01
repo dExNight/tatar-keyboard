@@ -51,6 +51,16 @@ schema 2**: блочный front-coding (K = 8) + u8-длины + varint-час�
 schema 2 по умолчанию (`--schema 1` оставлен для справки и golden-тестов).
 Эквивалентность доказывается `scripts/schema2_equivalence_check.py`.
 
+Тем же днём (миссия SIZE-2, `docs/SIZE-SCHEMA3.md`) таблицы биграмм —
+**TATBIGR schema 3**: собственных слов нет, головы — дельта-varint индексов
+в словарь (блочный индекс по 64), преемники — varint-индексы в словарь,
+диапазоны — u8-счётчики. Таблица связана со словарём по raw SHA-256 (заголовок
++ пин `expectedDictionaryRawSha256`); валидатор, читатель и
+`rebuild_assets.py --check` проверяют связку fail-closed. Читатель schema 2
+удалён; `bigram_asset_pack.py pack` пишет schema 3 по умолчанию (`--schema 2` —
+для golden/истории), корпусо-независимый перевод — `bigram_asset_pack.py repack`.
+Эквивалентность доказывается `scripts/schema3_equivalence_check.py`.
+
 Единый вход пересборки — **`scripts/rebuild_assets.py`** (DEV-1): одна команда
 делает словари → обе таблицы биграмм → пересчёт пинов → проверку, поэтому забытой
 второй половины больше не бывает (исторический источник багов — см. `HANDOFF.md`).
