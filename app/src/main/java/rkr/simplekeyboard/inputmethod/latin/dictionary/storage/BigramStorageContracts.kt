@@ -6,7 +6,8 @@ import java.io.Closeable
 import java.util.Locale
 
 /**
- * E5b: the shipped bigram-table asset, schema 2 (`TATBIGR\0`) — a SEPARATE artifact kind from
+ * E5b: the shipped bigram-table asset, schema 3 (`TATBIGR\0`, cross-referenced into the linked
+ * dictionary since SIZE-2, `docs/SIZE-SCHEMA3.md`) — a SEPARATE artifact kind from
  * [DictionaryArtifactSpec]'s schema 1, per PROPOSALS.md ("E5b. Отдельный файл и отдельная
  * схема"). [fileLanguageTag] parameterized storage "with language from the start" (contract
  * wording) back when only the Tatar table shipped; the second language duly added a second spec
@@ -42,6 +43,13 @@ data class BigramArtifactSpec(
     val expectedCompressedSha256: String,
     val expectedRawSize: Long,
     val expectedRawSha256: String,
+    /**
+     * Raw SHA-256 of the TATDICT schema-2 dictionary this schema-3 table cross-references
+     * (SIZE-2, `docs/SIZE-SCHEMA3.md`): heads and successes are indices into exactly that
+     * dictionary, the table header names it, and both the validator and the runtime reader
+     * refuse a table paired with any other dictionary.
+     */
+    val expectedDictionaryRawSha256: String,
     val expectedHeadCount: Long,
     val schemaId: Int = TatBigrFormat.SCHEMA_ID,
     val formatVersion: Int = TatBigrFormat.FORMAT_VERSION,
@@ -60,6 +68,7 @@ data class BigramArtifactSpec(
         require(expectedHeadCount > 0)
         require(expectedCompressedSha256.isBigramSha256())
         require(expectedRawSha256.isBigramSha256())
+        require(expectedDictionaryRawSha256.isBigramSha256())
     }
 
     val finalFileName: String
@@ -113,6 +122,11 @@ data class BigramArtifactSpec(
          * triple — genre permutation among live dictionary words, measured head-by-head in the
          * part-B report; the conversational data follows the terms recorded in
          * assets/bigrams/NOTICE.txt.
+         *
+         * Repacked 2026-09-01 to TATBIGR schema 3 (SIZE-2, `docs/SIZE-SCHEMA3.md`) from the
+         * schema-2 asset, corpus-free and verified word-for-word identical (all 10 204 heads,
+         * 40 734 pairs): word blobs are gone, heads and successes are varint indices into the
+         * dictionary pinned by [expectedDictionaryRawSha256].
          */
         @JvmField
         val TATAR_BIGRAMS_V1 = BigramArtifactSpec(
@@ -122,12 +136,14 @@ data class BigramArtifactSpec(
             subtypeId = PersonalSubtypes.TATAR_RU,
             storageDirectoryName = "bigrams",
             assetPath = "bigrams/tatar_bigrams_v1.tatbigr.zlib",
-            expectedCompressedSize = 176_749,
+            expectedCompressedSize = 81_028,
             expectedCompressedSha256 =
-                "3a25ea6300fdbdd0e5b2cf45339a3359cd0b84cb9b57309e142d990d89c78857",
-            expectedRawSize = 520_892,
+                "b1b92914b27f595aef728435d991322abdffdc43c8a32ed3b64584ae5cfa087f",
+            expectedRawSize = 134_664,
             expectedRawSha256 =
-                "6db063319de1328ae73f084fdca6d76fe58e9571f080cb4738dd640ddfc3c966",
+                "93789e5323ac9fd1f580cf0032c002ff64154d3ea6adc18bb41772177af9b1c0",
+            expectedDictionaryRawSha256 =
+                "922d14f200ef650f69c45b18183ec30a48c7989cd0b520c5de59215592770130",
             expectedHeadCount = 10_204,
         )
 
@@ -152,6 +168,11 @@ data class BigramArtifactSpec(
          * Its own family and its own directory, so the Tatar table already inflated on a device
          * updating from 1.7.0 is neither renamed, re-inflated, nor sharing this language's lease
          * counter.
+         *
+         * Repacked 2026-09-01 to TATBIGR schema 3 (SIZE-2, `docs/SIZE-SCHEMA3.md`) from the
+         * schema-2 asset, corpus-free and verified word-for-word identical (all 9 998 heads,
+         * 39 949 pairs): word blobs are gone, heads and successes are varint indices into the
+         * dictionary pinned by [expectedDictionaryRawSha256].
          */
         @JvmField
         val RUSSIAN_BIGRAMS_V1 = BigramArtifactSpec(
@@ -161,12 +182,14 @@ data class BigramArtifactSpec(
             subtypeId = PersonalSubtypes.RUSSIAN,
             storageDirectoryName = "bigrams-ru",
             assetPath = "bigrams/russian_bigrams_v1.tatbigr.zlib",
-            expectedCompressedSize = 149_118,
+            expectedCompressedSize = 63_312,
             expectedCompressedSha256 =
-                "e2f41c05be5ed2d97bb60405c90d1b15307baa794d2f81a41d8c04a49c88be4a",
-            expectedRawSize = 465_610,
+                "aa25f6292f4d645c6c1fbb52a2744dfdfcf923f835cb1e42c04dac22250ae817",
+            expectedRawSize = 131_662,
             expectedRawSha256 =
-                "5e6c3e01bccd8272e82e8c01ded4a84adb9187b5b40b0afbb8486c266c2bf15e",
+                "20a228481952097b0001a057bb4615aba1b60ba2bf0becd3cdc27538532fb667",
+            expectedDictionaryRawSha256 =
+                "f05499a3b4c3c2811c6ee8e9084dfaf472951a289a20dde2ab8cb098cb5a15b2",
             expectedHeadCount = 9_998,
         )
     }
@@ -267,12 +290,13 @@ class BackgroundBigramPreparer(
 
 internal object TatBigrFormat {
     const val MAGIC = "TATBIGR\u0000"
-    const val SCHEMA_ID = 2
+    const val SCHEMA_ID = 3
     const val FORMAT_VERSION = 1
-    const val HEADER_SIZE = 96
-    const val CHECKSUM_OFFSET = 64
+    const val HEADER_SIZE = 128
+    const val CHECKSUM_OFFSET = 96
     const val CHECKSUM_SIZE = 32
     const val CHECKSUM_ALGORITHM_SHA256 = 1
+    const val HEAD_BLOCK_SIZE = 64
     const val MAX_COMPRESSED_SIZE = 250_000L
     const val MAX_RAW_SIZE = 1_048_576L
     const val MAX_U32 = 0xffff_ffffL

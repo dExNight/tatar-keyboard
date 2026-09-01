@@ -116,6 +116,37 @@ class RealBigramPrefixIndexTest {
         @JvmStatic
         @BeforeClass
         fun loadCommittedBigramTable() {
+            // Schema 3 resolves words through the linked dictionary: open the committed Tatar
+            // dictionary first, exactly like RealDictionaryPrefixIndexTest does for itself.
+            val dictSpec = rkr.simplekeyboard.inputmethod.latin.dictionary.storage
+                .DictionaryArtifactSpec.TATAR_TOP100K_V1
+            val dictAsset = locate(
+                "src/main/assets/dictionaries/tatar_top100k_v1.tdict.zlib",
+                "app/src/main/assets/dictionaries/tatar_top100k_v1.tdict.zlib",
+            )
+            val dictRawFile = File.createTempFile("e5c-real-dict-", ".tdict")
+            val dictionary: TdictPrefixIndex
+            try {
+                dictRawFile.outputStream().use { output ->
+                    rkr.simplekeyboard.inputmethod.latin.dictionary.storage.TdictValidator()
+                        .inflateAsset(dictAsset.inputStream(), output, dictSpec)
+                }
+                val validated = rkr.simplekeyboard.inputmethod.latin.dictionary.storage
+                    .TdictValidator().validateRaw(dictRawFile, dictSpec)
+                val dictIdentity = DictionaryIdentity(
+                    dictSpec.generation, validated.schemaId, validated.formatVersion,
+                    validated.rawSha256,
+                )
+                dictionary = requireNotNull(
+                    TdictPrefixIndex.open(
+                        ByteBuffer.wrap(dictRawFile.readBytes()), dictIdentity,
+                        validated.entryCount, validated.rawSize,
+                    ),
+                )
+            } finally {
+                dictRawFile.delete()
+            }
+
             val asset = locate(
                 "src/main/assets/bigrams/tatar_bigrams_v1.tatbigr.zlib",
                 "app/src/main/assets/bigrams/tatar_bigrams_v1.tatbigr.zlib",
@@ -133,7 +164,7 @@ class RealBigramPrefixIndexTest {
                     validated.rawSha256,
                 )
                 realIndex = TatBigrPrefixIndex.open(
-                    ByteBuffer.wrap(raw), identity, validated.headCount, validated.rawSize,
+                    ByteBuffer.wrap(raw), identity, dictionary, validated.headCount, validated.rawSize,
                 )
                 check(realIndex != null)
             } finally {

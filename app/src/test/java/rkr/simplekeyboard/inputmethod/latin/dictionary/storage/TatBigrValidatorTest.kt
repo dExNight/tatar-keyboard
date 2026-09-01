@@ -11,11 +11,17 @@ import java.nio.ByteBuffer
 import java.nio.ByteOrder
 
 /**
- * PROPOSALS.md, "E5b. Валидатор отвергает каждый класс порчи (чужой magic, schema ≠ 2, неверный
- * checksum, неканоническая арифметика секций, невалидный UTF-8, неотсортированные или
- * дублирующиеся слова, id ≥ V, пустой диапазон успехов, хвостовые байты) отдельным зелёным тестом
- * на свободно созданной fixture" — one test per named class below, plus the zlib-layer classes
- * ([TatBigrValidator.inflateAsset]) mirrored from [TdictValidatorTest].
+ * The schema-3 (SIZE-2) sibling of the E5b validator contract: one test per corruption class —
+ * чужой magic, schema ≠ 3, неверная версия/размер заголовка/алгоритм checksum, несовпадение
+ * checksum, сырого SHA-256 или SHA-256 СЛОВАРЯ против пина (связка таблицы со словарём),
+ * неканоническая арифметика секций, ненулевые reserved-байты, нулевой/переполненный счётчик
+ * голов, пустой диапазон преемников, нулевая дельта индекса головы, немонотонные записи
+ * блочного индекса, сумма u8-счётчиков ≠ pairCount, хвостовые байты — плюс zlib-классы
+ * ([TatBigrValidator.inflateAsset]), зеркально [TdictValidatorTest].
+ *
+ * Класса «id ≥ размера словаря» здесь нет: у schema 3 нет собственного словаря преемников —
+ * верхнюю границу индексов проверяет `TatBigrPrefixIndex.open`, у которого словарь есть
+ * (см. KDoc [TatBigrValidator]).
  */
 class TatBigrValidatorTest {
     @get:Rule
@@ -32,6 +38,7 @@ class TatBigrValidatorTest {
 
         assertEquals(2, validated.headCount)
         assertEquals(3, validated.pairCount)
+        assertEquals(2, validated.successVocabularyCount)
         assertEquals(BigramTestFixtures.sha256(artifact.raw), validated.rawSha256)
     }
 
@@ -42,27 +49,21 @@ class TatBigrValidatorTest {
             BigramArtifactSpec.TATAR_BIGRAMS_V1,
         )
 
-        // K = 4 since 2026-08-23 (docs/archive/bigrams/BIGRAM-ADJACENCY.md), H = 10 132 since
-        // 2026-08-25 (docs/archive/bigrams/IMPERATIVE-HEADS.md). Repacked 2026-08-31 with the
-        // conversational admixture (docs/CORPUS-CONVERSATIONAL-TT.md, corpus-conversational
-        // part B): training = two Leipzig corpora + deduplicated Tatoeba + OpenSubtitles tt
-        // (unthinned, 3,7 % of the written mass), extra-heads rule extended to ranks
-        // [10 000, 40 000) — 75 named words. 10 204 = 10 129 (cutoff) + 75 (named); the three
-        // `-гәнчә` converbs are still dropped for zero pairs.
+        // Schema 3 since 2026-09-01 (SIZE-2, docs/SIZE-SCHEMA3.md): content carried over from the
+        // schema-2 asset verbatim — 10 204 heads and 40 734 pairs are the 2026-08-31
+        // conversational repack's (docs/CORPUS-CONVERSATIONAL-TT.md); only the encoding changed.
         assertEquals(10_204, validated.headCount)
-        assertEquals(520_892, validated.rawSize)
+        assertEquals(134_664, validated.rawSize)
         assertEquals(40_734, validated.pairCount)
     }
 
     /**
      * The ru table shipped in 1.8.x with no test against its real committed bytes while the tt
-     * table had one; the K = 4 repack touched both, so both are pinned now.
+     * table had one; both are pinned since the K = 4 repack.
      *
-     * Repacked 2026-08-31 with the conversational admixture (docs/CORPUS-CONVERSATIONAL-RU.md,
-     * corpus-conversational part A): training = three Leipzig corpora + deduplicated
-     * 1/60-thinned Tatoeba + OpenSubtitles. 9 998 heads, not 10 000 — `окей` and `берегись`
-     * have no in-vocabulary pair in the thinned input and are dropped rather than stored with
-     * an empty range (the same generator rule as the Tatar `-гәнчә` converbs).
+     * Schema 3 since 2026-09-01 (SIZE-2): the 9 998 heads / 39 949 pairs of the 2026-08-31
+     * conversational repack (docs/CORPUS-CONVERSATIONAL-RU.md), cross-referenced into the
+     * shipped Russian dictionary instead of carrying own word blobs.
      */
     @Test
     fun acceptsCommittedRussianBigramAssetWithFrozenProvenance() {
@@ -72,7 +73,7 @@ class TatBigrValidatorTest {
         )
 
         assertEquals(9_998, validated.headCount)
-        assertEquals(465_610, validated.rawSize)
+        assertEquals(131_662, validated.rawSize)
         assertEquals(39_949, validated.pairCount)
     }
 
@@ -130,6 +131,7 @@ class TatBigrValidatorTest {
             expectedCompressedSha256 = BigramTestFixtures.sha256(oversizedCompressed),
             expectedRawSize = artifact.raw.size.toLong(),
             expectedRawSha256 = BigramTestFixtures.sha256(artifact.raw),
+            expectedDictionaryRawSha256 = BigramTestFixtures.DEFAULT_DICTIONARY_SHA,
             expectedHeadCount = 2,
             maxCompressedSize = 64,
         )
@@ -148,6 +150,7 @@ class TatBigrValidatorTest {
             expectedCompressedSha256 = BigramTestFixtures.sha256(compressed),
             expectedRawSize = artifact.raw.size.toLong(),
             expectedRawSha256 = BigramTestFixtures.sha256(artifact.raw),
+            expectedDictionaryRawSha256 = BigramTestFixtures.DEFAULT_DICTIONARY_SHA,
             expectedHeadCount = 2,
             maxRawSize = artifact.raw.size.toLong(),
         )
@@ -165,7 +168,7 @@ class TatBigrValidatorTest {
 
     @Test
     fun rejectsWrongSchemaId() {
-        assertRawFails(mutateU16AndRehash(BigramTestFixtures.artifact().raw, 8, 3), 41)
+        assertRawFails(mutateU16AndRehash(BigramTestFixtures.artifact().raw, 8, 2), 41)
     }
 
     @Test
@@ -175,7 +178,7 @@ class TatBigrValidatorTest {
 
     @Test
     fun rejectsWrongHeaderSize() {
-        assertRawFails(mutateU16AndRehash(BigramTestFixtures.artifact().raw, 12, 70), 43)
+        assertRawFails(mutateU16AndRehash(BigramTestFixtures.artifact().raw, 12, 96), 43)
     }
 
     @Test
@@ -186,7 +189,7 @@ class TatBigrValidatorTest {
     @Test
     fun rejectsChecksumMismatch() {
         val artifact = BigramTestFixtures.artifact()
-        val corrupt = artifact.raw.copyOf().also { it[64] = (it[64].toInt() xor 1).toByte() }
+        val corrupt = artifact.raw.copyOf().also { it[96] = (it[96].toInt() xor 1).toByte() }
         assertValidationFails { validator.validateRaw(writeRaw(corrupt), artifact.spec) }
     }
 
@@ -198,18 +201,35 @@ class TatBigrValidatorTest {
     }
 
     @Test
+    fun rejectsDictionaryLinkMismatchAgainstSpec() {
+        // The schema-3 link: the header names the dictionary the table was packed against, and
+        // the spec pins exactly that dictionary — a table dragged next to another dictionary is
+        // rejected before a single index is read.
+        val artifact = BigramTestFixtures.artifact()
+        val wrongDictionary = artifact.spec.copy(expectedDictionaryRawSha256 = "0".repeat(64))
+        assertValidationFails { validator.validateRaw(writeRaw(artifact.raw), wrongDictionary) }
+    }
+
+    @Test
+    fun rejectsNonZeroReservedHeaderBytes() {
+        val artifact = BigramTestFixtures.artifact()
+        val corrupted = BigramTestFixtures.refreshEmbeddedChecksum(
+            artifact.raw.copyOf().also { it[88] = 1 },
+        )
+        assertRawFails(corrupted, 45)
+    }
+
+    @Test
     fun rejectsNoncanonicalSectionArithmetic() {
         val artifact = BigramTestFixtures.artifact()
-        // Offsets, in header order: three counts at 16/20/24, six section offsets at
-        // 28/32/36/40/44/48, two blob lengths at 52/56, file size at 60.
+        // Offsets, in header order: three counts at 16/20/24, five section offsets at
+        // 28/32/40/44, two stream sizes at 36/48, file size at 52.
         val variants = listOf(
-            mutateU32AndRehash(artifact.raw, 28, 97),
+            mutateU32AndRehash(artifact.raw, 28, 129),
             mutateU32AndRehash(artifact.raw, 32, 999),
-            mutateU32AndRehash(artifact.raw, 36, 999),
             mutateU32AndRehash(artifact.raw, 40, 999),
             mutateU32AndRehash(artifact.raw, 44, 999),
-            mutateU32AndRehash(artifact.raw, 48, 999),
-            mutateU32AndRehash(artifact.raw, 60, artifact.raw.size + 1),
+            mutateU32AndRehash(artifact.raw, 52, artifact.raw.size + 1),
         )
         variants.forEachIndexed { index, raw -> assertRawFails(raw, 50 + index) }
     }
@@ -239,33 +259,45 @@ class TatBigrValidatorTest {
 
     @Test
     fun rejectsEmptySuccessRange() {
-        // A head with no successes at all — the exact shape pack_bigram_table (E5b's Python
-        // generator) refuses to ever produce, and the validator must refuse to ever accept.
+        // A head with no successes at all — the exact shape the Python generator refuses to ever
+        // produce, and the validator must refuse to ever accept (schema 3 stores it as a 0 byte
+        // in the u8 count array).
         val raw = BigramTestFixtures.raw(listOf("аб" to listOf("аба"), "аба" to emptyList()))
         assertRawFails(raw, 65)
     }
 
     @Test
-    fun rejectsSuccessIdAtOrBeyondVocabularySize() {
+    fun rejectsZeroHeadIndexDelta() {
         val artifact = BigramTestFixtures.artifact()
-        val section4 = ByteBuffer.wrap(artifact.raw, 40, 4).order(ByteOrder.LITTLE_ENDIAN).int
-        val corrupted = mutateU32AndRehash(artifact.raw, section4, Int.MAX_VALUE)
+        val headDeltasOffset = ByteBuffer.wrap(artifact.raw, 32, 4).order(ByteOrder.LITTLE_ENDIAN).int
+        val corrupted = BigramTestFixtures.refreshEmbeddedChecksum(
+            artifact.raw.copyOf().also { it[headDeltasOffset] = 0 },
+        )
         assertRawFails(corrupted, 66)
     }
 
     @Test
-    fun rejectsInvalidUtf8UnsortedAndDuplicateWords() {
+    fun rejectsSuccessCountsNotAddingUpToPairCount() {
         val artifact = BigramTestFixtures.artifact()
-        val section2 = ByteBuffer.wrap(artifact.raw, 32, 4).order(ByteOrder.LITTLE_ENDIAN).int
-        val malformedUtf8 = BigramTestFixtures.refreshEmbeddedChecksum(
-            artifact.raw.copyOf().also { it[section2] = 0xff.toByte() },
+        val countsOffset = ByteBuffer.wrap(artifact.raw, 40, 4).order(ByteOrder.LITTLE_ENDIAN).int
+        val corrupted = BigramTestFixtures.refreshEmbeddedChecksum(
+            artifact.raw.copyOf().also { it[countsOffset] = 3 }, // 3 + 1 = 4 ≠ pairCount 3
         )
-        val rawVariants = listOf(
-            malformedUtf8,
-            BigramTestFixtures.raw(listOf("аба" to listOf("аб"), "аб" to listOf("аб"))), // heads unsorted
-            BigramTestFixtures.raw(listOf("аб" to listOf("аб"), "аб" to listOf("аб"))), // duplicate heads
+        assertRawFails(corrupted, 67)
+    }
+
+    @Test
+    fun rejectsNonMonotonicBlockFirstIndices() {
+        // 65 heads → two blocks; pushing the second block's first index down to the first
+        // block's breaks the strict increase the binary search relies on.
+        val heads = (0 until 65).map { index -> "а%03d".format(index) to listOf("б") }
+        val raw = BigramTestFixtures.raw(heads)
+        val corrupted = BigramTestFixtures.refreshEmbeddedChecksum(
+            raw.copyOf().also {
+                ByteBuffer.wrap(it).order(ByteOrder.LITTLE_ENDIAN).putInt(128 + 12, 0)
+            },
         )
-        rawVariants.forEachIndexed { index, raw -> assertRawFails(raw, 70 + index) }
+        assertRawFails(corrupted, 68)
     }
 
     @Test

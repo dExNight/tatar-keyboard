@@ -5,6 +5,9 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import rkr.simplekeyboard.inputmethod.latin.dictionary.storage.BigramTestFixtures
+import rkr.simplekeyboard.inputmethod.latin.dictionary.storage.DictionaryArtifactSpec
+import rkr.simplekeyboard.inputmethod.latin.dictionary.storage.DictionaryTestFixtures
+import rkr.simplekeyboard.inputmethod.latin.dictionary.storage.TdictValidator
 import java.nio.ByteBuffer
 
 class TatBigrPrefixIndexTest {
@@ -21,16 +24,29 @@ class TatBigrPrefixIndexTest {
     fun onlyExactMatchNoPrefixBehaviour() {
         val index = EngineTestFixtures.bigramIndex(listOf("аба" to listOf("өй")))
 
-        // "аб" is a strict prefix of the only head "аба" — must not match.
+        // "аб" is a strict prefix of the only head "аба" — and is not even a dictionary word here,
+        // so the schema-3 read misses twice over: no exact dictionary entry, then no head.
         assertTrue(predict(index, "аб").isEmpty())
         assertTrue(predict(index, "абалар").isEmpty())
     }
 
     @Test
-    fun headNotFoundReturnsEmpty() {
+    fun contextWordAbsentFromTheDictionaryReturnsEmpty() {
+        // Schema 3 resolves the context word through the linked dictionary FIRST: a word the
+        // dictionary does not contain can never be a head, so the read is an immediate miss.
         val index = EngineTestFixtures.bigramIndex(listOf("аб" to listOf("аба")))
 
         assertTrue(predict(index, "юл").isEmpty())
+    }
+
+    @Test
+    fun headInDictionaryButNotInTableReturnsEmpty() {
+        // "юл" IS in the fixture dictionary (as a success of "аб") but is not a head — the block
+        // scan walks past its dictionary index without finding it among the heads.
+        val index = EngineTestFixtures.bigramIndex(listOf("аб" to listOf("юл")))
+
+        assertTrue(predict(index, "юл").isEmpty())
+        assertEquals(listOf("юл"), predict(index, "аб"))
     }
 
     @Test
@@ -53,10 +69,13 @@ class TatBigrPrefixIndexTest {
 
     @Test
     fun openRejectsIdentityMismatch() {
-        val raw = BigramTestFixtures.raw(listOf("аб" to listOf("аба")))
+        val heads = listOf("аб" to listOf("аба"))
+        val raw = BigramTestFixtures.raw(heads)
+        val dictionary = fixtureDictionary(heads)
         val wrongSchema = TatBigrPrefixIndex.open(
             ByteBuffer.wrap(raw),
-            EngineTestFixtures.bigramIdentity.copy(schemaId = 1),
+            EngineTestFixtures.bigramIdentity.copy(schemaId = 2),
+            dictionary,
             1,
             raw.size.toLong(),
         )
@@ -65,6 +84,7 @@ class TatBigrPrefixIndexTest {
         val wrongHeadCount = TatBigrPrefixIndex.open(
             ByteBuffer.wrap(raw),
             EngineTestFixtures.bigramIdentity,
+            dictionary,
             2,
             raw.size.toLong(),
         )
@@ -73,6 +93,7 @@ class TatBigrPrefixIndexTest {
         val truncated = TatBigrPrefixIndex.open(
             ByteBuffer.wrap(raw.copyOf(raw.size - 1)),
             EngineTestFixtures.bigramIdentity,
+            dictionary,
             1,
             raw.size.toLong(),
         )
@@ -80,29 +101,73 @@ class TatBigrPrefixIndexTest {
     }
 
     @Test
-    fun openRejectsNonMonotonicHeadOffsets() {
+    fun openRejectsADictionaryOtherThanTheLinkedOne() {
+        // The schema-3 link: the header names the dictionary's raw SHA-256, and open() refuses a
+        // table paired with any other dictionary — fail closed, exactly like the validator.
+        val heads = listOf("аб" to listOf("аба"))
+        val raw = BigramTestFixtures.raw(heads)
+        val dictionaryWords = BigramTestFixtures.defaultDictionaryWords(heads)
+        val foreignDictionary = requireNotNull(
+            DictionaryTestFixtures.raw(dictionaryWords.map { it to 1L }).let { rawDict ->
+                TdictPrefixIndex.open(
+                    ByteBuffer.wrap(rawDict),
+                    DictionaryIdentity(1, 2, 1, "c".repeat(64)),
+                    dictionaryWords.size.toLong(),
+                    rawDict.size.toLong(),
+                )
+            },
+        )
+
+        assertNull(
+            TatBigrPrefixIndex.open(
+                ByteBuffer.wrap(raw), EngineTestFixtures.bigramIdentity, foreignDictionary,
+                1, raw.size.toLong(),
+            ),
+        )
+    }
+
+    @Test
+    fun openRejectsBlockFirstIndexBeyondTheDictionary() {
         // open() re-validates the invariants its own reads depend on rather than trusting that
         // TatBigrValidator was the only thing ever standing between this buffer and disk — this
         // corrupts the body (not the header) so only that specific check can catch it.
-        val raw = BigramTestFixtures.raw(listOf("аб" to listOf("аба"), "юл" to listOf("өй")))
-        val section1 = readU32(raw, 28)
-        writeU32(raw, section1 + 4, 0) // second head-offset entry must be > 0 (the first)
+        val heads = listOf("аб" to listOf("аба"), "юл" to listOf("өй"))
+        val raw = BigramTestFixtures.raw(heads)
+        writeU32(raw, 128, 50) // the only block's first dictionary index; the dictionary has 4 words
 
         val index = TatBigrPrefixIndex.open(
-            ByteBuffer.wrap(raw), EngineTestFixtures.bigramIdentity, 2, raw.size.toLong(),
+            ByteBuffer.wrap(raw), EngineTestFixtures.bigramIdentity, fixtureDictionary(heads),
+            2, raw.size.toLong(),
         )
 
         assertNull(index)
     }
 
     @Test
-    fun openRejectsSuccessIdAtOrBeyondVocabularySize() {
-        val raw = BigramTestFixtures.raw(listOf("аб" to listOf("аба")))
-        val section4 = readU32(raw, 40)
-        writeU32(raw, section4, Int.MAX_VALUE) // vocabulary size is 1; this id is far beyond it
+    fun openRejectsZeroSuccessCount() {
+        // The exact shape scripts/bigram_asset_pack.py refuses to ever produce (a head with zero
+        // successes is dropped, not stored with an empty range) — the reader must refuse it too.
+        val heads = listOf("аб" to listOf("аба"))
+        val raw = BigramTestFixtures.raw(heads)
+        raw[readU32(raw, 40)] = 0 // countsOffset: the only head's success count
 
         val index = TatBigrPrefixIndex.open(
-            ByteBuffer.wrap(raw), EngineTestFixtures.bigramIdentity, 1, raw.size.toLong(),
+            ByteBuffer.wrap(raw), EngineTestFixtures.bigramIdentity, fixtureDictionary(heads),
+            1, raw.size.toLong(),
+        )
+
+        assertNull(index)
+    }
+
+    @Test
+    fun openRejectsSuccessIdAtOrBeyondDictionarySize() {
+        val heads = listOf("аб" to listOf("аба"))
+        val raw = BigramTestFixtures.raw(heads)
+        raw[readU32(raw, 44)] = 5 // successIdsOffset: the dictionary has 2 words; 5 is far beyond
+
+        val index = TatBigrPrefixIndex.open(
+            ByteBuffer.wrap(raw), EngineTestFixtures.bigramIdentity, fixtureDictionary(heads),
+            1, raw.size.toLong(),
         )
 
         assertNull(index)
@@ -110,12 +175,12 @@ class TatBigrPrefixIndexTest {
 
     @Test
     fun openRejectsEmptySuccessRange() {
-        // The exact shape scripts/bigram_asset_pack.py refuses to ever produce (a head with zero
-        // successes is dropped, not stored with an empty range) — the reader must refuse it too.
-        val raw = BigramTestFixtures.raw(listOf("аб" to listOf("аба"), "юл" to emptyList()))
+        val heads = listOf("аб" to listOf("аба"), "юл" to emptyList())
+        val raw = BigramTestFixtures.raw(heads)
 
         val index = TatBigrPrefixIndex.open(
-            ByteBuffer.wrap(raw), EngineTestFixtures.bigramIdentity, 2, raw.size.toLong(),
+            ByteBuffer.wrap(raw), EngineTestFixtures.bigramIdentity, fixtureDictionary(heads),
+            2, raw.size.toLong(),
         )
 
         assertNull(index)
@@ -132,7 +197,10 @@ class TatBigrPrefixIndexTest {
     fun acceptsCommittedTatarBigramAssetAndFindsARealHead() {
         val spec = rkr.simplekeyboard.inputmethod.latin.dictionary.storage.BigramArtifactSpec
             .TATAR_BIGRAMS_V1
-        val asset = locateCommittedAsset().readBytes()
+        val asset = locateCommittedAsset(
+            "src/main/assets/bigrams/tatar_bigrams_v1.tatbigr.zlib",
+            "app/src/main/assets/bigrams/tatar_bigrams_v1.tatbigr.zlib",
+        ).readBytes()
         val decompressed = java.io.ByteArrayOutputStream(spec.expectedRawSize.toInt()).also { output ->
             rkr.simplekeyboard.inputmethod.latin.dictionary.storage.TatBigrValidator()
                 .inflateAsset(asset.inputStream(), output, spec)
@@ -143,6 +211,7 @@ class TatBigrPrefixIndexTest {
         val index = TatBigrPrefixIndex.open(
             ByteBuffer.wrap(decompressed),
             identity,
+            committedTatarDictionary(),
             spec.expectedHeadCount,
             decompressed.size.toLong(),
         )
@@ -151,17 +220,66 @@ class TatBigrPrefixIndexTest {
         // return at most three successes without throwing.
         val results = index!!.predict(ImmutableUtf8Prefix.copyOf("мин".toByteArray(Charsets.UTF_8)))
         assertTrue(results.size <= 3)
+        // The imperative "кил" is an extra-list head (docs/archive/bigrams/IMPERATIVE-HEADS.md);
+        // its triple is pinned by the schema-3 equivalence check — the reader must serve it.
+        assertEquals(
+            listOf("дә", "әле", "һәм"),
+            index.predict(ImmutableUtf8Prefix.copyOf("кил".toByteArray(Charsets.UTF_8))),
+        )
     }
 
     private fun predict(index: TatBigrPrefixIndex, word: String): List<String> =
         index.predict(ImmutableUtf8Prefix.copyOf(word.toByteArray(Charsets.UTF_8)))
 
-    private fun locateCommittedAsset(): java.io.File {
-        val candidates = listOf(
-            java.io.File("src/main/assets/bigrams/tatar_bigrams_v1.tatbigr.zlib"),
-            java.io.File("app/src/main/assets/bigrams/tatar_bigrams_v1.tatbigr.zlib"),
+    /** A real [TdictPrefixIndex] over the fixture dictionary, with the identity the table names. */
+    private fun fixtureDictionary(
+        heads: List<Pair<String, List<String>>>,
+    ): TdictPrefixIndex {
+        val words = BigramTestFixtures.defaultDictionaryWords(heads)
+        val rawDict = DictionaryTestFixtures.raw(words.map { it to 1L })
+        return requireNotNull(
+            TdictPrefixIndex.open(
+                ByteBuffer.wrap(rawDict),
+                EngineTestFixtures.identity,
+                words.size.toLong(),
+                rawDict.size.toLong(),
+            ),
         )
-        return candidates.firstOrNull(java.io.File::isFile)
-            ?: error("cannot locate committed bigram asset from ${java.io.File(".").absolutePath}")
+    }
+
+    companion object {
+        private var dictionary: TdictPrefixIndex? = null
+
+        private fun committedTatarDictionary(): TdictPrefixIndex {
+            dictionary?.let { return it }
+            val spec = DictionaryArtifactSpec.TATAR_TOP100K_V1
+            val asset = locateCommittedAsset(
+                "src/main/assets/dictionaries/tatar_top100k_v1.tdict.zlib",
+                "app/src/main/assets/dictionaries/tatar_top100k_v1.tdict.zlib",
+            )
+            val rawFile = java.io.File.createTempFile("e5c-real-dict-", ".tdict")
+            try {
+                rawFile.outputStream().use { output ->
+                    TdictValidator().inflateAsset(asset.inputStream(), output, spec)
+                }
+                val validated = TdictValidator().validateRaw(rawFile, spec)
+                val identity = DictionaryIdentity(
+                    spec.generation, validated.schemaId, validated.formatVersion, validated.rawSha256,
+                )
+                val index = TdictPrefixIndex.open(
+                    ByteBuffer.wrap(rawFile.readBytes()), identity,
+                    validated.entryCount, validated.rawSize,
+                )
+                check(index != null)
+                dictionary = index
+                return index
+            } finally {
+                rawFile.delete()
+            }
+        }
+
+        private fun locateCommittedAsset(vararg paths: String): java.io.File =
+            paths.map { java.io.File(it) }.firstOrNull(java.io.File::isFile)
+                ?: error("cannot locate committed asset from ${java.io.File(".").absolutePath}")
     }
 }

@@ -104,10 +104,10 @@ private inline fun isValidUtf8Scalar(size: Int, byteAt: (Int) -> Int): Boolean {
 internal class TdictPrefixIndex private constructor(
     private val bytes: ByteBuffer,
     val identity: DictionaryIdentity,
-    private val entryCount: Int,
+    override val entryCount: Int,
     private val blockCount: Int,
     private val blockIndexOffset: Int,
-) : ClassifiedPrefixComputer, KeyNeighborSink {
+) : ClassifiedPrefixComputer, KeyNeighborSink, BigramDictionary {
     // Reusable per-index scratch. The index stops being fully immutable: these buffers are touched
     // ONLY inside lookup(), whose exclusivity is guaranteed by LatestOnlyPrefixEngine serialization
     // (at most one active worker). updateKeyNeighbors() only swaps a @Volatile reference.
@@ -608,6 +608,21 @@ internal class TdictPrefixIndex private constructor(
         val start = cachedWordStart(index)
         return String(blockWordBytes, start, cachedWordEnd(index) - start, Charsets.UTF_8)
     }
+
+    // --- BigramDictionary (SIZE-2): the schema-3 bigram table resolves its head/success indices
+    // through exactly these two reads, on the same serialized worker as lookup() — so the block
+    // cache and the scratch discipline above apply unchanged.
+    override val rawSha256: String
+        get() = identity.rawSha256
+
+    /** Exact-word index lookup: one [lowerBound] plus an equality check, no prefix semantics. */
+    override fun indexOfWord(query: ByteArray, queryLength: Int): Int {
+        val candidate = lowerBound(query, queryLength, 0)
+        if (candidate >= entryCount) return -1
+        return if (wordEquals(candidate, query, queryLength)) candidate else -1
+    }
+
+    override fun wordAt(index: Int): String = decodeWord(index)
 
     /** Start of word [index] inside [blockWordBytes]; decodes its block if it is not cached. */
     private fun cachedWordStart(index: Int): Int {

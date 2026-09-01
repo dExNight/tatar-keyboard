@@ -80,8 +80,13 @@ class MappedDictionaryEngine private constructor(
                 table.generation, table.fileLanguageTag, table.schemaId, table.formatVersion, table.rawSha256,
             )
             mapped = mapper.mapReadOnly(table.file, table.rawSize)
+            // Schema 3 resolves its head/success indices through the linked dictionary and
+            // refuses to open against any other (the header names the dictionary's raw SHA-256);
+            // a missing dictionary index therefore fails closed, like any invalid table.
+            val dictionaryIndex = resources.index
+                ?: throw IllegalArgumentException("bigram attach before the dictionary is open")
             val index = TatBigrPrefixIndex.open(
-                mapped, bigramIdentity, table.headCount, table.rawSize,
+                mapped, bigramIdentity, dictionaryIndex, table.headCount, table.rawSize,
             ) ?: throw IllegalArgumentException("validated bigram layout mismatch")
             if (!resources.attachBigram(lease, catalog, mapped, index)) {
                 // The engine was destroyed while this was in flight: attachBigram left the lease

@@ -9,7 +9,7 @@ import java.util.concurrent.TimeUnit
 
 internal object EngineTestFixtures {
     val identity = DictionaryIdentity(1, 2, 1, "a".repeat(64))
-    val bigramIdentity = BigramTableIdentity(1, "tt", 2, 1, "b".repeat(64))
+    val bigramIdentity = BigramTableIdentity(1, "tt", 3, 1, "b".repeat(64))
 
     fun index(entries: List<Pair<String, Long>>): TdictPrefixIndex {
         val raw = DictionaryTestFixtures.raw(entries)
@@ -24,11 +24,17 @@ internal object EngineTestFixtures {
     }
 
     fun bigramIndex(headsToSuccesses: List<Pair<String, List<String>>>): TatBigrPrefixIndex {
-        val raw = BigramTestFixtures.raw(headsToSuccesses)
+        // Schema 3 resolves words through the linked dictionary: the fixture dictionary is
+        // exactly the heads and successes involved, and the table header names this fixture's
+        // identity hash (BigramTestFixtures.DEFAULT_DICTIONARY_SHA == identity.rawSha256).
+        val dictionaryWords = BigramTestFixtures.defaultDictionaryWords(headsToSuccesses)
+        val dictionary = index(dictionaryWords.map { it to 1L })
+        val raw = BigramTestFixtures.raw(headsToSuccesses, dictionaryWords)
         return requireNotNull(
             TatBigrPrefixIndex.open(
                 ByteBuffer.wrap(raw),
                 bigramIdentity,
+                dictionary,
                 headsToSuccesses.size.toLong(),
                 raw.size.toLong(),
             ),

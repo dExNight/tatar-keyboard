@@ -271,11 +271,14 @@ class SuggestionsControllerBigramLanguageSwitchTest {
         assertEquals(tables.size, tables.map { it.storageDirectoryName }.distinct().size)
         assertEquals(tables.size, tables.map { it.assetPath }.distinct().size)
 
-        // FROZEN: the file 1.6.0 inflated on devices, in the directory it inflated it into.
+        // FROZEN: family, tag, generation and directory of the file 1.6.0 inflated on devices.
+        // The schema segment is deliberately NOT frozen: s2 → s3 (SIZE-2, 2026-09-01) is exactly
+        // what makes a device re-inflate the cross-referenced table next to the old one instead
+        // of opening a format it does not understand.
         val tt = BigramArtifactSpec.TATAR_BIGRAMS_V1
         assertEquals("bigrams", tt.storageDirectoryName)
         assertEquals(
-            "tatar_bigrams-tt-v000001-s2-f1-${tt.expectedRawSha256}.tatbigr",
+            "tatar_bigrams-tt-v000001-s3-f1-${tt.expectedRawSha256}.tatbigr",
             tt.finalFileName,
         )
         // Neither family's pattern may ever match the other family's file.

@@ -383,7 +383,7 @@ class MappedDictionaryEngineTest {
         val published = mutableListOf<LookupResult>()
         val engine = requireNotNull(startWithDictionaryOnly(executor, published))
         val corruptFile = temporaryFolder.newFile("corrupt.tatbigr").also { it.writeBytes(byteArrayOf(1, 2, 3)) }
-        val corruptTable = PublishedBigramTable(1, "tt", corruptFile, 3, 1, 1, 1, 2, 1, "0".repeat(64))
+        val corruptTable = PublishedBigramTable(1, "tt", corruptFile, 3, 1, 1, 1, 3, 1, "0".repeat(64))
         var closed = false
         val catalog = bigramCatalog(corruptTable) { closed = true }
 
@@ -490,15 +490,21 @@ class MappedDictionaryEngineTest {
     )
 
     private fun bigramFixture(headsToSuccesses: List<Pair<String, List<String>>>): PublishedBigramTable {
-        val raw = BigramTestFixtures
-            .raw(headsToSuccesses)
+        // Schema 3 cross-references the very fixture dictionary the engine opens: the same word
+        // list (so the indices agree) and the header names that dictionary's raw SHA-256.
+        val dictionaryWords = listOf("аб", "аба", "әби")
+        val dictionarySha = DictionaryTestFixtures.artifact(
+            1,
+            listOf("аб" to 31L, "аба" to 20L, "әби" to 10L),
+        ).spec.expectedRawSha256
+        val raw = BigramTestFixtures.raw(headsToSuccesses, dictionaryWords, dictionarySha)
         val file = temporaryFolder.newFile("bigrams-${System.nanoTime()}.tatbigr")
         file.writeBytes(raw)
         return PublishedBigramTable(
             1, "tt", file, raw.size.toLong(), headsToSuccesses.size.toLong(),
             headsToSuccesses.sumOf { it.second.size }.toLong(),
             headsToSuccesses.flatMap { it.second }.toSet().size.toLong(),
-            2, 1,
+            3, 1,
             BigramTestFixtures.sha256(raw),
         )
     }
