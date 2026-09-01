@@ -1,3 +1,60 @@
+# HANDOFF — релиз-кандидат 1.9.9 (кампания ужатия SIZE-1/2/3 закрыта)
+
+**Состояние на 2026-09-01.** Кампания ужатия APK доехала до релиза. Собран и
+проаудирован **1.9.9 / versionCode 25**: `dist/tatar-keyboard-1.9.9.apk`,
+**1 775 548 Б**, SHA-256
+`d08fac8aa84825caffbe76703c205f4fda9f12f1ba3f6b008c9fbd1274f2efcf`,
+подпись тем же ключом (`98ca6feb…42ad`). Аудит артефакта —
+`docs/APK-AUDIT-1.9.9.md`, итог кампании — `docs/SIZE-CAMPAIGN.md`. Наружу не
+ушло ничего: push, теги, публикация — действия оператора.
+
+## Что вошло в 1.9.9 (поверх 1.9.8)
+
+- **APK 2 095 592 → 1 775 548 Б (−320 044, −15,3 %)**: словари на TATDICT
+  schema 2 (SIZE-1), таблицы биграмм на TATBIGR schema 3 со связкой со словарём
+  по raw SHA-256 (SIZE-2), zopfli-рекомпрессия упаковки (SIZE-3);
+- **идентичность выдачи доказана полными сверками**: 100 000 слов × 2 и все
+  76 839 distinct-префиксов (словари), все 20 202 головы / 80 683 пары пословно
+  и по порядку (таблицы) — расхождений 0;
+- **новый релизный пайплайн `scripts/release_pack.sh`**: unsigned
+  `assembleRelease -PskipReleaseSigning` → `zipalign -z` → `apksigner sign`
+  v2-only → verify. Детерминирован: три независимых прогона дали одинаковый
+  SHA-256. CI-гейт `reproducible` (unsigned) не тронут;
+- **baseline-профиль регенерирован** под новые читатели (устаревшая строка
+  `TatBigrValidator.validateNextWord` ушла, покрытие TdictPrefixIndex v2 и
+  TatBigrPrefixIndex v3 подтверждено);
+- живое обновление 1.9.8 → 1.9.9 на эмуляторе: `firstInstallTime` не изменился,
+  все четыре ассета переинфлировались ровно один раз (новые schema-id s2/s3 и
+  raw SHA в именах файлов), старые файлы — второй копией ретенции; полоса:
+  tt «ул кил » → дә·әле·һәм, ru «я в » → этом·том·результате (снимки
+  `docs/size-campaign/evidence/`).
+
+## Гейты (HEAD)
+
+| Гейт | Результат |
+|---|---|
+| `./gradlew test` | **1013 / 0 failures / 0 errors** (`--rerun-tasks`) |
+| python-тесты (11 файлов) | **312 OK** |
+| `./gradlew lintRelease` | зелёный с baseline |
+| `scripts/check-no-internet.sh` | оба уровня зелёные, включая `dist/tatar-keyboard-1.9.9.apk` |
+| Воспроизводимость | три прогона полного пайплайна `release_pack.sh` → одинаковый SHA-256 (`cmp` чистый) |
+| `scripts/release_check.sh` | все проверки PASS (OVERALL PASS) |
+| `rebuild_assets.py --check --allow-known-drift` | зелёный: rus 2/0, tat 3/0 |
+| Смоук DEV-3 | release: 15 PASS / 0 FAIL / 4 SKIP; debug: 18 PASS / 0 FAIL / 1 SKIP (skip'ы by design) |
+
+## Что осталось открытым
+
+* **Замеры на железе**: PSS, холодный старт, эффект baseline-профиля,
+  ландшафт (m3) и планшеты (m4) — ни разу не мерены на живом устройстве.
+* **`tatar-keyboard-release.jks` лежит в корне репозитория** (не трекнут) —
+  рекомендация вынести из каталога проекта в силе.
+* **Публикация 1.9.9 — действие оператора:** push, тег наружу, релиз в стор
+  (чек-лист `docs/PUBLISH-CHECKLIST.md` перецелен на 1.9.9).
+* Дальнейшее ужатие (~190 КБ) возможно только lossy (u8-log2 частоты) —
+  отдельным продуктовым решением, см. `docs/SIZE-OPTIMIZATION-RESEARCH.md`.
+
+---
+
 # HANDOFF — SIZE-2: таблицы биграмм на TATBIGR schema 3 (поверх SIZE-1)
 
 **Состояние на 2026-09-01 (поверх SIZE-1, версия не поднята).** Миссия SIZE-2
