@@ -685,8 +685,13 @@ public final class InputLogic {
             // and NEXT_WORD only ever applies to an empty prefix. Stale tap; do not edit.
             return false;
         }
+        // The same extraction the request was built with, cache-boundary knowledge included
+        // (docs/NEXTWORD-RACE.md): a tap on a first-word-of-field prediction must re-derive the
+        // same context the controller saw, or it would be refused as stale.
+        final CharSequence liveBeforeCursor = mConnection.getCachedTextBeforeCursor();
         final String liveContext =
-                TatarWordUtils.extractNextWordContext(mConnection.getCachedTextBeforeCursor());
+                TatarWordUtils.extractNextWordContext(liveBeforeCursor,
+                        liveBeforeCursor.length() < Constants.EDITOR_CONTENTS_CACHE_SIZE);
         if (!expectedContextWord.equals(liveContext)) {
             // Stale tap: the context word no longer matches. Do not edit.
             return false;

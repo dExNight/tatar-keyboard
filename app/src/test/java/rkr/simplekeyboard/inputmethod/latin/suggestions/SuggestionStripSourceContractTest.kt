@@ -306,10 +306,17 @@ class SuggestionStripSourceContractTest {
             ),
         )
         // The live context word, re-extracted by the exact same algorithm the request was built
-        // with, matching expectedContextWord.
+        // with — cache-boundary knowledge included (docs/NEXTWORD-RACE.md): the tap path and the
+        // request path must agree on a first-word-of-field context, or the tap would be refused
+        // as stale — matching expectedContextWord.
         assertTrue(
             commitBody.contains(
-                "TatarWordUtils.extractNextWordContext(mConnection.getCachedTextBeforeCursor())",
+                "TatarWordUtils.extractNextWordContext(liveBeforeCursor,",
+            ),
+        )
+        assertTrue(
+            commitBody.contains(
+                "liveBeforeCursor.length() < Constants.EDITOR_CONTENTS_CACHE_SIZE",
             ),
         )
         assertTrue(commitBody.contains("expectedContextWord.equals(liveContext)"))

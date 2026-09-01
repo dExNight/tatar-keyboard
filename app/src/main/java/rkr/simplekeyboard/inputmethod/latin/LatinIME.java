@@ -522,8 +522,13 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
 
             @Override
             public String cachedNextWordContext() {
-                return TatarWordUtils.INSTANCE.extractNextWordContext(
-                        mInputLogic.mConnection.getCachedTextBeforeCursor());
+                // docs/NEXTWORD-RACE.md: a cache shorter than the window it was filled with
+                // provably starts at the start of the text, so a word sitting at index 0 is
+                // whole — without passing that knowledge the first word of an empty field
+                // never got a NEXT_WORD prediction at all.
+                final CharSequence beforeCursor = mInputLogic.mConnection.getCachedTextBeforeCursor();
+                return TatarWordUtils.INSTANCE.extractNextWordContext(beforeCursor,
+                        beforeCursor.length() < Constants.EDITOR_CONTENTS_CACHE_SIZE);
             }
 
             @Override

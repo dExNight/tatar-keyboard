@@ -100,11 +100,28 @@ object TatarWordUtils {
      * start: if either reaches index 0, the true word may have been cut off by the caller's cache
      * limit ([rkr.simplekeyboard.inputmethod.latin.common.Constants.EDITOR_CONTENTS_CACHE_SIZE],
      * 1024 characters) rather than genuinely starting there, and "" is returned because a possibly
-     * truncated context word cannot be trusted for a lookup — this function has no way to tell a
-     * truncated cache from a genuinely short field, so it treats both the same, conservatively.
+     * truncated context word cannot be trusted for a lookup.
+     *
+     * The single-argument overload cannot tell a truncated cache from a genuinely short field, so it
+     * treats both the same, conservatively. [extractNextWordContext] with `cacheReachedTextStart` is
+     * the same extraction for a caller that CAN tell ([RichInputConnection]'s cache is filled with a
+     * request for the full 1024-character window, so a shorter result provably starts at the start of
+     * the text — docs/NEXTWORD-RACE.md): the boundary guard then applies only to a genuinely full
+     * cache, and the first word of an empty field — which always sits at index 0 without being
+     * truncated — is extracted like any other.
      */
     @JvmStatic
-    fun extractNextWordContext(textBeforeCursor: CharSequence?): String {
+    fun extractNextWordContext(textBeforeCursor: CharSequence?): String =
+        extractNextWordContext(textBeforeCursor, cacheReachedTextStart = false)
+
+    /**
+     * The two-argument form of [extractNextWordContext]: [cacheReachedTextStart] true means the
+     * caller knows the given text is NOT cut off at index 0 (the cache window reached the start of
+     * the field), so a word touching index 0 is whole and may be returned. The separator-run guard
+     * is unaffected either way: an all-spaces cache has no word in it regardless.
+     */
+    @JvmStatic
+    fun extractNextWordContext(textBeforeCursor: CharSequence?, cacheReachedTextStart: Boolean): String {
         if (textBeforeCursor == null) return ""
         val length = textBeforeCursor.length
         var separatorStart = length
@@ -115,7 +132,8 @@ object TatarWordUtils {
         if (separatorStart == 0) return "" // the separator itself reaches the cache boundary
         val word = extractTrailingWord(textBeforeCursor.subSequence(0, separatorStart))
         if (word.isEmpty()) return ""
-        if (separatorStart - word.length == 0) return "" // the word itself reaches the cache boundary
+        // The word reaching index 0 is only suspicious when the cache may have cut it off.
+        if (!cacheReachedTextStart && separatorStart - word.length == 0) return ""
         return word
     }
 

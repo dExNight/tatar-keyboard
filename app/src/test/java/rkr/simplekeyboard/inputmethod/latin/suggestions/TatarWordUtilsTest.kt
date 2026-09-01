@@ -160,8 +160,34 @@ class TatarWordUtilsTest {
         // "или слово ... упирается в нулевой индекс кэша" — the word touches index 0 of the given
         // text, so it may have been cut off by the real cache limit
         // (Constants.EDITOR_CONTENTS_CACHE_SIZE, 1024 characters) rather than genuinely starting
-        // there.
+        // there. The single-argument overload cannot tell and stays conservative; production
+        // passes the cache-start knowledge explicitly (see the two-argument tests below).
         assertEquals("", TatarWordUtils.extractNextWordContext("сүз "))
+        assertEquals("", TatarWordUtils.extractNextWordContext("сүз ", false))
+    }
+
+    // --- extractNextWordContext with cache-start knowledge (docs/NEXTWORD-RACE.md, 2026-09-01) ---
+
+    @Test
+    fun extractNextWordContextAtTheProvenTextStartReturnsTheFirstWordOfAField() {
+        // A word touching index 0 of a cache that PROVABLY reached the start of the text (a window
+        // shorter than the 1024 characters asked for) is whole, not truncated: the first word of
+        // an empty field gets its prediction like any other. This is the exact case the single-
+        // argument overload had to refuse.
+        assertEquals("сүз", TatarWordUtils.extractNextWordContext("сүз ", true))
+        assertEquals("сүз", TatarWordUtils.extractNextWordContext("сүз   ", true))
+        assertEquals(nfd("сәй"), TatarWordUtils.extractNextWordContext(nfd("сәй "), true))
+    }
+
+    @Test
+    fun extractNextWordContextCacheStartKnowledgeNeverInventsAContext() {
+        // The flag lifts only the word-at-index-0 guard; everything else is untouched: no trailing
+        // U+0020 run, an all-spaces cache, an empty one and null all still yield "".
+        assertEquals("", TatarWordUtils.extractNextWordContext("сүз", true))
+        assertEquals("", TatarWordUtils.extractNextWordContext("   ", true))
+        assertEquals("", TatarWordUtils.extractNextWordContext("", true))
+        assertEquals("", TatarWordUtils.extractNextWordContext(null, true))
+        assertEquals("", TatarWordUtils.extractNextWordContext("сүз.\n ", true))
     }
 
     @Test
