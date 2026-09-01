@@ -88,3 +88,20 @@ before the base was written. No toned sequence was added to emoji_set_v1.txt
 itself: the grid still shows one neutral cell per emoji and the five tones are
 offered on a long press. The original emoji-test.txt is not redistributed in
 this repository.
+
+---
+
+The emoji-suggest table app/src/main/assets/emoji/emoji_suggest_v1.txt is
+original Tatar Keyboard project data, licensed like the project
+(Apache-2.0); it is not derived from CLDR or emoji-test.txt content. It is a
+hand-curated word -> emoji table for the suggestion strip: the curated source
+is scripts/emoji_suggest_data.tsv (one line per word form: the panel emoji
+sequence, the language tag ru/tt, and the word), and
+scripts/emoji_suggest_pack.py validates every word against the alphabet of
+its language and every emoji against emoji_set_v1.txt, enforces the polysemy
+denylist written into the packer, and writes the asset as one
+language<TAB>word<TAB>emoji line per word form, sorted by (language, word).
+The method (intersection of CLDR keyword candidates with the project's
+dictionary frequency lists, followed by manual review) and the review
+protocol are documented in docs/emoji-suggest/DATA.md; the CLDR annotations
+were used only as a source of candidate concepts, not copied as data.
