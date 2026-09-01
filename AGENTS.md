@@ -9,7 +9,7 @@ namespace `rkr.simplekeyboard.inputmethod`. Ветка работы — `main`.
 | Действие | Команда |
 |---|---|
 | JVM-тесты (1007 шт.) | `./gradlew test` (для честного прогона — `--rerun-tasks`) |
-| Python-тесты конвейера (294 шт.) | `for f in tests/*/test_*.py; do python3 "$f" \|\| exit 1; done` — pytest НЕ используется, это чистый unittest |
+| Python-тесты конвейера (299 шт.) | `for f in tests/*/test_*.py; do python3 "$f" \|\| exit 1; done` — pytest НЕ используется, это чистый unittest |
 | Эмуляторный смоук (DEV-3) | `bash scripts/emulator-smoke.sh [--avd tt_suggest_a14] [--apk путь] [--no-boot] [--outdir build/emulator-smoke/]` — поднять AVD → установить APK → выбрать IME → сценарий (набор tt/ru/en, подсказки, эмодзи-панель, crash-буфер) → строки `RESULT\|PASS/FAIL/SKIP`, свидетельства (скриншоты, дампы) в outdir. Координаты клавиш откалиброваны под 1080×2280; пиксельная дельта полосы подсказок требует ImageMagick на хосте (без него — SKIP) |
 | Линт | `./gradlew lintRelease` (baseline `app/lint-baseline.xml` — 0 errors, 31 осознанный warning после P1 (5x IconLauncherShape сняты: иконки конвертированы в lossless WebP, детектор WebP не анализирует), классификация в `app/lint.xml`; `abortOnError=true`) |
 | error-prone (DEV-4) | встроен в компиляцию Java (плагин net.ltgt.errorprone 4.3.0 + error_prone_core 2.42.0 — последняя на JDK 17; build-time, в APK не попадает). Все находки — warnings (`allErrorsAsWarnings`), сборку не роняют; новые стоит разбирать по мере появления в выводе `compile*JavaWithJavac` |
@@ -44,6 +44,12 @@ python-конвейером (`scripts/`), а не руками. Их разме�
 в `app/src/main/java/.../dictionary/storage/DictionaryStorageContracts.kt` и
 `BigramStorageContracts.kt` — любая пересборка ассета требует пересчёта пинов,
 иначе красные тесты.
+
+С 2026-09-01 (миссия SIZE-1, `docs/SIZE-SCHEMA2.md`) словари — **TATDICT
+schema 2**: блочный front-coding (K = 8) + u8-длины + varint-частоты, lossless
+к schema 1. Читатель schema 1 удалён; `dictionary_pack.py build`/`repack` пишут
+schema 2 по умолчанию (`--schema 1` оставлен для справки и golden-тестов).
+Эквивалентность доказывается `scripts/schema2_equivalence_check.py`.
 
 Единый вход пересборки — **`scripts/rebuild_assets.py`** (DEV-1): одна команда
 делает словари → обе таблицы биграмм → пересчёт пинов → проверку, поэтому забытой
