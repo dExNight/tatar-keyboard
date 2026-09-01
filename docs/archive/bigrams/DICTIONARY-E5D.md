@@ -254,6 +254,11 @@ text field) with `pref_tatar_suggestions=true` and the `tt_RU` subtype active:
   finding: it is a live confirmation that the conservative cache-boundary clause in
   "Контракт текста" behaves on a real `InputConnection` exactly as the JVM tests (with
   synthetic `CharSequence`s) already said it would — not a bug this phase introduces.
+  *Датированная поправка (2026-09-01): «by design, not by defect» пересмотрено — это
+  поведение и есть пользовательский дефект «первое слово поля никогда не получает
+  предсказания». Закрыто миссией `docs/NEXTWORD-RACE.md`: кэш знает, достиг ли он
+  начала текста (ответ короче окна 1024 ⇒ достиг), и с этим знанием страж срабатывает
+  только на доказуемо полном кэше.*
 - **Tap-to-commit was attempted but not conclusively exercised.** Coordinate-based
   automated tapping at the strip's cell locations proved unreliable in this session
   (a stray tap once landed on the host app's own spellcheck popup over the typed word
