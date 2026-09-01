@@ -116,6 +116,19 @@ def _manual_raw(
     return raw[: pack.CHECKSUM_OFFSET] + digest + raw[pack.CHECKSUM_OFFSET + pack.CHECKSUM_SIZE :]
 
 
+def _parse(raw: bytes, asset_path: Path) -> pack.ParsedBigramTable:
+    """Разбор таблицы любой схемы: schema 2 напрямую, schema 3 — через словарь ассета.
+
+    Семантические тесты ниже проверяют ВЫБОР голов, а не кодировку, поэтому им нужен
+    единый вид разбора независимо от того, какая схема сегодня поставляется.
+    """
+    schema_id = struct.unpack_from("<H", raw, 8)[0]
+    if schema_id == pack.SCHEMA_ID:
+        return pack.validate_raw(raw)
+    words = dictionary_pack.validate_asset(asset_path.read_bytes()).words
+    return pack.validate_raw_v3(raw, words)
+
+
 def _valid_raw() -> bytes:
     table = {
         "әни": [("өйгә", 3), ("кайтты", 1)],
@@ -406,7 +419,7 @@ class HeadSelectionIsIndependentOfPairEvidenceTest(unittest.TestCase):
 
             result, report = pack.run_pack([train], asset_path, 2, 4, 1)
 
-            parsed = pack.validate_raw(result.raw)
+            parsed = _parse(result.raw, asset_path)
             # Abundant pair evidence loses to unigram rank: the head set is exactly the top 2.
             self.assertNotIn("шалтырат", parsed.head_words)
             self.assertEqual(["алма", "китап"], parsed.head_words)
@@ -442,20 +455,20 @@ class ExtraHeadsTest(unittest.TestCase):
             )
 
             without, _ = pack.run_pack([train], asset_path, 2, 4, 1)
-            self.assertNotIn("шалтырат", pack.validate_raw(without.raw).head_words)
+            self.assertNotIn("шалтырат", _parse(without.raw, asset_path).head_words)
 
             result, report = pack.run_pack(
                 [train], asset_path, 2, 4, 1, extra_heads=["шалтырат"]
             )
 
-            parsed = pack.validate_raw(result.raw)
+            parsed = _parse(result.raw, asset_path)
             self.assertIn("шалтырат", parsed.head_words)
             self.assertEqual(["алма", "китап"], parsed.successes_by_head["шалтырат"])
             # The cutoff itself did not move: the two frequency-chosen heads are still there,
             # with the successors they had before, and the head count grew by exactly one.
             self.assertEqual(["алма", "китап", "шалтырат"], parsed.head_words)
             self.assertEqual(
-                pack.validate_raw(without.raw).successes_by_head["алма"],
+                _parse(without.raw, asset_path).successes_by_head["алма"],
                 parsed.successes_by_head["алма"],
             )
             self.assertEqual(without.head_count + 1, result.head_count)
@@ -471,7 +484,7 @@ class ExtraHeadsTest(unittest.TestCase):
 
             result, report = pack.run_pack([train], asset_path, 2, 4, 1, extra_heads=["алма"])
 
-            parsed = pack.validate_raw(result.raw)
+            parsed = _parse(result.raw, asset_path)
             self.assertEqual(["алма", "китап"], parsed.head_words)
             self.assertEqual([], report["extra_heads_promoted"])
 
@@ -488,7 +501,7 @@ class ExtraHeadsTest(unittest.TestCase):
                 [train], asset_path, 2, 4, 1, extra_heads=["шалтырат"]
             )
 
-            self.assertNotIn("шалтырат", pack.validate_raw(result.raw).head_words)
+            self.assertNotIn("шалтырат", _parse(result.raw, asset_path).head_words)
             self.assertEqual(["шалтырат"], report["extra_heads_dropped_for_no_pairs"])
 
     def test_the_list_may_not_add_a_word_the_dictionary_does_not_ship(self) -> None:
@@ -605,7 +618,7 @@ class EndToEndCliTest(unittest.TestCase):
             self.assertEqual(0, completed.returncode, completed.stderr)
             self.assertTrue(out_raw.exists())
             self.assertTrue(out_compressed.exists())
-            parsed = pack.validate_raw(out_raw.read_bytes())
+            parsed = _parse(out_raw.read_bytes(), asset_path)
             self.assertGreater(len(parsed.head_words), 0)
             self.assertEqual(
                 pack.decompress(out_compressed.read_bytes()), out_raw.read_bytes()
@@ -620,6 +633,150 @@ class EndToEndCliTest(unittest.TestCase):
                 hashlib.sha256(out_compressed.read_bytes()).hexdigest(),
                 report["compressed_sha256"],
             )
+
+
+V3_WORDS = ["әни", "өйгә", "кайтты", "зур", "матур"]
+
+
+def _v3_table() -> tuple[bytes, list[str], bytes]:
+    """Корректная schema-3 таблица над маленьким словарём: (raw, слова, sha256 словаря-raw)."""
+    with TemporaryDirectory() as raw_directory:
+        asset_path = _write_asset(Path(raw_directory), V3_WORDS)
+        parsed_dictionary = dictionary_pack.validate_asset(asset_path.read_bytes())
+        word_index = {word: index for index, word in enumerate(parsed_dictionary.words)}
+        dictionary_sha = hashlib.sha256(parsed_dictionary.raw).digest()
+        table = {
+            "әни": [("өйгә", 3), ("кайтты", 1)],
+            "зур": [("матур", 2)],
+        }
+        result = pack.pack_bigram_table_v3(["әни", "зур"], table, 2, word_index, dictionary_sha)
+        return result.raw, list(parsed_dictionary.words), dictionary_sha
+
+
+def _rechecksum_v3(raw: bytes) -> bytes:
+    changed = bytearray(raw)
+    changed[pack.CHECKSUM_OFFSET_V3 : pack.CHECKSUM_OFFSET_V3 + pack.CHECKSUM_SIZE] = bytes(
+        pack.CHECKSUM_SIZE
+    )
+    digest = hashlib.sha256(bytes(changed)).digest()
+    changed[pack.CHECKSUM_OFFSET_V3 : pack.CHECKSUM_OFFSET_V3 + pack.CHECKSUM_SIZE] = digest
+    return bytes(changed)
+
+
+class Schema3HeaderLayoutTest(unittest.TestCase):
+    def test_header_is_128_bytes_with_digest_at_96(self) -> None:
+        self.assertEqual(128, pack.HEADER_V3.size)
+        self.assertEqual(128, pack.HEADER_SIZE_V3)
+        self.assertEqual(96, pack.CHECKSUM_OFFSET_V3)
+        self.assertEqual(12, pack.BLOCK_RECORD_V3.size)
+
+    def test_block_size_is_64(self) -> None:
+        self.assertEqual(64, pack.HEAD_BLOCK_V3)
+
+
+class Schema3RoundTripTest(unittest.TestCase):
+    def test_pack_and_validate_round_trip(self) -> None:
+        raw, words, dictionary_sha = _v3_table()
+        parsed = pack.validate_raw_v3(raw, words, dictionary_sha)
+        self.assertEqual(["зур", "әни"], parsed.head_words)  # кодпоинтный порядок
+        self.assertEqual(["матур"], parsed.successes_by_head["зур"])
+        self.assertEqual(["өйгә", "кайтты"], parsed.successes_by_head["әни"])
+
+    def test_repack_from_schema2_is_content_identical(self) -> None:
+        with TemporaryDirectory() as raw_directory:
+            directory = Path(raw_directory)
+            asset_path = _write_asset(directory, V3_WORDS)
+            table = {
+                "әни": [("өйгә", 3), ("кайтты", 1)],
+                "зур": [("матур", 2)],
+            }
+            v2 = pack.pack_bigram_table(["әни", "зур"], table, successes_per_head=2)
+            v2_asset = directory / "v2.tatbigr.zlib"
+            v2_asset.write_bytes(v2.compressed)
+
+            result, report = pack.run_repack(
+                v2_asset, asset_path, pack.coverage.language_for("tat")
+            )
+
+            self.assertEqual(3, report["schema"])
+            parsed = pack.validate_raw_v3(
+                result.raw,
+                list(dictionary_pack.validate_asset(asset_path.read_bytes()).words),
+            )
+            self.assertEqual(
+                pack.validate_raw(v2.raw).successes_by_head, parsed.successes_by_head
+            )
+
+    def test_a_word_outside_the_dictionary_stops_the_pack(self) -> None:
+        with TemporaryDirectory() as raw_directory:
+            asset_path = _write_asset(Path(raw_directory), V3_WORDS)
+            parsed_dictionary = dictionary_pack.validate_asset(asset_path.read_bytes())
+            word_index = {word: index for index, word in enumerate(parsed_dictionary.words)}
+            dictionary_sha = hashlib.sha256(parsed_dictionary.raw).digest()
+            with self.assertRaises(pack.BigramInputError):
+                pack.pack_bigram_table_v3(
+                    ["дус"], {"дус": [("өйгә", 1)]}, 2, word_index, dictionary_sha
+                )
+            with self.assertRaises(pack.BigramInputError):
+                pack.pack_bigram_table_v3(
+                    ["әни"], {"әни": [("дус", 1)]}, 2, word_index, dictionary_sha
+                )
+
+
+class Schema3ValidatorRejectsTest(unittest.TestCase):
+    def test_rejects_wrong_dictionary_link(self) -> None:
+        raw, words, _dictionary_sha = _v3_table()
+        with self.assertRaises(pack.BigramFormatError):
+            pack.validate_raw_v3(raw, words, bytes(32))
+
+    def test_rejects_non_zero_reserved_bytes(self) -> None:
+        raw, words, _ = _v3_table()
+        changed = bytearray(raw)
+        changed[88] = 1
+        with self.assertRaises(pack.BigramFormatError):
+            pack.validate_raw_v3(bytes(_rechecksum_v3(bytes(changed))), words)
+
+    def test_rejects_zero_success_count(self) -> None:
+        raw, words, _ = _v3_table()
+        counts_offset = struct.unpack_from("<I", raw, 40)[0]
+        changed = bytearray(raw)
+        changed[counts_offset] = 0
+        with self.assertRaises(pack.BigramFormatError):
+            pack.validate_raw_v3(bytes(_rechecksum_v3(bytes(changed))), words)
+
+    def test_rejects_zero_head_delta(self) -> None:
+        raw, words, _ = _v3_table()
+        deltas_offset = struct.unpack_from("<I", raw, 32)[0]
+        changed = bytearray(raw)
+        changed[deltas_offset] = 0  # дельта второй головы: 1 → 0
+        with self.assertRaises(pack.BigramFormatError):
+            pack.validate_raw_v3(bytes(_rechecksum_v3(bytes(changed))), words)
+
+    def test_rejects_counts_not_adding_up(self) -> None:
+        raw, words, _ = _v3_table()
+        counts_offset = struct.unpack_from("<I", raw, 40)[0]
+        changed = bytearray(raw)
+        changed[counts_offset] = 3  # было 2; сумма 4 ≠ pairCount 3
+        with self.assertRaises(pack.BigramFormatError):
+            pack.validate_raw_v3(bytes(_rechecksum_v3(bytes(changed))), words)
+
+    def test_rejects_success_index_beyond_dictionary(self) -> None:
+        raw, words, _ = _v3_table()
+        success_offset = struct.unpack_from("<I", raw, 44)[0]
+        changed = bytearray(raw)
+        changed[success_offset] = 90  # varint 90 при словаре из 5 слов
+        with self.assertRaises(pack.BigramFormatError):
+            pack.validate_raw_v3(bytes(_rechecksum_v3(bytes(changed))), words)
+
+    def test_rejects_checksum_mismatch_and_truncation(self) -> None:
+        raw, words, _ = _v3_table()
+        changed = bytearray(raw)
+        changed[96] ^= 1
+        with self.assertRaises(pack.BigramFormatError):
+            pack.validate_raw_v3(bytes(changed), words)
+        with self.assertRaises(pack.BigramFormatError):
+            pack.validate_raw_v3(raw[:-1], words)
+
 
 
 if __name__ == "__main__":

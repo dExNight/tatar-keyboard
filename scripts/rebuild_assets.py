@@ -179,13 +179,15 @@ BIGRAMS = (
 
 @dataclass(frozen=True)
 class Pins:
-    """Пять чисел, которыми контракт пинит ассет. count — записей словаря или голов."""
+    """Пять чисел, которыми контракт пинит ассет, плюс (для таблиц schema 3) raw SHA-256
+    словаря, с которым таблица связана. count — записей словаря или голов."""
 
     compressed_size: int
     compressed_sha256: str
     raw_size: int
     raw_sha256: str
     count: int
+    dictionary_raw_sha256: str = ""
 
 
 class ContractError(ValueError):
@@ -221,7 +223,9 @@ def _read_sha(block: str, field: str) -> str:
     return match.group(1)
 
 
-def read_pins(contract_path: Path, spec: str, kind: str, count_field: str) -> Pins:
+def read_pins(
+    contract_path: Path, spec: str, kind: str, count_field: str, linked: bool = False
+) -> Pins:
     text = contract_path.read_text(encoding="utf-8")
     start, end = _spec_block(text, spec, kind)
     block = text[start:end]
@@ -231,6 +235,9 @@ def read_pins(contract_path: Path, spec: str, kind: str, count_field: str) -> Pi
         raw_size=_read_number(block, "expectedRawSize"),
         raw_sha256=_read_sha(block, "expectedRawSha256"),
         count=_read_number(block, count_field),
+        dictionary_raw_sha256=(
+            _read_sha(block, "expectedDictionaryRawSha256") if linked else ""
+        ),
     )
 
 
@@ -279,11 +286,15 @@ def write_pins(
         block = _replace_sha(block, "expectedCompressedSha256", pins.compressed_sha256)
         block = _replace_number(block, "expectedRawSize", pins.raw_size)
         block = _replace_sha(block, "expectedRawSha256", pins.raw_sha256)
+        if pins.dictionary_raw_sha256:
+            block = _replace_sha(
+                block, "expectedDictionaryRawSha256", pins.dictionary_raw_sha256
+            )
         block = _replace_number(block, count_field, pins.count)
         text = text[:start] + block + text[end:]
     _atomic_write_text(contract_path, text)
     for spec, pins in updates.items():
-        if read_pins(contract_path, spec, kind, count_field) != pins:
+        if read_pins(contract_path, spec, kind, count_field, linked=bool(pins.dictionary_raw_sha256)) != pins:
             raise ContractError(f"{spec}: после записи пины не совпали с записанными")
 
 
@@ -304,16 +315,36 @@ def measure_dictionary(asset_path: Path, tag: str) -> Pins:
     )
 
 
-def measure_bigram(asset_path: Path) -> Pins:
+def measure_bigram(asset_path: Path, dictionary_path: Path, tag: str) -> Pins:
+    """Пины таблицы биграмм. Schema 3 (SIZE-2) валидируется только ВМЕСТЕ со словарём:
+    головы и преемники — индексы в него, а пины включают его raw SHA-256 (связку из
+    заголовка таблицы). Schema 2 читается для старых ассетов (golden/история)."""
+    language = coverage.language_for(tag)
     asset = asset_path.read_bytes()
     raw = bigram_asset_pack.decompress(asset)
-    parsed = bigram_asset_pack.validate_raw(raw)
+    schema_id = bigram_asset_pack.HEADER.unpack_from(raw)[1]
+    if schema_id == bigram_asset_pack.SCHEMA_ID:
+        parsed = bigram_asset_pack.validate_raw(raw)
+        head_count = len(parsed.head_words)
+        dictionary_raw_sha256 = ""
+    elif schema_id == bigram_asset_pack.SCHEMA_ID_V3:
+        parsed_dictionary = dictionary_pack.validate_asset(
+            dictionary_path.read_bytes(), language=language
+        )
+        dictionary_raw_sha256 = hashlib.sha256(parsed_dictionary.raw).hexdigest()
+        parsed = bigram_asset_pack.validate_raw_v3(
+            raw, parsed_dictionary.words, bytes.fromhex(dictionary_raw_sha256)
+        )
+        head_count = len(parsed.head_words)
+    else:
+        raise ContractError(f"неизвестный schema id таблицы биграмм: {schema_id}")
     return Pins(
         compressed_size=len(asset),
         compressed_sha256=hashlib.sha256(asset).hexdigest(),
         raw_size=len(raw),
         raw_sha256=hashlib.sha256(raw).hexdigest(),
-        count=len(parsed.head_words),
+        count=head_count,
+        dictionary_raw_sha256=dictionary_raw_sha256,
     )
 
 
@@ -350,9 +381,15 @@ def bigram_drift(
     vocabulary, frequencies = bigram_asset_pack.read_shipped_vocabulary(
         dictionary_path, language
     )
-    parsed = bigram_asset_pack.validate_raw(
-        bigram_asset_pack.decompress(table_path.read_bytes())
-    )
+    raw = bigram_asset_pack.decompress(table_path.read_bytes())
+    schema_id = bigram_asset_pack.HEADER.unpack_from(raw)[1]
+    if schema_id == bigram_asset_pack.SCHEMA_ID_V3:
+        ordered_words = dictionary_pack.validate_asset(
+            dictionary_path.read_bytes(), language=language
+        ).words
+        parsed = bigram_asset_pack.validate_raw_v3(raw, ordered_words)
+    else:
+        parsed = bigram_asset_pack.validate_raw(raw)
     actual = set(parsed.head_words)
     expected = set(select_heads(frequencies, heads)) | set(extra_heads)
     missing = sorted(expected - actual)
@@ -370,7 +407,11 @@ def bigram_drift(
 
 def _pin_problems(measured: Pins, pinned: Pins) -> list[str]:
     problems = []
-    for field in ("compressed_size", "compressed_sha256", "raw_size", "raw_sha256", "count"):
+    fields = ["compressed_size", "compressed_sha256", "raw_size", "raw_sha256", "count"]
+    # Связка schema 3 со словарём: сравнивается, если хоть одна сторона её несёт.
+    if measured.dictionary_raw_sha256 or pinned.dictionary_raw_sha256:
+        fields.append("dictionary_raw_sha256")
+    for field in fields:
         actual, expected = getattr(measured, field), getattr(pinned, field)
         if actual != expected:
             problems.append(f"{field}: в контракте {expected}, в ассете {actual}")
@@ -454,10 +495,13 @@ def run_check(
             failed = True
         else:
             pinned = read_pins(
-                bigram_contract, bigram.spec, "BigramArtifactSpec", "expectedHeadCount"
+                bigram_contract, bigram.spec, "BigramArtifactSpec", "expectedHeadCount",
+                linked=True,
             )
             try:
-                problems = _pin_problems(measure_bigram(asset_path), pinned)
+                problems = _pin_problems(
+                    measure_bigram(asset_path, dictionary_path, bigram.dictionary), pinned
+                )
                 extra: list[str] = []
                 if bigram.extra_heads is not None:
                     extra = bigram_asset_pack.read_extra_heads(
@@ -564,6 +608,8 @@ def bigram_pack_argv(root: Path, corpus_dir: Path, work_dir: Path, bigram: Bigra
         str(bigram.heads),
         "--successes-per-head",
         str(bigram.successes_per_head),
+        "--schema",
+        "3",
         "--out-raw",
         str(work_dir / Path(bigram.asset).name.removesuffix(".zlib")),
         "--out-compressed",
@@ -641,7 +687,14 @@ def run_rebuild(
     write_pins(
         root / DICT_CONTRACT, dict_updates, "DictionaryArtifactSpec", "expectedEntryCount"
     )
-    bigram_updates = {b.spec: measure_bigram(root / b.asset) for b in BIGRAMS}
+    bigram_updates = {
+        b.spec: measure_bigram(
+            root / b.asset,
+            root / next(d.asset for d in DICTIONARIES if d.tag == b.dictionary),
+            b.dictionary,
+        )
+        for b in BIGRAMS
+    }
     write_pins(
         root / BIGRAM_CONTRACT, bigram_updates, "BigramArtifactSpec", "expectedHeadCount"
     )

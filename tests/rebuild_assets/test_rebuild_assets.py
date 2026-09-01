@@ -45,14 +45,26 @@ def build_dictionary_asset(directory: Path, words=WORDS, frequencies=FREQUENCIES
     return asset_path
 
 
-def build_bigram_asset(directory: Path, heads, table, successes_per_head=2) -> Path:
-    result = bigram_asset_pack.pack_bigram_table(heads, table, successes_per_head)
+def build_bigram_asset(directory: Path, heads, table, dictionary_asset: Path,
+                       successes_per_head=2) -> Path:
+    """Schema 3: таблица кросс-референсит словарь фикстуры — индексы и его raw SHA-256."""
+    import hashlib
+
+    parsed_dictionary = dictionary_pack.validate_asset(dictionary_asset.read_bytes())
+    word_index = {word: index for index, word in enumerate(parsed_dictionary.words)}
+    result = bigram_asset_pack.pack_bigram_table_v3(
+        heads, table, successes_per_head, word_index,
+        hashlib.sha256(parsed_dictionary.raw).digest(),
+    )
     asset_path = directory / "tatar_bigrams_v1.tatbigr.zlib"
     asset_path.write_bytes(result.compressed)
     return asset_path
 
 
 SHA0 = "0" * 64
+
+# Путь словаря внутри фикстурного дерева (создаётся в FakeTreeTest.setUp).
+DICT_ASSET = Path("app/src/main/assets/dictionaries/tatar_top100k_v1.tdict.zlib")
 
 DICT_BLOCK = """\
         val {spec} = DictionaryArtifactSpec(
@@ -74,6 +86,8 @@ BIGRAM_BLOCK = """\
                 "{sha}",
             expectedRawSize = 96,
             expectedRawSha256 =
+                "{sha}",
+            expectedDictionaryRawSha256 =
                 "{sha}",
             expectedHeadCount = 1,
         )"""
@@ -111,7 +125,9 @@ def pin_everything(root: Path, dictionary: rebuild_assets.DictionaryAsset,
     )
     rebuild_assets.write_pins(
         root / rebuild_assets.BIGRAM_CONTRACT,
-        {bigram.spec: rebuild_assets.measure_bigram(root / bigram.asset)},
+        {bigram.spec: rebuild_assets.measure_bigram(
+            root / bigram.asset, root / dictionary.asset, bigram.dictionary
+        )},
         "BigramArtifactSpec",
         "expectedHeadCount",
     )
@@ -132,7 +148,8 @@ class FakeTreeTest(unittest.TestCase):
         bigram_dir.mkdir(parents=True)
         # Heads = the top-3 by frequency, each with a pair: the consistent baseline.
         self.table = {word: [(WORDS[0], 10)] for word in WORDS[:3]}
-        build_bigram_asset(bigram_dir, WORDS[:3], self.table)
+        build_bigram_asset(bigram_dir, WORDS[:3], self.table,
+                           asset_dir / "tatar_top100k_v1.tdict.zlib")
         self.dictionary = rebuild_assets.DictionaryAsset(
             tag="tat", spec="TATAR_TOP100K_V1",
             asset="app/src/main/assets/dictionaries/tatar_top100k_v1.tdict.zlib",
@@ -220,30 +237,32 @@ class CheckTest(FakeTreeTest):
         self.assertEqual("mismatch", report["dictionaries"]["tat"]["verdict"])
         self.assertTrue(report["dictionaries"]["tat"]["problems"])
 
-    def test_a_head_outside_the_dictionary_is_never_allowlisted(self):
-        pin_everything(self.root, self.dictionary, self.bigram)
+    def test_a_head_outside_the_dictionary_is_unrepresentable(self):
+        # Schema 3 хранит индексы в словарь: голова вне словаря НЕВЫРАЗИМА — упаковщик
+        # падает fail-closed ещё до записи файла (у schema 2 это был дрейф-вердикт
+        # «heads_outside_dictionary», который больше не нужен: класс закрыт конструкцией).
         table = dict(self.table)
         table["дус"] = [(WORDS[0], 5)]  # «дус» в словаре нет
-        build_bigram_asset(self.root / "app/src/main/assets/bigrams",
-                           WORDS[:3] + ["дус"], table)
-        pin_everything(self.root, self.dictionary, self.bigram)  # пины честные
+        with self.assertRaises(bigram_asset_pack.BigramInputError):
+            build_bigram_asset(self.root / "app/src/main/assets/bigrams",
+                               WORDS[:3] + ["дус"], table, self.root / DICT_ASSET)
+
+    def test_a_table_packed_against_another_dictionary_is_red(self):
+        # Связка schema 3: таблица упакована от одного словаря, пины и словарь сменились —
+        # заголовок таблицы называет СТАРЫЙ словарь, и проверка красная по связке.
+        pin_everything(self.root, self.dictionary, self.bigram)
+        build_dictionary_asset(self.root / "app/src/main/assets/dictionaries",
+                               frequencies=[100 + i for i in range(len(WORDS))])
         code, report = self.run_check()
         self.assertEqual(1, code)
-        drift = report["bigrams"]["tat"]["drift"]
-        self.assertEqual(1, drift["heads_outside_dictionary"])
-        self.assertIn("дус", report["bigrams"]["tat"]["problems"][0])
-        # Даже точная запись в файле известных расхождений это не разрешает.
-        known = self.write_known_drift({
-            "bigrams/tatar_bigrams_v1.tatbigr.zlib": {
-                "missing_top_heads": 0, "unexpected_heads": 1, "reason": "тест"}})
-        code, _report = self.run_check(known)
-        self.assertEqual(1, code)
+        self.assertEqual("mismatch", report["bigrams"]["tat"]["verdict"])
 
     def test_drift_is_counted_in_both_directions(self):
         # Таблица упакована с головами по СТАРОМУ порядку частот: «өлкә» вместо «мәхәббәт».
         build_bigram_asset(self.root / "app/src/main/assets/bigrams",
                            [WORDS[5], WORDS[1], WORDS[2]],
-                           {w: [(WORDS[1], 7)] for w in (WORDS[5], WORDS[1], WORDS[2])})
+                           {w: [(WORDS[1], 7)] for w in (WORDS[5], WORDS[1], WORDS[2])},
+                           self.root / DICT_ASSET)
         pin_everything(self.root, self.dictionary, self.bigram)
         code, report = self.run_check()
         self.assertEqual(1, code)
@@ -256,7 +275,8 @@ class CheckTest(FakeTreeTest):
     def test_known_drift_is_accepted_only_on_exact_numbers(self):
         build_bigram_asset(self.root / "app/src/main/assets/bigrams",
                            [WORDS[1], WORDS[2]],  # «мәхәббәт» не упакована
-                           {w: [(WORDS[1], 7)] for w in (WORDS[1], WORDS[2])})
+                           {w: [(WORDS[1], 7)] for w in (WORDS[1], WORDS[2])},
+                           self.root / DICT_ASSET)
         pin_everything(self.root, self.dictionary, self.bigram)
         key = "bigrams/tatar_bigrams_v1.tatbigr.zlib"
 

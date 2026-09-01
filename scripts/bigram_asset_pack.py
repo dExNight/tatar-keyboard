@@ -1,5 +1,12 @@
 #!/usr/bin/env python3
-"""E5b: pack the shipped Tatar bigram table asset — schema 2, magic ``TATBIGR\\0``.
+"""E5b: pack the shipped Tatar bigram table asset — magic ``TATBIGR\\0``.
+
+Schema 3 (the shipped one since SIZE-2, 2026-09-01, ``docs/SIZE-SCHEMA3.md``) stores NO words:
+heads are delta-varint indices into the linked TATDICT schema-2 dictionary, successes are varint
+indices into it, and the header names that dictionary by raw SHA-256 — a table is valid only
+with the exact dictionary it was packed against. Schema 2 (six sections, own word blobs) is kept
+selectable via ``pack --schema 2`` for golden tests and history, exactly like SIZE-1 kept
+``dictionary_pack.py --schema 1``; ``repack`` converts a schema-2 asset corpus-free.
 
 This is the real, byte-exact artifact generator. It is deliberately a SEPARATE file from
 ``scripts/bigram_pack.py`` (E5a): that script is the measurement prototype whose gate was
@@ -79,6 +86,7 @@ from typing import Sequence, TextIO
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import dictionary_coverage as coverage  # noqa: E402
+import dictionary_pack  # noqa: E402
 from bigram_pack import (  # noqa: E402
     MAX_COMPRESSED_BYTES,
     MAX_RAW_BYTES,
@@ -104,6 +112,45 @@ CHECKSUM_ALGORITHM_SHA256 = 1
 HEADER_FORMAT = "<8s" + "H" * 4 + "I" * 12 + "32s"
 HEADER = struct.Struct(HEADER_FORMAT)
 assert HEADER.size == HEADER_SIZE
+
+# --- schema 3 (SIZE-2, 2026-09-01, docs/SIZE-SCHEMA3.md) --------------------------------------
+#
+# Cross-reference into the dictionary instead of own word blobs: heads are delta-varint indices
+# into the shipped TATDICT schema-2 dictionary (both orderings are code-point ascending, so the
+# indices of sorted heads strictly increase), successes are plain varint indices into the same
+# dictionary, success-range boundaries are u8 counts (1..K), and the header carries the raw
+# SHA-256 of the dictionary the table was packed against — the table is valid only together with
+# that exact dictionary, and both validators (this module's and Android's TatBigrValidator) plus
+# the runtime reader check the link fail-closed.
+#
+# Header, 128 bytes: magic(8) + 4 x u16 (same four meta fields as schema 2) + 10 x u32
+# (headCount, pairCount, headBlockCount, blockIndexOffset, headDeltasOffset, headDeltasSize,
+# countsOffset, successIdsOffset, successIdsSize, fileSize) + 32s (dictionary raw SHA-256) +
+# 8 reserved zero bytes + 32s checksum at offset 96 (same zero-then-hash trick, new offset).
+#
+# Four sections, no padding, no separators:
+#   (1) headBlockCount records x 12 bytes {u32 firstDictIndex, u32 headDeltaOffset relative to
+#       section 2, u32 successOffset relative to section 4} — one record per HEAD_BLOCK_V3 heads,
+#       giving binary search over dictionary indices;
+#   (2) head dict-index delta stream: per block, (blockHeadCount - 1) varint deltas, each >= 1
+#       (the block's first index is absolute in its block-index record);
+#   (3) headCount x u8 success counts (the generator never writes 0 — a head without pairs is
+#       dropped — and never more than successes_per_head);
+#   (4) pairCount varint dictionary indices of successes, grouped by head in packing order
+#       (count descending, tie code-point ascending — the order the reader returns them in).
+
+SCHEMA_ID_V3 = 3
+FORMAT_VERSION_V3 = 1
+HEADER_SIZE_V3 = 128
+CHECKSUM_OFFSET_V3 = 96
+HEAD_BLOCK_V3 = 64
+
+HEADER_FORMAT_V3 = "<8s" + "H" * 4 + "I" * 10 + "32s" + "8s" + "32s"
+HEADER_V3 = struct.Struct(HEADER_FORMAT_V3)
+assert HEADER_V3.size == HEADER_SIZE_V3
+
+BLOCK_RECORD_V3 = struct.Struct("<3I")
+
 
 # zlib settings — identical mode to dictionary_pack.py / bigram_pack.py, so compressed sizes are
 # comparable across every asset the project ships.
@@ -435,6 +482,310 @@ def pack_bigram_table(
     )
 
 
+def _decode_varint_v3(raw: bytes, offset: int, limit: int) -> tuple[int, int]:
+    """dictionary_pack's canonical varint, re-raised as a bigram format error."""
+    try:
+        return dictionary_pack._decode_varint(raw, offset, limit)
+    except dictionary_pack.DictionaryFormatError as error:
+        raise BigramFormatError(f"schema 3 varint: {error}") from error
+
+
+def _serialize_v3(
+    kept_heads: Sequence[str],
+    kept_successes: dict[str, list[str]],
+    word_index: dict[str, int],
+    dictionary_raw_sha256: bytes,
+) -> tuple[bytes, int]:
+    """The schema-3 raw image of an already-selected head set. Internal: both the corpus ``pack``
+    front-end and the v2 ``repack`` front-end end up here, so the byte layout exists exactly once.
+
+    Every head and every success must be present in ``word_index`` — the whole point of schema 3
+    is that the table stores NO words of its own, so a word the dictionary does not contain is
+    unrepresentable, not merely suspect.
+    """
+    head_indices: list[int] = []
+    for head in kept_heads:
+        if head not in word_index:
+            raise BigramInputError(f"head {head!r} is not in the dictionary the table links to")
+        head_indices.append(word_index[head])
+    for index in range(1, len(head_indices)):
+        if head_indices[index] <= head_indices[index - 1]:
+            raise BigramFormatError(
+                "dictionary indices of sorted heads are not strictly increasing — "
+                "the dictionary order and the head order disagree"
+            )
+
+    head_count = len(kept_heads)
+    block_count = (head_count + HEAD_BLOCK_V3 - 1) // HEAD_BLOCK_V3
+
+    block_records: list[tuple[int, int, int]] = []
+    head_delta_parts: list[bytes] = []
+    success_parts: list[bytes] = []
+    counts = bytearray()
+    for block in range(block_count):
+        first = block * HEAD_BLOCK_V3
+        last = min(first + HEAD_BLOCK_V3, head_count)
+        block_records.append(
+            (head_indices[first], sum(map(len, head_delta_parts)), sum(map(len, success_parts)))
+        )
+        for position in range(first + 1, last):
+            head_delta_parts.append(
+                dictionary_pack._encode_varint(head_indices[position] - head_indices[position - 1])
+            )
+        for position in range(first, last):
+            successes = kept_successes[kept_heads[position]]
+            if not 1 <= len(successes) <= 255:
+                raise BigramFormatError(f"head {kept_heads[position]!r} has {len(successes)} successes")
+            counts.append(len(successes))
+            for word in successes:
+                if word not in word_index:
+                    raise BigramInputError(
+                        f"success {word!r} is not in the dictionary the table links to"
+                    )
+                success_parts.append(dictionary_pack._encode_varint(word_index[word]))
+    head_deltas = b"".join(head_delta_parts)
+    success_ids = b"".join(success_parts)
+    pair_count = sum(counts)
+
+    block_index_offset = HEADER_SIZE_V3
+    head_deltas_offset = block_index_offset + BLOCK_RECORD_V3.size * block_count
+    counts_offset = head_deltas_offset + len(head_deltas)
+    success_ids_offset = counts_offset + head_count
+    file_size = success_ids_offset + len(success_ids)
+
+    zero_digest_header = HEADER_V3.pack(
+        MAGIC,
+        SCHEMA_ID_V3,
+        FORMAT_VERSION_V3,
+        HEADER_SIZE_V3,
+        CHECKSUM_ALGORITHM_SHA256,
+        head_count,
+        pair_count,
+        block_count,
+        block_index_offset,
+        head_deltas_offset,
+        len(head_deltas),
+        counts_offset,
+        success_ids_offset,
+        len(success_ids),
+        file_size,
+        dictionary_raw_sha256,
+        bytes(8),
+        bytes(CHECKSUM_SIZE),
+    )
+    raw = (
+        zero_digest_header
+        + b"".join(BLOCK_RECORD_V3.pack(*record) for record in block_records)
+        + head_deltas
+        + bytes(counts)
+        + success_ids
+    )
+    digest = hashlib.sha256(raw).digest()
+    return raw[:CHECKSUM_OFFSET_V3] + digest + raw[CHECKSUM_OFFSET_V3 + CHECKSUM_SIZE :], pair_count
+
+
+def validate_raw_v3(
+    raw: bytes,
+    dictionary_words: Sequence[str],
+    dictionary_raw_sha256: bytes | None = None,
+) -> ParsedBigramTable:
+    """Strict validator for TATBIGR schema 3 — the cross-referenced layout.
+
+    ``dictionary_words`` is the ordered word list of the dictionary the table links to (indices
+    in the file resolve against it); ``dictionary_raw_sha256``, when given, must equal the digest
+    the header names — the table is valid only with that exact dictionary.
+    """
+    if len(raw) < HEADER_SIZE_V3:
+        raise BigramFormatError(
+            f"file is {len(raw)} bytes, shorter than the {HEADER_SIZE_V3}-byte header"
+        )
+    (
+        magic,
+        schema_id,
+        format_version,
+        header_size,
+        checksum_algorithm,
+        head_count,
+        pair_count,
+        block_count,
+        block_index_offset,
+        head_deltas_offset,
+        head_deltas_size,
+        counts_offset,
+        success_ids_offset,
+        success_ids_size,
+        file_size,
+        dictionary_sha,
+        reserved,
+        digest,
+    ) = HEADER_V3.unpack_from(raw)
+
+    if magic != MAGIC:
+        raise BigramFormatError(f"unrecognized magic: {magic!r}")
+    if schema_id != SCHEMA_ID_V3:
+        raise BigramFormatError(f"unsupported schema id: {schema_id}")
+    if format_version != FORMAT_VERSION_V3:
+        raise BigramFormatError(f"unsupported format version: {format_version}")
+    if header_size != HEADER_SIZE_V3:
+        raise BigramFormatError(f"unsupported header size: {header_size}")
+    if checksum_algorithm != CHECKSUM_ALGORITHM_SHA256:
+        raise BigramFormatError(f"unsupported checksum algorithm: {checksum_algorithm}")
+    if reserved != bytes(8):
+        raise BigramFormatError("reserved header bytes are not zero")
+    if dictionary_raw_sha256 is not None and dictionary_sha != dictionary_raw_sha256:
+        raise BigramFormatError("the table names a different dictionary than the one supplied")
+
+    zeroed = raw[:CHECKSUM_OFFSET_V3] + bytes(CHECKSUM_SIZE) + raw[CHECKSUM_OFFSET_V3 + CHECKSUM_SIZE :]
+    if digest != hashlib.sha256(zeroed).digest():
+        raise BigramFormatError("checksum mismatch")
+
+    expected_block_index = HEADER_SIZE_V3
+    expected_head_deltas = expected_block_index + BLOCK_RECORD_V3.size * block_count
+    expected_counts = expected_head_deltas + head_deltas_size
+    expected_success_ids = expected_counts + head_count
+    expected_file_size = expected_success_ids + success_ids_size
+    if (block_index_offset, head_deltas_offset, counts_offset, success_ids_offset, file_size) != (
+        expected_block_index,
+        expected_head_deltas,
+        expected_counts,
+        expected_success_ids,
+        expected_file_size,
+    ):
+        raise BigramFormatError("non-canonical section arithmetic")
+    if len(raw) != file_size:
+        raise BigramFormatError(
+            f"actual length {len(raw)} does not match header file_size {file_size} "
+            "(truncated or trailing bytes)"
+        )
+    if head_count == 0:
+        raise BigramFormatError("a table without heads is not representable")
+    if block_count != (head_count + HEAD_BLOCK_V3 - 1) // HEAD_BLOCK_V3:
+        raise BigramFormatError("block count disagrees with head count")
+
+    dictionary_size = len(dictionary_words)
+    counts = raw[counts_offset : counts_offset + head_count]
+    if min(counts) < 1:
+        raise BigramFormatError("a head with an empty success range — the packer never emits one")
+    if sum(counts) != pair_count:
+        raise BigramFormatError("success counts do not add up to pair_count")
+
+    head_words: list[str] = []
+    successes_by_head: dict[str, list[str]] = {}
+    pair_cursor = success_ids_offset
+    previous_index = -1
+    for block in range(block_count):
+        first_index, delta_offset, success_offset = BLOCK_RECORD_V3.unpack_from(
+            raw, block_index_offset + BLOCK_RECORD_V3.size * block
+        )
+        if first_index >= dictionary_size:
+            raise BigramFormatError(f"block {block} first index is >= dictionary size")
+        if block == 0 and (delta_offset != 0 or success_offset != 0):
+            raise BigramFormatError("the first block's stream offsets must be zero")
+        if first_index <= previous_index:
+            raise BigramFormatError("block first indices are not strictly increasing")
+        first = block * HEAD_BLOCK_V3
+        last = min(first + HEAD_BLOCK_V3, head_count)
+        delta_end = (
+            BLOCK_RECORD_V3.unpack_from(
+                raw, block_index_offset + BLOCK_RECORD_V3.size * (block + 1)
+            )[1]
+            if block + 1 < block_count
+            else head_deltas_size
+        )
+        success_end = (
+            BLOCK_RECORD_V3.unpack_from(
+                raw, block_index_offset + BLOCK_RECORD_V3.size * (block + 1)
+            )[2]
+            if block + 1 < block_count
+            else success_ids_size
+        )
+        if pair_cursor != success_ids_offset + success_offset:
+            raise BigramFormatError(f"block {block} success stream offset is not where decoding stands")
+
+        index = first_index
+        cursor = head_deltas_offset + delta_offset
+        delta_limit = head_deltas_offset + delta_end
+        block_indices = [index]
+        for _ in range(first + 1, last):
+            delta, cursor = _decode_varint_v3(raw, cursor, delta_limit)
+            if delta < 1:
+                raise BigramFormatError("head index delta is not positive")
+            index += delta
+            if index >= dictionary_size:
+                raise BigramFormatError("head index is >= dictionary size")
+            block_indices.append(index)
+        if cursor != delta_limit:
+            raise BigramFormatError(f"block {block} head delta stream does not end on its boundary")
+
+        for position, head_dict_index in enumerate(block_indices):
+            if head_dict_index <= previous_index:
+                raise BigramFormatError("head indices are not strictly increasing")
+            previous_index = head_dict_index
+            head = dictionary_words[head_dict_index]
+            head_words.append(head)
+            successes: list[str] = []
+            for _ in range(counts[first + position]):
+                success_index, pair_cursor = _decode_varint_v3(
+                    raw, pair_cursor, success_ids_offset + success_end
+                )
+                if success_index >= dictionary_size:
+                    raise BigramFormatError("success index is >= dictionary size")
+                successes.append(dictionary_words[success_index])
+            successes_by_head[head] = successes
+    if pair_cursor != success_ids_offset + success_ids_size:
+        raise BigramFormatError("success id stream does not end exactly at the file end section")
+
+    return ParsedBigramTable(
+        head_words=head_words,
+        success_vocabulary=sorted({word for s in successes_by_head.values() for word in s}),
+        successes_by_head=successes_by_head,
+    )
+
+
+def pack_bigram_table_v3(
+    heads_by_frequency: Sequence[str],
+    table: dict[str, list[tuple[str, int]]],
+    successes_per_head: int,
+    word_index: dict[str, int],
+    dictionary_raw_sha256: bytes,
+) -> PackResult:
+    """Schema-3 sibling of [pack_bigram_table]: same head selection and drop rules, indices into
+    the linked dictionary instead of word blobs."""
+    kept_successes: dict[str, list[str]] = {}
+    dropped_heads: list[str] = []
+    for head in heads_by_frequency:
+        successes = [word for word, _count in table.get(head, ())[:successes_per_head]]
+        if not successes:
+            dropped_heads.append(head)
+            continue
+        kept_successes[head] = successes
+
+    kept_heads = sorted(kept_successes)  # code-point lexical ascending, as schema 2
+    raw, pair_count = _serialize_v3(kept_heads, kept_successes, word_index, dictionary_raw_sha256)
+
+    if len(raw) > MAX_RAW_BYTES:
+        raise BigramBudgetError(f"raw table is {len(raw)} bytes; limit is {MAX_RAW_BYTES}")
+    compressed = compress(raw)
+    if len(compressed) > MAX_COMPRESSED_BYTES:
+        raise BigramBudgetError(
+            f"compressed table is {len(compressed)} bytes; limit is {MAX_COMPRESSED_BYTES}"
+        )
+
+    # Self-check against the real dictionary, exactly like schema 2's self-check.
+    ordered_words = sorted(word_index, key=word_index.get)
+    validate_raw_v3(raw, ordered_words, dictionary_raw_sha256)
+
+    return PackResult(
+        raw=raw,
+        compressed=compressed,
+        head_count=len(kept_heads),
+        pair_count=pair_count,
+        success_vocabulary_count=len({w for s in kept_successes.values() for w in s}),
+        dropped_heads=dropped_heads,
+    )
+
+
+
 def read_extra_heads(path: Path, vocabulary: frozenset[str]) -> list[str]:
     """Words named explicitly as heads, read from a reviewable list.
 
@@ -478,6 +829,7 @@ def run_pack(
     shards: int,
     language: coverage.Language = coverage.DEFAULT_LANGUAGE,
     extra_heads: Sequence[str] = (),
+    schema: int = SCHEMA_ID_V3,
 ) -> tuple[PackResult, dict[str, object]]:
     started = time.monotonic()
     vocabulary, frequencies = read_shipped_vocabulary(asset_path, language)
@@ -497,9 +849,29 @@ def run_pack(
         stats=[],
         alphabet=language.alphabet,
     )
-    result = pack_bigram_table(ordered_heads, table, successes_per_head)
+    if schema == SCHEMA_ID:
+        result = pack_bigram_table(ordered_heads, table, successes_per_head)
+    elif schema == SCHEMA_ID_V3:
+        # Schema 3 stores dictionary indices, so the packer reads the linked dictionary's ordered
+        # word list and raw digest, and fails closed on the first head or success the dictionary
+        # does not contain (the resource the whole schema stands on: 100 % of both are in it,
+        # docs/SIZE-OPTIMIZATION-RESEARCH.md).
+        parsed_dictionary = dictionary_pack.validate_asset(
+            asset_path.read_bytes(), language=language
+        )
+        word_index = {word: index for index, word in enumerate(parsed_dictionary.words)}
+        result = pack_bigram_table_v3(
+            ordered_heads,
+            table,
+            successes_per_head,
+            word_index,
+            hashlib.sha256(parsed_dictionary.raw).digest(),
+        )
+    else:
+        raise SystemExit(f"unsupported schema: {schema}")
     report = {
         "language": language.tag,
+        "schema": schema,
         "requested_heads": heads,
         "successes_per_head": successes_per_head,
         "extra_heads_requested": list(extra_heads),
@@ -522,6 +894,67 @@ def run_pack(
     return result, report
 
 
+def run_repack(
+    v2_asset_path: Path,
+    dictionary_asset_path: Path,
+    language: coverage.Language,
+) -> tuple[PackResult, dict[str, object]]:
+    """Byte-stable schema 2 → schema 3 repack: no corpus needed, content carried over verbatim.
+
+    The v2 table is strict-validated first; the v3 image is built from its parsed content and
+    then strict-validated back against the dictionary, and the two parses are compared head by
+    head — a repack whose output reads differently from its input is never written.
+    """
+    started = time.monotonic()
+    parsed_v2 = validate_raw(decompress(v2_asset_path.read_bytes()))
+    parsed_dictionary = dictionary_pack.validate_asset(
+        dictionary_asset_path.read_bytes(), language=language
+    )
+    word_index = {word: index for index, word in enumerate(parsed_dictionary.words)}
+    dictionary_sha = hashlib.sha256(parsed_dictionary.raw).digest()
+
+    kept_heads = list(parsed_v2.head_words)  # already code-point ascending
+    raw, pair_count = _serialize_v3(
+        kept_heads, parsed_v2.successes_by_head, word_index, dictionary_sha
+    )
+    if len(raw) > MAX_RAW_BYTES:
+        raise BigramBudgetError(f"raw table is {len(raw)} bytes; limit is {MAX_RAW_BYTES}")
+    compressed = compress(raw)
+    if len(compressed) > MAX_COMPRESSED_BYTES:
+        raise BigramBudgetError(
+            f"compressed table is {len(compressed)} bytes; limit is {MAX_COMPRESSED_BYTES}"
+        )
+
+    parsed_v3 = validate_raw_v3(raw, parsed_dictionary.words, dictionary_sha)
+    if parsed_v3.head_words != parsed_v2.head_words:
+        raise BigramFormatError("repack round-trip: head words differ")
+    if parsed_v3.successes_by_head != parsed_v2.successes_by_head:
+        raise BigramFormatError("repack round-trip: successes differ")
+
+    result = PackResult(
+        raw=raw,
+        compressed=compressed,
+        head_count=len(parsed_v2.head_words),
+        pair_count=pair_count,
+        success_vocabulary_count=len(parsed_v2.success_vocabulary),
+    )
+    report = {
+        "language": language.tag,
+        "schema": SCHEMA_ID_V3,
+        "repacked_from": str(v2_asset_path),
+        "dictionary_raw_sha256": dictionary_sha.hex(),
+        "actual_head_count": result.head_count,
+        "pair_count": result.pair_count,
+        "success_vocabulary_count": result.success_vocabulary_count,
+        "raw_bytes": len(result.raw),
+        "compressed_bytes": len(result.compressed),
+        "raw_sha256": hashlib.sha256(result.raw).hexdigest(),
+        "compressed_sha256": hashlib.sha256(result.compressed).hexdigest(),
+        "elapsed_seconds": round(time.monotonic() - started, 3),
+    }
+    return result, report
+
+
 def _atomic_write(path: Path, data: bytes) -> None:
     temp = path.with_suffix(path.suffix + ".tmp")
     temp.write_bytes(data)
@@ -531,12 +964,19 @@ def _atomic_write(path: Path, data: bytes) -> None:
 def create_argument_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     subparsers = parser.add_subparsers(dest="command", required=True)
-    pack = subparsers.add_parser("pack", help="build the real TATBIGR schema-2 asset")
+    pack = subparsers.add_parser("pack", help="build the real TATBIGR asset from a corpus")
     pack.add_argument("--train", nargs="+", required=True, type=Path)
     pack.add_argument("--asset", required=True, type=Path)
     pack.add_argument("--heads", type=int, required=True)
     pack.add_argument("--successes-per-head", type=int, required=True)
     pack.add_argument("--shards", type=int, default=8)
+    pack.add_argument(
+        "--schema",
+        type=int,
+        choices=(SCHEMA_ID, SCHEMA_ID_V3),
+        default=SCHEMA_ID_V3,
+        help="2 is kept for golden/history (SIZE-1 style); the shipped format is 3",
+    )
     pack.add_argument(
         "--extra-heads",
         type=Path,
@@ -548,27 +988,44 @@ def create_argument_parser() -> argparse.ArgumentParser:
     pack.add_argument(
         "--language", default=coverage.DEFAULT_LANGUAGE.tag, choices=sorted(coverage.LANGUAGES)
     )
+    repack = subparsers.add_parser(
+        "repack", help="schema 2 → schema 3, corpus-free, content verified identical"
+    )
+    repack.add_argument("--v2", required=True, type=Path, help="the schema-2 .tatbigr.zlib asset")
+    repack.add_argument(
+        "--dictionary", required=True, type=Path, help="the linked TATDICT .tdict.zlib asset"
+    )
+    repack.add_argument("--out-raw", required=True, type=Path)
+    repack.add_argument("--out-compressed", required=True, type=Path)
+    repack.add_argument("--report", type=Path)
+    repack.add_argument(
+        "--language", default=coverage.DEFAULT_LANGUAGE.tag, choices=sorted(coverage.LANGUAGES)
+    )
     return parser
 
 
 def main(argv: Sequence[str] | None = None, stream: TextIO = sys.stdout) -> int:
     arguments = create_argument_parser().parse_args(argv)
-    if arguments.shards < 1:
-        raise SystemExit("shards must be positive")
     language = coverage.language_for(arguments.language)
-    extra_heads: list[str] = []
-    if arguments.extra_heads is not None:
-        vocabulary, _frequencies = read_shipped_vocabulary(arguments.asset, language)
-        extra_heads = read_extra_heads(arguments.extra_heads, vocabulary)
-    result, report = run_pack(
-        arguments.train,
-        arguments.asset,
-        arguments.heads,
-        arguments.successes_per_head,
-        arguments.shards,
-        language,
-        extra_heads,
-    )
+    if arguments.command == "repack":
+        result, report = run_repack(arguments.v2, arguments.dictionary, language)
+    else:
+        if arguments.shards < 1:
+            raise SystemExit("shards must be positive")
+        extra_heads: list[str] = []
+        if arguments.extra_heads is not None:
+            vocabulary, _frequencies = read_shipped_vocabulary(arguments.asset, language)
+            extra_heads = read_extra_heads(arguments.extra_heads, vocabulary)
+        result, report = run_pack(
+            arguments.train,
+            arguments.asset,
+            arguments.heads,
+            arguments.successes_per_head,
+            arguments.shards,
+            language,
+            extra_heads,
+            arguments.schema,
+        )
     text = json.dumps(report, ensure_ascii=False, indent=2, sort_keys=True)
     if arguments.report is not None:
         arguments.report.write_text(text + "\n", encoding="utf-8")
