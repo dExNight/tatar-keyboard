@@ -29,6 +29,10 @@
   курируемый ассет «слово → эмодзи» `emoji_suggest_v1.txt` (ru+tt, 681 понятие,
   3 825 записей), метод, denylist полисемии, протокол вычитки —
   `emoji-suggest/evidence-data-review.txt`.
+- `emoji-suggest/ENGINE.md` — миссия 2 плана эмодзи-подсказок (2026-09-01):
+  движок — эмодзи в хвостовой ячейке NEXT_WORD-полосе, append через
+  `commitPredictedWord`, свой тоггл (opt-in), a11y-лейблы, эмуляторные
+  свидетельства в `emoji-suggest/evidence/`.
 - `SIZE-CAMPAIGN.md` — итоговый отчёт кампании ужатия (три миссии SIZE-1/2/3,
   таблица до/после, доказательства lossless, latency) — релиз 1.9.9;
   свидетельства живого обновления в `size-campaign/evidence/`.
