@@ -614,6 +614,8 @@ class CommittedAssetTest(unittest.TestCase):
             "👋": ["сәлам", "исәнмесез"],
             "📖": ["китап"],
             "🕌": ["мәчет"],
+            # M4a positive control: the rooster had no Tatar keyword at all.
+            "🐓": ["әтәч", "этэч"],
         }
         by_sequence = {}
         for line in self.search_lines:

@@ -167,10 +167,13 @@ class EmojiSuggestIndexTest {
     fun theShippedAssetParsesAndAnswersItsControls() {
         val file = File(sourceRoot(), "assets/emoji/emoji_suggest_v1.txt")
         val index = EmojiSuggestIndex.parse(file.inputStream())
-        assertEquals("the shipped table is pinned at 3825 entries", 3825, index.entryCount)
+        assertEquals("the shipped table is pinned at 3976 entries", 3976, index.entryCount)
         assertEquals("✈️", index.lookup("ru", "самолет"))
         assertEquals("❤️", index.lookup("ru", "сердце"))
         assertEquals("❤️", index.lookup("tt", "йөрәк"))
+        // M4a/M4b: закрытые tt-пробелы и конфузибл «йорэк».
+        assertEquals("🐓", index.lookup("tt", "әтәч"))
+        assertEquals("❤️", index.lookup("tt", "йорэк"))
         assertEquals("👋", index.lookup("tt", "сәлам"))
         // The polysemy denylist: no emoji for «кит» in either language.
         assertNull(index.lookup("ru", "кит"))

@@ -214,6 +214,9 @@ class EmojiSearchTest {
         assertTrue("мәче", results(index, "мәче").isNotEmpty())
         assertTrue("сәлам", results(index, "сәлам").contains("👋"))
         assertTrue("китап", results(index, "китап").contains("📖"))
+        // M4a: the rooster had no Tatar keyword before the coverage audit.
+        assertTrue("этэч", results(index, "этэч").contains("🐓"))
+        assertTrue("этэ (prefix)", results(index, "этэ").contains("🐓"))
         // A prefix of a Tatar word matches, a suffix does not.
         assertTrue(results(index, "йөр").contains("❤️"))
         assertFalse(results(index, "рәк").contains("❤️"))

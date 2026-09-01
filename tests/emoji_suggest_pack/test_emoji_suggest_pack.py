@@ -307,14 +307,19 @@ POSITIVE_CONTROLS = {
     ("tt", "йөрәккә"): "❤️",
     ("tt", "сәлам"): "👋",
     ("tt", "эш"): "💼",
+    # M4a: ru-only понятия получили tt-строки; M4b: конфузибл «йорэк».
+    ("tt", "әтәч"): "🐓",
+    ("tt", "кәҗә"): "🐐",
+    ("tt", "йорэк"): "❤️",
+    ("tt", "жыр"): "🎵",
 }
 
 # The shipped asset is pinned: a data change is a written decision that also
 # updates these numbers (and the review protocol of docs/emoji-suggest/DATA.md).
-EXPECTED_ASSET_SHA256 = "aef39f2f833e941fd46f04f3ce31ebc35b3fbea505abb51e3086a201814a2744"
-EXPECTED_LINE_COUNT = 3825
+EXPECTED_ASSET_SHA256 = "54171e32bdf3be6883dc6ffcbcf603257753cb4e6eaa5d20b5b38cd0def42c99"
+EXPECTED_LINE_COUNT = 3976
 EXPECTED_RU_ENTRIES = 2501
-EXPECTED_TT_ENTRIES = 1324
+EXPECTED_TT_ENTRIES = 1475
 
 
 class CommittedAssetTest(unittest.TestCase):
