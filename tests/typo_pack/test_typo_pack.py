@@ -41,28 +41,45 @@ pack = load_module("typo_pack", PACK_SCRIPT)
 
 
 def _make_raw_tdict(words: list[str]) -> bytes:
-    """Build a minimal canonical schema-1 tdict for ``words`` (already sorted, unique)."""
+    """Build a minimal canonical schema-2 tdict for ``words`` (already sorted, unique)."""
     encoded = [word.encode("utf-8") for word in words]
     count = len(encoded)
-    offsets = [0]
-    for chunk in encoded:
-        offsets.append(offsets[-1] + len(chunk))
-    blob_size = offsets[-1]
-    offsets_offset = pack._TDICT_HEADER_SIZE
-    frequencies_offset = offsets_offset + 4 * (count + 1)
-    blob_offset = frequencies_offset + 4 * count
-    file_size = blob_offset + blob_size
+    block_size = pack._TDICT_BLOCK_SIZE
+    block_count = (count + block_size - 1) // block_size
+    block_index_offset = pack._TDICT_HEADER_SIZE
+    blocks_offset = block_index_offset + 4 * block_count
+    blocks = []
+    block_offsets = []
+    cursor = 0
+    for start in range(0, count, block_size):
+        chunk = encoded[start : start + block_size]
+        first = chunk[0]
+        block = bytearray([len(first)]) + first
+        for word in chunk[1:]:
+            prefix = 0
+            limit = min(len(first), len(word))
+            while prefix < limit and first[prefix] == word[prefix]:
+                prefix += 1
+            block.append(prefix)
+            block.append(len(word) - prefix)
+            block += word[prefix:]
+        block += bytes([100]) * len(chunk)  # positive single-byte varint frequencies
+        block_offsets.append(blocks_offset + cursor)
+        blocks.append(bytes(block))
+        cursor += len(block)
+    blocks_size = cursor
+    file_size = blocks_offset + blocks_size
     header = bytearray()
     header += pack._TDICT_MAGIC
-    header += struct.pack("<HHHH", 1, 1, pack._TDICT_HEADER_SIZE, 1)
+    header += struct.pack("<HHHH", 2, 1, pack._TDICT_HEADER_SIZE, 1)
     header += struct.pack(
-        "<IIIIII", count, offsets_offset, frequencies_offset, blob_offset, blob_size, file_size
+        "<IIIIII", count, block_count, block_index_offset, blocks_offset,
+        blocks_size, file_size
     )
     header += b"\x00" * 32  # checksum field; not verified by the generator's enumerator
     assert len(header) == pack._TDICT_HEADER_SIZE
-    body = b"".join(struct.pack("<I", offset) for offset in offsets)
-    body += b"".join(struct.pack("<I", 100) for _ in encoded)  # positive frequencies
-    body += b"".join(encoded)
+    body = b"".join(struct.pack("<I", offset) for offset in block_offsets)
+    body += b"".join(blocks)
     return bytes(header) + body
 
 

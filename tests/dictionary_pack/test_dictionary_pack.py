@@ -169,11 +169,83 @@ class DictionaryPackTest(unittest.TestCase):
                     pack.validate_raw(bytes(corrupt))
 
     def test_golden_raw_and_zlib_bytes(self) -> None:
-        built = pack.build_dictionary(self.fixture_paths(), 10)
+        built = pack.build_dictionary(self.fixture_paths(), 10, schema=pack.SCHEMA_ID)
         self.assertEqual(built.raw, (FIXTURES / "golden-v1.tdict").read_bytes())
         self.assertEqual(
             built.asset, (FIXTURES / "golden-v1.tdict.zlib").read_bytes()
         )
+
+    def test_schema_v2_golden_raw_and_zlib_bytes(self) -> None:
+        built = pack.build_dictionary(self.fixture_paths(), 10, schema=pack.SCHEMA_ID_V2)
+        self.assertEqual(built.raw, (FIXTURES / "golden-v2.tdict").read_bytes())
+        self.assertEqual(
+            built.asset, (FIXTURES / "golden-v2.tdict.zlib").read_bytes()
+        )
+
+    def test_schema_v2_exact_layout(self) -> None:
+        entries = [("алма", 9), ("юл", 300), ("ә", 1)]
+        raw = pack.serialize_entries(entries, schema=pack.SCHEMA_ID_V2)
+        fields = pack.HEADER.unpack_from(raw)
+        self.assertEqual(fields[0], b"TATDICT\0")
+        self.assertEqual(fields[1:5], (2, 1, 72, 1))
+        self.assertEqual(fields[5], 3)  # записей
+        self.assertEqual(fields[6], 1)  # блоков
+        self.assertEqual(fields[7], 72)  # индекс блоков
+        self.assertEqual(fields[8], 76)  # начало блоков
+        self.assertEqual(fields[9], fields[10] - 76)
+        self.assertEqual(fields[10], len(raw))
+        parsed = pack.validate_raw(raw)
+        self.assertEqual(parsed.words, tuple(word for word, _ in entries))
+        self.assertEqual(parsed.frequencies, tuple(freq for _, freq in entries))
+
+    def test_schema_v2_block_boundary_and_round_trip(self) -> None:
+        # Девять записей — два блока: ровно на границе K = 8.
+        entries = [(f"әб{suffix}", i + 1) for i, suffix in enumerate("вгдежзиклн")]
+        entries.sort(key=lambda item: item[0])
+        raw = pack.serialize_entries(entries, schema=pack.SCHEMA_ID_V2)
+        self.assertEqual(pack.HEADER.unpack_from(raw)[6], 2)
+        parsed = pack.validate_raw(raw)
+        self.assertEqual(parsed.words, tuple(word for word, _ in entries))
+        self.assertEqual(
+            parsed.frequencies, tuple(frequency for _, frequency in entries)
+        )
+        # v1 → v2 → v1: состав, порядок и частоты возвращаются точно (lossless).
+        raw_v1 = pack.serialize_entries(entries, schema=pack.SCHEMA_ID)
+        built = pack.repack_asset(pack.compress_raw(raw_v1), schema=pack.SCHEMA_ID_V2)
+        self.assertEqual(built.parsed.words, parsed.words)
+        self.assertEqual(built.parsed.frequencies, parsed.frequencies)
+        back = pack.repack_asset(built.asset, schema=pack.SCHEMA_ID)
+        self.assertEqual(back.raw, raw_v1)
+
+    def test_schema_v2_rejects_noncanonical_and_truncated_varints(self) -> None:
+        # Каноничность varint проверяется напрямую через декодер.
+        self.assertEqual(pack._decode_varint(b"\x09", 0, 1), (9, 1))
+        self.assertEqual(pack._decode_varint(bytes([0xAC, 0x02]), 0, 2), (300, 2))
+        with self.assertRaises(pack.DictionaryFormatError):
+            pack._decode_varint(b"\x89\x00", 0, 2)  # overlong-форма 9
+        with self.assertRaises(pack.DictionaryFormatError):
+            pack._decode_varint(b"\x89", 0, 1)  # обрыв на continuation-бите
+        with self.assertRaises(pack.DictionaryFormatError):
+            pack._decode_varint(b"\xff\xff\xff\xff\x7f", 0, 5)  # за пределами u32
+        # Частота 300 пишется двухбайтовым varint 0xAC 0x02: последние четыре байта
+        # файла — частоты 9, 300, 1.
+        raw = pack.serialize_entries(
+            [("алма", 9), ("юл", 300), ("ә", 1)], schema=pack.SCHEMA_ID_V2
+        )
+        self.assertEqual(raw[-4:], bytes([0x09, 0xAC, 0x02, 0x01]))
+        # Обрыв последнего varint и нулевая частота отвергаются валидатором.
+        with self.assertRaises(pack.DictionaryFormatError):
+            pack.validate_raw(rechecksum(raw[:-1]))
+        zeroed = bytearray(raw)
+        zeroed[-4] = 0
+        with self.assertRaises(pack.DictionaryFormatError):
+            pack.validate_raw(rechecksum(bytes(zeroed)))
+
+    def test_schema_v2_budget_constants_are_tighter_than_v1(self) -> None:
+        self.assertEqual(600_000, pack.MAX_COMPRESSED_BYTES_V2)
+        self.assertEqual(1_400_000, pack.MAX_UNCOMPRESSED_BYTES_V2)
+        self.assertLess(pack.MAX_COMPRESSED_BYTES_V2, pack.MAX_COMPRESSED_BYTES)
+        self.assertLess(pack.MAX_UNCOMPRESSED_BYTES_V2, pack.MAX_UNCOMPRESSED_BYTES)
 
     def test_repeated_and_permuted_builds_are_identical(self) -> None:
         first = pack.build_dictionary(self.fixture_paths(), 10)
@@ -262,7 +334,7 @@ class DictionaryPackTest(unittest.TestCase):
         cases = {
             "short": valid[:20],
             "magic": b"BADMAGIC" + valid[8:],
-            "schema": replace_field(valid, 8, "<H", 2),
+            "schema": replace_field(valid, 8, "<H", 3),
             "version": replace_field(valid, 10, "<H", 2),
             "header": replace_field(valid, 12, "<H", 70),
             "algorithm": replace_field(valid, 14, "<H", 2),
@@ -429,15 +501,17 @@ class DictionaryPackTest(unittest.TestCase):
     def test_committed_asset_provenance_notice_and_review(self) -> None:
         asset = ASSET.read_bytes()
         parsed = pack.validate_asset(asset, expected_count=100_000)
-        asset_sha = hashlib.sha256(asset).hexdigest()
-        raw_sha = hashlib.sha256(parsed.raw).hexdigest()
-        provenance = PROVENANCE.read_text(encoding="utf-8")
+        # Пины поставляемого ассета (схема 2, SIZE-1) живут в Kotlin-контракте;
+        # архивный DICTIONARY-D1A.md описывает schema-1 сборку и не переписывается.
+        contract = (
+            ROOT
+            / "app/src/main/java/rkr/simplekeyboard/inputmethod/latin"
+            / "dictionary/storage/DictionaryStorageContracts.kt"
+        ).read_text(encoding="utf-8")
+        self.assertIn(hashlib.sha256(asset).hexdigest(), contract)
+        self.assertIn(hashlib.sha256(parsed.raw).hexdigest(), contract)
+        self.assertIn("CC BY 4.0", PROVENANCE.read_text(encoding="utf-8"))
         notice = NOTICE.read_text(encoding="utf-8")
-        self.assertIn(asset_sha, provenance)
-        self.assertIn(raw_sha, provenance)
-        self.assertIn(str(len(asset)), provenance)
-        self.assertIn(str(len(parsed.raw)), provenance)
-        self.assertIn("CC BY 4.0", provenance)
         self.assertIn("CC BY 4.0", notice)
         rows = pack._audit_rows(
             parsed, pack._read_queries(FIXTURES / "manual_tatar_queries.txt"), 3
@@ -500,13 +574,15 @@ class DictionaryPackTest(unittest.TestCase):
         raw_sha = hashlib.sha256(parsed.raw).hexdigest()
         provenance = RUSSIAN_PROVENANCE.read_text(encoding="utf-8")
         notice = NOTICE.read_text(encoding="utf-8")
-        # The prose groups thousands with spaces, so compare against a space-stripped copy.
-        digits_only = provenance.replace(" ", "").replace("\u00a0", "")
-        # Every number the Kotlin spec pins is also written down where a human can check it.
-        self.assertIn(asset_sha, provenance)
-        self.assertIn(raw_sha, provenance)
-        self.assertIn(str(len(asset)), digits_only)
-        self.assertIn(str(len(parsed.raw)), digits_only)
+        # Живые пины schema 2 (SIZE-1) — в Kotlin-контракте; архивный
+        # RUSSIAN-DICTIONARY.md описывает schema-1 сборку и не переписывается.
+        contract = (
+            ROOT
+            / "app/src/main/java/rkr/simplekeyboard/inputmethod/latin"
+            / "dictionary/storage/DictionaryStorageContracts.kt"
+        ).read_text(encoding="utf-8")
+        self.assertIn(asset_sha, contract)
+        self.assertIn(raw_sha, contract)
         self.assertIn("CC BY 4.0", provenance)
         self.assertIn("russian_top100k_v1.tdict.zlib", notice)
         self.assertIn("rus_news_2022_1M", notice)

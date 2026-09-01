@@ -540,7 +540,7 @@ def pack(args) -> int:
         language = cov.language_for(tag)
         shipped, before = load_baseline(tag, baseline)
         _shipped, accepted, entries = merged_entries(tag, baseline)
-        raw = dp.serialize_entries(entries)
+        raw = dp.serialize_entries(entries, schema=dp.SCHEMA_ID_V2)
         asset = dp.compress_raw(raw)
         target = CL.SHIPPED[tag]
         before_raw = dp.decompress_asset(before, language)
@@ -557,8 +557,8 @@ def pack(args) -> int:
             "raw_bytes_before": len(before_raw),
             "raw_bytes_after": len(raw),
             "raw_bytes_delta": len(raw) - len(before_raw),
-            "fits_compressed": len(asset) <= dp.MAX_COMPRESSED_BYTES,
-            "fits_raw": len(raw) <= dp.MAX_UNCOMPRESSED_BYTES,
+            "fits_compressed": len(asset) <= dp.MAX_COMPRESSED_BYTES_V2,
+            "fits_raw": len(raw) <= dp.MAX_UNCOMPRESSED_BYTES_V2,
             "sha256_before": hashlib.sha256(before).hexdigest(),
             "sha256_after": hashlib.sha256(asset).hexdigest(),
             "raw_sha256_after": hashlib.sha256(raw).hexdigest(),

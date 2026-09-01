@@ -55,11 +55,14 @@ from typing import Iterable, Sequence, TextIO
 # --- Pinned input identity: the committed Tatar top-100k dictionary asset. ------------
 # These match rkr...storage.DictionaryArtifactSpec.TATAR_TOP100K_V1. The SHA-256 pins are
 # the binding gate; the entry count is a readable cross-check.
+# 2026-09-01 (SIZE-1): словарь перешёл на schema 2 (front-coding + varint-частоты,
+# docs/SIZE-SCHEMA2.md) — состав, порядок и частоты слов побайтно те же, поэтому
+# наборы опечаток не пересобираются; поменялись только пины упаковки.
 EXPECTED_ASSET_SHA256 = (
-    "76bd5a39bc1091e7e85279e058385321db231084c269fd0a000f7ecb59bce7ac"
+    "cb34fe7d48bbaa73002a2d19e3696610c6e493d61a2a72355382e46987918119"
 )
 EXPECTED_RAW_SHA256 = (
-    "8f434ec7cfd718df31b4410e55d36cbb914d2497ec265f89db3aaf48ec625f76"
+    "922d14f200ef650f69c45b18183ec30a48c7989cd0b520c5de59215592770130"
 )
 EXPECTED_ENTRY_COUNT = 100_000
 
@@ -82,12 +85,13 @@ _SPLITMIX_GAMMA = 0x9E3779B97F4A7C15
 _SPLITMIX_MIX1 = 0xBF58476D1CE4E5B9
 _SPLITMIX_MIX2 = 0x94D049BB133111EB
 
-# --- tdict schema 1/version 1 layout (see docs/DICTIONARY-D1A.md). --------------------
+# --- tdict schema 2/version 1 layout (see docs/SIZE-SCHEMA2.md). -----------------------
 _TDICT_MAGIC = b"TATDICT\x00"
 _TDICT_HEADER_SIZE = 72
-_TDICT_SCHEMA_ID = 1
+_TDICT_SCHEMA_ID = 2
 _TDICT_FORMAT_VERSION = 1
 _TDICT_CHECKSUM_ALGORITHM_SHA256 = 1
+_TDICT_BLOCK_SIZE = 8
 
 # The Tatar layout row files carry every letter key and its long-press partners.
 _TATAR_ROWKEY_FILES = (
@@ -395,10 +399,10 @@ def _parse_tdict_words(raw: bytes, *, expected_entry_count: int) -> list[str]:
     ) = struct.unpack_from("<HHHH", raw, 8)
     (
         entry_count,
-        offsets_offset,
-        frequencies_offset,
-        blob_offset,
-        blob_size,
+        block_count,
+        block_index_offset,
+        blocks_offset,
+        blocks_size,
         file_size,
     ) = struct.unpack_from("<IIIIII", raw, 16)
     if schema_id != _TDICT_SCHEMA_ID or format_version != _TDICT_FORMAT_VERSION:
@@ -411,35 +415,74 @@ def _parse_tdict_words(raw: bytes, *, expected_entry_count: int) -> list[str]:
         raise TypoPackError(
             f"entry count {entry_count} does not match pinned {expected_entry_count}"
         )
-    expected_frequencies = _TDICT_HEADER_SIZE + 4 * (entry_count + 1)
-    expected_blob = expected_frequencies + 4 * entry_count
+    expected_block_count = (entry_count + _TDICT_BLOCK_SIZE - 1) // _TDICT_BLOCK_SIZE
+    expected_blocks_offset = _TDICT_HEADER_SIZE + 4 * block_count
     if (
-        offsets_offset != _TDICT_HEADER_SIZE
-        or frequencies_offset != expected_frequencies
-        or blob_offset != expected_blob
-        or file_size != blob_offset + blob_size
+        block_count != expected_block_count
+        or block_index_offset != _TDICT_HEADER_SIZE
+        or blocks_offset != expected_blocks_offset
+        or file_size != blocks_offset + blocks_size
         or file_size != len(raw)
     ):
         raise TypoPackError("noncanonical section layout")
 
-    offsets = struct.unpack_from(f"<{entry_count + 1}I", raw, offsets_offset)
-    if offsets[0] != 0 or offsets[-1] != blob_size:
-        raise TypoPackError("word offsets do not span the blob")
+    block_offsets = struct.unpack_from(f"<{block_count}I", raw, block_index_offset)
     words: list[str] = []
-    previous = 0
-    for index in range(entry_count):
-        start = offsets[index]
-        end = offsets[index + 1]
-        if end <= start or end > blob_size:
-            raise TypoPackError("word offsets are not strictly increasing")
-        chunk = raw[blob_offset + start : blob_offset + end]
-        try:
-            words.append(chunk.decode("utf-8"))
-        except UnicodeDecodeError as error:
-            raise TypoPackError(f"word #{index} is not valid UTF-8: {error}") from error
-        previous = end
-    if previous != blob_size:
-        raise TypoPackError("terminal word offset does not equal blob size")
+    for block in range(block_count):
+        cursor = block_offsets[block]
+        block_end = (
+            block_offsets[block + 1] if block + 1 < block_count else file_size
+        )
+        in_block = min(_TDICT_BLOCK_SIZE, entry_count - block * _TDICT_BLOCK_SIZE)
+        if cursor >= block_end:
+            raise TypoPackError("truncated block")
+        first_length = raw[cursor]
+        cursor += 1
+        if first_length == 0 or cursor + first_length > block_end:
+            raise TypoPackError("invalid first word of a block")
+        first = raw[cursor : cursor + first_length]
+        cursor += first_length
+        block_words = [first]
+        for _ in range(in_block - 1):
+            prefix_length = 0
+            shift = 0
+            while True:
+                if cursor >= block_end:
+                    raise TypoPackError("truncated varint")
+                byte = raw[cursor]
+                cursor += 1
+                prefix_length |= (byte & 0x7F) << shift
+                if not byte & 0x80:
+                    break
+                shift += 7
+            if prefix_length > first_length or cursor >= block_end:
+                raise TypoPackError("invalid block entry")
+            suffix_length = raw[cursor]
+            cursor += 1
+            if suffix_length == 0 or cursor + suffix_length > block_end:
+                raise TypoPackError("invalid block entry suffix")
+            block_words.append(first[:prefix_length] + raw[cursor : cursor + suffix_length])
+            cursor += suffix_length
+        # Частотный хвост блока пропускается: набор опечаток — про слова.
+        for _ in range(in_block):
+            while True:
+                if cursor >= block_end:
+                    raise TypoPackError("truncated frequency varint")
+                byte = raw[cursor]
+                cursor += 1
+                if not byte & 0x80:
+                    break
+        if cursor != block_end:
+            raise TypoPackError("trailing bytes in a block")
+        for index, chunk in enumerate(block_words):
+            try:
+                words.append(chunk.decode("utf-8"))
+            except UnicodeDecodeError as error:
+                raise TypoPackError(
+                    f"word #{len(words) + index} is not valid UTF-8: {error}"
+                ) from error
+    if len(words) != entry_count:
+        raise TypoPackError("decoded word count does not match the header")
     return words
 
 

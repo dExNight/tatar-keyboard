@@ -47,6 +47,17 @@ MAX_U32 = 0xFFFF_FFFF
 # ship a bigger artifact without noticing, and there is nothing to buy with it.
 MAX_COMPRESSED_BYTES = 700_000
 MAX_UNCOMPRESSED_BYTES = 2_936_012
+# Schema 2 (SIZE-1, docs/SIZE-SCHEMA2.md): блочный front-coding (K = 8 — замер 2026-09-01
+# на обоих поставляемых словарях дал ему минимум и по zlib-размеру, и по работе декода),
+# u8-длины вместо u32-оффсетов, varint-частоты. Lossless: состав, порядок и частоты
+# побайтно те же, что в schema 1. Бюджеты пересмотрены под измеренное (татарский
+# 502 092 / 1 162 870, русский 540 573 / 1 151 323) с запасом ~10 %/~20 %, как у schema 1.
+SCHEMA_ID_V2 = 2
+FORMAT_VERSION_V2 = 1
+BLOCK_SIZE_V2 = 8
+MAX_WORD_BYTES_V2 = 128
+MAX_COMPRESSED_BYTES_V2 = 600_000
+MAX_UNCOMPRESSED_BYTES_V2 = 1_400_000
 DEFAULT_COUNT = 100_000
 DEFAULT_CUTOFFS = (50_000, 100_000, 150_000)
 COMPRESSION_LEVEL = 9
@@ -162,7 +173,163 @@ def _checksum_with_zeroed_digest(raw: bytes) -> bytes:
     return hashlib.sha256(digest_input).digest()
 
 
+def _encode_varint(value: int) -> bytes:
+    """Минимальный little-endian base-128 varint; единственная каноничная запись."""
+    if not 0 <= value <= MAX_U32:
+        raise DictionaryInputError(f"varint value is not a u32: {value}")
+    out = bytearray()
+    while True:
+        byte = value & 0x7F
+        value >>= 7
+        if value:
+            out.append(byte | 0x80)
+        else:
+            out.append(byte)
+            return bytes(out)
+
+
+def _decode_varint(raw: bytes, offset: int, limit: int) -> tuple[int, int]:
+    """Читает каноничный varint из raw[offset:limit]; возвращает (value, next_offset)."""
+    value = 0
+    shift = 0
+    cursor = offset
+    while True:
+        if cursor >= limit:
+            raise DictionaryFormatError("truncated varint")
+        byte = raw[cursor]
+        cursor += 1
+        if shift == 28 and byte > 0x0F:
+            raise DictionaryFormatError("varint exceeds u32")
+        value |= (byte & 0x7F) << shift
+        if not byte & 0x80:
+            break
+        shift += 7
+    if cursor - offset != len(_encode_varint(value)):
+        raise DictionaryFormatError("non-canonical (overlong) varint")
+    return value, cursor
+
+
+def _check_canonical_entries(
+    entries: Sequence[tuple[str, int]],
+    language: coverage.Language,
+) -> list[tuple[bytes, int]]:
+    """Общие для обеих схем проверки состава: каноничность, сортировка, частоты."""
+    checked: list[tuple[bytes, int]] = []
+    previous_word: str | None = None
+    for word, frequency in entries:
+        normalized, reason = coverage.normalize_word(word, language.alphabet)
+        if reason is not None or normalized != word:
+            raise DictionaryInputError(f"word is not canonical: {word!r}")
+        if previous_word is not None:
+            if word == previous_word:
+                raise DictionaryInputError(f"duplicate word: {word!r}")
+            if word < previous_word:
+                raise DictionaryInputError("entries are not Unicode-lexically sorted")
+        if not 0 < frequency <= MAX_U32:
+            raise DictionaryInputError(
+                f"frequency for {word!r} is not a positive u32: {frequency}"
+            )
+        checked.append((word.encode("utf-8"), frequency))
+        previous_word = word
+    return checked
+
+
+def serialize_entries_v2(
+    entries: Sequence[tuple[str, int]],
+    language: coverage.Language = coverage.DEFAULT_LANGUAGE,
+) -> bytes:
+    """Schema 2: блочный front-coding (K = BLOCK_SIZE_V2) + u8-длины + varint-частоты.
+
+    Блок: первое слово целиком (u8 длина + байты), дальше K-1 записей
+    (varint общего байтового префикса с ПЕРВЫМ словом блока + u8 длина суффикса +
+    суффикс), затем K varint-частот в том же порядке. Перед блоками — массив
+    u32-оффсетов их начал (абсолютные), по первым словам блоков работает
+    бинарный поиск. Общий префикс двух валидных UTF-8 строк всегда кончается
+    на границе кодпоинта, поэтому байтовый префикс безопасен.
+    """
+    checked = _check_canonical_entries(entries, language)
+    if not checked:
+        raise DictionaryInputError("cannot serialize an empty dictionary")
+
+    entry_count = len(checked)
+    if entry_count >= MAX_U32:
+        raise DictionaryInputError("entry count does not fit schema 2")
+    block_count = (entry_count + BLOCK_SIZE_V2 - 1) // BLOCK_SIZE_V2
+
+    blocks: list[bytes] = []
+    block_offsets: list[int] = []
+    cursor = 0
+    for start in range(0, entry_count, BLOCK_SIZE_V2):
+        chunk = checked[start : start + BLOCK_SIZE_V2]
+        first_word = chunk[0][0]
+        if len(first_word) > MAX_WORD_BYTES_V2:
+            raise DictionaryInputError("word does not fit the u8 length of schema 2")
+        block = bytearray()
+        block.append(len(first_word))
+        block += first_word
+        for word_bytes, _ in chunk[1:]:
+            if len(word_bytes) > MAX_WORD_BYTES_V2:
+                raise DictionaryInputError("word does not fit the u8 length of schema 2")
+            prefix = 0
+            limit = min(len(first_word), len(word_bytes))
+            while prefix < limit and first_word[prefix] == word_bytes[prefix]:
+                prefix += 1
+            block += _encode_varint(prefix)
+            block.append(len(word_bytes) - prefix)
+            block += word_bytes[prefix:]
+        for _, frequency in chunk:
+            block += _encode_varint(frequency)
+        if cursor + len(block) > MAX_U32:
+            raise DictionaryInputError("block data exceeds u32")
+        block_offsets.append(cursor)
+        blocks.append(bytes(block))
+        cursor += len(block)
+
+    block_index_offset = HEADER_SIZE
+    blocks_offset = block_index_offset + 4 * block_count
+    blocks_size = cursor
+    file_size = blocks_offset + blocks_size
+    if file_size > MAX_U32:
+        raise DictionaryInputError("dictionary file size exceeds u32")
+
+    zero_digest_header = HEADER.pack(
+        MAGIC,
+        SCHEMA_ID_V2,
+        FORMAT_VERSION_V2,
+        HEADER_SIZE,
+        CHECKSUM_ALGORITHM_SHA256,
+        entry_count,
+        block_count,
+        block_index_offset,
+        blocks_offset,
+        blocks_size,
+        file_size,
+        bytes(CHECKSUM_SIZE),
+    )
+    raw = (
+        zero_digest_header
+        + struct.pack(
+            f"<{block_count}I", *[blocks_offset + offset for offset in block_offsets]
+        )
+        + b"".join(blocks)
+    )
+    digest = hashlib.sha256(raw).digest()
+    return raw[:CHECKSUM_OFFSET] + digest + raw[CHECKSUM_OFFSET + CHECKSUM_SIZE :]
+
+
 def serialize_entries(
+    entries: Sequence[tuple[str, int]],
+    language: coverage.Language = coverage.DEFAULT_LANGUAGE,
+    schema: int = SCHEMA_ID,
+) -> bytes:
+    if schema == SCHEMA_ID_V2:
+        return serialize_entries_v2(entries, language)
+    if schema != SCHEMA_ID:
+        raise DictionaryInputError(f"unsupported schema id: {schema}")
+    return _serialize_entries_v1(entries, language)
+
+
+def _serialize_entries_v1(
     entries: Sequence[tuple[str, int]],
     language: coverage.Language = coverage.DEFAULT_LANGUAGE,
 ) -> bytes:
@@ -274,6 +441,224 @@ def decompress_asset(
 
 
 def validate_raw(
+    raw: bytes,
+    expected_count: int | None = None,
+    language: coverage.Language = coverage.DEFAULT_LANGUAGE,
+) -> ParsedDictionary:
+    # Бюджетный потолок выше обеих схем: переполнение — BudgetError независимо от того,
+    # какая схема записана в заголовке (schema-1 валидатор ужимает до своего лимита сам).
+    if len(raw) > max(MAX_UNCOMPRESSED_BYTES, MAX_UNCOMPRESSED_BYTES_V2):
+        raise DictionaryBudgetError(
+            f"uncompressed dictionary is {len(raw)} bytes; "
+            f"limit is {max(MAX_UNCOMPRESSED_BYTES, MAX_UNCOMPRESSED_BYTES_V2)}"
+        )
+    if len(raw) < HEADER_SIZE:
+        raise DictionaryFormatError("raw dictionary is shorter than its header")
+    schema_id = struct.unpack_from("<H", raw, 8)[0]
+    if schema_id == SCHEMA_ID:
+        return _validate_raw_v1(raw, expected_count, language)
+    if schema_id == SCHEMA_ID_V2:
+        return _validate_raw_v2(raw, expected_count, language)
+    raise DictionaryFormatError(f"unsupported schema id: {schema_id}")
+
+
+def _validate_header(
+    raw: bytes,
+    max_uncompressed: int,
+    schema_id: int,
+    format_version: int,
+) -> tuple[int, int, int, int, int, int, bytes]:
+    """Общая часть обеих схем: бюджет, магия, версии, контрольная сумма.
+
+    Возвращает (entry_count, поле20, поле24, поле28, поле32, file_size, checksum) —
+    семантика полей 20–32 своя у каждой схемы, каноничность раскладки проверяет
+    вызывающий валидатор.
+    """
+    if len(raw) > max_uncompressed:
+        raise DictionaryBudgetError(
+            f"uncompressed dictionary is {len(raw)} bytes; "
+            f"limit is {max_uncompressed}"
+        )
+    if len(raw) < HEADER_SIZE:
+        raise DictionaryFormatError("raw dictionary is shorter than its header")
+    (
+        magic,
+        actual_schema,
+        actual_version,
+        header_size,
+        checksum_algorithm,
+        entry_count,
+        field20,
+        field24,
+        field28,
+        field32,
+        file_size,
+        stored_checksum,
+    ) = HEADER.unpack_from(raw)
+
+    if magic != MAGIC:
+        raise DictionaryFormatError("wrong dictionary magic")
+    if actual_schema != schema_id:
+        raise DictionaryFormatError(f"unsupported schema id: {actual_schema}")
+    if actual_version != format_version:
+        raise DictionaryFormatError(f"unsupported format version: {actual_version}")
+    if header_size != HEADER_SIZE:
+        raise DictionaryFormatError(f"unexpected header size: {header_size}")
+    if checksum_algorithm != CHECKSUM_ALGORITHM_SHA256:
+        raise DictionaryFormatError(
+            f"unsupported checksum algorithm: {checksum_algorithm}"
+        )
+    if entry_count == 0:
+        raise DictionaryFormatError("entry count must be positive")
+    calculated_checksum = _checksum_with_zeroed_digest(raw)
+    if not hmac.compare_digest(stored_checksum, calculated_checksum):
+        raise DictionaryFormatError("SHA-256 checksum mismatch")
+    return entry_count, field20, field24, field28, field32, file_size, stored_checksum
+
+
+def _check_word(
+    word: str,
+    index: int,
+    language: coverage.Language,
+    previous_word: str | None,
+) -> None:
+    normalized, reason = coverage.normalize_word(word, language.alphabet)
+    if reason is not None:
+        raise DictionaryFormatError(f"word {index} is invalid: {reason}")
+    if normalized != word:
+        raise DictionaryFormatError(f"word {index} is not NFC lowercase")
+    if previous_word is not None:
+        if word == previous_word:
+            raise DictionaryFormatError(f"duplicate dictionary word: {word!r}")
+        if word < previous_word:
+            raise DictionaryFormatError("dictionary words are not lexically sorted")
+
+
+def _validate_raw_v2(
+    raw: bytes,
+    expected_count: int | None = None,
+    language: coverage.Language = coverage.DEFAULT_LANGUAGE,
+) -> ParsedDictionary:
+    (
+        entry_count,
+        block_count,
+        block_index_offset,
+        blocks_offset,
+        blocks_size,
+        file_size,
+        _checksum,
+    ) = _validate_header(raw, MAX_UNCOMPRESSED_BYTES_V2, SCHEMA_ID_V2, FORMAT_VERSION_V2)
+    if expected_count is not None and entry_count != expected_count:
+        raise DictionaryFormatError(
+            f"expected {expected_count} entries, found {entry_count}"
+        )
+
+    expected_block_count = (entry_count + BLOCK_SIZE_V2 - 1) // BLOCK_SIZE_V2
+    if block_count != expected_block_count:
+        raise DictionaryFormatError("block count is not ceil(entries / block size)")
+    expected_index_offset = HEADER_SIZE
+    expected_blocks_offset = expected_index_offset + 4 * block_count
+    expected_file_size = expected_blocks_offset + blocks_size
+    for value, label in (
+        (expected_blocks_offset, "blocks offset"),
+        (expected_file_size, "file size"),
+    ):
+        if value > MAX_U32:
+            raise DictionaryFormatError(f"{label} arithmetic exceeds u32")
+    if block_index_offset != expected_index_offset:
+        raise DictionaryFormatError("block index is not at the canonical offset")
+    if blocks_offset != expected_blocks_offset:
+        raise DictionaryFormatError("blocks section is not at the canonical offset")
+    if file_size != expected_file_size or file_size != len(raw):
+        raise DictionaryFormatError("declared file size does not match canonical layout")
+
+    block_offsets = struct.unpack_from(f"<{block_count}I", raw, block_index_offset)
+    if block_offsets[0] != blocks_offset:
+        raise DictionaryFormatError("first block offset must equal the blocks offset")
+    previous_block_offset = block_offsets[0]
+    for index, offset in enumerate(block_offsets[1:], start=1):
+        if offset <= previous_block_offset:
+            raise DictionaryFormatError("block offsets must be strictly increasing")
+        if offset >= file_size:
+            raise DictionaryFormatError(f"block offset {index} is outside the file")
+        previous_block_offset = offset
+
+    words: list[str] = []
+    encoded_words: list[bytes] = []
+    frequencies: list[int] = []
+    previous_word: str | None = None
+    global_index = 0
+    for block_index in range(block_count):
+        block_start = block_offsets[block_index]
+        block_end = (
+            block_offsets[block_index + 1]
+            if block_index + 1 < block_count
+            else file_size
+        )
+        expected_in_block = min(BLOCK_SIZE_V2, entry_count - block_index * BLOCK_SIZE_V2)
+        cursor = block_start
+        first_length = raw[cursor]
+        cursor += 1
+        if first_length == 0 or first_length > MAX_WORD_BYTES_V2:
+            raise DictionaryFormatError(f"block {block_index}: invalid first word length")
+        if cursor + first_length > block_end:
+            raise DictionaryFormatError(f"block {block_index}: truncated first word")
+        first_bytes = raw[cursor : cursor + first_length]
+        cursor += first_length
+
+        block_words: list[bytes] = [first_bytes]
+        for _ in range(expected_in_block - 1):
+            prefix_length, cursor = _decode_varint(raw, cursor, block_end)
+            if prefix_length > first_length:
+                raise DictionaryFormatError(
+                    f"block {block_index}: prefix longer than the first word"
+                )
+            if cursor >= block_end:
+                raise DictionaryFormatError(f"block {block_index}: truncated entry")
+            suffix_length = raw[cursor]
+            cursor += 1
+            if suffix_length == 0:
+                raise DictionaryFormatError(f"block {block_index}: empty suffix")
+            if prefix_length + suffix_length > MAX_WORD_BYTES_V2:
+                raise DictionaryFormatError(f"block {block_index}: word too long")
+            if cursor + suffix_length > block_end:
+                raise DictionaryFormatError(f"block {block_index}: truncated suffix")
+            block_words.append(
+                first_bytes[:prefix_length] + raw[cursor : cursor + suffix_length]
+            )
+            cursor += suffix_length
+        for _ in range(expected_in_block):
+            frequency, cursor = _decode_varint(raw, cursor, block_end)
+            if frequency == 0:
+                raise DictionaryFormatError(
+                    f"block {block_index}: frequency must be positive"
+                )
+            frequencies.append(frequency)
+        if cursor != block_end:
+            raise DictionaryFormatError(f"block {block_index}: trailing bytes")
+
+        for encoded in block_words:
+            try:
+                word = encoded.decode("utf-8", errors="strict")
+            except UnicodeDecodeError as error:
+                raise DictionaryFormatError(
+                    f"word {global_index} is not valid UTF-8"
+                ) from error
+            _check_word(word, global_index, language, previous_word)
+            words.append(word)
+            encoded_words.append(encoded)
+            previous_word = word
+            global_index += 1
+
+    return ParsedDictionary(
+        raw=raw,
+        words=tuple(words),
+        word_bytes=tuple(encoded_words),
+        frequencies=tuple(frequencies),
+    )
+
+
+def _validate_raw_v1(
     raw: bytes,
     expected_count: int | None = None,
     language: coverage.Language = coverage.DEFAULT_LANGUAGE,
@@ -393,32 +778,78 @@ def validate_raw(
     )
 
 
+def _schema_caps(schema_id: int) -> tuple[int, int]:
+    """(max_compressed, max_uncompressed) схемы."""
+    if schema_id == SCHEMA_ID_V2:
+        return MAX_COMPRESSED_BYTES_V2, MAX_UNCOMPRESSED_BYTES_V2
+    return MAX_COMPRESSED_BYTES, MAX_UNCOMPRESSED_BYTES
+
+
 def validate_asset(
     asset: bytes,
     expected_count: int | None = None,
     language: coverage.Language = coverage.DEFAULT_LANGUAGE,
 ) -> ParsedDictionary:
-    return validate_raw(decompress_asset(asset, language), expected_count, language)
+    raw = decompress_asset(asset, language)
+    parsed = validate_raw(raw, expected_count, language)
+    schema_id = struct.unpack_from("<H", raw, 8)[0]
+    max_compressed, _ = _schema_caps(schema_id)
+    if len(asset) > max_compressed:
+        raise DictionaryBudgetError(
+            f"compressed asset is {len(asset)} bytes; limit is {max_compressed}"
+        )
+    return parsed
 
 
 def build_dictionary(
     paths: Sequence[Path],
     count: int,
     language: coverage.Language = coverage.DEFAULT_LANGUAGE,
+    schema: int = SCHEMA_ID_V2,
 ) -> BuiltDictionary:
     frequencies = _read_frequencies(paths, language)
     entries, boundary_frequency = select_entries(frequencies, count)
-    raw = serialize_entries(entries, language)
+    raw = serialize_entries(entries, language, schema=schema)
     parsed = validate_raw(raw, expected_count=count, language=language)
     asset = compress_raw(raw)
-    if len(asset) > MAX_COMPRESSED_BYTES:
+    max_compressed, _ = _schema_caps(schema)
+    if len(asset) > max_compressed:
         raise DictionaryBudgetError(
-            f"compressed asset is {len(asset)} bytes; limit is {MAX_COMPRESSED_BYTES}"
+            f"compressed asset is {len(asset)} bytes; limit is {max_compressed}"
         )
     reparsed = validate_asset(asset, expected_count=count, language=language)
     if reparsed.raw != raw:
         raise DictionaryFormatError("zlib round trip changed the raw dictionary")
     return BuiltDictionary(raw, asset, parsed, boundary_frequency)
+
+
+def repack_asset(
+    asset: bytes,
+    language: coverage.Language = coverage.DEFAULT_LANGUAGE,
+    schema: int = SCHEMA_ID_V2,
+) -> BuiltDictionary:
+    """Перепаковка готового ассета в новую схему без изменения состава.
+
+    Источник валидируется строго, записи (слово, частота) сериализуются заново
+    в том же порядке — состав, порядок и частоты lossless по построению, что
+    и доказывает транскодинг v1 → v2. Провал любой проверки — исключение,
+    ничего не пишется (fail-closed, как у build).
+    """
+    parsed = validate_asset(asset, language=language)
+    entries = list(zip(parsed.words, parsed.frequencies, strict=True))
+    raw = serialize_entries(entries, language, schema=schema)
+    reparsed = validate_raw(raw, expected_count=parsed.entry_count, language=language)
+    if reparsed.words != parsed.words or reparsed.frequencies != parsed.frequencies:
+        raise DictionaryFormatError("repack changed the dictionary content")
+    new_asset = compress_raw(raw)
+    max_compressed, _ = _schema_caps(schema)
+    if len(new_asset) > max_compressed:
+        raise DictionaryBudgetError(
+            f"compressed asset is {len(new_asset)} bytes; limit is {max_compressed}"
+        )
+    if validate_asset(new_asset, language=language).raw != raw:
+        raise DictionaryFormatError("zlib round trip changed the raw dictionary")
+    return BuiltDictionary(raw, new_asset, reparsed, parsed.frequencies[-1])
 
 
 def _stage_file(path: Path, data: bytes) -> Path:
@@ -449,14 +880,15 @@ def _write_outputs(raw_path: Path, raw: bytes, asset_path: Path, asset: bytes) -
 
 
 def summary(asset: bytes, parsed: ParsedDictionary) -> dict[str, object]:
+    schema_id, format_version = struct.unpack_from("<HH", parsed.raw, 8)
     return {
         "asset_sha256": hashlib.sha256(asset).hexdigest(),
         "compressed_bytes": len(asset),
         "entry_count": parsed.entry_count,
-        "format_version": FORMAT_VERSION,
+        "format_version": format_version,
         "generator_version": GENERATOR_VERSION,
         "raw_sha256": hashlib.sha256(parsed.raw).hexdigest(),
-        "schema_id": SCHEMA_ID,
+        "schema_id": schema_id,
         "uncompressed_bytes": len(parsed.raw),
         "zlib_runtime_version": zlib.ZLIB_RUNTIME_VERSION,
     }
@@ -654,7 +1086,30 @@ def create_argument_parser() -> argparse.ArgumentParser:
     build.add_argument("--count", type=_positive_int, default=DEFAULT_COUNT)
     build.add_argument("--raw-output", type=Path, required=True)
     build.add_argument("--asset-output", type=Path, required=True)
+    build.add_argument(
+        "--schema",
+        type=int,
+        choices=(SCHEMA_ID, SCHEMA_ID_V2),
+        default=SCHEMA_ID_V2,
+        help="binary schema to write (default: %(default)s)",
+    )
     add_language(build)
+
+    repack = commands.add_parser(
+        "repack",
+        help="transcode a validated asset into another schema, content unchanged",
+    )
+    repack.add_argument("--asset", required=True, type=Path)
+    repack.add_argument("--raw-output", type=Path, required=True)
+    repack.add_argument("--asset-output", type=Path, required=True)
+    repack.add_argument(
+        "--schema",
+        type=int,
+        choices=(SCHEMA_ID, SCHEMA_ID_V2),
+        default=SCHEMA_ID_V2,
+        help="binary schema to write (default: %(default)s)",
+    )
+    add_language(repack)
 
     validate = commands.add_parser("validate", help="strictly validate a dictionary")
     source = validate.add_mutually_exclusive_group(required=True)
@@ -694,22 +1149,29 @@ def main(argv: Sequence[str] | None = None) -> int:
     language = coverage.language_for(args.language)
     try:
         if args.command == "build":
-            built = build_dictionary(args.inputs, args.count, language)
+            built = build_dictionary(args.inputs, args.count, language, args.schema)
             _write_outputs(args.raw_output, built.raw, args.asset_output, built.asset)
             result = summary(built.asset, built.parsed)
             result["boundary_frequency"] = built.boundary_frequency
+            result["language"] = language.tag
+            _print_json(result)
+        elif args.command == "repack":
+            built = repack_asset(args.asset.read_bytes(), language, args.schema)
+            _write_outputs(args.raw_output, built.raw, args.asset_output, built.asset)
+            result = summary(built.asset, built.parsed)
             result["language"] = language.tag
             _print_json(result)
         elif args.command == "validate":
             if args.raw is not None:
                 raw = args.raw.read_bytes()
                 parsed = validate_raw(raw, args.expected_count, language)
+                schema_id, format_version = struct.unpack_from("<HH", raw, 8)
                 result = {
                     "entry_count": parsed.entry_count,
-                    "format_version": FORMAT_VERSION,
+                    "format_version": format_version,
                     "language": language.tag,
                     "raw_sha256": hashlib.sha256(raw).hexdigest(),
-                    "schema_id": SCHEMA_ID,
+                    "schema_id": schema_id,
                     "uncompressed_bytes": len(raw),
                 }
             else:
