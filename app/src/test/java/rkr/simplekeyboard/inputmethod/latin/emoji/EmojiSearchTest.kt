@@ -288,4 +288,23 @@ class EmojiSearchTest {
         query.appendCodePoint('о'.code)
         assertNotEquals(first, query.text())
     }
+
+    // --- nameOf (the strip's spoken labels, mission 2 of docs/EMOJI-SUGGEST-PLAN.md) ----------
+
+    @Test
+    fun nameOfAnswersTheShortNameWithoutASearch() {
+        val index = indexOf(
+            "🐱\tкот\tкот кошка животное cat",
+            "✈️\tсамолёт\tсамолет самолёт самолета airplane",
+        )
+        assertEquals("кот", index.nameOf("🐱"))
+        assertEquals("самолёт", index.nameOf("✈️"))
+    }
+
+    @Test
+    fun nameOfMissesSilentlyOnAnUnknownSequence() {
+        val index = indexOf("🐱\tкот\tкот кошка животное cat")
+        assertEquals(null, index.nameOf("🐶"))
+        assertEquals(null, EmojiSearchIndex.EMPTY.nameOf("🐱"))
+    }
 }

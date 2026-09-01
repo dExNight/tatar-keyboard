@@ -114,6 +114,20 @@ class EmojiSearchIndex private constructor(
         if (position in 0 until resultCount) names[results[position]] else ""
 
     /**
+     * The Russian short name of [sequence] itself, or null when the index does not hold it. A
+     * linear scan, allocation-free; used off the keystroke path, when a strip cell that shows an
+     * emoji (mission 2 of `docs/EMOJI-SUGGEST-PLAN.md`) needs a spoken label for TalkBack.
+     */
+    fun nameOf(sequence: String): String? {
+        var index = 0
+        while (index < sequences.size) {
+            if (sequences[index] == sequence) return names[index]
+            index++
+        }
+        return null
+    }
+
+    /**
      * Returns a copy of this index holding only the sequences in [available] — the set the glyph
      * probe already accepted — so the search can never offer an emoji the device cannot render.
      */
