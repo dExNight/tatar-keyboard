@@ -1513,6 +1513,12 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
     @Override
     public void onWindowHidden() {
         super.onWindowHidden();
+        // A hidden window must not resurrect a dead emoji search on the next show: without this
+        // reset the switcher still flags the search as open while the query is already dropped,
+        // leaving a visible but dead search band (M4c). Both calls are no-ops when the panel
+        // never opened.
+        abandonEmojiSearch();
+        mKeyboardSwitcher.hideEmojiPanel();
         final MainKeyboardView mainKeyboardView = mKeyboardSwitcher.getMainKeyboardView();
         if (mainKeyboardView != null) {
             mainKeyboardView.closing();
