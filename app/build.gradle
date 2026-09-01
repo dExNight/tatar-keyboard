@@ -50,7 +50,10 @@ android {
             minifyEnabled true
             shrinkResources true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
-            if (keystorePropsFile.exists()) {
+            // SIZE-3: -PskipReleaseSigning produces an unsigned APK even when
+            // keystore.properties exists — scripts/release_pack.sh builds unsigned,
+            // then zipalign -z (zopfli, must run BEFORE signing) + apksigner sign.
+            if (keystorePropsFile.exists() && !project.hasProperty('skipReleaseSigning')) {
                 signingConfig signingConfigs.release
             }
         }
