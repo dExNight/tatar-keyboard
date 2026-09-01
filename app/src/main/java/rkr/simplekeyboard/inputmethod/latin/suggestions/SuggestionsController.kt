@@ -32,6 +32,10 @@ import rkr.simplekeyboard.inputmethod.latin.dictionary.personal.WordCompletionSi
 import rkr.simplekeyboard.inputmethod.latin.dictionary.storage.PreparationResult
 import rkr.simplekeyboard.inputmethod.latin.dictionary.storage.PublishedBigramTableCatalog
 import rkr.simplekeyboard.inputmethod.latin.dictionary.storage.PublishedDictionaryCatalog
+import rkr.simplekeyboard.inputmethod.latin.emoji.AssetEmojiSuggestPreparation
+import rkr.simplekeyboard.inputmethod.latin.emoji.EmojiSuggestIndex
+import rkr.simplekeyboard.inputmethod.latin.emoji.EmojiSuggestPreparation
+import rkr.simplekeyboard.inputmethod.latin.emoji.EmojiSuggestSource
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
@@ -39,6 +43,14 @@ import java.util.concurrent.Executors
 /** Suggestion-strip UI seam. All methods are called on the UI thread. */
 interface StripSurface {
     fun showSuggestions(first: String, second: String?, third: String?)
+
+    /**
+     * Optional spoken labels for cells whose own text does not read well aloud — an emoji cell
+     * (mission 2 of `docs/EMOJI-SUGGEST-PLAN.md`). Called immediately after [showSuggestions]
+     * with one entry per cell; a null entry means "speak the cell's text". Defaults to a no-op so
+     * a surface written before emoji suggestions keeps compiling and simply speaks the glyph.
+     */
+    fun setSpokenCellLabels(first: String?, second: String?, third: String?) {}
 
     /** Make the strip VISIBLE with no words (empty band), keeping its reserved 40dp height. */
     fun reserve()
@@ -118,6 +130,16 @@ interface EditorSurface {
  * and JVM tests can flip the setting between two keystrokes exactly as a user can.
  */
 fun interface AutocorrectGate {
+    fun isOn(): Boolean
+}
+
+/**
+ * Reads the live value of `PREF_EMOJI_SUGGESTIONS` — the exact same seam shape as
+ * [AutocorrectGate], for the emoji cell of the NEXT_WORD band (mission 2 of
+ * `docs/EMOJI-SUGGEST-PLAN.md`). Read on every fill, so flipping the setting takes effect on the
+ * next band without restarting anything.
+ */
+fun interface EmojiSuggestGate {
     fun isOn(): Boolean
 }
 
@@ -283,6 +305,11 @@ class SuggestionsController internal constructor(
     // constructor passes real wiring.
     private val bigramPreparationFactory: (ExecutorService, String) -> BigramPreparation? =
         { _, _ -> null },
+    // Emoji-suggest (mission 2 of docs/EMOJI-SUGGEST-PLAN.md): trailing default so every existing
+    // test constructor keeps compiling with no emoji source at all — which is also the exact
+    // fail-closed shape a missing asset has.
+    private val emojiSuggestPreparationFactory: (ExecutorService) -> EmojiSuggestPreparation? =
+        { null },
 ) {
     /** Production entry point (frozen contract). */
     constructor(
@@ -304,6 +331,7 @@ class SuggestionsController internal constructor(
         { executor, subtypeId ->
             DeviceProtectedBigramPreparation.create(context, executor, subtypeId)
         },
+        { executor -> AssetEmojiSuggestPreparation(context, executor) },
     )
 
     /** Test entry point: injects a synchronous poster + executor and pre-marks the dictionary. */
@@ -507,6 +535,22 @@ class SuggestionsController internal constructor(
     /** The autocorrect setting, read live. OFF until LatinIME wires the real one. */
     private var autocorrectGate: AutocorrectGate = AutocorrectGate { false }
 
+    // --- Emoji-suggest state (mission 2 of docs/EMOJI-SUGGEST-PLAN.md). Nothing here is persisted;
+    // the source is immutable once loaded and the band carries no emoji state of its own — the
+    // emoji cell is simply part of [bandBaseCells], so every existing clear/invalidate path covers
+    // it unchanged.
+    /** The emoji-suggestions setting, read live. OFF until LatinIME wires the real one. */
+    private var emojiSuggestGate: EmojiSuggestGate = EmojiSuggestGate { false }
+
+    /** The loaded table, or null while it has never finished loading. Load failure is terminal. */
+    private var emojiSource: EmojiSuggestSource? = null
+
+    /** Lazily built loading seam; null means fail-closed, with no emoji cell ever. */
+    private var emojiPreparation: EmojiSuggestPreparation? = null
+
+    /** Set the moment the one-per-process load is requested; a failure is not retried. */
+    private var emojiPreparationRequested: Boolean = false
+
     /**
      * One replacement, as far as the undo is concerned. There is no history: at most one of these
      * exists at a time and it is dropped, never stacked.
@@ -539,6 +583,11 @@ class SuggestionsController internal constructor(
     /** Set once by LatinIME, for the same reason as [setCompletionSink]. */
     fun setAutocorrectGate(gate: AutocorrectGate) {
         autocorrectGate = gate
+    }
+
+    /** Set once by LatinIME, for the same reason as [setCompletionSink]. */
+    fun setEmojiSuggestGate(gate: EmojiSuggestGate) {
+        emojiSuggestGate = gate
     }
 
     /**
@@ -1301,21 +1350,28 @@ class SuggestionsController internal constructor(
         clearCompanionRequest()
         if (suggestions.isEmpty()) return
         val base = bandBaseCells
-        if (base.size >= SuggestionStripState.CELL_COUNT) return
+        // The emoji cell, when present, is always the tail one (mission 2 of
+        // docs/EMOJI-SUGGEST-PLAN.md): companion words insert BEFORE it and never push it out.
+        // A word cell is always a letter sequence; only the emoji cell is letter-free.
+        val emojiTail = if (base.isNotEmpty() && isEmojiCell(base.last())) base.last() else null
+        val wordBase = if (emojiTail != null) base.dropLast(1) else base
+        val room = SuggestionStripState.CELL_COUNT - (if (emojiTail != null) 1 else 0)
+        if (wordBase.size >= room) return
         // PREFIX re-applies the typed capitalization to every cell it shows, so the companion's
         // candidates get exactly the same treatment; NEXT_WORD applies none, to either language.
         val casing = if (kind == LookupKind.PREFIX) TatarWordUtils.classifyCasing(query) else null
         val cells = ArrayList<String>(SuggestionStripState.CELL_COUNT)
-        cells.addAll(base)
+        cells.addAll(wordBase)
         for (candidate in suggestions) {
             val shown = if (casing == null) candidate else TatarWordUtils.applyCasing(candidate, casing)
             // A word both languages offer occupies ONE cell, and it is the one the active language
             // already gave it.
             if (cells.contains(shown)) continue
             cells.add(shown)
-            if (cells.size >= SuggestionStripState.CELL_COUNT) break
+            if (cells.size >= room) break
         }
-        if (cells.size == base.size) return
+        if (cells.size == wordBase.size) return
+        if (emojiTail != null) cells.add(emojiTail)
         when (kind) {
             LookupKind.PREFIX -> displayedPrefix = query
             LookupKind.NEXT_WORD -> displayedContextWord = query
@@ -1328,6 +1384,135 @@ class SuggestionsController internal constructor(
     private fun showBand(cells: List<String>) {
         bandBaseCells = cells
         strip.showSuggestions(cells[0], cells.getOrNull(1), cells.getOrNull(2))
+        strip.setSpokenCellLabels(
+            spokenLabelFor(cells[0]),
+            spokenLabelFor(cells.getOrNull(1)),
+            spokenLabelFor(cells.getOrNull(2)),
+        )
+    }
+
+    /**
+     * True when [cell] holds the emoji candidate rather than a word: every word the band can ever
+     * show is a letter sequence (dictionary, bigram and personal candidates are all alphabet-checked
+     * by their packers), so a letter-free cell IS the emoji cell. Char-level on purpose: words here
+     * are BMP, and a supplementary letter would read as two non-letters — "emoji", the safe
+     * direction.
+     */
+    private fun isEmojiCell(cell: String): Boolean {
+        var index = 0
+        while (index < cell.length) {
+            if (Character.isLetter(cell[index])) return false
+            index++
+        }
+        return true
+    }
+
+    /**
+     * The spoken label of a cell, or null when the cell's own text reads fine aloud. Only the emoji
+     * cell gets a label — the emoji's short name from the search index; a source that never loaded
+     * (or a name the index does not hold) leaves the glyph to speak for itself, which TalkBack
+     * already does meaningfully.
+     */
+    private fun spokenLabelFor(cell: String?): String? {
+        if (cell.isNullOrEmpty() || !isEmojiCell(cell)) return null
+        return emojiSource?.spokenNameOf(cell)
+    }
+
+    // --- Emoji suggest (mission 2 of docs/EMOJI-SUGGEST-PLAN.md) --------------------------------
+
+    /**
+     * The emoji mapped to [contextWord] on the active language, or null. Every early exit is
+     * silent by design: the feature off, a subtype with no table, an unloaded or unusable asset
+     * and a word without a mapping all look exactly alike from the strip — the band shows what it
+     * would have shown anyway. The FIRST eligible miss is what starts the one-per-process
+     * background load, so a user who never turns the toggle on never reads the asset at all.
+     */
+    private fun emojiCandidate(contextWord: String): String? {
+        if (!emojiSuggestGate.isOn()) return null
+        val language = activeLanguage ?: return null
+        if (emojiSource == null) {
+            // Not loaded yet: start the one-time background load. Re-read the field afterwards —
+            // a preparation that answers synchronously (a direct test executor) has already
+            // published the source by the time the call returns.
+            maybePrepareEmojiSuggest()
+        }
+        val source = emojiSource ?: return null
+        return source.emojiFor(
+            EmojiSuggestIndex.assetLanguageOf(language),
+            TatarWordUtils.normalizeForLookup(contextWord),
+        )
+    }
+
+    /**
+     * Appends the emoji cell to the tail of the current NEXT_WORD band, applying the same
+     * tail-pinning [applyNextWordResult] applies synchronously: front cells keep their order, the
+     * emoji takes the tail, and the lowest-ranked word cell is the only one that ever yields. Runs
+     * from [onEmojiSuggestReady] only, for a band painted before the table finished loading; when
+     * it is what puts the first cell on an otherwise empty band it also BINDS the band, so the tap
+     * path treats the emoji exactly like a predicted word.
+     */
+    private fun maybeAppendEmojiTail(contextWord: String) {
+        if (contextWord.isEmpty()) return
+        val emoji = emojiCandidate(contextWord) ?: return
+        if (bandBaseCells.contains(emoji)) return
+        val cells = ArrayList<String>(SuggestionStripState.CELL_COUNT)
+        val wordCap = SuggestionStripState.CELL_COUNT - 1
+        for (cell in bandBaseCells) {
+            cells.add(cell)
+            if (cells.size >= wordCap) break
+        }
+        cells.add(emoji)
+        displayedContextWord = contextWord
+        displayedSessionId = sessionId
+        showBand(cells)
+    }
+
+    /**
+     * Starts the one-per-process background load of the emoji-suggest table, at most once and only
+     * while the feature is on. A factory or executor failure is silent and terminal: the band
+     * simply never grows an emoji cell.
+     */
+    private fun maybePrepareEmojiSuggest() {
+        if (destroyed || emojiPreparationRequested) return
+        if (!emojiSuggestGate.isOn()) return
+        val backgroundExecutor = backgroundExecutor() ?: return
+        val preparation = emojiPreparation ?: run {
+            val created = try {
+                emojiSuggestPreparationFactory(backgroundExecutor)
+            } catch (_: Throwable) {
+                null
+            } ?: return
+            emojiPreparation = created
+            created
+        }
+        emojiPreparationRequested = true
+        try {
+            preparation.prepare { source ->
+                // The callback may run on the background executor. Marshal onto the serialized UI
+                // owner before touching any controller state.
+                uiPoster.post { onEmojiSuggestReady(source) }
+            }
+        } catch (_: Throwable) {
+            // Silent: the band behaves exactly as if no word ever had a mapping.
+        }
+    }
+
+    /**
+     * The table finished loading. A NEXT_WORD band painted before the table arrived gets its emoji
+     * cell filled NOW rather than after the next word — but only if the live editor state is still
+     * exactly the NEXT_WORD moment the last request was built for: the same re-derivation the tap
+     * path performs, so a load that finished after the user typed on changes nothing.
+     */
+    private fun onEmojiSuggestReady(source: EmojiSuggestSource?) {
+        if (destroyed) return
+        emojiSource = source ?: return
+        if (!eligible) return
+        if (requestSessionId != sessionId) return
+        if (!editor.hasKnownCursor() || editor.hasLetterAfterCursor()) return
+        if (editor.cachedWordBeforeCursor().isNotEmpty()) return
+        val context = editor.cachedNextWordContext()
+        if (context.isEmpty() || context != pendingContextWord) return
+        maybeAppendEmojiTail(context)
     }
 
     private fun requestCurrentPrefix() {
@@ -1609,20 +1794,38 @@ class SuggestionsController internal constructor(
      * предсказаний": predictions are shown and inserted exactly as the bigram table stores them.
      */
     private fun applyNextWordResult(suggestions: List<String>) {
+        // The emoji cell is pinned to the TAIL of the band whenever the context word maps to one
+        // (mission 2 of docs/EMOJI-SUGGEST-PLAN.md): word predictions keep their order in the
+        // front cells, the emoji never leads a band that has words, and the one candidate that
+        // ever yields to it is the lowest-ranked tail one (bigram #3). With no mapping the band
+        // is byte-for-byte what it was before this feature existed.
+        val emoji = emojiCandidate(pendingContextWord)
         if (suggestions.isEmpty()) {
-            displayedContextWord = null
-            bandBaseCells = emptyList()
-            strip.reserve()
+            if (emoji == null) {
+                displayedContextWord = null
+                bandBaseCells = emptyList()
+                strip.reserve()
+            } else {
+                displayedContextWord = pendingContextWord
+                displayedSessionId = sessionId
+                showBand(listOf(emoji))
+            }
             requestCompanionFill(LookupKind.NEXT_WORD, pendingContextWord)
             return
         }
         displayedContextWord = pendingContextWord
         displayedSessionId = sessionId
+        val wordCap = if (emoji == null) {
+            SuggestionStripState.CELL_COUNT
+        } else {
+            SuggestionStripState.CELL_COUNT - 1
+        }
         val cells = ArrayList<String>(SuggestionStripState.CELL_COUNT)
         for (candidate in suggestions) {
             cells.add(candidate)
-            if (cells.size >= SuggestionStripState.CELL_COUNT) break
+            if (cells.size >= wordCap) break
         }
+        if (emoji != null && !cells.contains(emoji)) cells.add(emoji)
         showBand(cells)
         if (cells.size < SuggestionStripState.CELL_COUNT) {
             requestCompanionFill(LookupKind.NEXT_WORD, pendingContextWord)

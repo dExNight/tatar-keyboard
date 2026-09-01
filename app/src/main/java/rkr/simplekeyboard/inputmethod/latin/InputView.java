@@ -277,6 +277,18 @@ public final class InputView extends FrameLayout {
         return strip;
     }
 
+    /**
+     * Forwards the spoken cell labels to the strip if it exists; never creates it — labels for a
+     * strip that is not there yet are pointless, and the first [showSuggestionStrip] after
+     * creation is always followed by its own labels.
+     */
+    public void setSuggestionStripSpokenLabels(final String first, final String second,
+            final String third) {
+        if (mSuggestionStripView != null) {
+            mSuggestionStripView.setSpokenLabels(first, second, third);
+        }
+    }
+
     /** Clears stale contents and removes all layout and touch impact without creating the strip. */
     public void clearAndHideSuggestionStrip() {
         if (mSuggestionStripView == null) {

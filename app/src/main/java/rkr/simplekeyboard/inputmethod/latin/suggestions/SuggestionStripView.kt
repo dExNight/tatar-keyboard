@@ -55,6 +55,13 @@ class SuggestionStripView @JvmOverloads constructor(
     }
 
     private val state = SuggestionStripState()
+    /**
+     * Optional spoken label per cell, set right after [setSuggestions] by the owner of the band
+     * for cells whose text does not read well aloud (an emoji). A null entry means "speak the
+     * cell's text". Reset by every [setSuggestions]/[clearSuggestions], so a label can never
+     * outlive the content it described.
+     */
+    private val spokenLabels = arrayOfNulls<String>(SuggestionStripState.CELL_COUNT)
     private val textPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
         textAlign = Paint.Align.CENTER
         textSize = TypedValue.applyDimension(
@@ -149,6 +156,7 @@ class SuggestionStripView @JvmOverloads constructor(
     }
 
     fun setSuggestions(first: String?, second: String?, third: String?) {
+        clearSpokenLabels()
         val hadSuggestions = state.hasAnySuggestion()
         if (!state.setSuggestions(first, second, third)) return
         rebuildDisplaySuggestions()
@@ -176,14 +184,36 @@ class SuggestionStripView @JvmOverloads constructor(
     }
 
     fun clearSuggestions() {
+        clearSpokenLabels()
         if (!state.clear()) return
         clearDisplaySuggestions()
         accessibilityHelper.invalidateRoot()
         invalidate()
     }
 
+    /**
+     * Sets the spoken labels of the three cells; see the field comment. Called by the owner of the
+     * band immediately after [setSuggestions]; never creates content of its own.
+     */
+    fun setSpokenLabels(first: String?, second: String?, third: String?) {
+        if (spokenLabels[0] == first && spokenLabels[1] == second && spokenLabels[2] == third) {
+            return
+        }
+        spokenLabels[0] = first
+        spokenLabels[1] = second
+        spokenLabels[2] = third
+        accessibilityHelper.invalidateRoot()
+    }
+
+    private fun clearSpokenLabels() {
+        spokenLabels[0] = null
+        spokenLabels[1] = null
+        spokenLabels[2] = null
+    }
+
     /** Drops every reference and transient state that must not survive view replacement. */
     fun release() {
+        clearSpokenLabels()
         val changed = state.clear()
         touchSequenceAccepted = false
         listener = null
@@ -399,7 +429,8 @@ class SuggestionStripView @JvmOverloads constructor(
                 return
             }
             node.className = android.widget.Button::class.java.name
-            node.contentDescription = suggestion
+            // An emoji cell speaks its name ("самолёт"), a word cell its own text.
+            node.contentDescription = spokenLabels[virtualViewId] ?: suggestion
             tempBounds.set(
                 state.cellLeft(virtualViewId, width),
                 0,

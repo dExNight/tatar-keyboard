@@ -412,6 +412,15 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
             }
 
             @Override
+            public void setSpokenCellLabels(final String first, final String second,
+                    final String third) {
+                final InputView inputView = getInputViewForSuggestions();
+                if (inputView != null) {
+                    inputView.setSuggestionStripSpokenLabels(first, second, third);
+                }
+            }
+
+            @Override
             public void reserve() {
                 final InputView inputView = getInputViewForSuggestions();
                 if (inputView != null) {
@@ -442,7 +451,15 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
                 // E4d: the long press is wired next to the tap, on the same strip instance, so a
                 // strip created later (the band appears lazily) gets both or neither.
                 strip.setOnSuggestionLongPressListener(
-                        (cellId, suggestion) -> showForgetPersonalWordDialog(suggestion));
+                        (cellId, suggestion) -> {
+                            // An emoji-suggest cell holds no word, so there is nothing to forget:
+                            // the long press is answered with silence rather than with a
+                            // "not a saved word" dialog about a picture.
+                            if (!containsAnyLetter(suggestion)) {
+                                return;
+                            }
+                            showForgetPersonalWordDialog(suggestion);
+                        });
             }
         };
 
@@ -569,6 +586,10 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         // without restarting the engine or touching its lease.
         mSuggestionsController.setAutocorrectGate(
                 () -> mSettings.getCurrent().mTatarAutocorrectEnabled);
+        // Emoji suggestions (mission 2 of docs/EMOJI-SUGGEST-PLAN.md): same live-read seam, same
+        // subordination to the suggestions switch, carried by SettingsValues.
+        mSuggestionsController.setEmojiSuggestGate(
+                () -> mSettings.getCurrent().mEmojiSuggestEnabled);
         mSuggestionsController.onCreate();
         // Erasing words on the settings screen must unbind whatever the band is showing right now:
         // the screen and the IME live in the same process, so the store notifies us directly. The
@@ -800,6 +821,20 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         // reference through the one existing path instead of a second mechanism.
         mOptionsDialog = dialog;
         dialog.show();
+    }
+
+    /**
+     * True when [text] holds at least one letter. Used to tell an emoji-suggest cell apart from a
+     * word cell: every word the band can show is BMP Cyrillic, and a supplementary letter would
+     * simply read as two non-letters — "emoji", the safe direction for a forget-word gesture.
+     */
+    private static boolean containsAnyLetter(final String text) {
+        for (int index = 0; index < text.length(); index++) {
+            if (Character.isLetter(text.charAt(index))) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
