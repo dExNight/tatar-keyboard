@@ -8,8 +8,8 @@ namespace `rkr.simplekeyboard.inputmethod`. Ветка работы — `main`.
 
 | Действие | Команда |
 |---|---|
-| JVM-тесты (1013 шт.) | `./gradlew test` (для честного прогона — `--rerun-tasks`) |
-| Python-тесты конвейера (312 шт.) | `for f in tests/*/test_*.py; do python3 "$f" \|\| exit 1; done` — pytest НЕ используется, это чистый unittest |
+| JVM-тесты (1058 шт.) | `./gradlew test` (для честного прогона — `--rerun-tasks`) |
+| Python-тесты конвейера (346 шт.) | `for f in tests/*/test_*.py; do python3 "$f" \|\| exit 1; done` — pytest НЕ используется, это чистый unittest |
 | Эмуляторный смоук (DEV-3) | `bash scripts/emulator-smoke.sh [--avd tt_suggest_a14] [--apk путь] [--no-boot] [--outdir build/emulator-smoke/]` — поднять AVD → установить APK → выбрать IME → сценарий (набор tt/ru/en, подсказки, эмодзи-панель, crash-буфер) → строки `RESULT\|PASS/FAIL/SKIP`, свидетельства (скриншоты, дампы) в outdir. Координаты клавиш откалиброваны под 1080×2280; пиксельная дельта полосы подсказок требует ImageMagick на хосте (без него — SKIP) |
 | Линт | `./gradlew lintRelease` (baseline `app/lint-baseline.xml` — 0 errors, 31 осознанный warning после P1 (5x IconLauncherShape сняты: иконки конвертированы в lossless WebP, детектор WebP не анализирует), классификация в `app/lint.xml`; `abortOnError=true`) |
 | error-prone (DEV-4) | встроен в компиляцию Java (плагин net.ltgt.errorprone 4.3.0 + error_prone_core 2.42.0 — последняя на JDK 17; build-time, в APK не попадает). Все находки — warnings (`allErrorsAsWarnings`), сборку не роняют; новые стоит разбирать по мере появления в выводе `compile*JavaWithJavac` |
@@ -44,6 +44,12 @@ python-конвейером (`scripts/`), а не руками. Их разме�
 в `app/src/main/java/.../dictionary/storage/DictionaryStorageContracts.kt` и
 `BigramStorageContracts.kt` — любая пересборка ассета требует пересчёта пинов,
 иначе красные тесты.
+
+Эмодзи-ассеты (`assets/emoji/*.txt`, включая `emoji_suggest_v1.txt` — таблицу
+«слово → эмодзи» для подсказок в полосе, 1.9.10) контрактов хранилища не имеют
+и в гейт пинов `release_check.sh` не входят: их пины (SHA-256, числа записей)
+живут в `tests/emoji_*` (python) и JVM-контрактах `Emoji*AssetTest` — правка
+данных без пересчёта пина даёт красные тесты там.
 
 С 2026-09-01 (миссия SIZE-1, `docs/SIZE-SCHEMA2.md`) словари — **TATDICT
 schema 2**: блочный front-coding (K = 8) + u8-длины + varint-частоты, lossless
@@ -90,7 +96,7 @@ schema 2 по умолчанию (`--schema 1` оставлен для спра�
 - `latin/LatinIME.java` — InputMethodService, точка входа IME.
 - `keyboard/` (Java) — View, PointerTracker, KeyDetector; `latin/suggestions/`,
   `latin/dictionary/**`, `latin/emoji/` (Kotlin) — подсказки, словари, эмодзи.
-- `app/src/test` — 1013 JVM-тестов (JUnit 4, Robolectric нет — осознанно).
+- `app/src/test` — 1058 JVM-тестов (JUnit 4, Robolectric нет — осознанно).
 - `scripts/` — python-конвейер ассетов (stdlib only, fail-closed);
   `research/corpus/` — измерительные скрипты и манифесты корпусов (данные OPUS
   не коммитятся — лицензии).
