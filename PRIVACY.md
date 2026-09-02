@@ -1,6 +1,6 @@
 # Политика конфиденциальности / Privacy Policy
 
-**Версия / Version:** 1.3 — 2026-07-31
+**Версия / Version:** 1.4 — 2026-09-02
 
 ## English
 
@@ -20,7 +20,16 @@ So the emoji panel can show them first, it remembers **up to 24 recently used em
 - **Before the device is unlocked** for the first time after a restart, this list is **not read and not added to** — there simply is no “Recent” tab until you unlock.
 - **Excluded from backup.** This list lives in an internal “no‑backup” folder that Android does **not** include in a cloud backup or in a transfer to a new device.
 - **Not everywhere.** Nothing is remembered in **password fields or other private fields** — e‑mail, URL, and any field that asks the keyboard not to show suggestions or not to personalize (for example an incognito browser tab or a banking app).
-- **How to erase it.** Open the keyboard settings and tap **“Clear recent emoji.”** To remove it together with everything else, delete the app's data in the system settings — that also removes the **2,542,036‑byte** unpacked dictionary, which the app rebuilds on next use.
+- **How to erase it.** Open the keyboard settings and tap **“Clear recent emoji.”** To remove it together with everything else, delete the app's data in the system settings — that also removes the unpacked dictionaries and prediction tables the app rebuilds on next use.
+
+### Word and emoji suggestions
+
+The word-completion dictionaries, the next-word prediction tables and the “word → emoji” table are **shipped inside the app** and unpacked to an internal app folder on first use.
+
+- **Size.** Two unpacked dictionaries (1,162,870 and 1,151,323 bytes) and two prediction tables (134,664 and 131,662 bytes) — about 2.6 MB in total. The emoji lookup tables add a few hundred KB packed and store nothing about you.
+- **What they record about you: nothing.** Suggestions, predictions and emoji suggestions are pure read-only lookups against these bundled tables. They keep no history, no counters, no copy of what you type. The emoji suggestion that appears in the strip reads only the word you just finished, on the device, and is gone from memory with it. In password and other private fields neither word suggestions nor emoji suggestions appear at all.
+- **Two versions kept after an update.** When a new app version brings a new dictionary or table, the previous unpacked copy is kept next to the new one for a while, so the update can be rolled back; an old version is removed on later launches. At most two versions of each artifact are on the device at any time.
+- **Excluded from backup**, like everything else.
 
 ### Personal dictionary
 
@@ -31,6 +40,7 @@ If you turn the **personal dictionary** on (it is **off** unless you turn it on)
 - **It never leaves your device**, and it is excluded from cloud backup and from the transfer to a new device — there is no export, no import and no sync, in this version or any planned one.
 - **Not everywhere.** Nothing is saved in **password fields or other private fields** — e-mail, URL, postal address, and any field that asks the keyboard not to show suggestions or not to personalize (an incognito tab, a banking app).
 - **How to see and erase it.** Keyboard settings → **“Saved words”**: every saved word of every language, with **“Delete”** on each one and **“Erase all saved words.”** Turning the personal dictionary off does **not** erase what was already saved — erase it here. Deleting the app, or clearing its data in the system settings, destroys everything saved, and no backup brings it back.
+- **If a saved-words file cannot be read, it is not destroyed.** The keyboard moves it aside into a quarantine copy (a `*.tpers.quarantine` file next to the dictionary), tells you once that the words could not be read, and keeps the copy on the device. On the **“Saved words”** screen a card appears for that language: **“Restore words”** puts back every word that survived (the card says how many, and warns if the tail of the copy is damaged beyond recovery); **“Delete copy”** removes the quarantine file. Nothing in it is ever uploaded anywhere.
 - **A limit worth knowing, on Android 7 only.** The standard signal an app uses to say "do not learn from this field" (`IME_FLAG_NO_PERSONALIZED_LEARNING`) exists from Android 8 onwards. On Android 7.0 and 7.1 no app sets it, so on those two versions the keyboard cannot tell such a field apart, and only the other gates above (password and private field types, postal addresses, the off-by-default switch itself) protect it. Every other guarantee on this page holds on all supported versions.
 - **The screen is not behind a separate password.** Anyone holding your unlocked phone can read the list of saved words. `FLAG_SECURE` keeps it out of screenshots and out of the recent-apps thumbnail, but it cannot keep out a person standing next to you. This is a deliberate trade-off, stated rather than left unsaid.
 
@@ -52,7 +62,16 @@ Tatar Keyboard хранит то, что вы печатаете, **на ваш�
 - **До разблокировки** устройства после перезагрузки этот список **не читается и не пополняется** — вкладки «Недавние» до разблокировки просто нет.
 - **Исключено из бэкапа.** Этот список лежит во внутренней «no‑backup» папке, которую Android **не** включает ни в облачную резервную копию, ни в перенос на новое устройство.
 - **Не везде.** Ничего не запоминается в **полях пароля и других приватных полях** — e‑mail, URL и любое поле, которое просит клавиатуру не показывать подсказки или не персонализироваться (например, вкладка браузера в режиме инкогнито или банковское приложение).
-- **Как стереть.** Откройте настройки клавиатуры и нажмите **«Очистить недавние эмодзи»**. Чтобы удалить вместе со всем остальным — удалите данные приложения в системных настройках; это заодно удалит распакованный словарь на **2 542 036 байт**, который приложение соберёт заново при следующем использовании.
+- **Как стереть.** Откройте настройки клавиатуры и нажмите **«Очистить недавние эмодзи»**. Чтобы удалить вместе со всем остальным — удалите данные приложения в системных настройках; это заодно удалит распакованные словари и таблицы предсказаний, которые приложение соберёт заново при следующем использовании.
+
+### Подсказки слов и эмодзи
+
+Словари подсказок, таблицы предсказания следующего слова и таблица «слово → эмодзи» **поставляются внутри приложения** и распаковываются во внутреннюю папку при первом использовании.
+
+- **Размер.** Два распакованных словаря (1 162 870 и 1 151 323 байта) и две таблицы предсказаний (134 664 и 131 662 байта) — около 2,6 МБ суммарно. Таблицы эмодзи добавляют несколько сотен КБ в упакованном виде и ничего о вас не хранят.
+- **Что они о вас записывают: ничего.** Подсказки, предсказания и эмодзи-подсказки — это чистые чтения из встроенных таблиц. Никакой истории, счётчиков, копий набранного. Эмодзи-подсказка в полосе читает только что завершённое слово, на устройстве, и исчезает из памяти вместе с ним. В полях паролей и других приватных полях не показываются ни подсказки слов, ни подсказки эмодзи.
+- **Две версии после обновления.** Когда новая версия приложения приносит новый словарь или таблицу, прежняя распакованная копия некоторое время лежит рядом с новой — чтобы обновление можно было откатить; старая версия удаляется при последующих запусках. Одновременно на устройстве не больше двух версий каждого артефакта.
+- **Исключены из бэкапа**, как и всё остальное.
 
 ### Личный словарь
 
@@ -63,6 +82,7 @@ Tatar Keyboard хранит то, что вы печатаете, **на ваш�
 - **Это никогда не покидает ваше устройство** и исключено из облачной резервной копии и переноса на новое устройство — ни экспорта, ни импорта, ни синхронизации нет ни в этой версии, ни в планах.
 - **Не везде.** Ничего не сохраняется в **полях пароля и других приватных полях** — e-mail, URL, почтовый адрес и любое поле, которое просит клавиатуру не показывать подсказки или не персонализироваться (вкладка инкогнито, банковское приложение).
 - **Как посмотреть и стереть.** Настройки клавиатуры → **«Сохранённые слова»**: все сохранённые слова всех языков, у каждого — **«Удалить»**, и отдельно **«Стереть все сохранённые слова»**. Выключение личного словаря **не** удаляет накопленное — стирать нужно здесь. Удаление приложения или «стереть данные» в системных настройках уничтожает всё накопленное безвозвратно, и восстановление из резервной копии его не вернёт.
+- **Если файл сохранённых слов не читается, он не уничтожается.** Клавиатура откладывает его в карантинную копию (файл `*.tpers.quarantine` рядом со словарём), один раз сообщает, что слова не удалось прочитать, и хранит копию на устройстве. На экране **«Сохранённые слова»** появляется карточка этого языка: кнопка **«Вернуть слова»** возвращает всё, что уцелело (карточка называет число слов и честно предупреждает, если конец копии повреждён безвозвратно); кнопка **«Удалить копию»** стирает карантинный файл. Ничего из него никуда не отправляется.
 - **Ограничение, о котором стоит знать, — только для Android 7.** Стандартный сигнал, которым приложение просит клавиатуру не запоминать набранное в поле (`IME_FLAG_NO_PERSONALIZED_LEARNING`), существует начиная с Android 8. На Android 7.0 и 7.1 его не выставляет ни одно приложение, поэтому на этих двух версиях клавиатура не может отличить такое поле, и его защищают только остальные перечисленные выше условия (поля пароля и другие приватные типы полей, почтовые адреса и сам выключенный по умолчанию тумблер). Все прочие гарантии этой страницы действуют на всех поддерживаемых версиях.
 - **Экран не защищён отдельным паролем.** Любой, у кого в руках ваш разблокированный телефон, увидит список сохранённых слов. `FLAG_SECURE` закрывает его от скриншота и от миниатюры «недавних приложений», но не от человека рядом. Это осознанный компромисс, и он назван, а не умолчан.
 
