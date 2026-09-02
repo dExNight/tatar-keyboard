@@ -308,18 +308,35 @@ class SuggestionStripSourceContractTest {
         // The live context word, re-extracted by the exact same algorithm the request was built
         // with — cache-boundary knowledge included (docs/NEXTWORD-RACE.md): the tap path and the
         // request path must agree on a first-word-of-field context, or the tap would be refused
-        // as stale — matching expectedContextWord.
+        // as stale — matching expectedContextWord. The knowledge is the connection's provenance
+        // flag (audit 2026-09-02, C6), NOT a length re-derivation, which local cache mutations
+        // (a cursor swipe re-slicing the window, a long backspace run) make lie.
         assertTrue(
             commitBody.contains(
-                "TatarWordUtils.extractNextWordContext(liveBeforeCursor,",
+                "TatarWordUtils.extractNextWordContext(mConnection.getCachedTextBeforeCursor(),",
             ),
         )
         assertTrue(
             commitBody.contains(
-                "liveBeforeCursor.length() < Constants.EDITOR_CONTENTS_CACHE_SIZE",
+                "mConnection.cacheReachedTextStart()",
             ),
         )
         assertTrue(commitBody.contains("expectedContextWord.equals(liveContext)"))
+    }
+
+    @Test
+    fun theCacheBoundaryKnowledgeIsProvenanceNotLengthInference() {
+        // Audit 2026-09-02, C6: after a local cache mutation (a setSelection re-slice, a
+        // deleteTextBeforeCursor truncation) the cache's length proves nothing about the text
+        // start, so the only place allowed to compare it against the window size is the reload
+        // seam inside RichInputConnection. The two consumers read the provenance flag.
+        for (file in listOf("latin/LatinIME.java", "latin/inputlogic/InputLogic.java")) {
+            val source = File(sourceRoot(), "java/rkr/simplekeyboard/inputmethod/$file").readText()
+            assertFalse(
+                "$file must read RichInputConnection.cacheReachedTextStart(), not the length",
+                source.contains("EDITOR_CONTENTS_CACHE_SIZE"),
+            )
+        }
     }
 
     @Test

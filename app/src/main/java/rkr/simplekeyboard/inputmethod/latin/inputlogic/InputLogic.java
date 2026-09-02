@@ -687,11 +687,11 @@ public final class InputLogic {
         }
         // The same extraction the request was built with, cache-boundary knowledge included
         // (docs/NEXTWORD-RACE.md): a tap on a first-word-of-field prediction must re-derive the
-        // same context the controller saw, or it would be refused as stale.
-        final CharSequence liveBeforeCursor = mConnection.getCachedTextBeforeCursor();
+        // same context the controller saw, or it would be refused as stale. The knowledge is the
+        // connection's provenance flag (audit 2026-09-02, C6), never a length re-derivation.
         final String liveContext =
-                TatarWordUtils.extractNextWordContext(liveBeforeCursor,
-                        liveBeforeCursor.length() < Constants.EDITOR_CONTENTS_CACHE_SIZE);
+                TatarWordUtils.extractNextWordContext(mConnection.getCachedTextBeforeCursor(),
+                        mConnection.cacheReachedTextStart());
         if (!expectedContextWord.equals(liveContext)) {
             // Stale tap: the context word no longer matches. Do not edit.
             return false;

@@ -75,6 +75,28 @@ public final class RichInputConnection {
     private String mTextAfterCursor = "";
     private String mTextSelection = "";
 
+    /**
+     * Audit 2026-09-02, C6: whether the before-cursor cache PROVABLY starts at the very start of
+     * the editor's text. {@link #getCachedTextBeforeCursor} alone cannot say: the D1 fix
+     * (docs/NEXTWORD-RACE.md) inferred it from the length — a full reload asks for exactly
+     * {@link Constants#EDITOR_CONTENTS_CACHE_SIZE} chars, so a shorter answer reached the start —
+     * but that inference breaks the moment a LOCAL mutation changes the length: a cursor swipe
+     * re-slices the cached window to a few chars ({@link #setSelection}), a long backspace run
+     * truncates it ({@link #deleteTextBeforeCursor}), and both leave a short cache that does NOT
+     * start at the text start. A truncated word at index 0 would then be accepted as a whole
+     * NEXT_WORD context.
+     *
+     * So this flag carries the knowledge from the one place that actually has it: the full
+     * re-read, written only by {@link #onBeforeCursorCacheReloaded} (and cleared by
+     * {@link #clearCaches}). Every local mutation PRESERVES it on purpose — they all move only the
+     * CURSOR-side edge of the cached window (append/truncate at the cursor, re-slice inside the
+     * window), so the window's start edge, the very thing the flag describes, is untouched by
+     * them. Clearing it on a mutation would be wrong in both directions: it would un-prove the
+     * empty field the user is typing their first word into (commitText), and it would re-"prove"
+     * nothing.
+     */
+    private boolean mCacheReachedTextStart = false;
+
     private final LatinIME mLatinIME;
     private InputConnection mIC;
     private int mNestLevel;
@@ -118,15 +140,30 @@ public final class RichInputConnection {
     private void setTextAroundCursor(final SurroundingText textAroundCursor) {
         if (null == textAroundCursor) {
             Log.e(TAG, "Unable get text around cursor.");
-            mTextBeforeCursor = "";
+            onBeforeCursorCacheReloaded("");
             mTextAfterCursor = "";
             mTextSelection = "";
             return;
         }
         final CharSequence text = textAroundCursor.getText();
-        mTextBeforeCursor = text.subSequence(0, textAroundCursor.getSelectionStart()).toString();
+        onBeforeCursorCacheReloaded(text.subSequence(0, textAroundCursor.getSelectionStart()).toString());
         mTextSelection = text.subSequence(textAroundCursor.getSelectionStart(), textAroundCursor.getSelectionEnd()).toString();
         mTextAfterCursor = text.subSequence(textAroundCursor.getSelectionEnd(), text.length()).toString();
+    }
+
+    /**
+     * The single writer of the before-cursor cache together with its provenance (C6): called on
+     * every FULL re-read of the cache — from {@link #setTextAroundCursor} and from the pre-S
+     * branch of {@link #reloadTextCache()} — and never from a local mutation, which is the whole
+     * invariant (see the field). Package-private so the JVM tests can drive the same bookkeeping
+     * the Android reload paths run; the window-size rule itself lives here, exactly once.
+     */
+    void onBeforeCursorCacheReloaded(final String textBeforeCursor) {
+        mTextBeforeCursor = textBeforeCursor;
+        // The reload asks for exactly EDITOR_CONTENTS_CACHE_SIZE chars before the cursor, so a
+        // shorter answer provably reached the start of the text; an answer of exactly the window
+        // size may or may not have — fail closed.
+        mCacheReachedTextStart = textBeforeCursor.length() < Constants.EDITOR_CONTENTS_CACHE_SIZE;
     }
 
     /**
@@ -189,10 +226,10 @@ public final class RichInputConnection {
                 }
                 if (null == textBeforeCursor) {
                     Log.e(TAG, "Unable get text before cursor.");
-                    mTextBeforeCursor = "";
+                    onBeforeCursorCacheReloaded("");
                     return;
                 } else {
-                    mTextBeforeCursor = textBeforeCursor.toString();
+                    onBeforeCursorCacheReloaded(textBeforeCursor.toString());
                 }
 
                 // All callbacks that need text before cursor are here
@@ -241,6 +278,8 @@ public final class RichInputConnection {
         mTextBeforeCursor = "";
         mTextSelection = "";
         mTextAfterCursor = "";
+        // No cache at all proves nothing about the text start (C6).
+        mCacheReachedTextStart = false;
     }
 
     /**
@@ -311,6 +350,16 @@ public final class RichInputConnection {
     public CharSequence getCachedTextBeforeCursor() {
         // Never initiates IPC; reads only the local cache. Do not log the returned value.
         return mTextBeforeCursor == null ? "" : mTextBeforeCursor;
+    }
+
+    /**
+     * Whether the before-cursor cache provably starts at the very start of the editor's text —
+     * the knowledge a full reload had when it filled the cache (C6, see the field). Reads no
+     * editor state and never initiates IPC, exactly like {@link #getCachedTextBeforeCursor}; the
+     * two are meant to be consumed together.
+     */
+    public boolean cacheReachedTextStart() {
+        return mCacheReachedTextStart;
     }
 
     /**
