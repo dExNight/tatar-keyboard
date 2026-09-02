@@ -22,6 +22,15 @@ check-no-internet оба уровня на свежем release APK, assembleRel
 анимации подъёма клавиатуры могут попадать в соседнюю клавишу (калибровка
 живой, не двигалась).*
 
+*Поправка 2026-09-02 (миссия B3): baseline-профиль регенерирован под
+эмодзи-подсказки и фиксы CODE-FIX — CUJ коммитит 👋-ячейку полосы после
+«сәлам » (`3ab373ae`), правил 2638 → 2708 (`170c7f2e`); покрыты
+EmojiSuggestIndex, onEmojiSuggestReady, onBigramAttached, двухаргументный
+extractNextWordContext, cacheReachedTextStart, SharedEmojiSearchIndex.
+Воспроизводимость: два release_pack.sh → один SHA-256. Гейты зелёные
+(JVM 1085, python 348, lint, check-no-internet, smoke 18/15). Версия не
+бампалась.*
+
 **Состояние на 2026-09-01.** Миссия NEXTWORD-RACE доехала до релиза. Собран и
 проаудирован **1.9.11 / versionCode 27**: `dist/tatar-keyboard-1.9.11.apk`,
 **1 792 011 Б**, SHA-256
