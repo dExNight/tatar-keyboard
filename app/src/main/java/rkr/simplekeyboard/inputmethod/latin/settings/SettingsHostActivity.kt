@@ -51,6 +51,7 @@ import rkr.simplekeyboard.inputmethod.latin.common.LocaleUtils
 import rkr.simplekeyboard.inputmethod.latin.dictionary.personal.PersonalSubtypes
 import rkr.simplekeyboard.inputmethod.latin.dictionary.personalstore.PersonalQuarantineReport
 import rkr.simplekeyboard.inputmethod.latin.emoji.EmojiPanelController
+import rkr.simplekeyboard.inputmethod.latin.utils.DialogUtils
 import rkr.simplekeyboard.inputmethod.latin.utils.LocaleResourceUtils
 import rkr.simplekeyboard.inputmethod.latin.utils.SubtypeLocaleUtils
 
@@ -593,7 +594,11 @@ class SettingsHostActivity : Activity() {
                     }
                 }
                 .setNegativeButton(android.R.string.cancel, null)
-                .show()
+                .create()
+                .also { dialog ->
+                    DialogUtils.filterObscuredTouches(dialog)
+                    dialog.show()
+                }
     }
 
     /** Subtypes whose words the screen shows: every enabled one, in the order the system lists them. */
@@ -644,7 +649,11 @@ class SettingsHostActivity : Activity() {
                     }
                 }
                 .setNegativeButton(android.R.string.cancel, null)
-                .show()
+                .create()
+                .also { dialog ->
+                    DialogUtils.filterObscuredTouches(dialog)
+                    dialog.show()
+                }
     }
 
     private fun showForgetPersonalWordDialog(
@@ -659,7 +668,11 @@ class SettingsHostActivity : Activity() {
                     }
                 }
                 .setNegativeButton(android.R.string.cancel, null)
-                .show()
+                .create()
+                .also { dialog ->
+                    DialogUtils.filterObscuredTouches(dialog)
+                    dialog.show()
+                }
     }
 
     private fun showErasePersonalDictionaryDialog(
@@ -678,7 +691,11 @@ class SettingsHostActivity : Activity() {
                     }
                 }
                 .setNegativeButton(android.R.string.cancel, null)
-                .show()
+                .create()
+                .also { dialog ->
+                    DialogUtils.filterObscuredTouches(dialog)
+                    dialog.show()
+                }
     }
 
     /**
@@ -886,6 +903,7 @@ class SettingsHostActivity : Activity() {
                 }
                 .setNegativeButton(android.R.string.cancel, null)
                 .create()
+        DialogUtils.filterObscuredTouches(dialog)
         dialog.show()
         // Disable the positive button since nothing is checked by default.
         dialog.getButton(AlertDialog.BUTTON_POSITIVE).isEnabled = false
@@ -913,6 +931,7 @@ class SettingsHostActivity : Activity() {
                 }
                 .setNegativeButton(android.R.string.cancel, null)
                 .create()
+        DialogUtils.filterObscuredTouches(dialog)
         dialog.show()
         currentDialog = dialog
     }

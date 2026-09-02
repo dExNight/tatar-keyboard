@@ -1101,6 +1101,9 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         lp.type = WindowManager.LayoutParams.TYPE_APPLICATION_ATTACHED_DIALOG;
         window.setAttributes(lp);
         window.addFlags(WindowManager.LayoutParams.FLAG_ALT_FOCUSABLE_IM);
+        // Audit 2026-09-02, C5: these dialogs float over OTHER apps' windows, so they must not
+        // accept a touch delivered while something obscures them.
+        DialogUtils.filterObscuredTouches(dialog);
     }
 
     /**

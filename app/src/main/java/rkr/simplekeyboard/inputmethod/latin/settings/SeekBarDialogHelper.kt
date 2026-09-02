@@ -21,6 +21,7 @@ import android.app.AlertDialog
 import android.widget.SeekBar
 import android.widget.TextView
 import rkr.simplekeyboard.inputmethod.R
+import rkr.simplekeyboard.inputmethod.latin.utils.DialogUtils
 
 /**
  * Seek-bar value dialog for the View-based settings screens: the dialog
@@ -77,7 +78,7 @@ object SeekBarDialogHelper {
         valueView.text = proxy.getValueText(value)
         seekBar.progress = clipValue(value) - minValue
 
-        return AlertDialog.Builder(activity)
+        val dialog = AlertDialog.Builder(activity)
             .setTitle(title)
             .setView(view)
             .setPositiveButton(android.R.string.ok) { _, _ ->
@@ -89,6 +90,12 @@ object SeekBarDialogHelper {
                 proxy.writeDefaultValue(key)
                 onValueChanged()
             }
-            .show()
+            .create()
+        // Same rule as the rest of the app's dialogs (audit 2026-09-02, C5): the layout's own
+        // rows already carry android:filterTouchesWhenObscured, the window's decor view covers
+        // the platform's button panel.
+        DialogUtils.filterObscuredTouches(dialog)
+        dialog.show()
+        return dialog
     }
 }
