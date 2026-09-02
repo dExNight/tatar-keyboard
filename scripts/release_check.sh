@@ -305,6 +305,8 @@ fi
 # Эмодзи-ассеты — открытый текст (без zlib-обёртки), поэтому их пин — сам файл в
 # дереве: содержимое APK обязано быть побайтно тем, что закоммичено (до 2026-09-01
 # они покрывались только python/JVM-тестами, но не этим гейтом).
+# С 2026-09-02 (C2 аудита) сверяется МНОЖЕСТВО файлов, а не зашитый список:
+# новый файл в дереве без APK (или наоборот) — тоже FAIL, fail-open закрыт.
 
 EMOJI_LOG="$LOG_DIR/emoji-assets.log"
 if python3 - "$APK" >"$EMOJI_LOG" 2>&1 <<'PYEOF'
@@ -314,34 +316,35 @@ import zipfile
 from pathlib import Path
 
 apk_path = sys.argv[1]
-ASSETS = ["emoji_set_v1.txt", "emoji_search_v1.txt",
-          "emoji_skin_v1.txt", "emoji_suggest_v1.txt", "NOTICE.txt"]
+TREE_DIR = Path("app/src/main/assets/emoji")
 
 problems = []
+tree = {p.relative_to(TREE_DIR).as_posix(): p for p in TREE_DIR.rglob("*") if p.is_file()}
 with zipfile.ZipFile(apk_path) as apk:
-    for name in ASSETS:
-        repo = Path(f"app/src/main/assets/emoji/{name}")
-        if not repo.is_file():
-            problems.append(f"{name}: нет файла в дереве")
-            continue
-        try:
-            in_apk = apk.read(f"assets/emoji/{name}")
-        except KeyError:
-            problems.append(f"{name}: нет в APK")
-            continue
-        want = repo.read_bytes()
-        if in_apk != want:
+    in_apk = {name.removeprefix("assets/emoji/")
+              for name in apk.namelist()
+              if name.startswith("assets/emoji/") and not name.endswith("/")}
+
+    for name in sorted(set(tree) - in_apk):
+        problems.append(f"{name}: есть в дереве, нет в APK")
+    for name in sorted(in_apk - set(tree)):
+        problems.append(f"{name}: есть в APK, нет в дереве")
+    for name in sorted(set(tree) & in_apk):
+        want = tree[name].read_bytes()
+        got = apk.read(f"assets/emoji/{name}")
+        if got != want:
             problems.append(
                 f"{name}: расходится с деревом "
                 f"(дерево {hashlib.sha256(want).hexdigest()[:16]}…, "
-                f"APK {hashlib.sha256(in_apk).hexdigest()[:16]}…)")
+                f"APK {hashlib.sha256(got).hexdigest()[:16]}…)")
         else:
             print(f"OK {name} ({len(want)} Б, побайтно дерево)")
+
 for p in problems:
     print(f"MISMATCH {p}")
 if problems:
     sys.exit(1)
-print(f"TOTAL {len(ASSETS)} эмодзи-ассетов совпали с деревом")
+print(f"TOTAL {len(tree)} эмодзи-ассетов совпали с деревом (множество и содержимое)")
 PYEOF
 then
     report PASS artifact.emoji_assets "$(tail -1 "$EMOJI_LOG")"
