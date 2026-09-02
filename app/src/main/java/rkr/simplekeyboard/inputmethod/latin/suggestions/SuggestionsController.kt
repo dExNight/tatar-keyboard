@@ -499,6 +499,14 @@ class SuggestionsController internal constructor(
     private var pendingContextWord: String = ""
     private var displayedContextWord: String? = null
 
+    // Audit 2026-09-02, B4: whether the band the ACTIVE language painted for [pendingContextWord]
+    // holds at least one WORD cell of that language. This is NOT "the band is occupied": an
+    // emoji-only band and a band the companion language filled both leave it false, and both still
+    // deserve the re-request a finished bigram attach exists to issue ([onBigramAttached]). Written
+    // only where the NEXT_WORD band is (re)bound: a fresh request clears it for the new moment, and
+    // [applyNextWordResult] sets it from the answer it actually painted.
+    private var bandHasActiveLanguageWord: Boolean = false
+
     // --- Правило приоритета языков (docs/LANG-PRIORITY.md). The layout the user chose with their
     // own hand owns the band; the other language may only fill the cells that language left empty,
     // and only from the end.
@@ -624,6 +632,7 @@ class SuggestionsController internal constructor(
         sessionId++
         displayedPrefix = null
         displayedContextWord = null
+        bandHasActiveLanguageWord = false
         bandBaseCells = emptyList()
         clearCompanionRequest()
         setActiveLanguage(subtypeId)
@@ -1117,23 +1126,63 @@ class SuggestionsController internal constructor(
      * engine a scheduled release has since made unusable, or to a controller that is gone; and the
      * live editor state must still be the exact NEXT_WORD moment the outstanding request was
      * built for — re-derived through [EditorSurface] exactly like the tap path re-derives it, so
-     * an attach that finished after the user typed on changes nothing. A band that already shows
-     * predictions (the request was answered late-but-correctly, or the companion language filled
-     * it) needs nothing. The re-issued request of a context the table genuinely does not answer
-     * comes back empty and the reserved band stays empty: legitimate silence is preserved, only
-     * the "never asked again" kind is repaired.
+     * an attach that finished after the user typed on changes nothing.
+     *
+     * The last guard is about WHAT the band shows, not THAT it shows something (audit 2026-09-02,
+     * B4): an emoji-only band and a band the companion language filled both bind
+     * [displayedContextWord] without a single word of the ACTIVE language on them, and both still
+     * deserve the re-request — the attach is exactly what could turn their "no answer yet" into
+     * words. Only a band that already holds an active-language word cell is left alone: the
+     * request was answered late-but-correctly and needs nothing. The re-issued request of a
+     * context the table genuinely does not answer comes back empty and the reserved band stays
+     * empty: legitimate silence is preserved, only the "never asked again" kind is repaired.
+     *
+     * An attach of a NON-active slot takes [onCompanionBigramAttached]: the companion language
+     * races its own table the same way (docs/LANG-PRIORITY.md).
      */
     private fun onBigramAttached(slot: LanguageSlot, handle: EngineHandle) {
         if (destroyed || !eligible) return
-        if (slot !== activeSlot()) return
+        if (slot !== activeSlot()) {
+            onCompanionBigramAttached(slot, handle)
+            return
+        }
         if (usableEngine() !== handle) return
         if (requestSessionId != sessionId) return
         if (!editor.hasKnownCursor() || editor.hasLetterAfterCursor()) return
         if (editor.cachedWordBeforeCursor().isNotEmpty()) return
         val context = editor.cachedNextWordContext()
         if (context.isEmpty() || context != pendingContextWord) return
-        if (displayedContextWord != null) return
+        if (bandHasActiveLanguageWord) return
         requestCurrentPrefix()
+    }
+
+    /**
+     * The bigram table of the COMPANION language finished attaching (audit 2026-09-02, B4). A
+     * companion NEXT_WORD lookup issued while its table was still attaching answered empty exactly
+     * like the active language's did, and nothing would ask again — so the tail cells stayed empty
+     * until the next keystroke. The guards mirror the active path's (same session, same live
+     * NEXT_WORD moment, the attach must belong to the engine the slot still holds), plus the one
+     * the fill rule itself lives by: there must be a cell left to fill. A moment whose active
+     * request is still in flight may see one companion lookup too many — the active answer, when
+     * it lands, re-issues the fill anyway ([applyNextWordResult]), so the band always ends in the
+     * state the fill rule prescribes.
+     */
+    private fun onCompanionBigramAttached(slot: LanguageSlot, handle: EngineHandle) {
+        if (slot.releasePending) return
+        if (slot.engine !== handle) return
+        if (requestSessionId != sessionId) return
+        if (!editor.hasKnownCursor() || editor.hasLetterAfterCursor()) return
+        if (editor.cachedWordBeforeCursor().isNotEmpty()) return
+        val context = editor.cachedNextWordContext()
+        if (context.isEmpty() || context != pendingContextWord) return
+        // The room rule of [applyCompanionResult]: word cells stay put, the pinned emoji tail is
+        // not a cell the companion may take.
+        val base = bandBaseCells
+        val emojiTail = if (base.isNotEmpty() && isEmojiCell(base.last())) base.last() else null
+        val room = SuggestionStripState.CELL_COUNT - (if (emojiTail != null) 1 else 0)
+        val wordBase = if (emojiTail != null) base.dropLast(1) else base
+        if (wordBase.size >= room) return
+        requestCompanionFill(LookupKind.NEXT_WORD, context)
     }
 
     /**
@@ -1647,6 +1696,9 @@ class SuggestionsController internal constructor(
         }
         clearCompanionRequest()
         pendingContextWord = context
+        // A new NEXT_WORD moment begins: whatever the band painted for the previous one says
+        // nothing about this one (audit B4).
+        bandHasActiveLanguageWord = false
         requestSessionId = sessionId
         val contextBytes = TatarWordUtils.toLookupBytes(TatarWordUtils.normalizeForLookup(context))
         val token = activeEngine.requestNextWord(sessionId, activeLanguage ?: return, contextBytes)
@@ -1840,6 +1892,10 @@ class SuggestionsController internal constructor(
         // is byte-for-byte what it was before this feature existed.
         val emoji = emojiCandidate(pendingContextWord)
         if (suggestions.isEmpty()) {
+            // The active language put no WORD on the band either way (audit B4): a later bigram
+            // attach may still re-ask this context — the emoji cell and any companion fill must
+            // not read as "the active language already answered with words".
+            bandHasActiveLanguageWord = false
             if (emoji == null) {
                 displayedContextWord = null
                 bandBaseCells = emptyList()
@@ -1854,6 +1910,7 @@ class SuggestionsController internal constructor(
         }
         displayedContextWord = pendingContextWord
         displayedSessionId = sessionId
+        bandHasActiveLanguageWord = true
         val wordCap = if (emoji == null) {
             SuggestionStripState.CELL_COUNT
         } else {

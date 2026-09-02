@@ -5,9 +5,17 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import rkr.simplekeyboard.inputmethod.latin.dictionary.engine.LookupKind
+import rkr.simplekeyboard.inputmethod.latin.dictionary.personal.PersonalSubtypes
 import rkr.simplekeyboard.inputmethod.latin.dictionary.storage.BigramPreparationResult
+import rkr.simplekeyboard.inputmethod.latin.dictionary.storage.DictionaryFileLease
+import rkr.simplekeyboard.inputmethod.latin.dictionary.storage.PreparationResult
 import rkr.simplekeyboard.inputmethod.latin.dictionary.storage.PublishedBigramTableCatalog
+import rkr.simplekeyboard.inputmethod.latin.dictionary.storage.PublishedDictionary
+import rkr.simplekeyboard.inputmethod.latin.dictionary.storage.PublishedDictionaryCatalog
 import rkr.simplekeyboard.inputmethod.latin.dictionary.storage.StorageFailure
+import rkr.simplekeyboard.inputmethod.latin.emoji.EmojiSuggestPreparation
+import rkr.simplekeyboard.inputmethod.latin.emoji.EmojiSuggestSource
+import java.io.File
 import java.util.concurrent.AbstractExecutorService
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.TimeUnit
@@ -67,8 +75,18 @@ class SuggestionsControllerBigramAttachTest {
         /** The result callback the controller handed to the engine factory. */
         var callback: ResultCallback? = null
 
-        /** What the next NEXT_WORD request answers; delivered synchronously, like a warm table. */
+        /** The result the next NEXT_WORD request answers. */
         var nextWordAnswer: List<String> = emptyList()
+
+        /**
+         * True (the default) = the answer is delivered synchronously inside the request, like a
+         * warm table — the controller must digest that too. False = the test delivers by hand via
+         * [deliverNextWord], which is the only way to model a COMPANION answer: the companion's
+         * bookkeeping is written after the request returns, so a synchronous companion answer would
+         * be dropped as not-yet-expected — an artifact of the fake, not of the controller.
+         */
+        var synchronousAnswers: Boolean = true
+        private var lastToken: Any? = null
         val requestedContexts = mutableListOf<ByteArray>()
 
         override fun request(editorSessionId: Long, subtypeId: String, prefixUtf8: ByteArray): Any? {
@@ -80,11 +98,17 @@ class SuggestionsControllerBigramAttachTest {
             events += "requestNextWord"
             requestedContexts += contextWordUtf8
             val token = Any()
+            lastToken = token
             // The real engine answering instantly (table attached — or not attached yet, which is
             // exactly the same empty list from the controller's side): the controller must digest
             // a synchronous delivery too.
-            callback?.onResult(token, nextWordAnswer, LookupKind.NEXT_WORD)
+            if (synchronousAnswers) callback?.onResult(token, nextWordAnswer, LookupKind.NEXT_WORD)
             return token
+        }
+
+        /** The engine's answer to its newest NEXT_WORD request, delivered when the test says so. */
+        fun deliverNextWord(suggestions: List<String>) {
+            callback?.onResult(requireNotNull(lastToken), suggestions, LookupKind.NEXT_WORD)
         }
 
         override fun attachBigramSource(catalog: PublishedBigramTableCatalog): Boolean {
@@ -150,11 +174,53 @@ class SuggestionsControllerBigramAttachTest {
         override fun catalog(): PublishedBigramTableCatalog = catalog
     }
 
+    /** The second language needs its own dictionary readiness; this publishes instantly. */
+    private class FakeDictionaryPreparation : DictionaryPreparation {
+        private val catalog = object : PublishedDictionaryCatalog {
+            override fun acquireLatestForActivation(): DictionaryFileLease? = null
+            override fun cleanupReleasedVersions() {}
+        }
+
+        override fun prepare(onResult: (PreparationResult) -> Unit) {
+            onResult(
+                PreparationResult.Published(
+                    PublishedDictionary(
+                        generation = 1,
+                        file = File("/dev/null"),
+                        rawSize = 72,
+                        entryCount = 1,
+                        schemaId = 1,
+                        formatVersion = 1,
+                        rawSha256 = "0".repeat(64),
+                    ),
+                    alreadyPresent = true,
+                ),
+            )
+        }
+
+        override fun catalog(): PublishedDictionaryCatalog = catalog
+    }
+
+    /** A one-mapping emoji table, published the moment it is asked for (a warm emoji source). */
+    private class FakeEmojiPreparation(
+        private val table: Map<String, String>,
+    ) : EmojiSuggestPreparation {
+        override fun prepare(onResult: (EmojiSuggestSource?) -> Unit) {
+            onResult(object : EmojiSuggestSource {
+                override fun emojiFor(language: String, normalizedWord: String): String? =
+                    table[normalizedWord]
+
+                override fun spokenNameOf(emoji: String): String? = null
+            })
+        }
+    }
+
     private fun controller(
         strip: FakeStrip,
         editor: FakeEditor,
         engine: FakeEngine,
         executor: ExecutorService,
+        emojiPreparation: EmojiSuggestPreparation? = null,
         bigramPreparationFactory: (ExecutorService) -> BigramPreparation?,
     ) = SuggestionsController(
         strip,
@@ -165,6 +231,7 @@ class SuggestionsControllerBigramAttachTest {
         { _, _ -> null },
         true,
         { backgroundExecutor, _ -> bigramPreparationFactory(backgroundExecutor) },
+        { emojiPreparation },
     )
 
     @Test
@@ -295,6 +362,154 @@ class SuggestionsControllerBigramAttachTest {
 
         assertEquals(listOf("request", "attachBigramSource"), engine.events)
         assertTrue(engine.requestedContexts.isEmpty())
+    }
+
+    // --- Audit 2026-09-02, B4: the re-request guard asks "did the ACTIVE language put a WORD on
+    // the band", not "is the band occupied" ---------------------------------------------------------
+
+    @Test
+    fun emojiOnlyBandDoesNotBlockTheAttachReRequest() {
+        val strip = FakeStrip()
+        val editor = FakeEditor()
+        val engine = FakeEngine()
+        val bigramTable = PendingBigramPreparation()
+        val controller = controller(
+            strip, editor, engine, DirectExecutorService(),
+            emojiPreparation = FakeEmojiPreparation(mapOf("мин" to "🙂")),
+        ) { bigramTable }
+        controller.setEmojiSuggestGate { true }
+
+        controller.onStartInput(eligible = true)
+        // The NEXT_WORD request raced the attach and answered empty; the emoji table has a mapping
+        // for the context word, so the band it painted is an emoji-ONLY band — no word cell of the
+        // active language on it.
+        editor.context = "мин"
+        controller.onTextChanged()
+
+        assertEquals(1, engine.requestedContexts.size)
+        assertEquals(Triple("🙂", null, null), strip.shown.last())
+
+        // The table attached; the same context has a real answer now. The emoji cell must not read
+        // as "the band is filled": the re-request runs, and the words take their front cells with
+        // the emoji still pinned to the tail.
+        engine.nextWordAnswer = listOf("дә", "үзем")
+        bigramTable.completeWith(BigramPreparationResult.Published(fakeTable(), alreadyPresent = false))
+
+        assertEquals(2, engine.requestedContexts.size)
+        assertEquals(Triple("дә", "үзем", "🙂"), strip.shown.last())
+    }
+
+    @Test
+    fun wordBandDoesNotGetReRequestedAfterAttach() {
+        val strip = FakeStrip()
+        val editor = FakeEditor()
+        val engine = FakeEngine().apply { nextWordAnswer = listOf("дә", "үзем", "бу") }
+        val bigramTable = PendingBigramPreparation()
+        val controller = controller(strip, editor, engine, DirectExecutorService()) { bigramTable }
+
+        controller.onStartInput(eligible = true)
+        // The request went to an engine whose table was... already warm in effect: the answer came
+        // back with words BEFORE the attach completed. The band shows active-language words, so the
+        // attach repairs nothing — re-asking would only repaint what is already correct.
+        editor.context = "мин"
+        controller.onTextChanged()
+
+        assertEquals(1, engine.requestedContexts.size)
+        assertEquals(Triple("дә", "үзем", "бу"), strip.shown.last())
+
+        bigramTable.completeWith(BigramPreparationResult.Published(fakeTable(), alreadyPresent = false))
+
+        assertEquals(1, engine.requestedContexts.size)
+        assertEquals(Triple("дә", "үзем", "бу"), strip.shown.last())
+    }
+
+    /** Two warm languages, one bigram preparation each, resolved by the test on demand. */
+    private class TwoLanguageHarness {
+        val strip = FakeStrip()
+        val editor = FakeEditor()
+        val executor = DirectExecutorService()
+        val engines = LinkedHashMap<String, FakeEngine>()
+        val bigramTables = LinkedHashMap<String, PendingBigramPreparation>()
+
+        val controller = SuggestionsController(
+            strip,
+            editor,
+            UiPoster { it.run() },
+            { subtypeId, callback ->
+                engines.getOrPut(subtypeId) { FakeEngine().also { it.callback = callback } }
+            },
+            { executor },
+            { _: ExecutorService, _: String -> FakeDictionaryPreparation() },
+            false,
+            { _: ExecutorService, subtypeId: String ->
+                bigramTables.getOrPut(subtypeId) { PendingBigramPreparation() }
+            },
+        )
+
+        fun engine(subtypeId: String): FakeEngine = engines.getValue(subtypeId)
+        fun bigramTable(subtypeId: String): PendingBigramPreparation = bigramTables.getValue(subtypeId)
+
+        /** Brings both languages' engines up, leaving Tatar active in an empty field. */
+        fun warmBoth() {
+            controller.onStartInput(eligible = true, subtypeId = PersonalSubtypes.TATAR_RU)
+            controller.onSubtypeChanged(eligible = true, subtypeId = PersonalSubtypes.RUSSIAN)
+            controller.onSubtypeChanged(eligible = true, subtypeId = PersonalSubtypes.TATAR_RU)
+            strip.shown.clear()
+        }
+    }
+
+    @Test
+    fun companionAttachReRequestsTheCompanionFill() {
+        val h = TwoLanguageHarness()
+        h.warmBoth()
+        // The companion answers when the TEST says so — its bookkeeping is written after the
+        // request returns, so a synchronous fake answer would be dropped as not-yet-expected.
+        h.engine(PersonalSubtypes.RUSSIAN).synchronousAnswers = false
+        // The ACTIVE table is attached before the moment begins: its empty answer below is a
+        // legitimate "no prediction for this context", not a race.
+        h.bigramTable(PersonalSubtypes.TATAR_RU)
+            .completeWith(BigramPreparationResult.Published(fakeTable(), alreadyPresent = false))
+
+        // NEXT_WORD moment: the active language answers empty, the companion is asked to fill the
+        // band — but ITS table is still attaching, so its answer is the race's empty list.
+        h.editor.context = "мин"
+        h.controller.onTextChanged()
+        h.engine(PersonalSubtypes.RUSSIAN).deliverNextWord(emptyList())
+
+        assertEquals(1, h.engine(PersonalSubtypes.RUSSIAN).requestedContexts.size)
+        assertTrue(h.strip.shown.isEmpty())
+
+        // The companion table attached: the band still has no word of either language, so the
+        // companion fill is re-asked and the words arrive without another keystroke.
+        h.bigramTable(PersonalSubtypes.RUSSIAN)
+            .completeWith(BigramPreparationResult.Published(fakeTable(), alreadyPresent = false))
+
+        assertEquals(2, h.engine(PersonalSubtypes.RUSSIAN).requestedContexts.size)
+        h.engine(PersonalSubtypes.RUSSIAN).deliverNextWord(listOf("слово", "дело"))
+        assertEquals(Triple("слово", "дело", null), h.strip.shown.last())
+    }
+
+    @Test
+    fun companionAttachOnAFullBandRequestsNothing() {
+        val h = TwoLanguageHarness()
+        h.warmBoth()
+        h.bigramTable(PersonalSubtypes.TATAR_RU)
+            .completeWith(BigramPreparationResult.Published(fakeTable(), alreadyPresent = false))
+
+        // The active language fills all three cells: the companion is never even asked, and its
+        // attach completing later must not change that.
+        h.engine(PersonalSubtypes.TATAR_RU).nextWordAnswer = listOf("дә", "үзем", "бу")
+        h.editor.context = "мин"
+        h.controller.onTextChanged()
+
+        assertTrue(h.engine(PersonalSubtypes.RUSSIAN).requestedContexts.isEmpty())
+        assertEquals(Triple("дә", "үзем", "бу"), h.strip.shown.last())
+
+        h.bigramTable(PersonalSubtypes.RUSSIAN)
+            .completeWith(BigramPreparationResult.Published(fakeTable(), alreadyPresent = false))
+
+        assertTrue(h.engine(PersonalSubtypes.RUSSIAN).requestedContexts.isEmpty())
+        assertEquals(Triple("дә", "үзем", "бу"), h.strip.shown.last())
     }
 
     private fun fakeTable() = rkr.simplekeyboard.inputmethod.latin.dictionary.storage.PublishedBigramTable(
