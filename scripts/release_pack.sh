@@ -121,9 +121,12 @@ fi
 # --- 4. подпись (v2-only — как у AGP-сборки линейки с 2026-08-18) ------------------------------
 
 echo "== 4/5 apksigner sign =="
+# Пароли — через env:-форму, а не pass: в argv: командная строка процесса видна
+# любому пользователю хоста через ps (C1 аудита 2026-09-02), окружение — нет.
+KS_STORE_PASS="$KS_STORE_PASS" KS_KEY_PASS="$KS_KEY_PASS" \
 "$APKSIGNER" sign \
     --ks "$KS_FILE" --ks-key-alias "$KS_ALIAS" \
-    --ks-pass "pass:$KS_STORE_PASS" --key-pass "pass:$KS_KEY_PASS" \
+    --ks-pass env:KS_STORE_PASS --key-pass env:KS_KEY_PASS \
     --v1-signing-enabled false --v2-signing-enabled true --v3-signing-enabled false \
     --out "$OUT" "$ALIGNED"
 
