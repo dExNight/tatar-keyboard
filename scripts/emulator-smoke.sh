@@ -36,6 +36,16 @@
 # default_input_method — поэтому ime set идёт строго ПОСЛЕ force-stop
 # (та же грабля, что в фазе 4б реструктуризации).
 #
+# Деструктивность записи префов (C4 аудита 2026-09-02): правка идёт через run-as
+# прямо в shared_prefs пакета, МИМО API SharedPreferences. До 2026-09-02 файл
+# затирался ЦЕЛИКОМ заготовкой из двух ключей — все прочие настройки приложения
+# на этом AVD терялись безвозвратно. Теперь правка точечная (меняются или
+# добавляются только pref_tatar_suggestions и pref_tatar_suggestions_offer_spent,
+# остальные ключи сохраняются), но это всё равно запись в обход API: живой
+# процесс файл с диска не перечитывает (поэтому дальше force-stop), а гонку
+# с одновременной записью самого приложения ничто не страхует. Запускать на
+# выделенных тестовых AVD, а не на эмуляторе с настроенным состоянием.
+#
 # Координаты клавиш — доли экрана, откалиброваны на tt_suggest_a14 (1080×2280),
 # как KeyGeom в baselineprofile/ImeBaselineProfileGenerator.java; на AVD с
 # другим размером сценарий набора не пройдёт — это осознанно.
@@ -157,6 +167,13 @@ log "устройство: $SERIAL"
 result PASS boot "serial=$SERIAL avd=$AVD"
 
 wh=$("$ADB" -s "$SERIAL" shell wm size | grep -oP '\d+x\d+' | head -1)
+if [ -z "$wh" ]; then
+    # Пустой ответ wm size (surfaceflinger ещё не поднялся / устройство в
+    # странном состоянии) — раньше скрипт молча падал по set -e в TAPF без
+    # RESULT-строки (C4 аудита 2026-09-02). Это честный FAIL.
+    result FAIL screen-size "wm size вернул пустоту — координаты клавиш не вычислить"
+    exit 1
+fi
 if [ "$wh" != "1080x2280" ]; then
     log "ВНИМАНИЕ: экран $wh, координаты клавиш откалиброваны под 1080x2280"
 fi
@@ -241,16 +258,42 @@ result PASS ime-id "$IME_ID"
 SHELL ime list -s > "$OUTDIR/ime-list.txt" 2>&1 || true
 
 # Подсказки включаем префом ДО первого чтения настроек приложением.
+# Правка ТОЧЕЧНАЯ (C4 аудита 2026-09-02): читаем текущий преф-файл, меняем или
+# добавляем только два своих ключа, остальные сохраняем; файла ещё нет (чистый
+# AVD) — пишем минимальную заготовку, как раньше.
 SUGGESTIONS=off
 PREFS_PATH="/data/user_de/0/$PKG/shared_prefs/${PKG}_preferences.xml"
 if A shell "run-as $PKG true" >/dev/null 2>&1; then
-    printf '%s\n' \
-        "<?xml version='1.0' encoding='utf-8' standalone='yes' ?>" \
-        '<map>' \
-        '    <boolean name="pref_tatar_suggestions" value="true" />' \
-        '    <boolean name="pref_tatar_suggestions_offer_spent" value="true" />' \
-        '</map>' | A shell "run-as $PKG sh -c 'mkdir -p \$(dirname $PREFS_PATH) && cat > $PREFS_PATH'" \
-        && SUGGESTIONS=on
+    A shell "run-as $PKG cat $PREFS_PATH" 2>/dev/null | tr -d '\r' > "$OUTDIR/prefs-before.xml"
+    python3 - "$OUTDIR/prefs-before.xml" > "$OUTDIR/prefs-new.xml" <<'PYEOF'
+import re
+import sys
+from pathlib import Path
+
+source = Path(sys.argv[1])
+xml = source.read_text(encoding="utf-8") if source.is_file() else ""
+KEYS = ("pref_tatar_suggestions", "pref_tatar_suggestions_offer_spent")
+
+for key in KEYS:
+    entry = f'<boolean name="{key}" value="true" />'
+    pattern = re.compile(rf'<boolean name="{key}" value="[^"]*" ?/>')
+    if pattern.search(xml):
+        xml = pattern.sub(entry, xml)
+    elif "</map>" in xml:
+        xml = xml.replace("</map>", f"    {entry}\n</map>", 1)
+    else:
+        xml = ""  # файла не было или он не XML — ниже пишем заготовку целиком
+        break
+if not xml:
+    xml = ("<?xml version='1.0' encoding='utf-8' standalone='yes' ?>\n<map>\n"
+           + "".join(f'    <boolean name="{key}" value="true" />\n' for key in KEYS)
+           + "</map>\n")
+sys.stdout.write(xml)
+PYEOF
+    if A shell "run-as $PKG sh -c 'mkdir -p \$(dirname $PREFS_PATH) && cat > $PREFS_PATH'" \
+        < "$OUTDIR/prefs-new.xml"; then
+        SUGGESTIONS=on
+    fi
 fi
 if [ "$SUGGESTIONS" = on ]; then
     result PASS suggestions-enabled "pref_tatar_suggestions=true через run-as"
