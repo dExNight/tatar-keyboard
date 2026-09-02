@@ -43,11 +43,18 @@ import kotlin.Unit;
  * keyboard, types a Tatar word with real key taps (PointerTracker -> InputLogic ->
  * dictionary suggestion engine -> suggestion strip), commits a suggestion by tapping
  * the strip, commits the word with SPACE (which triggers the bigram next-word
- * prediction), commits a predicted word, and opens the emoji panel (long-press comma)
- * and commits an emoji. This covers process start, onCreateInputView, layout XML
- * parsing/inflation, first frame render, the suggestion engine hot path (tdict unpack
- * + mmap + binary search in TdictPrefixIndex/MappedDictionaryEngine, bigram lookup in
- * TatBigrPrefixIndex) and the emoji panel.
+ * prediction), commits the emoji-suggest cell the strip grew for "сәлам" (👋, tail
+ * slot — EmojiSuggestIndex load + onEmojiSuggestReady + emoji commit path), commits a
+ * predicted word, and opens the emoji panel (long-press comma) and commits an emoji.
+ * This covers process start, onCreateInputView, layout XML parsing/inflation, first
+ * frame render, the suggestion engine hot path (tdict unpack + mmap + binary search in
+ * TdictPrefixIndex/MappedDictionaryEngine, bigram lookup in TatBigrPrefixIndex), the
+ * emoji-suggest path (mission M4) and the emoji panel.
+ *
+ * Emoji suggestions are ON by default (mission M4b, PREF_EMOJI_SUGGESTIONS), so no
+ * extra toggle is needed: the first eligible lookup starts the one-per-process table
+ * load, and the band painted for "сәлам "+SPACE carries the 👋 tail cell once
+ * onEmojiSuggestReady re-derives it.
  *
  * Suggestions are opt-in (PREF_TATAR_SUGGESTIONS, default OFF) and a CUJ that never
  * turns them on profiles nothing of the engine (P2 of docs/AUDIT-2026-08-31.md). The
@@ -150,7 +157,29 @@ public class ImeBaselineProfileGenerator {
         SystemClock.sleep(800);
 
         // Type "сәлам" again and commit with SPACE: a word separator after a known
-        // head triggers the bigram next-word prediction (TatBigrPrefixIndex).
+        // head triggers the bigram next-word prediction (TatBigrPrefixIndex) and,
+        // because "сәлам" maps to 👋 in emoji_suggest_v1.txt, the emoji-suggest path
+        // (EmojiSuggestIndex load + onEmojiSuggestReady re-deriving the band).
+        tapKeyFraction(device, KeyGeom.KEY_S);
+        tapKeyFraction(device, KeyGeom.KEY_AE);
+        tapKeyFraction(device, KeyGeom.KEY_L);
+        tapKeyFraction(device, KeyGeom.KEY_A);
+        tapKeyFraction(device, KeyGeom.KEY_M);
+        tapKeyFraction(device, KeyGeom.KEY_SPACE);
+        // Longer settle than the prefix wait: the emoji table load is asynchronous
+        // (one per process) and onEmojiSuggestReady must have re-painted the band
+        // before the tail slot is tapped.
+        SystemClock.sleep(2_500);
+
+        // Commit the emoji-suggest tail cell (👋 in the right slot after "сәлам "+
+        // on the calibration AVD: band is [биреп · белән · 👋]) — the strip tap path
+        // treats the bound emoji cell exactly like a predicted word, and binding it
+        // also exercises SharedEmojiSearchIndex through the spoken label lookup.
+        tapKeyFraction(device, KeyGeom.SUGGESTION_RIGHT);
+        SystemClock.sleep(800);
+
+        // Once more "сәлам" + SPACE, then commit a next-word prediction from the
+        // strip ("белән" in the middle slot after "сәлам" on the calibration AVD).
         tapKeyFraction(device, KeyGeom.KEY_S);
         tapKeyFraction(device, KeyGeom.KEY_AE);
         tapKeyFraction(device, KeyGeom.KEY_L);
@@ -158,9 +187,6 @@ public class ImeBaselineProfileGenerator {
         tapKeyFraction(device, KeyGeom.KEY_M);
         tapKeyFraction(device, KeyGeom.KEY_SPACE);
         SystemClock.sleep(1_500);
-
-        // Commit a next-word prediction from the strip ("белән" in the middle slot
-        // after "сәлам" on the calibration AVD).
         tapKeyFraction(device, KeyGeom.PREDICTION_MIDDLE);
         SystemClock.sleep(800);
 
@@ -280,7 +306,9 @@ public class ImeBaselineProfileGenerator {
      *  suggestion strip sits at y≈0.60 with three slots (left/middle/right ≈
      *  0.167/0.5/0.833); tapping SUGGESTION_LEFT after "сәлам" commits "сәламәтлек",
      *  and after "сәлам"+SPACE the strip shows bigram predictions
-     *  "биреп | белән | биру". EMOJI_FIRST_CELL is the first cell of the emoji grid
+     *  "биреп | белән | биру" with the emoji-suggest tail cell, so the band is
+     *  [биреп · белән · 👋] (verified 2026-09-02 against the emoji_suggest_v1.txt
+     *  mapping сәлам→👋). EMOJI_FIRST_CELL is the first cell of the emoji grid
      *  (same calibration as scripts/emulator-smoke.sh). */
     private static final class KeyGeom {
         // {xFraction, yFraction} of key centers on the Tatar layout.
@@ -293,6 +321,7 @@ public class ImeBaselineProfileGenerator {
         static final float[] KEY_SPACE = {0.55f, 0.9075f};
         static final float[] SUGGESTION_LEFT = {0.167f, 0.60f};
         static final float[] PREDICTION_MIDDLE = {0.5f, 0.60f};
+        static final float[] SUGGESTION_RIGHT = {0.833f, 0.60f};
         static final float[] EMOJI_FIRST_CELL = {0.059f, 0.777f};
 
         static int x(UiDevice device, float[] fraction) {
