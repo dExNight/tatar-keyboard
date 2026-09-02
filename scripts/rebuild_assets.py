@@ -440,7 +440,11 @@ def run_check(
     known_drift_path: Path | None,
     stream: TextIO = sys.stdout,
 ) -> int:
-    """Сверка ассетов с пинами и словарями. Ничего не пишет и не пересобирает."""
+    """Сверка ассетов с пинами и словарями. Ничего не пишет и не пересобирает.
+
+    Коды выхода как у команды в целом (см. docstring модуля): 1 — расхождение,
+    2 — входы или окружение, в том числе ContractError «контракт не разобрался»
+    (C3 аудита 2026-09-02: раньше он улетал необработанным traceback'ом с кодом 1)."""
     dict_contract = root / DICT_CONTRACT
     bigram_contract = root / BIGRAM_CONTRACT
     for path in (dict_contract, bigram_contract):
@@ -465,9 +469,13 @@ def run_check(
             entry["verdict"] = "missing"
             failed = True
         else:
-            pinned = read_pins(
-                dict_contract, dictionary.spec, "DictionaryArtifactSpec", "expectedEntryCount"
-            )
+            try:
+                pinned = read_pins(
+                    dict_contract, dictionary.spec, "DictionaryArtifactSpec", "expectedEntryCount"
+                )
+            except ContractError as error:
+                print(f"error: контракт не разобрался: {error}", file=sys.stderr)
+                return 2
             try:
                 problems = _pin_problems(
                     measure_dictionary(asset_path, dictionary.tag), pinned
@@ -494,10 +502,14 @@ def run_check(
             entry["verdict"] = "missing"
             failed = True
         else:
-            pinned = read_pins(
-                bigram_contract, bigram.spec, "BigramArtifactSpec", "expectedHeadCount",
-                linked=True,
-            )
+            try:
+                pinned = read_pins(
+                    bigram_contract, bigram.spec, "BigramArtifactSpec", "expectedHeadCount",
+                    linked=True,
+                )
+            except ContractError as error:
+                print(f"error: контракт не разобрался: {error}", file=sys.stderr)
+                return 2
             try:
                 problems = _pin_problems(
                     measure_bigram(asset_path, dictionary_path, bigram.dictionary), pinned
@@ -770,7 +782,11 @@ def main(argv: Sequence[str] | None = None) -> int:
               file=sys.stderr)
         return 2
     work_dir = args.work_dir if args.work_dir is not None else root / DEFAULT_WORK_DIR
-    return run_rebuild(root, args.baseline, args.corpus_dir, work_dir, known_drift)
+    try:
+        return run_rebuild(root, args.baseline, args.corpus_dir, work_dir, known_drift)
+    except ContractError as error:
+        print(f"error: контракт не разобрался: {error}", file=sys.stderr)
+        return 2
 
 
 if __name__ == "__main__":

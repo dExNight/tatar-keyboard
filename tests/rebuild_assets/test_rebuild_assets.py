@@ -315,6 +315,26 @@ class CheckTest(FakeTreeTest):
         code = rebuild_assets.run_check(self.root, None, stream)
         self.assertEqual(2, code)
 
+    def test_unparseable_dict_contract_is_an_input_error(self):
+        # C3 аудита 2026-09-02: ContractError («контракт не разобрался») — код 2,
+        # а не необработанный traceback с кодом 1.
+        contract = self.root / rebuild_assets.DICT_CONTRACT
+        text = contract.read_text(encoding="utf-8")
+        contract.write_text(text.replace("expectedCompressedSize", "expectedGone"),
+                            encoding="utf-8")
+        stream = io.StringIO()
+        code = rebuild_assets.run_check(self.root, None, stream)
+        self.assertEqual(2, code)
+
+    def test_unparseable_bigram_contract_is_an_input_error(self):
+        contract = self.root / rebuild_assets.BIGRAM_CONTRACT
+        text = contract.read_text(encoding="utf-8")
+        contract.write_text(text.replace("expectedHeadCount", "expectedGone"),
+                            encoding="utf-8")
+        stream = io.StringIO()
+        code = rebuild_assets.run_check(self.root, None, stream)
+        self.assertEqual(2, code)
+
 
 class PackArgvTest(unittest.TestCase):
     """The canned pack commands are the mission's parameters, pinned verbatim."""
