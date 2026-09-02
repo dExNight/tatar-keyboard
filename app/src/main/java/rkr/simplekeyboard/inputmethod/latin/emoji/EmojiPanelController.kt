@@ -570,13 +570,6 @@ private class AssetSnapshotSource(private val context: Context) : EmojiSnapshotS
 }
 
 /**
- * Production [EmojiSearchIndexSource]: reads and parses the packed search asset. Constructed
- * cheaply on the UI thread (it only keeps the application context); the AssetManager is touched
- * only inside [load], which runs on the controller's background executor the first time the user
- * opens the search — never on the cold-start path. The result is returned to the caller and never
- * written to any persistent store.
- */
-/**
  * Production [EmojiSkinToneSource]: reads and parses the packed skin-tone asset on the controller's
  * background executor, as part of the one-shot preparation. Never touched on the cold-start path.
  */
@@ -593,15 +586,14 @@ private class AssetSkinToneSource(private val context: Context) : EmojiSkinToneS
     }
 }
 
+/**
+ * Production [EmojiSearchIndexSource]: hands out the process-wide shared index
+ * ([SharedEmojiSearchIndex], audit 2026-09-02 C7) — the emoji-suggest source reads the same asset
+ * for its spoken names, and one parse serves both. Constructed cheaply on the UI thread (it only
+ * keeps the application context); the AssetManager is touched only inside [load], which runs on
+ * the controller's background executor the first time the user opens the search — never on the
+ * cold-start path. The result is returned to the caller and never written to any persistent store.
+ */
 private class AssetSearchIndexSource(private val context: Context) : EmojiSearchIndexSource {
-    override fun load(): EmojiSearchIndex =
-        try {
-            context.assets.open(ASSET_PATH).use { input -> EmojiSearchIndex.parse(input) }
-        } catch (_: Throwable) {
-            EmojiSearchIndex.EMPTY
-        }
-
-    private companion object {
-        const val ASSET_PATH = "emoji/emoji_search_v1.txt"
-    }
+    override fun load(): EmojiSearchIndex = SharedEmojiSearchIndex.of(context).get()
 }

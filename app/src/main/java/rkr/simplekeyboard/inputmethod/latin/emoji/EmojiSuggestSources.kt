@@ -87,12 +87,9 @@ class AssetEmojiSuggestPreparation(
         val filtered = table.filterTo(drawable)
         if (filtered.isEmpty) return null
         // Names ride along on the same background pass; an unreadable search asset only costs the
-        // spoken labels (TalkBack then reads the glyph itself), never the feature.
-        val names = try {
-            appContext.assets.open(SEARCH_ASSET_PATH).use { EmojiSearchIndex.parse(it) }
-        } catch (_: Throwable) {
-            EmojiSearchIndex.EMPTY
-        }
+        // spoken labels (TalkBack then reads the glyph itself), never the feature. The index is
+        // the process-wide shared one (audit C7): the panel search reads the same asset.
+        val names = SharedEmojiSearchIndex.of(appContext).get()
         return LoadedEmojiSuggestSource(filtered, names)
     }
 
@@ -108,6 +105,5 @@ class AssetEmojiSuggestPreparation(
 
     private companion object {
         const val SUGGEST_ASSET_PATH = "emoji/emoji_suggest_v1.txt"
-        const val SEARCH_ASSET_PATH = "emoji/emoji_search_v1.txt"
     }
 }
