@@ -304,20 +304,6 @@ class ReadPanelSequencesTest(unittest.TestCase):
                 pack.read_panel_sequences(panel)
 
 
-class ReadPanelSequencesTest(unittest.TestCase):
-    def test_duplicate_sequence_raises(self) -> None:
-        with tempfile.TemporaryDirectory() as directory:
-            panel = write_panel(Path(directory), PANEL + GRINNING + "\n")
-            with self.assertRaises(pack.EmojiSearchPackError):
-                pack.read_panel_sequences(panel)
-
-    def test_empty_panel_raises(self) -> None:
-        with tempfile.TemporaryDirectory() as directory:
-            panel = write_panel(Path(directory), "#smileys-emotion\n")
-            with self.assertRaises(pack.EmojiSearchPackError):
-                pack.read_panel_sequences(panel)
-
-
 class ReadTtExtraTest(unittest.TestCase):
     """The hand-written Tatar keyword file: fail-closed parsing."""
 

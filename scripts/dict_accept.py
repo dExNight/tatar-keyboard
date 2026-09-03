@@ -63,8 +63,10 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import random
 import sys
+import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -565,7 +567,7 @@ def pack(args) -> int:
         }
         if args.write:
             dp.validate_asset(asset, language=language)
-            target.write_bytes(asset)
+            _atomic_write(target, asset)
             result[tag]["written"] = True
         else:
             result[tag]["written"] = False
@@ -575,6 +577,30 @@ def pack(args) -> int:
         Path(args.json_out).write_text(json.dumps(result, ensure_ascii=False, indent=2) + "\n",
                                        encoding="utf-8")
     return 0
+
+
+def _atomic_write(path: Path, data: bytes) -> None:
+    """Запись ассета как у `dictionary_pack._write_outputs`: temp в том же каталоге,
+    fsync, затем атомарный os.replace. Краш посреди записи не должен оставлять битый
+    ассет в дереве — старый файл переживает любую точку отказа."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary: Path | None = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="wb", dir=path.parent, prefix=f".{path.name}.", delete=False
+        ) as stream:
+            stream.write(data)
+            stream.flush()
+            os.fsync(stream.fileno())
+            temporary = Path(stream.name)
+        os.replace(temporary, path)
+        temporary = None
+    finally:
+        if temporary is not None:
+            try:
+                temporary.unlink()
+            except FileNotFoundError:
+                pass
 
 
 def main(argv=None) -> int:
