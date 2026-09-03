@@ -32,9 +32,9 @@ v1.5.0/versionCode 7.** Все числа получены сегодня на �
 | Gradle | 9.6.0 (wrapper) |
 | Android Gradle Plugin | 9.2.1 |
 | Android SDK | `/home/tarchok/Android/Sdk`, build-tools 37.0.0, platform android-37.0 |
-| Ветка | `codex/version-1.5.0` (отведена от `codex/emoji-telegram`) |
+| Ветка | `version-1.5.0` (отведена от `emoji-telegram`) |
 | Frozen commit SHA | `4283944e570c46344baffd3523edc5d55c0cddf0` |
-| Состояние дерева | на момент сборки чисто: `git status --short` пуст, `git diff --check` чист; из неотслеживаемого — только служебный `.smgr/` (git-ignored) |
+| Состояние дерева | на момент сборки чисто: `git status --short` пуст, `git diff --check` чист; из неотслеживаемого — только локальный служебный каталог миссий (git-ignored) |
 
 Оговорка про frozen commit та же, что и в прошлых отчётах: release commit не создан,
 поэтому `4283944` — это HEAD ветки на момент сборки, а не тег релиза. Коммит `4283944`
@@ -507,17 +507,17 @@ adb install -r dist/tatar-keyboard-1.5.0.apk
 
 ```sh
 git diff --check
-git log --oneline codex/version-1.4.0..codex/version-1.5.0
-git diff codex/version-1.4.0..codex/version-1.5.0
+git log --oneline version-1.4.0..version-1.5.0
+git diff version-1.4.0..version-1.5.0
 ```
 
-Кандидат — HEAD ветки `codex/version-1.5.0`, коммит `4283944`. Release commit не создан
+Кандидат — HEAD ветки `version-1.5.0`, коммит `4283944`. Release commit не создан
 намеренно: его содержимое зависит от того, что оператор решит по пунктам 1 и 2.
 
 ### 4. Push, merge, CI
 
 ```sh
-git push origin codex/version-1.5.0
+git push origin version-1.5.0
 ```
 
 Дальше — merge в `main` по своему обычаю и зелёный GitHub Actions **на том самом коммите**,
@@ -540,8 +540,8 @@ Release: title `Tatar Keyboard 1.5.0`, notes — раздел `[1.5.0]` из `CH
 
 ### 6. IzzyOnDroid
 
-По разделу 7 чеклиста, после публичного Release. Там же — обязательное честное раскрытие
-AI assistance; сверить актуальные требования на Codeberg перед подачей.
+По разделу 7 чеклиста, после публичного Release; сверить актуальные требования на
+Codeberg перед подачей.
 
 ### 7. Два вопроса, которые ждут решения и в 1.5.0 не входили
 

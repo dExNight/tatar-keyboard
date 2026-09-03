@@ -58,9 +58,8 @@ keystore.properties
 # Локальные релизные артефакты (APK не коммитим)
 dist/
 
-# Локальные git worktree и конфиги сторонних инструментов
+# Локальные git worktree
 .wt/
-.kiro/
 
 tat_*.tar.gz
 tat_*-words.txt

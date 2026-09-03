@@ -33,9 +33,9 @@ permission dump, число actionable tasks).
 | Gradle | 9.6.0 (wrapper) |
 | Android Gradle Plugin | 9.2.1 |
 | Android SDK | `/home/tarchok/Android/Sdk`, build-tools 37.0.0, platform android-37.0 |
-| Ветка | `codex/version-1.6.0` (отведена от `codex/emoji-telegram`, вобрала `codex/version-1.5.0` слиянием `a617f57`) |
+| Ветка | `version-1.6.0` (отведена от `emoji-telegram`, вобрала `version-1.5.0` слиянием `a617f57`) |
 | Frozen commit SHA | `16f477b` |
-| Состояние дерева | на момент сборки чисто: `git status --short` пуст, `git diff --check` чист; из неотслеживаемого — только служебный `.smgr/` (git-ignored) |
+| Состояние дерева | на момент сборки чисто: `git status --short` пуст, `git diff --check` чист; из неотслеживаемого — только локальный служебный каталог миссий (git-ignored) |
 
 Оговорка про frozen commit та же, что и в прошлых отчётах: release commit не создан,
 поэтому `16f477b` — это HEAD ветки на момент сборки, а не тег релиза. Коммит `16f477b`
@@ -49,18 +49,18 @@ permission dump, число actionable tasks).
 
 ```
 f30589b  ← общий предок: дерево, из которого нарезана 1.5.0
-├─ codex/version-1.5.0:  c53d450 → 4283944 (версия 1.5.0/7) → 2500fb6 (аудит 1.5.0)
-└─ codex/emoji-telegram: 02d594b → 96fc862 (свайп, кожные тона)
+├─ version-1.5.0:  c53d450 → 4283944 (версия 1.5.0/7) → 2500fb6 (аудит 1.5.0)
+└─ emoji-telegram: 02d594b → 96fc862 (свайп, кожные тона)
                        → 0dc5e9f → 5bf6b37 → 9244e67 (порог касания)
                             ↓
-codex/version-1.6.0 = 9244e67 + merge a617f57 (вбирает codex/version-1.5.0)
+version-1.6.0 = 9244e67 + merge a617f57 (вбирает version-1.5.0)
                             → 16f477b (версия 1.6.0/8)
 ```
 
 Слияние понадобилось потому, что релизные артефакты 1.5.0 (версия, `CHANGELOG.md`,
 `metadata/en-US/changelogs/7.txt`, `docs/APK-AUDIT-1.5.0.md`, перецеленный чеклист) жили
 только на своей ветке, а код 1.6.0 — только на своей. Конфликт был **один** — `HANDOFF.md`,
-который обе стороны переписали целиком; взята версия с `codex/emoji-telegram` как более
+который обе стороны переписали целиком; взята версия с `emoji-telegram` как более
 поздняя, и этот же файл заново переписан в конце миссии. Ни одна строка `CHANGELOG.md`,
 `app/build.gradle` или чеклиста конфликтов не дала: слияние приняло сторону 1.5.0
 автоматически, и поверх него лёг бамп до 1.6.0/8.
@@ -414,7 +414,7 @@ SHA-256 копии, verify копии, badging копии); ретаргет ч�
 
 Не входило в объём миссии и не трогалось: keystore и `keystore.properties`, код свайпа,
 кожных тонов и порога касания, ассеты, `docs/DICTIONARY-E3-TYPO-REVIEW.tsv`, ветка
-`codex/version-1.5.0` и её артефакт.
+`version-1.5.0` и её артефакт.
 
 ## Дефектов в правках не обнаружено
 
@@ -464,8 +464,8 @@ cp tatar-keyboard-release.jks keystore.properties <куда-то вне этой
 
 - **1.5.0 не выпущен** — самый простой случай: выпускать только 1.6.0, а `versionCode 7`
   никогда не появится в публичном канале. Пропуск номера в цепочке versionCode допустим,
-  Android требует лишь монотонного роста. Ветку `codex/version-1.5.0` тогда можно оставить
-  как есть: её содержимое целиком внутри `codex/version-1.6.0`.
+  Android требует лишь монотонного роста. Ветку `version-1.5.0` тогда можно оставить
+  как есть: её содержимое целиком внутри `version-1.6.0`.
 - **1.5.0 уже выпущен** — тогда 1.6.0 идёт обычным обновлением поверх него, ключ тот же,
   установка пройдёт.
 
@@ -512,17 +512,17 @@ adb install -r dist/tatar-keyboard-1.6.0.apk
 
 ```sh
 git diff --check
-git log --oneline codex/version-1.5.0..codex/version-1.6.0
-git diff codex/version-1.5.0..codex/version-1.6.0
+git log --oneline version-1.5.0..version-1.6.0
+git diff version-1.5.0..version-1.6.0
 ```
 
-Кандидат — HEAD ветки `codex/version-1.6.0`, коммит `16f477b`. Release commit не создан
+Кандидат — HEAD ветки `version-1.6.0`, коммит `16f477b`. Release commit не создан
 намеренно: его содержимое зависит от того, что оператор решит по пунктам 1–3.
 
 ### 5. Push, merge, CI
 
 ```sh
-git push origin codex/version-1.6.0
+git push origin version-1.6.0
 ```
 
 Дальше — merge в `main` по своему обычаю и зелёный GitHub Actions **на том самом коммите**,
@@ -545,8 +545,8 @@ Release: title `Tatar Keyboard 1.6.0`, notes — раздел `[1.6.0]` из `CH
 
 ### 7. IzzyOnDroid
 
-По разделу 7 чеклиста, после публичного Release. Там же — обязательное честное раскрытие
-AI assistance; сверить актуальные требования на Codeberg перед подачей.
+По разделу 7 чеклиста, после публичного Release; сверить актуальные требования на
+Codeberg перед подачей.
 
 ### 8. Что осталось за бортом 1.6.0
 

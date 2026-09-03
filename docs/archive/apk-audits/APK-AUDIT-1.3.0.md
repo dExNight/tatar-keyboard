@@ -27,9 +27,9 @@ v1.3.0/versionCode 5.** Все числа получены сегодня на �
 | Gradle | 9.6.0 (wrapper) |
 | Android Gradle Plugin | 9.2.1 |
 | Android SDK | `/home/tarchok/Android/Sdk`, build-tools 37.0.0, platform android-37.0 |
-| Ветка | `codex/version-1.3.0` (отведена от `codex/apk-audit-2026-08-18`) |
+| Ветка | `version-1.3.0` (отведена от `apk-audit-2026-08-18`) |
 | Frozen commit SHA | `1dc14afa5576f9781ba56f13df4e94d0c67de61c` |
-| Состояние дерева | `git diff --check` чист; из незакоммиченного на момент сборки — только правка оператора в `docs/TATAR-REVIEW-QUEUE.tsv` (документация, на APK не влияет) и служебный `.smgr/` |
+| Состояние дерева | `git diff --check` чист; из незакоммиченного на момент сборки — только правка оператора в `docs/TATAR-REVIEW-QUEUE.tsv` (документация, на APK не влияет) и локальный служебный каталог миссий (git-ignored) |
 
 Оговорка про frozen commit та же, что и в прошлом отчёте: release commit не создан, поэтому
 `1dc14afa` — это HEAD ветки на момент сборки, а не тег релиза. Коммит `1dc14afa` содержит

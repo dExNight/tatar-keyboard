@@ -1,6 +1,6 @@
 # D1e — opt-in Tatar suggestions integration
 
-Branch: `codex/d1-sequential` · Base commit: `80f332c` (D1d) · Status:
+Branch: `d1-sequential` · Base commit: `80f332c` (D1d) · Status:
 **implemented; the six confirmed audit findings are fixed and independently re-reviewed;
 the D1f artifact gate passed; device UAT on a real Samsung remains open.**
 

@@ -1,6 +1,6 @@
 # Аудит артефакта 1.9.4
 
-Миссия `tt-imperative-heads`. Ветка `codex/version-1.6.0`, база — маркер 1.9.3 (`2f02c5a1`).
+Миссия `tt-imperative-heads`. Ветка `version-1.6.0`, база — маркер 1.9.3 (`2f02c5a1`).
 Файл: `dist/tatar-keyboard-1.9.4.apk`.
 
 ## Одной таблицей

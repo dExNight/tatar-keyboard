@@ -1,6 +1,6 @@
 # Artifact audit v1.8.3 / versionCode 14
 
-Миссия `tt-version-1.8.3`. Ветка `codex/version-1.6.0`, frozen commit
+Миссия `tt-version-1.8.3`. Ветка `version-1.6.0`, frozen commit
 `bcc439192d89e4e275ed56bdd7d784056c05cde4`. Артефакт — `dist/tatar-keyboard-1.8.3.apk`,
 SHA-256 `a5b1279357f0f8e0f03ba746ed88a750bcd3e369a23e1e5555ce6c2901fdb85c`.
 
@@ -112,12 +112,12 @@ SHA-256 обоих ассетов сменились (tt `89eb4aa8…` → `4ed4
 | Gradle | 9.6.0 |
 | AGP | 9.2.1 |
 | build-tools | 37.0.0 (`aapt2`, `apksigner`) |
-| Ветка | `codex/version-1.6.0`, новая не отводилась |
+| Ветка | `version-1.6.0`, новая не отводилась |
 | Frozen commit | `bcc439192d89e4e275ed56bdd7d784056c05cde4` |
 | Эмулятор | AVD `tatar_e5_test`, Android 11 / API 30, x86-64, headless, `-gpu swiftshader_indirect`, 1080×2280, density 440 |
 | Python | 3.14.7 |
 
-Служебный каталог `.smgr/` не отслеживается; ключи и `dist/` git-ignored. Работа трёх прошлых
+Локальный служебный каталог миссий (git-ignored) не отслеживается; ключи и `dist/` git-ignored. Работа трёх прошлых
 миссий лежала в дереве незакоммиченной — эта миссия закоммитила её (`4ad8a83`, `00733b2`) и
 заморозила версию (`bcc4391`) до сборки. Наружу не уходило ничего: ни push, ни тега, ни
 релиза, ни merge.

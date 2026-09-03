@@ -92,12 +92,12 @@
 | JDK | OpenJDK 17.0.20.1 |
 | Gradle | 9.6.0 |
 | build-tools | 37.0.0 (`aapt2`, `apksigner`) |
-| Ветка | `codex/version-1.6.0`, новая не отводилась |
+| Ветка | `version-1.6.0`, новая не отводилась |
 | Frozen commit | `2f9e571564f9ededec1fc2988fbecf72df279f6d` |
 | Эмулятор | AVD `tatar_e5_test`, Android 11 / API 30, x86-64, headless, `-gpu swiftshader_indirect`, 1080×2280, density 440 |
 | Python | 3.14.7 |
 
-Служебный каталог `.smgr/` не отслеживается; ключи и `dist/` git-ignored.
+Локальный служебный каталог миссий (git-ignored) не отслеживается; ключи и `dist/` git-ignored.
 
 ## Команда
 

@@ -27,7 +27,7 @@ applicationId → getString(0) crash), а также сброс выбранно
 - [x] B2. README.md: проверить утверждения про настройки/онбординг — после фиксов они снова
   верны, правки только если остались неточности; версию не хардкодит — ок
 
-## C. Planning-артефакты (.planning/) — привести в соответствие с реальностью
+## C. Planning-артефакты (устаревший каталог планирования, удалён 2026-09-03) — привести в соответствие с реальностью
 
 - [x] C1. REQUIREMENTS.md: аннотации к SETUP-02, SWITCH-02, UI-04 — «в v1.0.0 были де-факто
   сломаны крашем SettingsActivity/пикера (LocaleResourceUtils); исправлено в 1.0.1,
@@ -57,10 +57,7 @@ applicationId → getString(0) crash), а также сброс выбранно
 - [x] E4. `fix: пропущенный break в case Sakha реестра раскладок` (SubtypeLocaleUtils)
 - [x] E5. `chore(release): версия 1.0.1 (versionCode 2)` (build.gradle)
 - [x] E6. `docs: CHANGELOG 1.0.1, аннотации REQUIREMENTS/STATE/AUDIT по итогам device-UAT`
-  (CHANGELOG, README при необходимости, .planning/*, docs/FIXES-1.0.1.md)
-
-Каждый коммит завершать строкой:
-`Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>`
+  (CHANGELOG, README при необходимости, артефакты планирования, docs/FIXES-1.0.1.md)
 
 ## Вне скоупа 1.0.1 (backlog, зафиксировано ревью)
 

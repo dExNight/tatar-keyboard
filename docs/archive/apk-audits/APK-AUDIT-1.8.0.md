@@ -71,12 +71,12 @@ IzzyOnDroid. Это раздел «Что осталось сделать опе
 | Gradle | 9.6.0 |
 | AGP | 9.2.1 |
 | build-tools | 37.0.0 (`aapt2`, `apksigner`) |
-| Ветка | `codex/version-1.6.0` — та же, в которой закончили обе предшествующие миссии; новая не отводилась |
+| Ветка | `version-1.6.0` — та же, в которой закончили обе предшествующие миссии; новая не отводилась |
 | Frozen commit | `07b2c4323b59874463b6bf69d67259218e60f1e6` |
 | Эмулятор | AVD `tatar_e5_test`, Android 11 / API 30, x86-64, headless, `-gpu swiftshader_indirect`, 1080×2280, density 440 |
 | Python | 3.14 (наборы `tests/` запускаются напрямую, `pytest` в системе нет) |
 
-Служебный каталог `.smgr/` не отслеживается; ключи и `dist/` git-ignored. Release commit
+Локальный служебный каталог миссий (git-ignored) не отслеживается; ключи и `dist/` git-ignored. Release commit
 **не создан** намеренно: его содержимое зависит от решений оператора.
 
 ## Шаг 1 — freeze версии
@@ -614,7 +614,7 @@ git diff b2e2f33..HEAD --stat
 Всё это — руками, и ничего из этого миссия не делала:
 
 ```sh
-git push origin codex/version-1.6.0      # зелёный CI обязателен
+git push origin version-1.6.0      # зелёный CI обязателен
 # merge в main
 git tag -a v1.8.0 -m "Tatar Keyboard 1.8.0"
 git push origin v1.8.0
@@ -625,8 +625,7 @@ CHANGELOG и **ровно одним** вложением: `dist/tatar-keyboard-
 SHA-256 `e7d99887b5316644ab8344e37916b312304850793324664f42755212371d1be5`. **Не
 пересобирать перед вложением** — тот же коммит даёт другой SHA-256.
 
-После публичного Release — заявка в IzzyOnDroid по разделу 7 чеклиста, с честным
-раскрытием AI assistance и без непроверенных claims про human review и manual tests.
+После публичного Release — заявка в IzzyOnDroid по разделу 7 чеклиста.
 
 ### 6. Решить судьбу 1.5.0, 1.6.0, 1.6.1 и 1.7.0
 

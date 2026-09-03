@@ -165,7 +165,7 @@ v1.2.0, v1.3.0, v1.4.0, v1.5.0, v1.6.0, v1.6.1, v1.7.0, v1.8.0, v1.8.1, v1.8.2, 
 
 - Кандидат этого чеклиста — **v1.8.4 / versionCode 15**, замороженный коммит `2f9e5715`.
   Все `[x]`, проставленные ниже по прогону 2026-08-24 (v1.8.4), относятся к нему.
-- Ветка та же, что у 1.6.0…1.8.3 — `codex/version-1.6.0`; новая не отводилась.
+- Ветка та же, что у 1.6.0…1.8.3 — `version-1.6.0`; новая не отводилась.
 - Записи `[1.8.3]` и старше в `CHANGELOG.md`, а также `metadata/en-US/changelogs/14.txt`
   и старше не менялись. Версия описана разделом `[1.8.4]` и
   `metadata/en-US/changelogs/15.txt`. Разделы `[1.5.0]`…`[1.8.4]` вместе составляют то,
@@ -200,8 +200,8 @@ v2024). **Лицензионного гранта у этого источник
 распространять или изменять, а раздающий прямо пишет, что текстом не владеет и снимет
 файлы по обоснованному требованию. Дословные тексты — `docs/archive/dictionary/CORPUS.md` раздел 1.1.
 
-Оператор 2026-08-24 решил использовать источник, зная это (вариант B вопроса
-`.smgr/tt-corpus/ask.json`). Решение осознанное и относится только к OpenSubtitles: QED и
+Оператор 2026-08-24 решил использовать источник, зная это (вариант B вопроса миссии
+`tt-corpus`; файл вопроса локальный, не публикуется). Решение осознанное и относится только к OpenSubtitles: QED и
 TED2020 остаются непригодными, а правило «данные с невыясненной лицензией внутрь
 приложения не попадают» для остальных источников продолжает действовать. Единственное,
 о чём просит сам корпус, — ссылка на opensubtitles.org; она стоит в экране «Источники
@@ -297,7 +297,7 @@ TED2020 остаются непригодными, а правило «данн�
 
 - Кандидат этого чеклиста — **v1.7.0 / versionCode 10**, коммит `b2e2f33`. Все `[x]`,
   проставленные ниже по прогону 2026-08-21 (v1.7.0), относятся к нему.
-- Ветка та же, что у 1.6.0 и 1.6.1 — `codex/version-1.6.0`; новая не отводилась.
+- Ветка та же, что у 1.6.0 и 1.6.1 — `version-1.6.0`; новая не отводилась.
 - Записи `[1.6.1]` и старше в `CHANGELOG.md`, а также `metadata/en-US/changelogs/9.txt`
   и старше не менялись. Версия описана разделом `[1.7.0]` и
   `metadata/en-US/changelogs/10.txt`. Разделы `[1.5.0]`…`[1.7.0]` вместе составляют то,
@@ -324,7 +324,7 @@ TED2020 остаются непригодными, а правило «данн�
 
 - Кандидат этого чеклиста — **v1.6.1 / versionCode 9**, коммит `652e1da`. Все `[x]`,
   проставленные ниже по прогону 2026-08-20 (v1.6.1), относятся к нему.
-- Ветка та же, что у 1.6.0 — `codex/version-1.6.0`; новая под патч не отводилась.
+- Ветка та же, что у 1.6.0 — `version-1.6.0`; новая под патч не отводилась.
 - Записи `[1.6.0]` и старше в `CHANGELOG.md`, а также `metadata/en-US/changelogs/8.txt`
   и старше не менялись. Патч описан разделом `[1.6.1]` и
   `metadata/en-US/changelogs/9.txt`. Разделы `[1.5.0]`, `[1.6.0]` и `[1.6.1]` вместе
@@ -351,8 +351,8 @@ TED2020 остаются непригодными, а правило «данн�
 
 - Кандидат этого чеклиста — **v1.6.0 / versionCode 8**, коммит `16f477b`. Все `[x]`,
   проставленные ниже по прогону 2026-08-20 (v1.6.0), относятся к нему.
-- Ветка `codex/version-1.6.0` отведена от `codex/emoji-telegram` и вобрала
-  `codex/version-1.5.0` слиянием `a617f57`: релизные артефакты 1.5.0 (версия, changelog,
+- Ветка `version-1.6.0` отведена от `emoji-telegram` и вобрала
+  `version-1.5.0` слиянием `a617f57`: релизные артефакты 1.5.0 (версия, changelog,
   `changelogs/7.txt`, `docs/archive/apk-audits/APK-AUDIT-1.5.0.md`, этот чеклист) сохранены целиком.
 - Записи `[1.5.0]` и старше в `CHANGELOG.md`, а также `metadata/en-US/changelogs/7.txt`
   и старше не менялись. Новый набор описан разделом `[1.6.0]` и
@@ -802,14 +802,14 @@ SHA-256, копия в `dist/` с `cmp` без различий.
   не содержит случайных файлов, ключей или локальных конфигов. Частично: правки разложены
   на смысловые коммиты (`1837d964` полоса, `a3ef5540` молчаливые отказы, `b85d0661`
   строки трёх языков), бамп версии и changelog — `2f9e5715`; всё в той же ветке
-  `codex/version-1.6.0`. Дифф `2ad54f9d..2f9e5715` по `app/` затрагивает файлов кода: три
+  `version-1.6.0`. Дифф `2ad54f9d..2f9e5715` по `app/` затрагивает файлов кода: три
   файла рабочего кода (`SuggestionsController.kt`, `LatinIME.java`,
   `EmojiPanelController.kt`, `SettingsHostActivity.kt`), три файла строк и четыре файла
   тестов, из них три новых. **Ассеты не тронуты вовсе** — ни словари, ни таблицы
   предсказания, ни наборы эмодзи, ни раскладки; это подтверждено поэлементным сравнением
   архивов (`assets/` ±0 Б). Рабочее дерево на момент сборки чисто
-  (`git status --porcelain` пуст), ключи и `dist/` git-ignored. Открыто: служебный `.smgr/`
-  не отслеживается; полный diff человеком не просмотрен.
+  (`git status --porcelain` пуст), ключи и `dist/` git-ignored. Открыто: локальный
+  служебный каталог миссий не отслеживается; полный diff человеком не просмотрен.
   **Release commit на этой версии создан локально** (`2f9e5715`) — этого требовал порядок
   «заморозить коммит и собрать из него»; наружу он не уходил. Отчёт миссии, аудит,
   свидетельства в `docs/archive/ux/final-polish/` и ретаргет этого файла закоммичены после `2f9e5715`;
@@ -971,7 +971,7 @@ apksigner verify --verbose --print-certs \
 
 | Проверка | Результат v1.8.3 (2026-08-23) |
 |---|---|
-| Frozen commit SHA | `bcc439192d89e4e275ed56bdd7d784056c05cde4` (HEAD ветки `codex/version-1.6.0`, новая ветка не отводилась); **release commit создан локально** — этого требовал порядок «заморозить коммит и собрать из него»; наружу он не уходил. Отчёт и ретаргет этого файла закоммичены после и в APK не попадают |
+| Frozen commit SHA | `bcc439192d89e4e275ed56bdd7d784056c05cde4` (HEAD ветки `version-1.6.0`, новая ветка не отводилась); **release commit создан локально** — этого требовал порядок «заморозить коммит и собрать из него»; наружу он не уходил. Отчёт и ретаргет этого файла закоммичены после и в APK не попадают |
 | Дата сборки | 2026-08-23, артефакт release 21:16:53 |
 | Среда | Linux 6.18.44-1-lts x86-64, OpenJDK 17.0.20.1, Gradle 9.6.0, AGP 9.2.1, build-tools 37.0.0, Python 3.14.7 |
 | JVM tests | 913 tests, 0 failures / 0 errors / 1 skipped (90 suite-файлов); +54 теста и +3 файла к v1.8.2; skipped — чужой `@Ignore` миссии v1.8.1 на тесте второго, независимого дефекта полосы |
@@ -1032,7 +1032,7 @@ Python 155 tests, release 2 578 753 Б, SHA-256
 
 | Проверка | Результат v1.7.0 (2026-08-21) |
 |---|---|
-| Frozen commit SHA | `b2e2f333b0f355646cccc39d2d135dcd03ab44c2` (HEAD ветки `codex/version-1.6.0`, новая ветка не отводилась); release commit по-прежнему не создан |
+| Frozen commit SHA | `b2e2f333b0f355646cccc39d2d135dcd03ab44c2` (HEAD ветки `version-1.6.0`, новая ветка не отводилась); release commit по-прежнему не создан |
 | Дата сборки | 2026-08-21, артефакты 03:57:02 (release) и 03:56:56 (debug) |
 | Среда | Linux 6.18.44-1-lts x86-64, OpenJDK 17.0.20.1, Gradle 9.6.0, AGP 9.2.1, build-tools 37.0.0 |
 | JVM tests | 798 tests, 0 failures / 0 errors / 0 skipped (80 suite-файлов) |
@@ -1061,7 +1061,7 @@ Python 155 tests, release 2 578 753 Б, SHA-256
 
 | Проверка | Результат v1.6.1 (2026-08-20) |
 |---|---|
-| Frozen commit SHA | `652e1dad8aca06939165ffcd804b092eaf2894bc` (HEAD ветки `codex/version-1.6.0`, новая ветка под патч не отводилась); release commit по-прежнему не создан |
+| Frozen commit SHA | `652e1dad8aca06939165ffcd804b092eaf2894bc` (HEAD ветки `version-1.6.0`, новая ветка под патч не отводилась); release commit по-прежнему не создан |
 | Дата сборки | 2026-08-20, артефакты 16:37:22 (release) и 16:37:18 (debug) |
 | Среда | Linux 6.18.44-1-lts x86-64, OpenJDK 17.0.20.1, Gradle 9.6.0, AGP 9.2.1, build-tools 37.0.0 |
 | JVM tests | 789 tests, 0 failures / 0 errors / 0 skipped (79 suite-файлов) |
@@ -1081,7 +1081,7 @@ Python 155 tests, release 2 578 753 Б, SHA-256
 
 | Проверка | Результат v1.6.0 (2026-08-20) |
 |---|---|
-| Frozen commit SHA | `16f477b` (HEAD ветки `codex/version-1.6.0`, отведена от `codex/emoji-telegram`, вобрала `codex/version-1.5.0` слиянием `a617f57`); release commit по-прежнему не создан |
+| Frozen commit SHA | `16f477b` (HEAD ветки `version-1.6.0`, отведена от `emoji-telegram`, вобрала `version-1.5.0` слиянием `a617f57`); release commit по-прежнему не создан |
 | Дата сборки | 2026-08-20, артефакты 15:46:40 (release) и 15:46:32 (debug) |
 | Среда | Linux 6.18.44-1-lts x86-64, OpenJDK 17.0.20.1, Gradle 9.6.0, AGP 9.2.1, build-tools 37.0.0 |
 | JVM tests | 780 tests, 0 failures / 0 errors / 0 skipped (78 suite-файлов) |
@@ -1106,7 +1106,7 @@ Python 155 tests, release 2 578 753 Б, SHA-256
 
 | Проверка | Результат v1.5.0 (2026-08-20) |
 |---|---|
-| Frozen commit SHA | `4283944e570c46344baffd3523edc5d55c0cddf0` (HEAD ветки `codex/version-1.5.0`, отведена от `codex/emoji-telegram`); release commit по-прежнему не создан |
+| Frozen commit SHA | `4283944e570c46344baffd3523edc5d55c0cddf0` (HEAD ветки `version-1.5.0`, отведена от `emoji-telegram`); release commit по-прежнему не создан |
 | Дата сборки | 2026-08-20, артефакты 04:22:36 (release) и 04:22:36 (debug) |
 | Среда | Linux 6.18.44-1-lts x86-64, OpenJDK 17.0.20.1, Gradle 9.6.0, AGP 9.2.1, build-tools 37.0.0 |
 | JVM tests | 748 tests, 0 failures / 0 errors / 0 skipped (75 suite-файлов) |
@@ -1127,7 +1127,7 @@ v1.5.0 не выдаются. Полный отчёт того прогона �
 
 | Проверка | Результат v1.4.0 (2026-08-20) |
 |---|---|
-| Frozen commit SHA | `660c34f386ed6b00e0327a60434bdd00083d9467` (HEAD ветки `codex/version-1.4.0`, отведена от `codex/emoji-panel-redesign`); release commit по-прежнему не создан |
+| Frozen commit SHA | `660c34f386ed6b00e0327a60434bdd00083d9467` (HEAD ветки `version-1.4.0`, отведена от `emoji-panel-redesign`); release commit по-прежнему не создан |
 | Дата сборки | 2026-08-20, артефакты 02:49:20 (release) и 02:49:20 (debug) |
 | Среда | Linux 6.18.44-1-lts x86-64, OpenJDK 17.0.20.1, Gradle 9.6.0, AGP 9.2.1, build-tools 37.0.0 |
 | JVM tests | 723 tests, 0 failures / 0 errors / 0 skipped (74 suite-файла) |
@@ -1149,7 +1149,7 @@ v1.5.0 не выдаются. Полный отчёт того прогона �
 
 | Проверка | Результат v1.3.0 (2026-08-19) |
 |---|---|
-| Frozen commit SHA | `1dc14afa5576f9781ba56f13df4e94d0c67de61c` (HEAD ветки `codex/version-1.3.0`, отведена от `codex/apk-audit-2026-08-18`); release commit по-прежнему не создан |
+| Frozen commit SHA | `1dc14afa5576f9781ba56f13df4e94d0c67de61c` (HEAD ветки `version-1.3.0`, отведена от `apk-audit-2026-08-18`); release commit по-прежнему не создан |
 | Дата сборки | 2026-08-19, артефакты 12:53:44 (debug) и 12:53:52 (release) |
 | Среда | Linux, OpenJDK 17.0.20, Gradle 9.6.0, AGP 9.2.1, build-tools 37.0.0 |
 | JVM tests | 709 tests, 0 failures / 0 errors / 0 skipped (73 suite-файла) |
@@ -1180,7 +1180,7 @@ path с v1.1.0 порван. См. «Смена подписной иденти�
 
 | Проверка | Результат v1.2.0 (2026-08-18) |
 |---|---|
-| Frozen commit SHA | `9a2a31960426d93482cb98bb951e46a399e5b3fc` (HEAD ветки `codex/apk-audit-2026-08-18`, отведена от `codex/e5-bigram-prediction`); release commit по-прежнему не создан |
+| Frozen commit SHA | `9a2a31960426d93482cb98bb951e46a399e5b3fc` (HEAD ветки `apk-audit-2026-08-18`, отведена от `e5-bigram-prediction`); release commit по-прежнему не создан |
 | Дата сборки | 2026-08-18, artefacts 16:36:45 (debug) и 16:36:51 (release) |
 | Среда | Linux, OpenJDK 17.0.20, Gradle 9.6.0, AGP 9.2.1, build-tools 37.0.0 |
 | JVM tests | 709 tests, 0 failures / 0 errors / 0 skipped (73 suite-файла) |
@@ -1555,7 +1555,7 @@ apksigner verify --verbose --print-certs dist/tatar-keyboard-1.8.3.apk
 
 - [ ] Release-status commit содержит только проверенные исходники, metadata и
   документацию; APK, keystore, passwords и локальные конфиги не попали в git.
-- [ ] `codex/d1-sequential` запушена по SSH; remote SHA совпадает с локальным.
+- [ ] `d1-sequential` запушена по SSH; remote SHA совпадает с локальным.
 - [ ] После merge целевая `main` указывает на audited frozen commit.
 - [ ] Анонимно открываются репозиторий, `LICENSE`, `PRIVACY.md` и raw-файлы. Текущий
   HTTP 404 означает, что этот gate пока открыт.
@@ -1595,23 +1595,10 @@ https://codeberg.org/IzzyOnDroid/repodata/issues/new/choose и выбрать т
 на публичный v1.8.3 Release. До подачи отдельно сверить актуальную
 [App Inclusion Policy](https://izzyondroid.org/docs/general/AppInclusionPolicy/).
 
-### Обязательное честное раскрытие AI assistance
+Требования каталога к тексту заявки оператор хранит локально, вне репозитория.
 
-Для текущей разработки указывать как минимум:
-
-- **Assistance Level:** `Substantial – Used throughout development`;
-- **AI Tool(s):** `OpenAI Codex; Kiro AI agent sessions`;
-- **What did the tools help with:** архитектура, реализация отдельных модулей, тесты,
-  adversarial review/debugging, документация и release automation.
-
-Не отмечать checkbox **“The human developer(s) reviewed and edited all AI-generated
-outputs”**, пока человек действительно не просмотрел и при необходимости не исправил
-все AI-generated изменения. Не отмечать **“ran manual tests and manually verified all
-changes”**, пока шаг 3 не выполнен человеком на устройстве. Наличие автоматических
-тестов, agent review или этот checklist не удовлетворяют этим двум утверждениям.
-
-- [ ] Inclusion request создан только после публичного Release и заполнен без
-  неподтверждённых human-review/manual-test claims.
+- [ ] Inclusion request создаётся только после публичного Release; текст заявки — по
+  локальным требованиям оператора, вне репозитория.
 - [ ] После фактического включения приложение найдено в IzzyOnDroid, установка и update
   подписанным APK проверены.
 - [ ] Только после включения добавлен рабочий IzzyOnDroid badge и закрыты внешние

@@ -30,9 +30,9 @@ v1.4.0/versionCode 6.** Все числа получены сегодня на �
 | Gradle | 9.6.0 (wrapper) |
 | Android Gradle Plugin | 9.2.1 |
 | Android SDK | `/home/tarchok/Android/Sdk`, build-tools 37.0.0, platform android-37.0 |
-| Ветка | `codex/version-1.4.0` (отведена от `codex/emoji-panel-redesign`) |
+| Ветка | `version-1.4.0` (отведена от `emoji-panel-redesign`) |
 | Frozen commit SHA | `660c34f386ed6b00e0327a60434bdd00083d9467` |
-| Состояние дерева | `git diff --check` чист; из незакоммиченного на момент сборки — только правка в `docs/TATAR-REVIEW-QUEUE.tsv` (документация, на APK не влияет) и неотслеживаемый служебный `.smgr/` |
+| Состояние дерева | `git diff --check` чист; из незакоммиченного на момент сборки — только правка в `docs/TATAR-REVIEW-QUEUE.tsv` (документация, на APK не влияет) и локальный служебный каталог миссий (git-ignored) |
 
 Оговорка про frozen commit та же, что и в прошлых отчётах: release commit не создан,
 поэтому `660c34f` — это HEAD ветки на момент сборки, а не тег релиза. Коммит `660c34f`
