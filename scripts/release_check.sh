@@ -115,7 +115,11 @@ APKSIGNER=$(resolve_tool apksigner)
 echo "== release_check: кандидат и гейты =="
 
 if [ "$FULL" -eq 1 ]; then
-    if run_logged "$LOG_DIR/assemble-release.log" ./gradlew clean assembleRelease --console=plain; then
+    # `gradlew clean` стирает корневой build/ вместе с LOG_DIR, поэтому чистим отдельно
+    # и пересоздаём каталог логов перед сборкой (та же осторожность, что в release_pack.sh).
+    ./gradlew clean --console=plain >/dev/null 2>&1
+    mkdir -p "$LOG_DIR"
+    if run_logged "$LOG_DIR/assemble-release.log" ./gradlew assembleRelease --console=plain; then
         report PASS build.assemble_release "clean assembleRelease, лог $LOG_DIR/assemble-release.log"
     else
         report FAIL build.assemble_release "сборка упала, лог $LOG_DIR/assemble-release.log"
